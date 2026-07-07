@@ -1,0 +1,31 @@
+{
+  "name": "doc77",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Doc77 CLI — 命令行入口与集成",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "doc77": "./dist/bin/doc77.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@doc77/core": "workspace:*",
+    "@doc77/mcp": "workspace:*",
+    "@doc77/ai": "workspace:*"
+  }
+}

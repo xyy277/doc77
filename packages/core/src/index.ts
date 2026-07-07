@@ -1,0 +1,42 @@
+/**
+ * @doc77/core — Doc77 核心引擎
+ *
+ * 提供数据库、文件系统抽象层、预览引擎和 Express Server。
+ */
+
+export const VERSION = '0.1.0';
+
+// Database
+export { initDatabase, getConnection, closeConnection } from './db/connection.js';
+export { runMigrations } from './db/migrations.js';
+export { getConfig, setConfig, listConfig, loadDefaults } from './db/config.js';
+export { registerProject, listProjects, removeProject, updateProject } from './db/projects.js';
+export type { Project, ProjectUpdate } from './db/projects.js';
+
+// File System
+export {
+  readFile,
+  statFile,
+  listDir,
+  isSensitiveFile,
+  validatePath,
+  resolveProjectPath,
+} from './fs/index.js';
+export type { DirEntry } from './fs/index.js';
+
+// Scanner
+export { scanDirectory, clearCache } from './scanner/index.js';
+export type { ScanResult } from './scanner/index.js';
+
+// Server
+export { createApp } from './server/app.js';
+
+// Renderers
+export {
+  renderMarkdown,
+  renderMermaid,
+  renderPdf,
+  renderImage,
+  renderCode,
+  getRendererForFile,
+} from './renderers/index.js';
