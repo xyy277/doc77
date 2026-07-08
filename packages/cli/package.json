@@ -1,11 +1,23 @@
 {
-  "name": "doc77",
+  "name": "@doc77/cli",
   "version": "0.1.0",
   "description": "Doc77 CLI — 默认安全、对话驱动的智能本地文档管理 Agent",
   "license": "MIT",
-  "repository": "github:xyy277/doc77",
-  "keywords": ["doc77", "document", "manager", "mcp", "cli", "agent"],
-  "files": ["dist"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xyy277/doc77.git"
+  },
+  "keywords": [
+    "doc77",
+    "document",
+    "manager",
+    "mcp",
+    "cli",
+    "agent"
+  ],
+  "files": [
+    "dist"
+  ],
   "preferGlobal": true,
   "type": "module",
   "main": "./dist/index.cjs",
@@ -19,7 +31,7 @@
     }
   },
   "bin": {
-    "doc77": "./dist/bin/doc77.js"
+    "doc77": "dist/bin/doc77.js"
   },
   "scripts": {
     "build": "tsup",
@@ -31,5 +43,8 @@
     "@doc77/core": "workspace:*",
     "@doc77/mcp": "workspace:*",
     "@doc77/ai": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
