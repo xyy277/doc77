@@ -37,7 +37,7 @@ export class StatementCompat {
       const idStmt = this._db.prepare('SELECT last_insert_rowid() as id');
       if (idStmt.step()) lastInsertRowid = idStmt.getAsObject().id as number;
       idStmt.free();
-      changes = 1;
+      changes = this._db.getRowsModified();
     } else if (/^\s*(UPDATE|DELETE)\b/i.test(this._sql.trim())) {
       changes = this._db.getRowsModified();
     }
@@ -120,31 +120,37 @@ export class DatabaseCompat {
 // ── Exported API ───────────────────────────────────────
 
 let sqlModule: SqlJsStatic | null = null;
+let initPromise: Promise<DatabaseCompat> | null = null;
 
 /**
  * Initialize the database.
  * On first call, loads sql.js WASM (async).
  * Subsequent calls with same path reuse existing connection.
+ * Uses a promise guard to prevent race conditions.
  */
 export async function initDatabase(filePath: string): Promise<DatabaseCompat> {
   if (rawDb && wrappedDb) return wrappedDb;
+  if (initPromise) return initPromise;
 
-  // Load WASM once
-  if (!sqlModule) {
-    sqlModule = await initSqlJs();
-  }
+  initPromise = (async () => {
+    if (!sqlModule) {
+      sqlModule = await initSqlJs();
+    }
 
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  let buffer: Buffer | undefined;
-  if (fs.existsSync(filePath)) buffer = fs.readFileSync(filePath);
+    let buffer: Buffer | undefined;
+    if (fs.existsSync(filePath)) buffer = fs.readFileSync(filePath);
 
-  rawDb = new sqlModule.Database(buffer);
-  dbPath = filePath;
-  rawDb.run('PRAGMA foreign_keys = ON');
-  wrappedDb = new DatabaseCompat(rawDb);
-  return wrappedDb;
+    rawDb = new sqlModule.Database(buffer);
+    dbPath = filePath;
+    rawDb.run('PRAGMA foreign_keys = ON');
+    wrappedDb = new DatabaseCompat(rawDb);
+    return wrappedDb;
+  })();
+
+  return initPromise;
 }
 
 /** Get current connection (must call initDatabase first). */
@@ -162,5 +168,6 @@ export function closeConnection(): void {
     rawDb = null;
     wrappedDb = null;
     dbPath = null;
+    initPromise = null;
   }
 }

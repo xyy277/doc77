@@ -53,19 +53,19 @@ export function createApp() {
   // Health check
   app.get('/api/health', (_req: Request, res: Response) => {
     let dbStatus = 'connected';
+    let activeLocks = 0;
+    let sessionCount = 0;
     try {
-      getConnection();
+      const db = getConnection();
+      activeLocks = (
+        db.prepare('SELECT COUNT(*) as count FROM project_locks').get() as { count: number }
+      ).count;
+      sessionCount = (
+        db.prepare('SELECT COUNT(*) as count FROM sessions').get() as { count: number }
+      ).count;
     } catch {
       dbStatus = 'disconnected';
     }
-
-    const db = getConnection();
-    const activeLocks = (
-      db.prepare('SELECT COUNT(*) as count FROM project_locks').get() as { count: number }
-    ).count;
-    const sessionCount = (
-      db.prepare('SELECT COUNT(*) as count FROM sessions').get() as { count: number }
-    ).count;
 
     res.json({
       status: 'ok',

@@ -25,6 +25,7 @@ const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
 async function init() {
   await initDatabase(DB_PATH);
   runMigrations();
+  loadDefaults();
 }
 
 function printHelp() {
@@ -87,8 +88,7 @@ async function main() {
   await init();
   const command = args[0];
 
-  try {
-    switch (command) {
+  switch (command) {
       case 'start': {
         const portIdx = args.indexOf('--port');
         const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 3099;
@@ -142,6 +142,7 @@ async function main() {
         const resolved = resolveProjectPath(dirPath);
         const proj = registerProject(name, resolved);
         console.log(`Registered: [${proj.id}] ${proj.name} (${proj.path})`);
+        closeConnection();
         break;
       }
 
@@ -159,6 +160,7 @@ async function main() {
             }
           }
         }
+        closeConnection();
         break;
       }
 
@@ -170,6 +172,7 @@ async function main() {
         }
         removeProject(id);
         console.log(`Project ${id} removed.`);
+        closeConnection();
         break;
       }
 
@@ -179,7 +182,7 @@ async function main() {
         const pathIdx = args.indexOf('--path');
         const updates: { name?: string; path?: string } = {};
         if (nameIdx !== -1) updates.name = args[nameIdx + 1];
-        if (pathIdx !== -1) updates.path = path.resolve(args[pathIdx + 1]);
+        if (pathIdx !== -1) updates.path = resolveProjectPath(args[pathIdx + 1]);
 
         if (isNaN(id) || Object.keys(updates).length === 0) {
           console.error('Usage: doc77 update <id> [--name <n>] [--path <p>]');
@@ -187,6 +190,7 @@ async function main() {
         }
         updateProject(id, updates);
         console.log(`Project ${id} updated.`);
+        closeConnection();
         break;
       }
 
@@ -289,6 +293,7 @@ async function main() {
         console.log(`Doc77 v${VERSION}`);
         console.log(`DB: ${DB_PATH}`);
         console.log(`Projects: ${listProjects().length} registered`);
+        closeConnection();
         break;
 
       case 'mcp': {
@@ -324,9 +329,6 @@ async function main() {
         console.error('Run doc77 --help for usage.');
         process.exit(1);
     }
-  } finally {
-    closeConnection();
-  }
 }
 
 main().catch((err) => {

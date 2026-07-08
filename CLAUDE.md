@@ -36,6 +36,64 @@
 3. 结构化内容（表格、列表）中的术语使用英文，描述性文字使用中文
 4. 标题可根据内容性质使用中英混合
 
+## 隐私与安全规范
+
+**严禁将包含隐私数据的文件提交到 Git 仓库。** 以下文件一律默认保留在本地，不得 `git add`、`git commit` 或 `git push`：
+
+- 包含 token、API key、secret、password、access_key、private key 等认证凭据的任何文件
+- 环境变量文件：`.env`、`.env.local`、`.env.development`、`.env.production` 等（`.env.example` 模板文件除外）
+- 证书与密钥：`*.pem`、`*.key`、`*.pfx`、`*.p12`、`*.cert`、`*.crt`
+- 任何 OAuth、AWS、GitHub token 等第三方服务凭据
+
+### 原则
+
+1. **默认本地** — 不确定是否包含敏感数据时，默认不提交
+2. **模板替代** — 如需共享配置结构，提供 `.example` 模板文件（值用占位符）
+3. **提交前检查** — 每次 `git add` 前确认文件内容不包含 token / secret / password 等关键字
+4. **误提交处理** — 若不慎提交，立即回滚并轮换所有泄露的凭据
+
+### 历史记录清理（隐私数据已入 Git 历史时）
+
+**优先级：先轮换凭据，再清理历史。** 清理 Git 历史不能让已泄露的 token 失效，必须先在服务端 revoke / rotate 所有暴露的凭据。
+
+#### 推荐方案：`git filter-repo`
+
+```bash
+pip install git-filter-repo
+
+# 删除某个文件的所有历史记录
+git filter-repo --path .env --invert-paths
+
+# 替换历史中的敏感字符串
+git filter-repo --replace-text <(echo 'sk-abc123xxx==>***REDACTED***')
+```
+
+#### 备选方案
+
+| 工具 | 说明 |
+|---|---|
+| `git filter-repo`（推荐） | Python 工具，速度快，安全校验 |
+| BFG Repo-Cleaner | Java 工具，比 `filter-branch` 快 |
+| `git filter-branch` | Git 内置，但慢且容易出错 |
+
+#### 清理后操作
+
+```bash
+# 1. 强制推送
+git push origin --force --all
+git push origin --force --tags
+
+# 2. 清理本地引用
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+```
+
+#### 协作者须知
+
+所有 clone 过仓库的人必须**删除本地副本后重新 clone**（不能 `git pull`），否则后续推送可能将敏感数据重新引入。
+
+> GitHub 会将 force-push 前的旧 commits 在 `https://github.com/<org>/<repo>/security/secret-alerts` 中保留。推送清理后，联系 GitHub Support 请求清除缓存。
+
 ## 项目概述
 
 Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。

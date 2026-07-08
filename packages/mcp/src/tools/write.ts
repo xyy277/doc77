@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
-import { getConnection } from '@doc77/core';
 import { checkPathAccess } from '../security/guard.js';
+import { enqueueOperation as enqueue } from '../queue/index.js';
+import type { QueuedTask } from '../queue/index.js';
 
 /**
  * Task returned by write operations.
@@ -12,28 +12,13 @@ export interface WriteTask {
   details?: Record<string, unknown>;
 }
 
-/**
- * Enqueue a write operation for approval.
- */
-function enqueueOperation(
-  projectId: number,
-  sessionId: string,
-  opType: string,
-  opData: Record<string, unknown>,
-): WriteTask {
-  const db = getConnection();
-  const taskId = `task_${Date.now()}_${randomUUID().slice(0, 8)}`;
-
-  db.prepare(
-    `INSERT INTO operation_queue (project_id, session_id, operation_type, operation_data, status)
-     VALUES (?, ?, ?, ?, 'pending')`,
-  ).run(projectId, sessionId, opType, JSON.stringify(opData));
-
+/** Convert QueuedTask from queue module to WriteTask */
+function toWriteTask(q: QueuedTask, opType: string): WriteTask {
   return {
-    task_id: taskId,
+    task_id: q.task_id,
     status: 'pending_approval',
     message: `Operation "${opType}" queued for approval.`,
-    details: { project_id: projectId, operation_type: opType, ...opData },
+    details: { project_id: q.project_id, operation_type: opType, ...q.operation_data },
   };
 }
 
@@ -41,70 +26,35 @@ function enqueueOperation(
  * write_file — create or overwrite a file.
  */
 export async function writeFile(
-  projectId: number,
-  sessionId: string,
-  filePath: string,
-  content: string,
+  projectId: number, sessionId: string, filePath: string, content: string,
 ): Promise<WriteTask> {
   const access = checkPathAccess(projectId, filePath);
   if (!access.allowed) throw new Error(access.reason);
-
-  return enqueueOperation(projectId, sessionId, 'write_file', {
-    file_path: filePath,
-    content_length: content.length,
-  });
+  return toWriteTask(enqueue(projectId, sessionId, 'write_file', { file_path: filePath, content_length: content.length }), 'write_file');
 }
 
-/**
- * create_folder — create a new directory.
- */
 export async function createFolder(
-  projectId: number,
-  sessionId: string,
-  folderPath: string,
+  projectId: number, sessionId: string, folderPath: string,
 ): Promise<WriteTask> {
   const access = checkPathAccess(projectId, folderPath);
   if (!access.allowed) throw new Error(access.reason);
-
-  return enqueueOperation(projectId, sessionId, 'create_folder', {
-    folder_path: folderPath,
-  });
+  return toWriteTask(enqueue(projectId, sessionId, 'create_folder', { folder_path: folderPath }), 'create_folder');
 }
 
-/**
- * move_file — move or rename a file.
- */
 export async function moveFile(
-  projectId: number,
-  sessionId: string,
-  source: string,
-  target: string,
+  projectId: number, sessionId: string, source: string, target: string,
 ): Promise<WriteTask> {
-  const srcAccess = checkPathAccess(projectId, source);
-  if (!srcAccess.allowed) throw new Error(srcAccess.reason);
-  const tgtAccess = checkPathAccess(projectId, target);
-  if (!tgtAccess.allowed) throw new Error(tgtAccess.reason);
-
-  return enqueueOperation(projectId, sessionId, 'move_file', {
-    source,
-    target,
-  });
+  if (!checkPathAccess(projectId, source).allowed) throw new Error(checkPathAccess(projectId, source).reason);
+  if (!checkPathAccess(projectId, target).allowed) throw new Error(checkPathAccess(projectId, target).reason);
+  return toWriteTask(enqueue(projectId, sessionId, 'move_file', { source, target }), 'move_file');
 }
 
-/**
- * delete_file — delete a file or empty folder.
- */
 export async function deleteFile(
-  projectId: number,
-  sessionId: string,
-  filePath: string,
+  projectId: number, sessionId: string, filePath: string,
 ): Promise<WriteTask> {
   const access = checkPathAccess(projectId, filePath);
   if (!access.allowed) throw new Error(access.reason);
-
-  return enqueueOperation(projectId, sessionId, 'delete_file', {
-    file_path: filePath,
-  });
+  return toWriteTask(enqueue(projectId, sessionId, 'delete_file', { file_path: filePath }), 'delete_file');
 }
 
 /**

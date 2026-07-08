@@ -1,6 +1,6 @@
 {
   "name": "@doc77/mcp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Doc77 MCP 服务层 — MCP 协议实现、安全校验、操作队列、事务系统",
   "license": "MIT",
   "repository": {
@@ -37,7 +37,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@doc77/core": "^0.2.0",
+    "@doc77/core": "^0.2.2",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^4.4.0"
   }
