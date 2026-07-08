@@ -1,8 +1,12 @@
 {
   "name": "@doc77/core",
   "version": "0.1.0",
-  "private": true,
   "description": "Doc77 核心引擎 — 数据库、文件系统抽象层、预览引擎、Express Server",
+  "license": "MIT",
+  "repository": "github:xyy277/doc77",
+  "keywords": ["doc77", "document", "manager", "mcp", "preview"],
+  "publishConfig": { "access": "public" },
+  "files": ["dist"],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

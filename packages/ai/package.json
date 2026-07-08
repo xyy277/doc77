@@ -1,8 +1,12 @@
 {
   "name": "@doc77/ai",
   "version": "0.1.0",
-  "private": true,
   "description": "Doc77 AI 模块 — AI Provider 抽象、Agent 核心、对话 API",
+  "license": "MIT",
+  "repository": "github:xyy277/doc77",
+  "keywords": ["doc77", "ai", "agent", "openai", "chat"],
+  "publishConfig": { "access": "public" },
+  "files": ["dist"],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
