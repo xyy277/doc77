@@ -29,15 +29,15 @@ describe('Express Server', () => {
   let testDir: string;
   let dbPath: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-server-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {

@@ -11,7 +11,7 @@ describe('Project CRUD', () => {
   let dbPath: string;
   let projectDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-proj-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
@@ -21,11 +21,11 @@ describe('Project CRUD', () => {
     fs.mkdirSync(projectDir, { recursive: true });
     fs.writeFileSync(path.join(projectDir, 'README.md'), '# Test');
 
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {

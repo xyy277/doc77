@@ -7,10 +7,21 @@
 export const VERSION = '0.1.0';
 
 // Database
-export { initDatabase, getConnection, closeConnection } from './db/connection.js';
+export {
+  initDatabase,
+  getConnection,
+  closeConnection,
+  DatabaseCompat,
+  StatementCompat,
+} from './db/connection.js';
 export { runMigrations } from './db/migrations.js';
 export { getConfig, setConfig, listConfig, loadDefaults } from './db/config.js';
-export { registerProject, listProjects, removeProject, updateProject } from './db/projects.js';
+export {
+  registerProject,
+  listProjects,
+  removeProject,
+  updateProject,
+} from './db/projects.js';
 export type { Project, ProjectUpdate } from './db/projects.js';
 
 // File System

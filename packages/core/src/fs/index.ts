@@ -135,12 +135,11 @@ export function validatePath(projectRoot: string, requestedPath: string): string
 /**
  * Resolve a user-provided project path to an absolute, normalized path.
  *
- * Handles:
- * - `~` expansion (e.g., `~/work/docs` → `/home/user/work/docs`)
- * - Windows path on WSL (e.g., `D:\\agent\\kit` → `/mnt/d/agent/kit`)
- * - Relative paths (e.g., `./my-project` → `/cwd/my-project`)
- *
- * Throws if the resolved path does not exist.
+ * Platform-aware logic:
+ * - Native Windows:   keeps Windows paths (D:\\foo), expands ~ to %USERPROFILE%
+ * - WSL (Linux+microsoft kernel): converts Windows paths → /mnt/d/... via wslpath
+ * - Native Linux/macOS: expands ~ to $HOME, rejects Windows paths with a clear error
+ * - Relative paths are resolved against cwd
  */
 export function resolveProjectPath(rawPath: string): string {
   let resolved = rawPath;
@@ -150,19 +149,42 @@ export function resolveProjectPath(rawPath: string): string {
     resolved = path.join(os.homedir(), resolved.slice(1));
   }
 
-  // 2. Detect Windows-style absolute paths (e.g., D:\... or C:/...)
-  //    and try to convert via wslpath if available
-  if (/^[A-Za-z]:[/\\]/.test(resolved)) {
-    const wslPath = tryWslPath(resolved);
-    if (wslPath) {
-      resolved = wslPath;
-    }
+  const isWinPath = /^[A-Za-z]:[/\\]/.test(resolved);
+
+  // 2. Native Windows — keep Windows paths as-is
+  if (process.platform === 'win32') {
+    return path.resolve(resolved);
   }
 
-  // 3. Resolve to absolute path
-  resolved = path.resolve(resolved);
+  // 3. WSL environment — convert Windows paths to Linux mount points
+  if (isWinPath && isWsl()) {
+    const converted = tryWslPath(resolved);
+    if (converted) return converted;
+    // wslpath failed but we're in WSL — fall through to resolve
+  }
 
-  return resolved;
+  // 4. Native Linux/macOS with a Windows path — error
+  if (isWinPath && !isWsl()) {
+    throw new Error(
+      `Windows path "${rawPath}" is not valid on ${process.platform}. ` +
+      'Use a Linux path (e.g., /home/user/docs) or run inside WSL for Windows paths.',
+    );
+  }
+
+  // 5. Standard Linux/macOS path
+  return path.resolve(resolved);
+}
+
+/**
+ * Check if the current process is running inside Windows Subsystem for Linux.
+ */
+function isWsl(): boolean {
+  try {
+    const content = fs.readFileSync('/proc/version', 'utf-8');
+    return content.toLowerCase().includes('microsoft') || content.toLowerCase().includes('wsl');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -175,12 +197,11 @@ function tryWslPath(windowsPath: string): string | null {
       encoding: 'utf-8',
       timeout: 3000,
     }).trim();
-    // Verify the result is a valid Linux path
     if (result.startsWith('/')) {
       return result;
     }
   } catch {
-    // wslpath not available, not on WSL, or conversion failed
+    // wslpath not available or conversion failed
   }
   return null;
 }

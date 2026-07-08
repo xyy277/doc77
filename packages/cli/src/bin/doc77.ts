@@ -22,8 +22,8 @@ import { getPendingTasks, getActiveLock, releaseProjectLock, updateTaskStatus } 
 const VERSION = '0.1.0';
 const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
 
-function init() {
-  initDatabase(DB_PATH);
+async function init() {
+  await initDatabase(DB_PATH);
   runMigrations();
 }
 
@@ -84,7 +84,7 @@ async function main() {
     return;
   }
 
-  init();
+  await init();
   const command = args[0];
 
   try {

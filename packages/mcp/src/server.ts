@@ -156,7 +156,7 @@ function registerWriteTools(server: McpServer): void {
           await import('./tools/write.js');
 
         // Generate a session ID for this operation
-        const { createSession } = await import('../session.js');
+        const { createSession } = await import('./session.js');
         const session = createSession();
         const sessionId = session.id;
 

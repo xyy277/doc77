@@ -1,12 +1,10 @@
-import Database from 'better-sqlite3';
-import { getConnection } from './connection.js';
+import { getConnection, type DatabaseCompat } from './connection.js';
 
 /**
  * Run all schema migrations.
  * Uses IF NOT EXISTS to ensure idempotency.
- * If no db instance is provided, uses the current connection.
  */
-export function runMigrations(db?: Database.Database): void {
+export function runMigrations(db?: DatabaseCompat): void {
   const conn = db ?? getConnection();
   conn.exec(SCHEMA_SQL);
 }

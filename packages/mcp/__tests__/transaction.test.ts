@@ -24,7 +24,7 @@ describe('Operation Queue', () => {
   let projectId: number;
   let sessionId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-tx-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
@@ -32,7 +32,7 @@ describe('Operation Queue', () => {
     fs.mkdirSync(projDir);
     fs.writeFileSync(path.join(projDir, 'test.txt'), 'hello');
 
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
     const proj = registerProject('TxTest', projDir);
     projectId = proj.id;
@@ -40,7 +40,7 @@ describe('Operation Queue', () => {
     sessionId = session.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {
@@ -108,7 +108,7 @@ describe('Pre-flight Check', () => {
   let projDir: string;
   let projectId: number;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-pf-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
@@ -116,12 +116,12 @@ describe('Pre-flight Check', () => {
     fs.mkdirSync(projDir);
     fs.writeFileSync(path.join(projDir, 'existing.txt'), 'data');
 
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
     projectId = registerProject('PfTest', projDir).id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {
@@ -155,12 +155,12 @@ describe('Pre-flight Check', () => {
 describe('safeMove', () => {
   let testDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-sm-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -204,16 +204,16 @@ describe('Project Lock', () => {
   let dbPath: string;
   let projectId: number;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-lock-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
     projectId = registerProject('LockTest', testDir).id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {
@@ -244,12 +244,12 @@ describe('Project Lock', () => {
 describe('Shadow Backup & Rollback', () => {
   let testDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-shadow-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -297,12 +297,12 @@ describe('Shadow Backup & Rollback', () => {
 describe('Volume Circuit Breaker', () => {
   let testDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-cb-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {
@@ -328,16 +328,16 @@ describe('Audit Log', () => {
   let dbPath: string;
   let projectId: number;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-audit-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
     projectId = registerProject('AuditTest', testDir).id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {
@@ -365,12 +365,12 @@ describe('Audit Log', () => {
 describe('Shadow GC', () => {
   let testDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-gc-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 

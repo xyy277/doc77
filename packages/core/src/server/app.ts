@@ -27,8 +27,11 @@ export function createApp() {
   // Parse JSON bodies
   app.use(express.json());
 
-  // Serve static files from the web directory
-  const webDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web');
+  // Serve static files — try dist/web (npm) first, then src/web (dev)
+  let webDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'web');
+  if (!fs.existsSync(webDir)) {
+    webDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web');
+  }
   if (fs.existsSync(webDir)) {
     app.use(express.static(webDir));
   }

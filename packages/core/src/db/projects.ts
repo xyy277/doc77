@@ -21,6 +21,9 @@ export function registerProject(name: string, projectPath: string): Project {
   const db = getConnection();
   const stmt = db.prepare(`INSERT INTO projects (name, path) VALUES (?, ?)`);
   const result = stmt.run(name, projectPath);
+  if (result.lastInsertRowid === 0) {
+    throw new Error(`Project path already exists: ${projectPath}`);
+  }
   return {
     id: Number(result.lastInsertRowid),
     name,
