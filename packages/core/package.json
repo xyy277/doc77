@@ -1,6 +1,6 @@
 {
   "name": "@doc77/core",
-  "version": "0.2.2",
+  "version": "0.2.5",
   "description": "Doc77 核心引擎 — 数据库、文件系统抽象层、预览引擎、Express Server",
   "license": "MIT",
   "repository": {
@@ -32,12 +32,13 @@
     }
   },
   "scripts": {
-    "build": "tsup && node -e \"require('fs').cpSync('src/web','dist/web',{recursive:true})\"",
+    "build": "tsup && node -e \"require('fs').cpSync('src/web','dist/web',{recursive:true})\" && node -e \"const fs=require('fs');const p=require('path');['index.html','preview.html'].forEach(f=>{const fp=p.join('dist/web',f);if(!fs.existsSync(fp)){console.error('ERROR: '+fp+' missing after build');process.exit(1)}});console.log('Build OK: web assets verified')\"",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "test": "vitest run"
   },
   "dependencies": {
+    "@doc77/ai": "workspace:*",
     "express": "^5.1.0",
     "marked": "^17.0.0",
     "pino": "^9.0.0",

@@ -79,6 +79,17 @@ CREATE TABLE IF NOT EXISTS sessions (
     expired_at DATETIME
 );
 
+-- 用户认证表
+CREATE TABLE IF NOT EXISTS user_auth (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    password_hash TEXT,
+    pbkdf2_salt TEXT,
+    encryption_salt TEXT,
+    failed_attempts INTEGER DEFAULT 0,
+    locked_until DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 项目锁表
 CREATE TABLE IF NOT EXISTS project_locks (
     project_id INTEGER PRIMARY KEY,

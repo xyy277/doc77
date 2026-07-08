@@ -6,6 +6,20 @@
 
 export const VERSION = '0.1.0';
 
+// Crypto
+export {
+  encrypt,
+  decrypt,
+  deriveKey,
+  generateSalt,
+  hashPassword,
+  verifyPassword,
+  checkPasswordStrength,
+  isSensitiveKey,
+  maskSensitive,
+} from './crypto.js';
+export type { EncryptedData } from './crypto.js';
+
 // Database
 export {
   initDatabase,
@@ -40,7 +54,7 @@ export { scanDirectory, clearCache } from './scanner/index.js';
 export type { ScanResult } from './scanner/index.js';
 
 // Server
-export { createApp } from './server/app.js';
+export { createApp, createQueueApproveHandler } from './server/app.js';
 
 // Renderers
 export {

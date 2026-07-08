@@ -32,7 +32,8 @@ config.local.*
 .DS_Store
 Thumbs.db
 ~/.doc77/
-scripts/publish.sh
 scripts/build-portable.sh
 scripts/start-test-server.ts
+*.tsbuildinfo
+*.tgz
 release/

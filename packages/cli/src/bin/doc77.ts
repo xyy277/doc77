@@ -13,6 +13,7 @@ import {
   listConfig,
   registerProject,
   resolveProjectPath,
+  loadDefaults,
   listProjects,
   removeProject,
   updateProject,
@@ -111,6 +112,11 @@ async function main() {
         }, 30 * 60 * 1000);
 
         const app = createApp();
+
+        // Register MCP-dependent routes (avoid circular dep in @doc77/core)
+        const { executeApprovedTasks } = await import('@doc77/mcp');
+        const { createQueueApproveHandler } = await import('@doc77/core');
+        app.post('/api/queue/approve', createQueueApproveHandler(executeApprovedTasks));
         const server = http.createServer(app);
         server.listen(port, () => {
           console.log(`Doc77 Dashboard: http://localhost:${port}`);

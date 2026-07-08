@@ -1,9 +1,10 @@
 packages:
   - "packages/*"
+linkWorkspacePackages: true
 allowBuilds:
   better-sqlite3: true
   esbuild: true
 minimumReleaseAgeExclude:
-  - '@doc77/ai@0.1.1'
-  - '@doc77/core@0.1.0'
-  - '@doc77/mcp@0.1.0 || 0.1.1'
+  - '@doc77/ai@0.1.1 || 0.1.4'
+  - '@doc77/core@0.1.0 || 0.2.2'
+  - '@doc77/mcp@0.1.0 || 0.1.1 || 0.1.5'
