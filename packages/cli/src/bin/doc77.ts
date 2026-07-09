@@ -106,13 +106,14 @@ async function setPasswordInteractive(): Promise<void> {
 }
 
 function printBanner() {
-  console.log(`
-  ╔══════════════════════════════════════╗
-  ║         Doc77                       ║
-  ║   默认安全 · 对话驱动                 ║
-  ║   智能本地文档管理 Agent              ║
-  ║                          v${VERSION}  ║
-  ╚══════════════════════════════════════╝`);
+  const padEnd = (s: string, w: number) => { let d = 0; for (const c of s) d += /[一-鿿　-〿＀-￯]/.test(c) ? 2 : 1; return s + ' '.repeat(w - d); };
+  // Inner width = 36 display columns
+  console.log('\n  ╔' + '═'.repeat(36) + '╗' +
+    '\n  ║  ' + padEnd('Doc77', 34) + '║' +
+    '\n  ║  ' + padEnd('默认安全 · 对话驱动', 34) + '║' +
+    '\n  ║  ' + padEnd('智能本地文档管理 Agent', 34) + '║' +
+    '\n  ║  ' + padEnd('v' + VERSION, 34) + '║' +
+    '\n  ╚' + '═'.repeat(36) + '╝');
 }
 
 function printHelp() {
