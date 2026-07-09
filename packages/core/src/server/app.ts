@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { exec, execFileSync } from 'node:child_process';
+import { exec, execFileSync, execSync } from 'node:child_process';
 import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
@@ -18,13 +18,16 @@ import {
   FORMAT_SIZE_LIMITS,
 } from '../renderers/index.js';
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
+import { isMobileRequest } from './mobile-detect.js';
 
 const VERSION = '0.1.0';
 
 /**
  * Create and configure the Express application.
+ * @param restartCallback — if provided, enables POST /api/restart endpoint
+ * @param bindAddr — actual runtime bind address (for /api/server-info)
  */
-export function createApp() {
+export function createApp(restartCallback?: () => void, bindAddr?: string) {
   const app = express();
 
   // --- Middleware ---
@@ -32,7 +35,7 @@ export function createApp() {
   // Parse JSON bodies
   app.use(express.json());
 
-  // Serve static files — try multiple paths for dev / npm / monorepo layouts
+  // === Resolve web directory (unchanged logic) ===
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const webCandidates = [
     path.join(moduleDir, 'web'),              // dist/web/ (npm publish layout)
@@ -46,21 +49,9 @@ export function createApp() {
       break;
     }
   }
-  if (webDir) {
-    app.use(express.static(webDir));
-  }
 
-  // Explicit GET / route — always mounted regardless of static file discovery
-  app.get('/', (_req: Request, res: Response) => {
-    if (webDir) {
-      const indexPath = path.join(webDir, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-        return;
-      }
-    }
-    // Ultimate fallback: inline HTML ensures the homepage never 404s
-    res.type('html').send(`<!DOCTYPE html>
+  // === Fallback HTML (extracted from original inline) ===
+  const fallbackHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doc77</title></head>
@@ -69,8 +60,68 @@ export function createApp() {
 <h1 style="color:#1e293b;font-size:2rem;margin-bottom:.5rem">📁 Doc77</h1>
 <p style="color:#64748b">Dashboard is running.</p>
 <p style="color:#94a3b8;font-size:14px">Run <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px">pnpm build</code> in the workspace root to rebuild the web assets.</p>
-</div></body></html>`);
+</div></body></html>`;
+
+  // === Device-aware HTML routes (must be before static middleware) ===
+
+  app.get('/', (_req: Request, res: Response) => {
+    if (!webDir) {
+      res.type('html').send(fallbackHtml);
+      return;
+    }
+    const useMobile = isMobileRequest(_req);
+    const target = path.join(webDir, useMobile ? 'mobile/index.html' : 'index.html');
+    if (fs.existsSync(target)) {
+      res.sendFile(target);
+      return;
+    }
+    // Graceful degradation: fall back to desktop if mobile HTML missing
+    if (useMobile) {
+      const desktopFallback = path.join(webDir, 'index.html');
+      if (fs.existsSync(desktopFallback)) {
+        res.sendFile(desktopFallback);
+        return;
+      }
+    }
+    res.type('html').send(fallbackHtml);
   });
+
+  app.get('/preview.html', (_req: Request, res: Response) => {
+    if (!webDir) {
+      res.status(404).type('html').send('<h1>Not Found</h1>');
+      return;
+    }
+    const useMobile = isMobileRequest(_req);
+    const target = path.join(webDir, useMobile ? 'mobile/preview.html' : 'preview.html');
+    if (fs.existsSync(target)) {
+      res.sendFile(target);
+      return;
+    }
+    if (useMobile) {
+      const desktopFallback = path.join(webDir, 'preview.html');
+      if (fs.existsSync(desktopFallback)) {
+        res.sendFile(desktopFallback);
+        return;
+      }
+    }
+    res.status(404).type('html').send('<h1>Not Found</h1>');
+  });
+
+  // === Static file serving (after explicit routes) ===
+
+  if (webDir) {
+    // /mobile/* → web/mobile/ files (conditional — no error if dir missing)
+    const mobileDir = path.join(webDir, 'mobile');
+    if (fs.existsSync(mobileDir)) {
+      app.use('/mobile', express.static(mobileDir));
+    }
+    // /* → desktop + shared assets (catch-all)
+    app.use(express.static(webDir));
+  }
+
+  // Serve vendor cache (offline CDN resources)
+  const vendorDir = path.join(require('node:os').homedir(), '.doc77', 'vendor');
+  app.use('/vendor', express.static(vendorDir, { fallthrough: true }));
 
   // CORS — allow all origins (localhost-only binding for security)
   app.use((_req: Request, res: Response, next: NextFunction) => {
@@ -85,6 +136,27 @@ export function createApp() {
   });
 
   // --- API Routes ---
+
+  // Server info — runtime state (actual bind address, not config)
+  app.get('/api/server-info', (_req: Request, res: Response) => {
+    const addr = bindAddr || '127.0.0.1';
+    const isLocal = addr === '127.0.0.1' || addr === '::1' || addr === 'localhost';
+    res.json({
+      bindAddress: addr,
+      isLocal,
+      port: 3099,
+      version: VERSION,
+    });
+  });
+
+  // Server restart (only when callback provided)
+  if (restartCallback) {
+    app.post('/api/restart', (_req: Request, res: Response) => {
+      res.json({ ok: true, message: 'Server restarting...' });
+      // Delay restart to allow response to be sent
+      setTimeout(() => restartCallback(), 500);
+    });
+  }
 
   // Health check
   app.get('/api/health', (_req: Request, res: Response) => {
@@ -171,6 +243,179 @@ export function createApp() {
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
     touchProject(id);
     res.json({ ok: true });
+  });
+
+  // Environment detection — tells frontend what strategies are available
+  app.get('/api/env', (_req: Request, res: Response) => {
+    let wsl = false;
+    try {
+      wsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
+    } catch {}
+    const hasDisplay = !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
+    res.json({
+      platform: process.platform,
+      wsl,
+      hasDisplay,
+      home: process.env.HOME || '/home',
+      username: process.env.USER || '',
+    });
+  });
+
+  // Fingerprint-based folder finder — matches a directory picked by the browser
+  // against the server's local filesystem
+  app.post('/api/find-folder', async (req: Request, res: Response) => {
+    const { folderName, fingerprint } = req.body as {
+      folderName?: string;
+      fingerprint?: Array<{ name: string; size: number; type: string }>;
+    };
+    if (!folderName || !fingerprint || fingerprint.length === 0) {
+      res.status(400).json({ error: 'folderName and fingerprint are required' });
+      return;
+    }
+
+    // Determine search roots — Linux home first (fast), then Windows mounts
+    const searchRoots: string[] = [];
+    const home = process.env.HOME || '/home';
+    searchRoots.push(home);
+    let isWsl = false;
+    try {
+      isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
+    } catch {}
+    if (isWsl) {
+      for (const drive of ['d', 'c', 'e']) {
+        try { if (fs.existsSync('/mnt/' + drive)) searchRoots.push('/mnt/' + drive); } catch {}
+      }
+      try {
+        const usersDir = '/mnt/c/Users';
+        for (const e of fs.readdirSync(usersDir, { withFileTypes: true })) {
+          if (e.isDirectory() && !e.isSymbolicLink() && !['Public', 'Default', 'Default User', 'All Users', 'WsiAccount'].includes(e.name) && !e.name.startsWith('.')) {
+            searchRoots.push(usersDir + '/' + e.name);
+          }
+        }
+      } catch {}
+    }
+
+    const matches: Array<{ path: string; score: number }> = [];
+    const deadline = Date.now() + 5000;
+
+    for (const root of searchRoots) {
+      if (Date.now() > deadline) break;
+      try {
+        const raw = (() => {
+          try {
+            return execSync(
+              `find "${root}" -maxdepth 4 -type d -name "${folderName}" 2>/dev/null; true`,
+              { timeout: 4000, encoding: 'utf-8', maxBuffer: 1024 * 1024 }
+            ).trim();
+          } catch (e: unknown) {
+            // execSync throws on non-zero exit, but stdout may still have results
+            const err = e as { stdout?: string; stderr?: string };
+            return (err.stdout || '').trim();
+          }
+        })();
+        const candidates = raw.split('\n').filter(Boolean);
+        for (const candidate of candidates) {
+          if (Date.now() > deadline) break;
+          try {
+            // Match all fingerprint entries (files + directories)
+            let matched = 0, checked = 0;
+            for (const fp of fingerprint) {
+              checked++;
+              try {
+                const fpPath = candidate + '/' + fp.name;
+                const st = fs.statSync(fpPath);
+                if (fp.type === 'directory' && st.isDirectory()) { matched++; }
+                else if (fp.type === 'file' && st.isFile()) {
+                  if (fp.size === 0 || st.size === fp.size || Math.abs(st.size - fp.size) < 10) matched++;
+                }
+              } catch {}
+            }
+            const score = checked > 0 ? matched / checked : 0;
+            if (score > 0) {
+              matches.push({ path: candidate, score });
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
+    // Sort by score descending, deduplicate
+    matches.sort((a, b) => b.score - a.score);
+    const seen = new Set<string>();
+    const unique = matches.filter(m => { if (seen.has(m.path)) return false; seen.add(m.path); return true; });
+
+    res.json({ matches: unique.slice(0, 5) });
+  });
+
+  // Server-side file browser — for remote access or when native dialog unavailable
+  app.get('/api/browse-fs', (req: Request, res: Response) => {
+    let dirPath = (req.query.path as string) || '/';
+    // Expand ~ and resolve
+    if (dirPath.startsWith('~')) {
+      dirPath = (process.env.HOME || '/home') + dirPath.slice(1);
+    }
+    dirPath = path.resolve(dirPath);
+
+    // Security: allow browsing / but filter out system directories
+    const BLOCKED_DIRS = new Set([
+      'etc', 'proc', 'sys', 'root', 'var', 'boot', 'dev', 'run', 'snap',
+      'bin', 'sbin', 'lib', 'lib64', 'usr', 'lost+found', '.dockerenv',
+    ]);
+    const SAFE_ROOTS = new Set(['/home', '/mnt', '/tmp', '/Users', '/Volumes', '/opt', '/media', '/srv']);
+    const isRoot = dirPath === '/';
+    const inSafe = SAFE_ROOTS.has(dirPath) || [...SAFE_ROOTS].some(r => dirPath.startsWith(r + '/'));
+    if (!isRoot && !inSafe) {
+      res.json({ path: dirPath, parent: null, roots: [...SAFE_ROOTS], entries: [], error: '此目录不在允许访问的范围内' });
+      return;
+    }
+
+    // Security: verify the path exists and is a directory
+    let entries: Array<{ name: string; type: string; size: number }> = [];
+    let error: string | undefined;
+    try {
+      const stat = fs.statSync(dirPath);
+      if (!stat.isDirectory()) {
+        error = 'Not a directory';
+      } else {
+        const raw = fs.readdirSync(dirPath, { withFileTypes: true });
+        entries = raw
+          .filter(e => !e.name.startsWith('.')) // hide dotfiles
+          .filter(e => !(isRoot && (BLOCKED_DIRS.has(e.name) || e.name.includes('usr-is-merged') || e.name === 'init')))
+          .map(e => ({
+            name: e.name,
+            type: e.isDirectory() ? 'directory' : 'file',
+            size: 0,
+          }))
+          .sort((a, b) => {
+            if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          })
+          .slice(0, 200); // cap entries
+      }
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : 'Access denied';
+    }
+
+    // Compute parent path
+    const parent = path.dirname(dirPath);
+    const hasParent = parent !== dirPath;
+
+    // Safe roots for initial view (no /etc, /proc, etc.)
+    const roots: string[] = [];
+    const home = process.env.HOME || '/home';
+    if (fs.existsSync(home)) roots.push(home);
+    try {
+      const isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
+      if (isWsl) {
+        for (const drive of ['d', 'c', 'e']) {
+          try { if (fs.existsSync('/mnt/' + drive)) roots.push('/mnt/' + drive); } catch {}
+        }
+      }
+    } catch {}
+    if (process.platform === 'darwin' && !roots.includes('/Users')) roots.push('/Users');
+    if (!roots.includes('/tmp')) roots.push('/tmp');
+
+    res.json({ path: dirPath, parent: hasParent ? parent : null, roots, entries, error });
   });
 
   // Native directory picker dialog

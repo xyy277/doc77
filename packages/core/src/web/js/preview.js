@@ -4,6 +4,44 @@
  *        Reading progress, Recent files, Bookmarks, Search, Outline, Chat, Queue
  */
 
+//══════════ Vendor (Offline CDN) ══════════
+// VENDOR_MAP: CDN URL patterns → local vendor filenames
+var VENDOR_MAP = {
+  'highlight.min.js': 'highlight.min.js',
+  'highlight.js/11.9.0/highlight.min.js': 'highlight.min.js',
+  'pdfjs-dist': 'pdf.min.mjs',
+  'pdf.worker.min.mjs': 'pdf.worker.min.mjs',
+  'xlsx.mini.min.js': 'xlsx.mini.min.js',
+  'mammoth.browser.min.js': 'mammoth.browser.min.js',
+  'pyodide': 'pyodide.js',
+};
+
+/**
+ * Resolve a URL: try local vendor cache first, fallback to original URL.
+ * @param {string} originalUrl - The CDN URL
+ * @param {string} [localName] - Optional explicit local filename
+ * @returns {string} The best available URL
+ */
+function vsrc(originalUrl, localName) {
+  if (!window.__VENDOR_READY) return originalUrl;
+  if (!localName) {
+    for (var key in VENDOR_MAP) {
+      if (originalUrl.indexOf(key) >= 0) { localName = VENDOR_MAP[key]; break; }
+    }
+  }
+  if (!localName) return originalUrl;
+  return '/vendor/' + localName;
+}
+
+/** Check vendor readiness asynchronously and call callback with boolean. */
+function vendorReady(cb) {
+  if (window.__VENDOR_READY) { cb(true); return; }
+  fetch('/vendor/.ready').then(function(r) {
+    window.__VENDOR_READY = r.ok;
+    cb(r.ok);
+  }).catch(function() { cb(false); });
+}
+
 //══════════ Data ══════════
 var pid = new URLSearchParams(location.search).get('id');
 if (!pid) location.href = '/';
@@ -268,7 +306,7 @@ function highlightCode() {
 }
 function loadHighlightJS() {
   var s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
+  s.src = vsrc('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js');
   s.onload = highlightCode;
   document.head.appendChild(s);
 }
@@ -633,10 +671,10 @@ var pdfLoading = false;
 function loadPdfJs(cb) {
   if (typeof pdfjsLib !== 'undefined') { cb(); return; }
   var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+  s.src = vsrc('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
   s.type = 'module';
   s.onload = function() {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = vsrc('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs');
     cb();
   };
   document.head.appendChild(s);
@@ -763,7 +801,7 @@ function renderXlsx(d) {
   var area = document.getElementById('contentArea');
   if (typeof XLSX === 'undefined') {
     var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.mini.min.js';
+    s.src = vsrc('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.mini.min.js');
     s.onload = function(){ renderXlsx(d); };
     document.head.appendChild(s);
     area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载 XLSX 查看器...</div></div>';
@@ -797,7 +835,7 @@ function switchXlsxSheet(name) {
 function loadMammoth(cb) {
   if (typeof mammoth !== 'undefined') { cb(); return; }
   var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
+  s.src = vsrc('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
   s.onload = cb;
   document.head.appendChild(s);
 }
@@ -949,7 +987,7 @@ function initPyodide(cb) {
   if (window._pyodide) { cb(window._pyodide); return; }
   var outEl = document.getElementById('codeOutputText');
   if (outEl) outEl.textContent = '正在加载 Python 运行时 (Pyodide ~12MB, 首次加载较慢)...';
-  var pyodideUrl = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/';
+  var pyodideUrl = window.__VENDOR_READY ? '/vendor/' : 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/';
 
   // Check if the Pyodide CDN has already loaded its global init function
   if (typeof window.loadPyodide === 'function') {

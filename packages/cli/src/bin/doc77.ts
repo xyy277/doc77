@@ -3,10 +3,13 @@
  * Doc77 CLI — 命令行入口
  */
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
+import * as readline from 'node:readline';
 import {
   initDatabase,
   closeConnection,
+  getConnection,
   runMigrations,
   getConfig,
   setConfig,
@@ -27,6 +30,63 @@ async function init() {
   await initDatabase(DB_PATH);
   runMigrations();
   loadDefaults();
+}
+
+/** Read a password from stdin without echoing. */
+function askPassword(prompt: string = '请输入密码（至少6位）'): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    // Use stdin raw mode to hide echo (not perfect but works)
+    const stdin = process.stdin;
+    if (stdin.isTTY) stdin.setRawMode(true);
+    let password = '';
+    process.stdout.write(prompt + ': ');
+    stdin.on('data', (chunk: Buffer) => {
+      const char = chunk.toString();
+      if (char === '\r' || char === '\n') {
+        stdin.setRawMode(false);
+        process.stdout.write('\n');
+        rl.close();
+        stdin.removeAllListeners('data');
+        resolve(password);
+        return;
+      }
+      if (char === '') { // Ctrl+C
+        process.exit(1);
+      }
+      if (char === '') { // Backspace
+        if (password.length > 0) {
+          password = password.slice(0, -1);
+          process.stdout.write('\b \b');
+        }
+        return;
+      }
+      password += char;
+      process.stdout.write('*');
+    });
+  });
+}
+
+/** Set password via CLI command. */
+async function setPasswordInteractive(): Promise<void> {
+  const pwd = await askPassword('请输入新密码（至少6位）');
+  if (pwd.length < 6) {
+    console.error('❌ 密码至少6位');
+    process.exit(1);
+  }
+  const confirm = await askPassword('请再次输入密码');
+  if (pwd !== confirm) {
+    console.error('❌ 两次密码不一致');
+    process.exit(1);
+  }
+  const { hashPassword, generateSalt } = await import('@doc77/core');
+  const hash = hashPassword(pwd);
+  const encSalt = generateSalt();
+  const pbkdf2Salt = generateSalt();
+  getConnection()
+    .prepare('INSERT OR REPLACE INTO user_auth (id, password_hash, pbkdf2_salt, encryption_salt) VALUES (1, ?, ?, ?)')
+    .run(hash, pbkdf2Salt, encSalt);
+  console.log('✅ 密码已设置');
 }
 
 function printHelp() {
@@ -93,8 +153,11 @@ async function main() {
       case 'start': {
         const portIdx = args.indexOf('--port');
         const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 3099;
+        const bindIdx = args.indexOf('--bind');
+        const cliBind = bindIdx !== -1 ? args[bindIdx + 1] : undefined;
 
         const { createApp } = await import('@doc77/core');
+        const { spawn } = await import('node:child_process');
         const http = await import('node:http');
 
         // Startup maintenance
@@ -111,7 +174,18 @@ async function main() {
           rejectExpiredTasks();
         }, 30 * 60 * 1000);
 
-        const app = createApp();
+        // Bind address priority: CLI --bind > DB config > default 127.0.0.1
+        const isLocalAddr = (a: string) => a === '127.0.0.1' || a === 'localhost' || a === '::1';
+        const bindAddr = cliBind || getConfig('security.bind_address') || '127.0.0.1';
+
+        // Restart callback: spawn new process with same args, then exit
+        const restartServer = () => {
+          const argv = process.argv.slice(1); // skip node binary
+          const child = spawn(process.execPath, argv, { detached: true, stdio: 'inherit' });
+          child.unref();
+          process.exit(0);
+        };
+        const app = createApp(restartServer, bindAddr);
 
         // Register MCP-dependent routes (avoid circular dep in @doc77/core)
         const { executeApprovedTasks } = await import('@doc77/mcp');
@@ -124,8 +198,44 @@ async function main() {
         app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, READ_TOOLS }));
 
         const server = http.createServer(app);
-        server.listen(port, () => {
-          console.log(`Doc77 Dashboard: http://localhost:${port}`);
+
+        // Security: non-localhost binding requires password authentication
+        if (!isLocalAddr(bindAddr)) {
+          const authRow = getConnection()
+            .prepare('SELECT password_hash FROM user_auth WHERE id = 1')
+            .get() as { password_hash: string } | undefined;
+          if (!authRow?.password_hash) {
+            console.log(`\n⚠️  绑定 ${bindAddr} 会将 Doc77 暴露到网络，需要设置访问密码。`);
+            // Try interactive password setup
+            if (process.stdin.isTTY) {
+              const pwd = await askPassword();
+              if (pwd) {
+                const { hashPassword, generateSalt } = await import('@doc77/core');
+                const hash = hashPassword(pwd);
+                const encSalt = generateSalt();
+                const pbkdf2Salt = generateSalt();
+                getConnection()
+                  .prepare('INSERT OR REPLACE INTO user_auth (id, password_hash, pbkdf2_salt, encryption_salt) VALUES (1, ?, ?, ?)')
+                  .run(hash, pbkdf2Salt, encSalt);
+                console.log('✅ 密码已设置\n');
+              } else {
+                console.error('❌ 密码设置失败，启动取消。\n');
+                process.exit(1);
+              }
+            } else {
+              console.error('❌ 无法交互设置密码（非终端环境）。请先运行:');
+              console.error('   doc77 config set-password');
+              console.error('   或: doc77 start (绑定 127.0.0.1)，通过 Web 设置密码\n');
+              process.exit(1);
+            }
+          }
+          console.log(`🔒 密码保护已启用 — 绑定 ${bindAddr}`);
+        }
+        if (!isLocalAddr(bindAddr)) {
+          console.log(`⚠️  绑定 ${bindAddr} — 确保防火墙已配置。`);
+        }
+        server.listen(port, bindAddr, () => {
+          console.log(`Doc77 Dashboard: http://${bindAddr === '127.0.0.1' || bindAddr === '::1' || bindAddr === 'localhost' ? 'localhost' : bindAddr}:${port}`);
         });
 
         // Graceful shutdown
@@ -219,8 +329,10 @@ async function main() {
           for (const [k, v] of Object.entries(all)) {
             console.log(`${k}=${v}`);
           }
+        } else if (sub === 'set-password') {
+          await setPasswordInteractive();
         } else {
-          console.error('Usage: doc77 config set|get|list [key] [value]');
+          console.error('Usage: doc77 config set|get|list|set-password [key] [value]');
           process.exit(1);
         }
         break;
@@ -298,6 +410,17 @@ async function main() {
           console.error('Usage: doc77 lock status|release <project_id>');
           process.exit(1);
         }
+        break;
+      }
+
+      case 'vendor-install': {
+        const vendorDir = path.join(os.homedir(), '.doc77', 'vendor');
+        const skipPyodide = args.includes('--no-pyodide');
+        const { fetchVendorAssets, VENDOR_ASSETS } = await import('@doc77/core');
+        const assets = skipPyodide ? VENDOR_ASSETS.filter(a => !a.name.includes('pyodide')) : VENDOR_ASSETS;
+        console.log(`下载 ${assets.length} 个资源到 ${vendorDir}...`);
+        await fetchVendorAssets(vendorDir, assets);
+        console.log('✅ Vendor 资源下载完成！离线模式已就绪。');
         break;
       }
 

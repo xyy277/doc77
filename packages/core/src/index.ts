@@ -59,6 +59,10 @@ export type { ScanResult } from './scanner/index.js';
 // Server
 export { createApp, createQueueApproveHandler, createAIChatHandler } from './server/app.js';
 
+// Vendor
+export { fetchVendorAssets, isVendorReady, VENDOR_ASSETS } from './server/vendor.js';
+export type { VendorAsset } from './server/vendor.js';
+
 // Renderers
 export {
   renderMarkdown,

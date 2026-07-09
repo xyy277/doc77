@@ -6,6 +6,8 @@
   "description": "Doc77 — 默认安全、对话驱动的智能本地文档管理 Agent",
   "scripts": {
     "build": "pnpm -r build",
+    "dev:start": "pnpm build && node packages/cli/dist/bin/doc77.js start",
+    "dev:restart": "pkill -f 'doc77.js start' 2>/dev/null || true; sleep 1; pnpm build && node packages/cli/dist/bin/doc77.js start",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint packages --ext .ts",

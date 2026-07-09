@@ -106,13 +106,47 @@ function switchSettingsTab(tab) {
   } else if (tab === 'account') {
     c.innerHTML = '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">登录密码</div>' +
       '<div class="space-y-3" id="authSection"><div class="text-xs text-slate-400">检查中...</div></div>' +
-      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">安全设置</div><div class="space-y-3">' +
-      settingRow('绑定地址','security.bind_address','text','127.0.0.1') +
+      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">网络绑定 <span id="bindStatus" class="font-normal text-[10px]"></span></div>' +
+      '<div class="text-xs text-slate-500 mb-2 leading-relaxed">控制 Doc77 监听哪些网络接口。<b>127.0.0.1</b> = 仅本机访问（安全）；<b>0.0.0.0</b> = 局域网可访问（需设密码）。</div>' +
+      '<div class="space-y-2">' +
+      '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">当前实际绑定</span><span class="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400" id="runtimeBind">-</span></div>' +
+      '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">配置值（重启后生效）</span><span class="text-sm font-mono" id="configBind">-</span></div>' +
+      settingRow('','security.bind_address','text','127.0.0.1') +
+      '<input data-key="security.bind_address" type="hidden" id="bindAddrInput" value="">' +
+      '</div>' +
+      '<div class="text-[10px] text-amber-600 dark:text-amber-400 mt-1 ml-1" id="bindMismatch" style="display:none">⚠️ 配置值与当前实际绑定不一致，重启后生效</div>' +
+      '<div class="text-[10px] text-slate-400 mt-1 ml-1">修改后需点击下方「重启服务」生效</div>' +
+      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">其他安全设置</div><div class="space-y-3">' +
       settingRow('共享密钥','security.shared_secret','password','') +
-      settingToggle('跟踪符号链接','security.follow_symlinks') + '</div>';
+      settingToggle('跟踪符号链接','security.follow_symlinks') + '</div>' +
+      '<div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700"><button onclick="restartServer()" class="w-full py-2 text-sm font-medium text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700 rounded-md hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">🔄 重启服务</button></div>';
     loadAuthStatus();
+    loadServerInfo();
   }
   loadSettingsValues();
+}
+
+async function loadServerInfo() {
+  try {
+    var r = await fetch('/api/server-info');
+    var d = await r.json();
+    var runtimeEl = document.getElementById('runtimeBind');
+    var mismatchEl = document.getElementById('bindMismatch');
+    var configEl = document.getElementById('configBind');
+    if (runtimeEl) {
+      runtimeEl.textContent = d.bindAddress;
+      runtimeEl.className = 'text-sm font-mono font-semibold ' + (d.isLocal ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400');
+    }
+    // Update config display after a short delay (wait for loadSettingsValues to fill)
+    setTimeout(function() {
+      var inp = document.querySelector('[data-key="security.bind_address"]');
+      var configVal = inp ? inp.value : '';
+      if (configEl) configEl.textContent = configVal || '127.0.0.1 (默认)';
+      if (mismatchEl && configVal && configVal !== d.bindAddress) {
+        mismatchEl.style.display = 'block';
+      }
+    }, 500);
+  } catch(e) {}
 }
 function settingRow(label, key, type, placeholder, opts) {
   if (type === 'toggle') return settingToggle(label, key);
@@ -188,6 +222,15 @@ async function saveSettings() {
   }
   toast('设置已保存','success');
 }
+async function restartServer() {
+  if (!await confirmDialog('确定重启服务？正在进行的操作会中断，浏览器需要刷新页面重新连接。')) return;
+  try {
+    await fetch('/api/restart', { method: 'POST' });
+    toast('服务正在重启，3 秒后自动刷新...', 'info');
+    setTimeout(function() { location.reload(); }, 3000);
+  } catch(e) { toast('重启失败', 'error'); }
+}
+
 async function resetDefaults() {
   if (!await confirmDialog('确定恢复所有默认设置？')) return;
   try { await fetch('/api/config/reset',{method:'POST'}); switchSettingsTab('system'); toast('已恢复默认值','success'); } catch(e) { toast('恢复失败','error'); }

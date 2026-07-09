@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doc77 — Dashboard</title>
+<script>window.__VENDOR_READY=false;fetch('/vendor/.ready').then(r=>{if(r.ok)window.__VENDOR_READY=true}).catch(()=>{});</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={darkMode:'class',theme:{extend:{}}}</script>
 <link rel="stylesheet" href="css/app.css">
@@ -19,6 +20,7 @@
       <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
       服务运行中
       <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-base" title="切换主题" id="themeBtn">🌙</button>
+      <button onclick="document.cookie='doc77-desktop=;path=/;max-age=0';location.href='/mobile/'" class="text-slate-400 hover:text-white transition-colors text-base" title="移动版">📱</button>
       <button class="text-slate-400 hover:text-white transition-colors text-base" title="设置" onclick="toggleSettings()">⚙</button>
     </div>
   </div>
