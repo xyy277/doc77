@@ -1,8 +1,56 @@
 # Doc77 实施状态
 
-> 最后更新：2026-07-07
+> 最后更新：2026-07-09
 
-## 总进度：40 / 40 Tasks 完成（100%）
+## 总进度：40 / 40 Tasks 完成（100%）+ v0.3 增强
+
+---
+
+## v0.3 增强（2026-07-08 ~ 2026-07-09）
+
+> 在原 40 个 Task 基础上，根据实际使用反馈进行的 UI 改造、跨平台适配和品牌建设。
+
+### 品牌与 Logo
+- [x] SVG Logo 设计（favicon + 深色/浅色双模标题 Logo）
+- [x] Web 全局部署 favicon + Header Logo
+- [x] Console ASCII Banner
+- [x] 移动端 Logo
+- [x] 功能引导页 guide.html
+
+### UI / UX 改造
+- [x] 左侧栏折叠（☰ 按钮 + 56px 窄条 + 平滑动画）
+- [x] 左侧栏拖动 resize 与折叠联动
+- [x] 设置面板抽屉滑入动画（opacity + transform）
+- [x] 收藏区折叠 + 5 条限高
+- [x] 首页介绍区 + GitHub Star 按钮
+- [x] 点 backdrop 关闭设置
+- [x] 浏览文件夹策略重排（移除慢 PowerShell，浏览器 picker 为主力）
+
+### Windows 兼容
+- [x] `/api/browse-fs` 路径兼容（驱动器字母、SAFE_ROOTS → 黑名单）
+- [x] 全局搜索去 grep（Node.js 原生 searchInFiles）
+- [x] 常用用户目录快捷入口（Desktop、Documents、Downloads）
+- [x] winToWsl double-resolve bug 修复
+
+### 安全
+- [x] 白名单路径 → 黑名单拦截（开放除系统目录外的所有路径）
+- [x] `isLocalAccess` 检测 `0.0.0.0` + localhost 场景
+- [x] 设置页 security.bind_address 保存被覆盖修复
+- [x] 重启前自动保存设置
+
+### Bug 修复
+- [x] 重启 spawn 无错误处理
+- [x] CLI help 文本补全 `--bind`
+- [x] README 文档补全 `--bind` / `0.0.0.0`
+- [x] 左侧栏 Logo 折叠/展开切换逻辑反转
+- [x] 拖动 resize 双 Logo bug
+- [x] PowerShell 对话框超时 120s → 30s
+
+### 发布
+- [x] @doc77/core v0.3.0
+- [x] @doc77/mcp v0.2.0
+- [x] @doc77/ai v0.2.0
+- [x] @doc77/cli v0.2.0
 
 ---
 
