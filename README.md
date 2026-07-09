@@ -1,8 +1,8 @@
-# Doc77
+# Doc77 — 本地文档预览与管理 · Markdown · PDF · MCP Server · 局域网共享
 
-> 一命令部署 · 局域网共享 · 移动端适配 · 完全免费 · 跨平台
+> 文档预览器 | 文档管理器 | Markdown 阅读器 | PDF 查看器 | Code Viewer | 知识库 | 局域网文档服务器
 >
-> 默认安全、对话驱动的智能本地文档管理 Agent
+> 开源 · 免费 · 跨平台 · 移动端适配 · 零配置 · 一命令部署
 
 **Doc77** 是轻量级本地文档预览器 + MCP 文件操作桥梁 + AI 对话驱动管理 Agent。一行命令启动 Web Dashboard，浏览器即文档工作台。支持 Windows / macOS / Linux / WSL，密码保护下可安全对外暴露。
 
