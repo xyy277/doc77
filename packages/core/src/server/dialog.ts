@@ -101,6 +101,7 @@ function winToWsl(winPath: string): string | null {
         } else {
           resolve(null);
         }
+        return;
       }
       resolve(stdout.trim());
     });

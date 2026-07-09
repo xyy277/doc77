@@ -123,19 +123,8 @@ async function openDirDialog(forEditId) {
   btn.disabled = true;
   _dirPickTarget = forEditId;
 
-  // Strategy 1: Server-side native dialog (macOS / Linux+X11 / native Windows)
-  try {
-    var r = await fetch('/api/dialog/open-directory', { method: 'POST' });
-    var d = await r.json();
-    if (d.path) {
-      fillPath(forEditId, d.path);
-      btn.innerHTML = origHTML; btn.disabled = false;
-      return;
-    }
-  } catch (e) { /* fall through */ }
-
-  // Strategy 2: Local mode → browser folder picker + fingerprint match
-  // Only when browser & server are on the SAME machine (localhost)
+  // Strategy 1: Browser folder picker + fingerprint match
+  // Fast, native, no server round-trip. Localhost only.
   if (isLocalMode() && typeof window.showDirectoryPicker === 'function') {
     var folderName = '';
     try {
@@ -180,18 +169,16 @@ async function openDirDialog(forEditId) {
           return;
         }
       }
-      // Fingerprint failed — show server file browser, pre-navigated to likely paths
+      // Fingerprint failed — fall through to server file browser
       toast('未自动匹配到路径，请从服务器文件系统中选择', 'info');
     } catch (e) {
       if (e.name === 'AbortError') { btn.innerHTML = origHTML; btn.disabled = false; return; }
+      // Other errors → fall through to server file browser
     }
   }
 
-  // Strategy 3: Server-side file browser
-  // Used for: remote access, fingerprint failure, or unsupported browsers
+  // Strategy 2: Server-side file browser (always available, only option for remote)
   if (!isLocalMode()) {
-    // Remote mode: server file browser is the ONLY option (showDirectoryPicker
-    // would open the CLIENT's filesystem which is irrelevant)
     toast('远程访问模式，请从服务器文件系统中选择目录', 'info');
   }
   showServerFileBrowser(forEditId);

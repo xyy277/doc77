@@ -370,8 +370,36 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       return;
     }
 
-    // Security: allow browsing root but filter out system directories
+    // Security: blacklist system directories per OS, allow everything else.
+    // Password protection is the primary security layer for remote access.
     const isWin = process.platform === 'win32';
+    function isPathBlocked(p: string): boolean {
+      const BLOCKED_ROOTS: Record<string, string[]> = {
+        win32: [
+          'C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)',
+          'C:\\ProgramData', 'C:\\$Recycle.Bin',
+          'C:\\System Volume Information', 'C:\\Recovery',
+          'C:\\Config.Msi', 'C:\\MSOCache', 'C:\\PerfLogs',
+        ],
+        linux: [
+          '/etc', '/proc', '/sys', '/dev', '/run', '/boot',
+          '/var/log', '/var/run', '/var/lock',
+          '/bin', '/sbin', '/usr/bin', '/usr/sbin',
+        ],
+        darwin: [
+          '/System', '/Library', '/private/etc', '/private/var',
+          '/usr/bin', '/usr/sbin',
+        ],
+      };
+      const blocked = BLOCKED_ROOTS[process.platform] || [];
+      return blocked.some(r => p === r || p.startsWith(r + path.sep));
+    }
+    if (isPathBlocked(dirPath)) {
+      res.json({ path: dirPath, parent: null, roots: [], entries: [], error: '此目录不允许访问' });
+      return;
+    }
+
+    // Hidden system dirs to filter from root-level listings only
     const BLOCKED_DIRS = isWin
       ? new Set(['Windows', 'Program Files', 'Program Files (x86)', 'ProgramData',
                  '$Recycle.Bin', 'System Volume Information', 'Recovery', 'Config.Msi',
@@ -379,27 +407,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       : new Set(['etc', 'proc', 'sys', 'root', 'var', 'boot', 'dev', 'run', 'snap',
                  'bin', 'sbin', 'lib', 'lib64', 'usr', 'lost+found', '.dockerenv']);
 
-    function getSafeRoots(): Set<string> {
-      if (isWin) {
-        const drives = new Set<string>();
-        for (let c = 65; c <= 90; c++) { // A-Z
-          const drive = String.fromCharCode(c) + ':\\';
-          try { if (fs.existsSync(drive)) drives.add(drive); } catch {}
-        }
-        return drives;
-      }
-      return new Set(['/home', '/mnt', '/tmp', '/Users', '/Volumes', '/opt', '/media', '/srv']);
-    }
-    const SAFE_ROOTS = getSafeRoots();
-
     // Cross-platform root detection (C:\ on Windows, / on Unix)
     const parsedRoot = path.parse(dirPath).root;
     const isRoot = parsedRoot === dirPath;
-    const inSafe = SAFE_ROOTS.has(dirPath) || [...SAFE_ROOTS].some(r => dirPath.startsWith(r + path.sep));
-    if (!isRoot && !inSafe) {
-      res.json({ path: dirPath, parent: null, roots: [...SAFE_ROOTS], entries: [], error: '此目录不在允许访问的范围内' });
-      return;
-    }
 
     // Security: verify the path exists and is a directory
     let entries: Array<{ name: string; type: string; size: number }> = [];
@@ -433,21 +443,34 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     const parent = path.dirname(dirPath);
     const hasParent = parent !== dirPath;
 
-    // Safe roots for initial view (no system directories)
+    // Quick-access root shortcuts (common user directories + drives)
     const roots: string[] = [];
     if (isWin) {
-      // Windows: use USERPROFILE as home, plus available drives
       const winHome = process.env.USERPROFILE || 'C:\\Users\\Default';
       if (fs.existsSync(winHome)) roots.push(winHome);
+      // Common user folders
+      for (const sub of ['Desktop', 'Documents', 'Downloads']) {
+        const p = path.join(winHome, sub);
+        try { if (fs.existsSync(p)) roots.push(p); } catch {}
+      }
+      // Available drives
       for (let c = 65; c <= 90; c++) {
         const drive = String.fromCharCode(c) + ':\\';
         try { if (fs.existsSync(drive)) roots.push(drive); } catch {}
       }
     } else {
-      // Unix: use HOME, plus platform-specific paths
       const home = process.env.HOME || '/home';
       if (fs.existsSync(home)) roots.push(home);
-      // Only show /mnt mounts on local access (remote blocks them for security)
+      // Common user folders
+      for (const sub of ['Desktop', 'Documents', 'Downloads']) {
+        const p = path.join(home, sub);
+        try { if (fs.existsSync(p)) roots.push(p); } catch {}
+      }
+      // /tmp always available
+      if (!roots.includes('/tmp')) roots.push('/tmp');
+      // macOS specific
+      if (process.platform === 'darwin' && !roots.includes('/Users')) roots.push('/Users');
+      // WSL /mnt (local access only)
       if (isLocalAccess && isLinux) {
         try {
           const isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
@@ -458,8 +481,6 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
           }
         } catch {}
       }
-      if (process.platform === 'darwin' && !roots.includes('/Users')) roots.push('/Users');
-      if (!roots.includes('/tmp')) roots.push('/tmp');
     }
 
     res.json({ path: dirPath, parent: hasParent ? parent : null, roots, entries, error });
