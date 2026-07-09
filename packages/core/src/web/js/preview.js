@@ -706,7 +706,20 @@ async function loadPdfViewer(rawUrl, filePath) {
       canvas.className = 'mx-auto shadow-sm';
       var ctx = canvas.getContext('2d');
       ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      try {
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      } catch (renderErr) {
+        // Known: unsupported shadingType 1 in some PDFs
+        // Fallback: show a placeholder for this page instead of crashing
+        console.warn('PDF page ' + i + ' render error:', renderErr.message);
+        canvas.remove();
+        var errDiv = document.createElement('div');
+        errDiv.className = 'pdf-page mb-4 flex justify-center';
+        errDiv.dataset.page = i;
+        errDiv.innerHTML = '<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded p-4 text-sm text-amber-700 dark:text-amber-300">⚠️ 第 ' + i + ' 页渲染异常（不兼容的 PDF 元素）</div>';
+        pageContainers.push(errDiv);
+        continue;
+      }
 
       // Extract text (progressive)
       page.getTextContent().then(function(tc) {
