@@ -19,15 +19,42 @@ var proj = null, projects = [], currentFile = null, activeTab = 'outline';
     document.title = 'Doc77 — ' + proj.name;
     renderProjMenu(); loadTree(''); loadTasks(); setActiveTab('outline');
     renderBookmarks(); renderRecentFiles();
+    // Touch project's last_opened
+    fetch('/api/projects/' + pid + '/touch', { method: 'POST' }).catch(function(){});
   } catch(e) { document.getElementById('projName').textContent = '⚠ 加载失败'; }
 })();
 
 //══════════ Project Switcher ══════════
-function toggleProjMenu() { document.getElementById('projMenu').classList.toggle('hidden'); }
-function renderProjMenu() {
-  document.getElementById('projMenu').innerHTML = projects.map(function(p) {
+function toggleProjMenu() {
+  var menu = document.getElementById('projMenu');
+  menu.classList.toggle('hidden');
+  if (!menu.classList.contains('hidden')) {
+    // Focus search input when menu opens
+    setTimeout(function(){ var s = document.getElementById('projSearch'); if (s) s.focus(); }, 50);
+  }
+}
+function renderProjMenu(filter) {
+  filter = (filter || '').toLowerCase();
+  // Sort: current project first, then by last_opened desc
+  var sorted = projects.slice().sort(function(a, b) {
+    if (proj && a.id === proj.id) return -1;
+    if (proj && b.id === proj.id) return 1;
+    var aLo = a.last_opened ? new Date(a.last_opened) : null;
+    var bLo = b.last_opened ? new Date(b.last_opened) : null;
+    if (aLo && bLo) return bLo - aLo;
+    if (aLo) return -1;
+    if (bLo) return 1;
+    return a.name.localeCompare(b.name, 'zh-CN');
+  });
+  var filtered = filter ? sorted.filter(function(p) { return p.name.toLowerCase().indexOf(filter) >= 0 || p.path.toLowerCase().indexOf(filter) >= 0; }) : sorted;
+  var items = filtered.map(function(p) {
     return '<button onclick="switchProject(' + p.id + ')" class="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 flex flex-col transition-colors"><span class="font-medium">' + (p.id===proj.id?'✓ ':'') + '💼 ' + esc(p.name) + '</span><span class="text-xs text-slate-500 truncate">' + esc(p.path) + '</span></button>';
-  }).join('') + '<div class="h-px bg-slate-700 my-1"></div><a href="/" class="block w-full text-left px-3 py-2 text-sm text-blue-400 hover:bg-slate-700 transition-colors">＋ 注册新项目</a>';
+  }).join('');
+  if (!items) items = '<div class="px-3 py-2 text-xs text-slate-500">没有匹配的项目</div>';
+  document.getElementById('projMenu').innerHTML =
+    '<div class="px-2 pt-2 pb-1 sticky top-0 bg-slate-800 z-10"><div class="relative"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="projSearch" placeholder="搜索项目..." oninput="renderProjMenu(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-md pl-7 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-500"></div></div>' +
+    '<div class="max-h-72 overflow-y-auto scrollbar-dark">' + items + '</div>' +
+    '<div class="h-px bg-slate-700 my-1"></div><a href="/" class="block w-full text-left px-3 py-2 text-sm text-blue-400 hover:bg-slate-700 transition-colors">＋ 注册新项目</a>';
 }
 function switchProject(id) { location.href = '/preview.html?id=' + id; }
 
@@ -156,21 +183,62 @@ async function loadContent(filePath) {
   currentFile = filePath; outlineBuilt = false;
   var empty = document.getElementById('emptyState'); if (empty) empty.classList.add('hidden');
   var area = document.getElementById('contentArea');
+  var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'];
+  var runBtn = document.getElementById('runBtn'); if (runBtn) runBtn.disabled = true;
   area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div>';
   document.getElementById('breadcrumbPath').textContent = filePath;
-  ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'].forEach(function(id){ document.getElementById(id).disabled = false; });
+  btns.forEach(function(id){ document.getElementById(id).disabled = false; });
   document.getElementById('readingProgress').style.width = '0%';
   try {
     var r = await fetch('/api/content/' + pid + '?path=' + encodeURIComponent(filePath));
     if (!r.ok) throw new Error('Not found');
     var d = await r.json(); var html = '';
+
+    // --- Unsupported format: file info card ---
+    if (d.type === 'unsupported') {
+      var labels = { video:'🎬 视频', audio:'🎵 音频', archive:'📦 压缩包', font:'🔤 字体',
+        database:'🗄 数据库', design:'🎨 设计文件', binary:'⚙ 二进制', gis:'🗺 GIS数据',
+        '3d':'🧊 3D模型', ebook:'📚 电子书', document:'📄 文档', spreadsheet:'📊 表格',
+        presentation:'📽 演示文稿', too_large:'📦 文件过大', unknown:'📁 未知格式' };
+      var label = labels[d.category] || labels.unknown;
+      var sizeStr = d.size < 1024 ? d.size + ' B' : d.size < 1048576 ? (d.size/1024).toFixed(1) + ' KB' : (d.size/1048576).toFixed(1) + ' MB';
+      html = '<div class="max-w-md mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 text-center">' +
+        '<div class="text-5xl mb-4">' + label.split(' ')[0] + '</div>' +
+        '<h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">' + label + '</h3>' +
+        '<p class="text-sm text-slate-500 dark:text-slate-400 mb-4">' + esc(filePath) + '</p>' +
+        '<div class="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 mb-4 text-xs text-left">' +
+        '<span class="text-slate-500">大小</span><span class="text-slate-700 dark:text-slate-300">' + sizeStr + '</span>' +
+        (d.modified ? '<span class="text-slate-500">修改时间</span><span class="text-slate-700 dark:text-slate-300">' + new Date(d.modified).toLocaleString('zh-CN') + '</span>' : '') +
+        '</div>' +
+        '<p class="text-xs text-amber-600 dark:text-amber-400 mb-4">⚠️ 不支持预览此文件格式</p>' +
+        '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 文件夹中显示</button>' +
+        '</div>';
+      area.innerHTML = '<div class="p-4 sm:p-10">' + html + '</div>';
+      addRecentFile(filePath);
+      return;
+    }
+
     if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
       html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
       if (d.type === 'markdown') setTimeout(function(){ buildOutline(); }, 50);
     } else if (d.type === 'image') {
-      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-center"><img src="' + d.rawUrl + '" alt="' + esc(filePath) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm" loading="lazy" /></div>';
+      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-center"><img src="' + d.rawUrl + '" alt="' + esc(filePath) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="openImageLightbox(\'' + escAttr(d.rawUrl) + '\', \'' + escAttr(filePath) + '\')" /></div>';
     } else if (d.type === 'pdf') {
-      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden" style="height:85vh"><iframe src="' + d.rawUrl + '" class="w-full h-full border-0"></iframe></div>';
+      // Use custom PDF.js viewer if available, fallback to iframe
+      if (typeof pdfjsLib !== 'undefined') {
+        area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">正在加载 PDF 查看器...</div></div>';
+        loadPdfViewer(d.rawUrl, filePath); return;
+      }
+      // Lazy-load PDF.js then retry
+      loadPdfJs(function() {
+        area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">正在渲染 PDF...</div></div>';
+        loadPdfViewer(d.rawUrl, filePath);
+      });
+      return;
+    } else if (d.type === 'docx' || d.type === 'xlsx') {
+      // Fetch raw binary and render client-side
+      area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载中...</div></div>';
+      renderOfficeDoc(d); return;
     } else {
       html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><pre class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono">' + esc(d.content) + '</pre></div>';
       document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">仅 Markdown 文档支持大纲</div>';
@@ -549,3 +617,260 @@ async function approveTask(id) { await fetch('/api/queue/approve',{method:'POST'
 async function rejectTask(id) { await fetch('/api/queue/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:id})}); loadTasks(); }
 async function approveAll() { var r = await fetch('/api/queue/status?project_id='+pid); var tasks = await r.json(); for (var i=0; i<tasks.length; i++) { if (tasks[i].status==='pending') await approveTask(tasks[i].id); } }
 async function rejectAll() { var r = await fetch('/api/queue/status?project_id='+pid); var tasks = await r.json(); for (var i=0; i<tasks.length; i++) { if (tasks[i].status==='pending') await rejectTask(tasks[i].id); } }
+
+//══════════ PDF.js Custom Viewer ══════════
+var pdfDoc = null, pdfCurrentPage = 1, pdfExtractedText = '';
+var pdfLoading = false;
+
+function loadPdfJs(cb) {
+  if (typeof pdfjsLib !== 'undefined') { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+  s.type = 'module';
+  s.onload = function() {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+    cb();
+  };
+  document.head.appendChild(s);
+}
+
+async function loadPdfViewer(rawUrl, filePath) {
+  if (pdfLoading) return; pdfLoading = true;
+  var area = document.getElementById('contentArea');
+  try {
+    var resp = await fetch(rawUrl);
+    var arrayBuf = await resp.arrayBuffer();
+    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
+    pdfExtractedText = '';
+
+    var totalPages = pdfDoc.numPages;
+    var scale = Math.min(window.devicePixelRatio || 1, 2);
+    var pageContainers = [];
+
+    // Render all pages
+    for (var i = 1; i <= totalPages; i++) {
+      var page = await pdfDoc.getPage(i);
+      var viewport = page.getViewport({ scale: scale });
+      var canvas = document.createElement('canvas');
+      canvas.width = viewport.width * (window.devicePixelRatio || 1);
+      canvas.height = viewport.height * (window.devicePixelRatio || 1);
+      canvas.style.width = viewport.width + 'px';
+      canvas.style.height = viewport.height + 'px';
+      canvas.style.maxWidth = '100%';
+      canvas.className = 'mx-auto shadow-sm';
+      var ctx = canvas.getContext('2d');
+      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+      // Extract text (progressive)
+      page.getTextContent().then(function(tc) {
+        pdfExtractedText += '\n--- Page ' + i + ' ---\n' +
+          tc.items.filter(function(it){ return 'str' in it; }).map(function(it){ return it.str; }).join(' ');
+      }).catch(function(){});
+
+      var container = document.createElement('div');
+      container.className = 'pdf-page mb-4 flex justify-center';
+      container.dataset.page = i;
+      container.appendChild(canvas);
+      pageContainers.push(container);
+    }
+
+    // Page nav
+    var navHtml = '<div class="flex items-center justify-center gap-3 mb-4 text-sm"><button onclick="pdfGoPage(-1)" class="px-3 py-1.5 border rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">◀ 上一页</button><span class="text-slate-600 dark:text-slate-400"><span id="pdfCurrentPage">1</span> / ' + totalPages + '</span><button onclick="pdfGoPage(1)" class="px-3 py-1.5 border rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">下一页 ▶</button></div>';
+
+    area.innerHTML = '<div class="p-4 sm:p-10"><div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">' + navHtml + '<div id="pdfPages">' + pageContainers.map(function(c){ return c.outerHTML; }).join('') + '</div>' + navHtml + '</div></div>';
+
+    // Populate outline
+    pdfDoc.getOutline().then(function(outline) {
+      if (outline && outline.length) {
+        var ol = document.getElementById('outlineList');
+        ol.innerHTML = outline.map(function(item){ return '<div onclick="pdfGoPage('+item.dest+')" class="py-1 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-sm text-slate-600 dark:text-slate-300">📑 '+esc(item.title)+'</div>'; }).join('');
+        outlineBuilt = true;
+      }
+    }).catch(function(){});
+
+    document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-xs text-slate-400">PDF 大纲加载中...</div>';
+    addRecentFile(filePath);
+    pdfLoading = false;
+  } catch(e) {
+    area.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">PDF 加载失败</p></div>';
+    pdfLoading = false;
+  }
+}
+
+function pdfGoPage(dirOrNum) {
+  var totalPages = pdfDoc ? pdfDoc.numPages : 0;
+  if (!totalPages) return;
+  if (typeof dirOrNum === 'number' && dirOrNum < 1) {
+    pdfCurrentPage = Math.max(1, pdfCurrentPage + dirOrNum);
+  } else if (typeof dirOrNum === 'number' && dirOrNum > 0) {
+    pdfCurrentPage = dirOrNum;
+  }
+  var target = document.querySelector('.pdf-page[data-page="' + pdfCurrentPage + '"]');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  var el = document.getElementById('pdfCurrentPage');
+  if (el) el.textContent = pdfCurrentPage;
+}
+
+// Override TTS for PDF: use extracted text instead of DOM text
+(function(){
+  var origToggleTTS = toggleTTS;
+  toggleTTS = function() {
+    if (pdfDoc && pdfExtractedText) {
+      if (ttsActive) { window.speechSynthesis.cancel(); ttsActive = false; return; }
+      ttsActive = true;
+      var rate = parseFloat(document.getElementById('ttsRate').value) || 1;
+      var u = new SpeechSynthesisUtterance(pdfExtractedText.substring(0, 8000));
+      u.lang = 'zh-CN'; u.rate = rate;
+      u.onend = function(){ ttsActive = false; };
+      window.speechSynthesis.speak(u);
+      return;
+    }
+    origToggleTTS();
+  };
+})();
+
+//══════════ Office Docs Rendering (DOCX/XLSX) ══════════
+function renderOfficeDoc(d) {
+  if (d.type === 'docx') renderDocx(d);
+  else if (d.type === 'xlsx') renderXlsx(d);
+}
+
+function renderDocx(d) {
+  var area = document.getElementById('contentArea');
+  loadMammoth(function() {
+    fetch(d.rawUrl).then(function(r){ return r.arrayBuffer(); }).then(function(buf) {
+      mammoth.convertToHtml({ arrayBuffer: buf }).then(function(result) {
+        var html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + result.value + '</div></div>';
+        area.innerHTML = '<div class="p-4 sm:p-10">' + html + '</div>';
+        if (result.warnings.length) console.warn('DOCX warnings:', result.warnings);
+        setTimeout(function(){ buildOutline(); }, 50);
+        addRecentFile(currentFile);
+      }).catch(function() { area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">DOCX 解析失败</div>'; });
+    });
+  });
+}
+
+function renderXlsx(d) {
+  var area = document.getElementById('contentArea');
+  if (typeof XLSX === 'undefined') {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.mini.min.js';
+    s.onload = function(){ renderXlsx(d); };
+    document.head.appendChild(s);
+    area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载 XLSX 查看器...</div></div>';
+    return;
+  }
+  fetch(d.rawUrl).then(function(r){ return r.arrayBuffer(); }).then(function(buf) {
+    var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+    var tabsHtml = '<div class="flex gap-1 mb-4 flex-wrap" id="xlsxTabs">';
+    wb.SheetNames.forEach(function(name, i) {
+      tabsHtml += '<button onclick="switchXlsxSheet(\'' + escAttr(name) + '\')" class="xlsx-tab px-3 py-1 text-xs rounded-t-md border ' + (i===0?'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 font-semibold':'bg-slate-100 dark:bg-slate-800 text-slate-500') + '" data-sheet="' + escAttr(name) + '">' + esc(name) + '</button>';
+    });
+    tabsHtml += '</div>';
+    var sheetsHtml = '';
+    wb.SheetNames.forEach(function(name, i) {
+      var html = XLSX.utils.sheet_to_html(wb.Sheets[name]);
+      sheetsHtml += '<div class="xlsx-sheet ' + (i===0?'':'hidden') + '" data-sheet="' + escAttr(name) + '"><div class="overflow-x-auto">' + html + '</div></div>';
+    });
+    area.innerHTML = '<div class="p-2 sm:p-4"><div class="max-w-full mx-auto bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">' + tabsHtml + sheetsHtml + '</div></div>';
+    addRecentFile(currentFile);
+  }).catch(function(){ area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">XLSX 加载失败</div>'; });
+}
+
+function switchXlsxSheet(name) {
+  document.querySelectorAll('.xlsx-sheet').forEach(function(el){ el.classList.toggle('hidden', el.dataset.sheet !== name); });
+  document.querySelectorAll('.xlsx-tab').forEach(function(el){
+    var active = el.dataset.sheet === name;
+    el.className = 'xlsx-tab px-3 py-1 text-xs rounded-t-md border ' + (active?'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 font-semibold':'bg-slate-100 dark:bg-slate-800 text-slate-500');
+  });
+}
+
+function loadMammoth(cb) {
+  if (typeof mammoth !== 'undefined') { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
+  s.onload = cb;
+  document.head.appendChild(s);
+}
+
+//══════════ Image Lightbox ══════════
+function openImageLightbox(url, filePath) {
+  getSiblingImages(filePath).then(function(siblings) {
+    var overlay = document.createElement('div');
+    overlay.id = 'imageLightbox';
+    overlay.className = 'fixed inset-0 z-[300] bg-black/90 flex items-center justify-center';
+    overlay.innerHTML = '<div class="relative w-full h-full flex flex-col items-center justify-center">' +
+      '<img src="' + url + '" class="max-w-[95vw] max-h-[85vh] object-contain transition-transform duration-200" id="lightboxImg">' +
+      '<div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur rounded-full px-4 py-2 text-white text-sm">' +
+      '<button onclick="lightboxZoom(-0.25)" class="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center">−</button>' +
+      '<span class="w-12 text-center" id="lightboxZoomPct">100%</span>' +
+      '<button onclick="lightboxZoom(0.25)" class="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center">+</button>' +
+      '<span class="mx-2">|</span>' +
+      '<button onclick="lightboxNav(-1)" class="w-8 h-8 rounded-full hover:bg-white/20 ' + (siblings.length>1?'':'opacity-30') + '">◀</button>' +
+      '<span class="text-xs w-20 text-center" id="lightboxCount"></span>' +
+      '<button onclick="lightboxNav(1)" class="w-8 h-8 rounded-full hover:bg-white/20 ' + (siblings.length>1?'':'opacity-30') + '">▶</button>' +
+      '<span class="mx-2">|</span>' +
+      '<button onclick="closeLightbox()" class="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center">✕</button>' +
+      '</div></div>';
+    document.body.appendChild(overlay);
+
+    window._lightboxSiblings = siblings;
+    window._lightboxIdx = siblings.findIndex(function(s){ return s.path === filePath; });
+    window._lightboxZoom = 1;
+    updateLightboxCount();
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) closeLightbox(); });
+    document.addEventListener('keydown', lightboxKeyHandler);
+  });
+}
+
+function closeLightbox() {
+  var el = document.getElementById('imageLightbox');
+  if (el) el.remove();
+  document.removeEventListener('keydown', lightboxKeyHandler);
+}
+
+function lightboxZoom(delta) {
+  window._lightboxZoom = Math.max(0.25, Math.min(5, (window._lightboxZoom||1) + delta));
+  document.getElementById('lightboxImg').style.transform = 'scale(' + window._lightboxZoom + ')';
+  document.getElementById('lightboxZoomPct').textContent = Math.round(window._lightboxZoom*100)+'%';
+}
+
+function lightboxNav(dir) {
+  var sibs = window._lightboxSiblings;
+  if (!sibs || sibs.length<2) return;
+  window._lightboxIdx = (window._lightboxIdx + dir + sibs.length) % sibs.length;
+  var next = sibs[window._lightboxIdx];
+  document.getElementById('lightboxImg').src = '/api/raw/' + pid + '?path=' + encodeURIComponent(next.path);
+  document.getElementById('lightboxImg').style.transform = 'scale(1)';
+  window._lightboxZoom = 1;
+  document.getElementById('lightboxZoomPct').textContent = '100%';
+  updateLightboxCount();
+  currentFile = next.path;
+  document.getElementById('breadcrumbPath').textContent = next.path;
+}
+
+function updateLightboxCount() {
+  var el = document.getElementById('lightboxCount');
+  if (el) el.textContent = (window._lightboxIdx+1) + ' / ' + (window._lightboxSiblings||[]).length;
+}
+
+function lightboxKeyHandler(e) {
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+}
+
+// Sibling image detection
+function getSiblingImages(filePath) {
+  var parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+  var imgExts = ['.png','.jpg','.jpeg','.gif','.svg','.webp','.avif','.bmp','.ico'];
+  return fetch('/api/tree/' + pid + '?path=' + encodeURIComponent(parentDir||''))
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var images = d.entries.filter(function(e){ return e.type==='file' && imgExts.some(function(ext){ return e.name.toLowerCase().endsWith(ext); }); });
+      images.sort(function(a,b){ return a.name.localeCompare(b.name,'zh-CN'); });
+      return images.map(function(e){ return { name:e.name, path: (parentDir ? parentDir+'/' : '') + e.name }; });
+    })
+    .catch(function(){ return []; });
+}

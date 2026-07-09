@@ -2,17 +2,20 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { exec, execFileSync } from 'node:child_process';
+import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
-import { registerProject, listProjects, removeProject } from '../db/projects.js';
+import { registerProject, listProjects, removeProject, updateProject, touchProject } from '../db/projects.js';
 import { scanDirectory } from '../scanner/index.js';
-import { readFile, validatePath, resolveProjectPath } from '../fs/index.js';
+import { readFile, readFileRaw, isBinaryFile, readFirstNLines, validatePath, resolveProjectPath } from '../fs/index.js';
 import * as crypto from '../crypto.js';
 import {
   renderMarkdown,
   renderMermaid,
   renderCode,
   getRendererForFile,
+  isUnsupportedFormat,
+  FORMAT_SIZE_LIMITS,
 } from '../renderers/index.js';
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
 
@@ -72,7 +75,7 @@ export function createApp() {
   // CORS — allow all origins (localhost-only binding for security)
   app.use((_req: Request, res: Response, next: NextFunction) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (_req.method === 'OPTIONS') {
       res.sendStatus(204);
@@ -146,6 +149,41 @@ export function createApp() {
     res.json({ removed: true });
   });
 
+  // Update project
+  app.put('/api/projects/:id', (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    const { name, path: newPath } = req.body;
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!name && !newPath) { res.status(400).json({ error: 'name or path required' }); return; }
+    try {
+      const resolved = newPath ? resolveProjectPath(newPath) : undefined;
+      updateProject(id, { name, path: resolved });
+      res.json({ ok: true });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      res.status(409).json({ error: message });
+    }
+  });
+
+  // Touch project (update last_opened)
+  app.post('/api/projects/:id/touch', (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    touchProject(id);
+    res.json({ ok: true });
+  });
+
+  // Native directory picker dialog
+  app.post('/api/dialog/open-directory', async (_req: Request, res: Response) => {
+    try {
+      const dirPath = await openDirectoryDialog();
+      res.json({ path: dirPath });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
   // Directory tree
   app.get('/api/tree/:id', (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
@@ -169,7 +207,7 @@ export function createApp() {
     }
   });
 
-  // File content with renderer dispatch
+  // File content with renderer dispatch + safety gates
   app.get('/api/content/:id', (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
     const filePath = req.query.path as string;
@@ -184,57 +222,119 @@ export function createApp() {
     }
 
     try {
-      // Get project root
       const db = getConnection();
       const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
         { path: string } | undefined;
 
-      if (!project) {
-        res.status(404).json({ error: 'Project not found' });
+      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+
+      const absPath = validatePath(project.path, filePath);
+      const stats = fs.statSync(absPath);
+      const rendererType = getRendererForFile(filePath);
+
+      // --- Safety Gate 1: Unsupported format ---
+      if (isUnsupportedFormat(filePath)) {
+        res.json({
+          path: filePath,
+          type: 'unsupported',
+          size: stats.size,
+          modified: stats.mtime.toISOString(),
+          category: getFileCategory(filePath),
+        });
         return;
       }
 
-      // Validate and read file
-      const absPath = validatePath(project.path, filePath);
-      const rawContent = readFile(absPath);
-      const rendererType = getRendererForFile(filePath);
+      // --- Safety Gate 2: Binary file detection ---
+      if (rendererType === 'text' && isBinaryFile(absPath)) {
+        res.json({
+          path: filePath,
+          type: 'unsupported',
+          size: stats.size,
+          modified: stats.mtime.toISOString(),
+          category: 'binary',
+        });
+        return;
+      }
 
-      let content: string;
+      // --- Safety Gate 3: Size limit ---
+      const sizeLimit = FORMAT_SIZE_LIMITS[rendererType] ?? FORMAT_SIZE_LIMITS.text;
+      if (sizeLimit > 0 && stats.size > sizeLimit) {
+        // For text-based formats: truncate and warn
+        if (['markdown','mermaid','code','text'].includes(rendererType)) {
+          const { content, truncated, totalBytes } = readFirstNLines(absPath, 10000);
+          res.json({
+            path: filePath,
+            type: rendererType === 'text' ? 'text' : rendererType,
+            content: truncated
+              ? `⚠️ 文件过大（${(totalBytes / 1024 / 1024).toFixed(1)} MB），仅显示前 10,000 行。建议在本地编辑器中打开。\n\n---\n\n${content}`
+              : content,
+            truncated,
+          });
+          return;
+        }
+        // For xlsx: reject
+        if (rendererType === 'xlsx') {
+          res.json({
+            path: filePath,
+            type: 'unsupported',
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
+            category: 'too_large',
+          });
+          return;
+        }
+      }
+
+      // --- Normal render ---
       switch (rendererType) {
-        case 'markdown':
-          content = renderMarkdown(rawContent);
-          break;
-        case 'mermaid':
-          content = renderMermaid(rawContent);
-          break;
-        case 'code':
-          content = renderCode(rawContent, path.extname(filePath).slice(1));
-          break;
+        case 'markdown': {
+          const raw = readFile(absPath);
+          res.json({ path: filePath, type: 'markdown', content: renderMarkdown(raw) });
+          return;
+        }
+        case 'mermaid': {
+          const raw = readFile(absPath);
+          res.json({ path: filePath, type: 'mermaid', content: renderMermaid(raw) });
+          return;
+        }
+        case 'code': {
+          const raw = readFile(absPath);
+          res.json({ path: filePath, type: 'code', content: renderCode(raw, path.extname(filePath).slice(1)) });
+          return;
+        }
+        case 'docx': {
+          // docx is handled later (needs mammoth), for now return unsupported info
+          res.json({
+            path: filePath, type: 'docx',
+            rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`,
+            size: stats.size, modified: stats.mtime.toISOString(),
+          });
+          return;
+        }
+        case 'xlsx': {
+          res.json({
+            path: filePath, type: 'xlsx',
+            rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`,
+            size: stats.size, modified: stats.mtime.toISOString(),
+          });
+          return;
+        }
         case 'image':
         case 'pdf':
-          // For binary files, return a raw URL instead of inline content
           res.json({
             path: filePath,
             type: rendererType,
             rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`,
           });
           return;
-        default:
-          content = rawContent;
+        default: {
+          const raw = readFile(absPath);
+          res.json({ path: filePath, type: 'text', content: raw });
+        }
       }
-
-      res.json({
-        path: filePath,
-        type: rendererType,
-        content,
-      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      if (
-        message.includes('not found') ||
-        message.includes('ENOENT') ||
-        message.includes('traversal')
-      ) {
+      if (message.includes('not found') || message.includes('ENOENT') || message.includes('traversal')) {
         res.status(404).json({ error: 'File not found' });
         return;
       }
@@ -268,15 +368,12 @@ export function createApp() {
 
       // Map extension to MIME type
       const mimeTypes: Record<string, string> = {
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.svg': 'image/svg+xml',
-        '.webp': 'image/webp',
-        '.bmp': 'image/bmp',
-        '.ico': 'image/x-icon',
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
+        '.bmp': 'image/bmp', '.ico': 'image/x-icon', '.avif': 'image/avif',
         '.pdf': 'application/pdf',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       };
       const contentType = mimeTypes[ext] || 'application/octet-stream';
 
@@ -684,6 +781,25 @@ export function createApp() {
   });
 
   return app;
+}
+
+/**
+ * Map a file extension to a human-readable category label for the unsupported-format UI.
+ */
+function getFileCategory(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const map: Record<string, string> = {
+    '.mp4':'video','.avi':'video','.mov':'video','.mkv':'video','.webm':'video','.wmv':'video','.flv':'video','.m4v':'video',
+    '.mp3':'audio','.wav':'audio','.ogg':'audio','.flac':'audio','.aac':'audio','.wma':'audio','.m4a':'audio','.opus':'audio',
+    '.zip':'archive','.tar':'archive','.gz':'archive','.7z':'archive','.rar':'archive','.bz2':'archive','.xz':'archive','.zst':'archive',
+    '.ttf':'font','.woff':'font','.woff2':'font','.otf':'font','.eot':'font',
+    '.db':'database','.sqlite':'database','.sqlite3':'database','.mdb':'database','.accdb':'database',
+    '.psd':'design','.ai':'design','.sketch':'design','.fig':'design','.xd':'design',
+    '.exe':'binary','.dll':'binary','.so':'binary','.dylib':'binary','.bin':'binary','.class':'binary','.jar':'binary','.war':'binary','.o':'binary','.wasm':'binary',
+    '.shp':'gis','.shx':'gis','.dbf':'gis','.obj':'3d','.stl':'3d','.glb':'3d','.gltf':'3d',
+    '.epub':'ebook','.mobi':'ebook','.pages':'document','.numbers':'spreadsheet','.key':'presentation','.ppt':'presentation','.pptx':'presentation',
+  };
+  return map[ext] || 'unknown';
 }
 
 /**

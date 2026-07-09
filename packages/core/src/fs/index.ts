@@ -39,6 +39,66 @@ export function readFile(absolutePath: string): string {
 }
 
 /**
+ * Read a file as a raw Buffer (no encoding).
+ */
+export function readFileRaw(absolutePath: string): Buffer {
+  return fs.readFileSync(absolutePath);
+}
+
+/**
+ * Detect if a file is binary by checking for null bytes in the first 8KB.
+ * Text files virtually never contain null bytes. Returns true if binary.
+ */
+export function isBinaryFile(absolutePath: string): boolean {
+  try {
+    const fd = fs.openSync(absolutePath, 'r');
+    const buf = Buffer.alloc(8192);
+    const bytesRead = fs.readSync(fd, buf, 0, 8192, 0);
+    fs.closeSync(fd);
+    // Check for null bytes in the sample
+    for (let i = 0; i < bytesRead; i++) {
+      if (buf[i] === 0) return true;
+    }
+    return false;
+  } catch {
+    // If we can't read the file, treat as binary for safety
+    return true;
+  }
+}
+
+/**
+ * Read only the first N lines of a text file. Returns { content, truncated, totalBytes }.
+ */
+export function readFirstNLines(absolutePath: string, maxLines: number): { content: string; truncated: boolean; totalBytes: number } {
+  const stats = fs.statSync(absolutePath);
+  const totalBytes = stats.size;
+  const fd = fs.openSync(absolutePath, 'r');
+  const buf = Buffer.alloc(65536); // 64KB chunks
+  let pos = 0, lines = 0;
+  const parts: string[] = [];
+
+  while (lines < maxLines && pos < totalBytes) {
+    const bytesRead = fs.readSync(fd, buf, 0, buf.length, pos);
+    if (bytesRead === 0) break;
+    const chunk = buf.toString('utf-8', 0, bytesRead);
+    const chunkLines = chunk.split('\n');
+    lines += chunkLines.length - 1;
+    if (lines >= maxLines) {
+      // Only include lines up to maxLines
+      const takeLines = chunkLines.slice(0, maxLines - (lines - chunkLines.length + 1));
+      parts.push(takeLines.join('\n'));
+      break;
+    }
+    parts.push(chunk);
+    pos += bytesRead;
+  }
+  fs.closeSync(fd);
+
+  const content = parts.join('');
+  return { content, truncated: pos < totalBytes, totalBytes };
+}
+
+/**
  * Get file/directory stats.
  */
 export function statFile(absolutePath: string): fs.Stats {

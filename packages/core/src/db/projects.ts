@@ -54,6 +54,14 @@ export function removeProject(id: number): boolean {
 }
 
 /**
+ * Update last_opened timestamp.
+ */
+export function touchProject(id: number): void {
+  const db = getConnection();
+  db.prepare('UPDATE projects SET last_opened = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+}
+
+/**
  * Update project name and/or path.
  */
 export function updateProject(id: number, updates: ProjectUpdate): void {

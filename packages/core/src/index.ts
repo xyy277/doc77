@@ -41,6 +41,9 @@ export type { Project, ProjectUpdate } from './db/projects.js';
 // File System
 export {
   readFile,
+  readFileRaw,
+  isBinaryFile,
+  readFirstNLines,
   statFile,
   listDir,
   isSensitiveFile,
@@ -64,4 +67,7 @@ export {
   renderImage,
   renderCode,
   getRendererForFile,
+  isUnsupportedFormat,
+  UNSUPPORTED_EXTENSIONS,
+  FORMAT_SIZE_LIMITS,
 } from './renderers/index.js';
