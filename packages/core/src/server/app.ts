@@ -22,6 +22,12 @@ import { isMobileRequest } from './mobile-detect.js';
 
 const VERSION = '0.1.0';
 
+// Module capabilities — set by CLI layer at startup
+let _capabilities = { ai: false, mcp: false };
+export function setCapabilities(caps: { ai: boolean; mcp: boolean }) {
+  _capabilities = caps;
+}
+
 /**
  * Create and configure the Express application.
  * @param restartCallback — if provided, enables POST /api/restart endpoint
@@ -147,6 +153,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       port: 3099,
       version: VERSION,
     });
+  });
+
+  // Module capabilities
+  app.get('/api/capabilities', (_req: Request, res: Response) => {
+    res.json(_capabilities);
   });
 
   // Server restart (only when callback provided)

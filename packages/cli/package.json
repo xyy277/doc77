@@ -40,7 +40,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@doc77/core": "workspace:^",
+    "@doc77/core": "workspace:^"
+  },
+  "optionalDependencies": {
     "@doc77/mcp": "workspace:^",
     "@doc77/ai": "workspace:^"
   },

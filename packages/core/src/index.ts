@@ -57,7 +57,7 @@ export { scanDirectory, clearCache } from './scanner/index.js';
 export type { ScanResult } from './scanner/index.js';
 
 // Server
-export { createApp, createQueueApproveHandler, createAIChatHandler } from './server/app.js';
+export { createApp, createQueueApproveHandler, createAIChatHandler, setCapabilities } from './server/app.js';
 
 // Vendor
 export { fetchVendorAssets, isVendorReady, VENDOR_ASSETS } from './server/vendor.js';

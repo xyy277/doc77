@@ -21,10 +21,26 @@ import {
   removeProject,
   updateProject,
 } from '@doc77/core';
-import { getPendingTasks, getActiveLock, releaseProjectLock, updateTaskStatus } from '@doc77/mcp';
 
 const VERSION = '0.1.0';
 const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
+
+// Module availability — checked at startup, cached for session
+let mcpAvailable = false;
+let aiAvailable = false;
+async function detectModules() {
+  try { await import('@doc77/mcp'); mcpAvailable = true; } catch {}
+  try { await import('@doc77/ai'); aiAvailable = true; } catch {}
+}
+async function tryGetMcp(names: string[]): Promise<Record<string, any> | null> {
+  if (!mcpAvailable) return null;
+  try {
+    const mcp = await import('@doc77/mcp');
+    const result: Record<string, any> = {};
+    for (const name of names) result[name] = (mcp as any)[name];
+    return result;
+  } catch { return null; }
+}
 
 async function init() {
   await initDatabase(DB_PATH);
@@ -116,6 +132,10 @@ Doc77 v${VERSION} — 默认安全、对话驱动的智能本地文档管理 Age
   --version                           显示版本号
   --help                              显示帮助
 
+模块管理:
+  i <ai|mcp|all>                      安装可选模块
+  rm <ai|mcp>                         卸载模块
+
 配置管理:
   config set <key> <value>            设置配置项
   config get <key>                    获取配置项
@@ -157,6 +177,7 @@ async function main() {
   }
 
   await init();
+  await detectModules();
   const command = args[0];
 
   switch (command) {
@@ -171,19 +192,22 @@ async function main() {
         const { spawn } = await import('node:child_process');
         const http = await import('node:http');
 
-        // Startup maintenance
-        const { runShadowGC, rejectExpiredTasks, cleanupExpiredSessions } = await import('@doc77/mcp');
-        const firstProject = listProjects()[0];
-        if (firstProject) runShadowGC(firstProject.path);
-        rejectExpiredTasks();
-        cleanupExpiredSessions();
-
-        // Periodic maintenance every 30 min
-        const maint = setInterval(() => {
-          const proj = listProjects()[0];
-          if (proj) runShadowGC(proj.path);
+        // Startup maintenance (MCP optional — skip if not installed)
+        let maint: ReturnType<typeof setInterval> | undefined;
+        try {
+          const mcpMaint = await import('@doc77/mcp');
+          const { runShadowGC, rejectExpiredTasks, cleanupExpiredSessions } = mcpMaint;
+          const firstProject = listProjects()[0];
+          if (firstProject) runShadowGC(firstProject.path);
           rejectExpiredTasks();
-        }, 30 * 60 * 1000);
+          cleanupExpiredSessions();
+          // Periodic maintenance every 30 min
+          maint = setInterval(() => {
+            const proj = listProjects()[0];
+            if (proj) runShadowGC(proj.path);
+            rejectExpiredTasks();
+          }, 30 * 60 * 1000);
+        } catch { /* MCP not installed, skip maintenance */ }
 
         // Bind address priority: CLI --bind > DB config > default 127.0.0.1
         const isLocalAddr = (a: string) => a === '127.0.0.1' || a === 'localhost' || a === '::1';
@@ -207,15 +231,25 @@ async function main() {
         };
         const app = createApp(restartServer, bindAddr);
 
-        // Register MCP-dependent routes (avoid circular dep in @doc77/core)
-        const { executeApprovedTasks } = await import('@doc77/mcp');
-        const { createQueueApproveHandler } = await import('@doc77/core');
-        app.post('/api/queue/approve', createQueueApproveHandler(executeApprovedTasks));
+        // Register MCP-dependent routes (optional)
+        try {
+          const { executeApprovedTasks } = await import('@doc77/mcp');
+          const { createQueueApproveHandler } = await import('@doc77/core');
+          app.post('/api/queue/approve', createQueueApproveHandler(executeApprovedTasks));
+        } catch { /* MCP not installed */ }
 
-        // Register AI-dependent routes (avoid circular dep in @doc77/core)
-        const { AiProvider, DocAgent, READ_TOOLS } = await import('@doc77/ai');
-        const { createAIChatHandler } = await import('@doc77/core');
-        app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, READ_TOOLS }));
+        // Register AI-dependent routes (optional)
+        try {
+          const { AiProvider, DocAgent, READ_TOOLS } = await import('@doc77/ai');
+          const { createAIChatHandler } = await import('@doc77/core');
+          app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, READ_TOOLS }));
+        } catch { /* AI not installed */ }
+
+        // Inject capabilities into app
+        try {
+          const { setCapabilities } = await import('@doc77/core');
+          setCapabilities({ ai: aiAvailable, mcp: mcpAvailable });
+        } catch {}
 
         const server = http.createServer(app);
 
@@ -262,7 +296,7 @@ async function main() {
         const shutdown = async () => {
           console.log('\nShutting down...');
           server.close();
-          clearInterval(maint);
+          if (maint) clearInterval(maint as any);
           closeConnection();
           process.exit(0);
         };
@@ -359,52 +393,40 @@ async function main() {
       }
 
       case 'approve': {
+        const mcp = await tryGetMcp(['getPendingTasks','getTaskById','updateTaskStatus','executeApprovedTasks']);
+        if (!mcp) { console.error('MCP 模块未安装。安装: doc77 i mcp'); break; }
         if (args.includes('--list')) {
-          // List all pending tasks across all projects
           const projects = listProjects();
           for (const p of projects) {
-            const tasks = getPendingTasks(p.id);
+            const tasks = mcp.getPendingTasks(p.id);
             if (tasks.length > 0) {
               console.log(`\nProject [${p.id}] ${p.name}:`);
               for (const t of tasks) {
-                console.log(
-                  `  ${t.task_id}: ${t.operation_type} — ${JSON.stringify(t.operation_data)}`,
-                );
+                console.log(`  ${t.task_id}: ${t.operation_type} — ${JSON.stringify(t.operation_data)}`);
               }
             }
           }
         } else if (args.includes('--accept')) {
           const taskId = args[args.indexOf('--accept') + 1];
-          if (!taskId || taskId.startsWith('-')) {
-            console.error('Usage: doc77 approve --accept <task_id>');
-            process.exit(1);
-          }
-          const { getTaskById } = await import('@doc77/mcp');
-          const task = getTaskById(taskId);
+          if (!taskId || taskId.startsWith('-')) { console.error('Usage: doc77 approve --accept <task_id>'); process.exit(1); }
+          const task = mcp.getTaskById(taskId);
           if (!task) { console.error('Task not found:', taskId); process.exit(1); }
-          updateTaskStatus(taskId, 'approved');
-          // Execute immediately if --exec flag is given
+          mcp.updateTaskStatus(taskId, 'approved');
           if (args.includes('--exec')) {
-            const { executeApprovedTasks } = await import('@doc77/mcp');
-            const result = await executeApprovedTasks(task.project_id, [taskId]);
+            const result = await mcp.executeApprovedTasks(task.project_id, [taskId]);
             console.log(result.success ? 'Task executed successfully.' : 'Execution failed: ' + result.errors.join(', '));
-          } else {
-            console.log(`Task ${taskId} approved. Run with --exec to execute immediately.`);
-          }
+          } else { console.log(`Task ${taskId} approved. Run with --exec to execute immediately.`); }
         } else if (args.includes('--reject')) {
           const taskId = args[args.indexOf('--reject') + 1];
-          if (!taskId || taskId.startsWith('-')) {
-            console.error('Usage: doc77 approve --reject <task_id>');
-            process.exit(1);
-          }
-          updateTaskStatus(taskId, 'rejected');
+          if (!taskId || taskId.startsWith('-')) { console.error('Usage: doc77 approve --reject <task_id>'); process.exit(1); }
+          mcp.updateTaskStatus(taskId, 'rejected');
           console.log(`Task ${taskId} rejected.`);
         } else if (args.includes('--all')) {
           const projects = listProjects();
-          const allTasks = projects.flatMap(p => getPendingTasks(p.id));
+          const allTasks = projects.flatMap((p: any) => mcp.getPendingTasks(p.id));
           const isReject = args.includes('--reject');
           const newStatus = isReject ? 'rejected' : 'approved';
-          for (const t of allTasks) updateTaskStatus(t.task_id, newStatus);
+          for (const t of allTasks) mcp.updateTaskStatus(t.task_id, newStatus);
           console.log(`${allTasks.length} tasks ${newStatus}.`);
         } else {
           console.error('Usage: doc77 approve --list|--accept <id>|--reject <id>');
@@ -414,22 +436,19 @@ async function main() {
       }
 
       case 'lock': {
+        const mcp = await tryGetMcp(['getActiveLock','releaseProjectLock']);
+        if (!mcp) { console.error('MCP 模块未安装。安装: doc77 i mcp'); break; }
         if (args[1] === 'status') {
           const projects = listProjects();
           for (const p of projects) {
-            const lock = getActiveLock(p.id);
-            if (lock) {
-              console.log(`Project ${p.id} locked by ${lock.locked_by} at ${lock.locked_at}`);
-            }
+            const lock = mcp.getActiveLock(p.id);
+            if (lock) console.log(`Project ${p.id} locked by ${lock.locked_by} at ${lock.locked_at}`);
           }
         } else if (args[1] === 'release') {
           const pid = parseInt(args[2]);
-          releaseProjectLock(pid);
+          mcp.releaseProjectLock(pid);
           console.log(`Lock released for project ${pid}.`);
-        } else {
-          console.error('Usage: doc77 lock status|release <project_id>');
-          process.exit(1);
-        }
+        } else { console.error('Usage: doc77 lock status|release <project_id>'); process.exit(1); }
         break;
       }
 
@@ -451,13 +470,40 @@ async function main() {
         closeConnection();
         break;
 
+      case 'i': {
+        let modules = args.slice(1).filter((m: string) => ['ai','mcp','all'].includes(m));
+        if (modules.includes('all')) modules = ['ai','mcp'];
+        if (!modules.length) { console.log('用法: doc77 i <ai|mcp|all>'); break; }
+        const { execSync } = await import('node:child_process');
+        for (const m of modules) {
+          console.log(`安装 @doc77/${m}...`);
+          execSync(`npm install @doc77/${m}@${VERSION}`, { stdio: 'inherit' });
+          console.log(`✅ @doc77/${m} 安装完成`);
+        }
+        console.log('重启 Doc77 服务生效');
+        break;
+      }
+      case 'rm': {
+        const modules = args.slice(1).filter((m: string) => ['ai','mcp'].includes(m));
+        if (!modules.length) { console.log('用法: doc77 rm <ai|mcp>'); break; }
+        const { execSync } = await import('node:child_process');
+        for (const m of modules) {
+          console.log(`卸载 @doc77/${m}...`);
+          execSync(`npm uninstall @doc77/${m}`, { stdio: 'inherit' });
+          console.log(`✅ @doc77/${m} 已卸载`);
+        }
+        console.log('重启 Doc77 服务生效');
+        break;
+      }
+
       case 'mcp': {
         if (args[1] === 'serve') {
-          const { createMcpServer } = await import('@doc77/mcp');
+          const mcp = await tryGetMcp(['createMcpServer']);
+          if (!mcp) { console.error('MCP 模块未安装。安装: doc77 i mcp'); break; }
           const { StdioServerTransport } = await import(
             '@modelcontextprotocol/sdk/server/stdio.js'
           );
-          const server = createMcpServer();
+          const server = mcp.createMcpServer();
           const transport = new StdioServerTransport();
           await server.connect(transport);
           console.error('Doc77 MCP server running (stdio transport)');

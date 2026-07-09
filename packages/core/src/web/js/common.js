@@ -3,6 +3,14 @@
  * 包含: Theme, Toast/Confirm, Settings, Login Gate, Helpers
  */
 
+// Module capabilities
+window.__doc77_caps_ai = false;
+window.__doc77_caps_mcp = false;
+fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c){
+  window.__doc77_caps_ai = c.ai;
+  window.__doc77_caps_mcp = c.mcp;
+}).catch(function(){});
+
 //══════════ Theme ══════════
 (function initTheme() {
   const saved = localStorage.getItem('doc77-theme');
@@ -93,10 +101,15 @@ function switchSettingsTab(tab) {
       settingRow('清理间隔(分钟)','session.cleanup_interval_minutes','number','60') +
       settingRow('写入限制/会话','rate.write_limit_per_session','number','50') +
       settingRow('限制窗口(分钟)','rate.write_window_minutes','number','5') +
+      (window.__doc77_caps_mcp ? (
       settingToggle('MCP stdio','transport.mcp_stdio_enabled') +
       settingToggle('MCP HTTP','transport.mcp_http_enabled') +
-      settingRow('MCP 端口','transport.mcp_http_port','number','8899') + '</div>';
+      settingRow('MCP 端口','transport.mcp_http_port','number','8899')) : '') + '</div>';
   } else if (tab === 'ai') {
+    if (!window.__doc77_caps_ai) {
+      c.innerHTML = '<div class="text-center py-8 text-slate-500 text-sm">AI 模块未安装<br><code class="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded mt-2 inline-block">doc77 i ai</code></div>';
+      return;
+    }
     c.innerHTML = '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">AI 提供商</div><div class="space-y-3">' +
       '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">提供商</span>' +
       '<select id="aiProvider" onchange="onProviderChange()" class="w-44 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">' +

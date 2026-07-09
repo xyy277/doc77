@@ -45,7 +45,22 @@ var pid = new URLSearchParams(location.search).get('id');
 if (!pid) location.href = '/';
 var proj = null, projects = [], currentFile = null, activeTab = 'outline';
 
+var CAPABILITIES = { ai: false, mcp: false };
+function applyCapabilities() {
+  if (!CAPABILITIES.ai) {
+    var aiBtn = document.getElementById('aiBtn'); if (aiBtn) aiBtn.style.display = 'none';
+    var tabChat = document.getElementById('tabChat'); if (tabChat) tabChat.style.display = 'none';
+  }
+  if (!CAPABILITIES.mcp) {
+    var tabQueue = document.getElementById('tabQueue'); if (tabQueue) tabQueue.style.display = 'none';
+  }
+}
+
 (async function boot() {
+  // Fetch capabilities first (non-blocking, apply when ready)
+  fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c){
+    CAPABILITIES = c; applyCapabilities();
+  }).catch(function(){});
   try {
     var r = await fetch('/api/projects');
     projects = await r.json();
@@ -55,7 +70,6 @@ var proj = null, projects = [], currentFile = null, activeTab = 'outline';
     document.title = 'Doc77 — ' + proj.name;
     renderProjMenu(); loadTree(''); loadTasks(); setActiveTab('outline');
     renderBookmarks(); renderRecentFiles();
-    // Touch project's last_opened
     fetch('/api/projects/' + pid + '/touch', { method: 'POST' }).catch(function(){});
   } catch(e) { document.getElementById('projName').textContent = '⚠ 加载失败'; }
 })();
@@ -660,7 +674,7 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
-function openAIChat() { togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容：' + currentFile); } }
+function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容：' + currentFile); } }
 
 // Outline
 var outlineHeadings = [], outlineBuilt = false;
