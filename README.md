@@ -13,8 +13,11 @@ npm install -g @doc77/cli
 # 注册一个项目
 doc77 register ./my-docs --name "我的文档"
 
-# 启动 Dashboard
+# 启动 Dashboard（仅本机访问）
 doc77 start
+
+# 或允许局域网 / 外部访问
+doc77 start --bind 0.0.0.0
 
 # 浏览器打开 http://localhost:3099
 ```
@@ -106,6 +109,8 @@ doc77 vendor-install --no-pyodide
 ./scripts/restart.sh              # 默认端口 3099
 ./scripts/restart.sh --port 8080  # 自定义端口
 ```
+
+> 如需绑定 `0.0.0.0` 允许外部访问，使用 `doc77 start --bind 0.0.0.0`（启用后需要设置访问密码）。
 
 ## 功能概览
 

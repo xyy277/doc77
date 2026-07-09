@@ -97,11 +97,41 @@ function renderProjMenu(filter) {
 function switchProject(id) { location.href = '/preview.html?id=' + id; }
 
 //══════════ Panels ══════════
+var leftPanelExpandedWidth = 288; // remembered expanded width
+
+function toggleCollapse() {
+  var panel = document.getElementById('leftPanel');
+  var btn = document.getElementById('collapseLeftBtn');
+  var isCollapsed = panel.classList.contains('collapsed');
+
+  if (isCollapsed) {
+    // Expand
+    panel.style.width = leftPanelExpandedWidth + 'px';
+    panel.classList.remove('collapsed');
+  } else {
+    // Save current width (if not already collapsed by another mechanism)
+    var curW = parseInt(panel.style.width);
+    if (curW > 60) leftPanelExpandedWidth = curW;
+    // Collapse
+    panel.style.width = '56px';
+    panel.classList.add('collapsed');
+  }
+
+  // Toggle visibility of collapsible content sections
+  panel.querySelectorAll('.collapsible-content').forEach(function(el) {
+    el.classList.toggle('hidden', !isCollapsed);
+  });
+}
+
 function togglePanel(side) {
   var panel = document.getElementById(side === 'left' ? 'leftPanel' : 'rightPanel');
   var h = panel.classList.toggle('hidden');
   if (side === 'left') {
     document.getElementById('showLeftBtn').classList.toggle('hidden', !h);
+    // When showing left panel from full hide, ensure expanded state
+    if (!h && panel.classList.contains('collapsed')) {
+      toggleCollapse();
+    }
   } else {
     var capsule = document.getElementById('capsuleBtn');
     var icon = document.getElementById('capsuleIcon');
@@ -114,11 +144,23 @@ function togglePanel(side) {
 (function(){
   var r = false, t = null;
   document.querySelectorAll('.cursor-col-resize').forEach(function(h, i) {
-    h.addEventListener('mousedown', function(e) { r = true; t = i === 0 ? 'left' : 'right'; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; e.preventDefault(); });
+    h.addEventListener('mousedown', function(e) {
+      // If left panel is collapsed, auto-expand before dragging
+      if (i === 0) {
+        var lp = document.getElementById('leftPanel');
+        if (lp && lp.classList.contains('collapsed')) {
+          lp.style.width = leftPanelExpandedWidth + 'px';
+          lp.classList.remove('collapsed');
+          lp.querySelectorAll('.collapsible-content').forEach(function(el) { el.classList.remove('hidden'); });
+        }
+      }
+      r = true; t = i === 0 ? 'left' : 'right';
+      document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; e.preventDefault();
+    });
   });
   document.addEventListener('mousemove', function(e) {
     if (!r) return;
-    if (t === 'left') { document.getElementById('leftPanel').style.width = Math.max(200, Math.min(500, e.clientX)) + 'px'; }
+    if (t === 'left') { var w = Math.max(200, Math.min(500, e.clientX)); document.getElementById('leftPanel').style.width = w + 'px'; leftPanelExpandedWidth = w; }
     else { var rp = document.getElementById('rightPanel'); var maxW = Math.floor(window.innerWidth / 3); var w = Math.max(200, Math.min(maxW, window.innerWidth - e.clientX)); rp.style.width = w + 'px'; var cb = document.getElementById('capsuleBtn'); if (cb && !rp.classList.contains('hidden')) cb.style.right = (w - 4) + 'px'; }
   });
   document.addEventListener('mouseup', function() { if (r) { r = false; t = null; document.body.style.cursor = ''; document.body.style.userSelect = ''; } });
@@ -504,6 +546,13 @@ async function doGlobalSearch() {
       return '<div onclick="loadContent(\'' + escAttr(m.file) + '\')" class="flex flex-col px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-xs"><span class="text-blue-400 truncate">' + esc(m.file) + ':' + m.line + '</span><span class="text-slate-400 truncate">' + esc(m.content) + '</span></div>';
     }).join('');
   } catch(e) { rdiv.innerHTML = '<div class="text-xs text-red-500 px-2 py-1">搜索失败</div>'; }
+}
+
+function toggleBookmarkSection() {
+  var list = document.getElementById('bookmarkList');
+  var arrow = document.getElementById('bookmarkArrow');
+  var collapsed = list.classList.toggle('hidden');
+  if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
 }
 
 // Feature 10: Bookmarks

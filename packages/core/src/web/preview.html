@@ -17,10 +17,11 @@
 <div class="flex h-screen w-full">
 
   <!-- ══════ 左侧栏 ══════ -->
-  <aside id="leftPanel" class="bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col z-20 shrink-0" style="width:288px">
+  <aside id="leftPanel" class="bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col z-20 shrink-0 transition-all duration-300 overflow-hidden" style="width:288px">
     <div class="h-14 px-4 border-b border-slate-800 flex items-center justify-between shrink-0">
-      <a href="/" class="flex items-center gap-2 text-white font-bold text-lg no-underline">
-        <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded text-sm">📁</span> Doc77
+      <a href="/" class="flex items-center gap-2 text-white font-bold text-lg no-underline shrink-0">
+        <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded text-sm">📁</span>
+        <span class="collapsible-content">Doc77</span>
       </a>
       <div class="flex items-center gap-1">
         <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-sm" title="切换主题" id="themeBtn">🌙</button>
@@ -29,7 +30,7 @@
     </div>
 
     <!-- Project Switcher -->
-    <div class="p-3 relative">
+    <div class="p-3 relative collapsible-content">
       <button id="projBtn" onclick="toggleProjMenu()" class="w-full text-left rounded-md px-3 py-2 text-sm flex items-center justify-between text-slate-200 cursor-pointer border transition-colors bg-slate-800 border-slate-700 hover:border-slate-600">
         <span class="font-medium truncate" id="projName">💼 加载中...</span>
         <span id="projChev" class="transition-transform text-xs">▾</span>
@@ -38,28 +39,30 @@
     </div>
 
     <!-- ⭐ Bookmarks -->
-    <div class="px-3" id="bookmarkSection">
-      <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between">
-        <span>⭐ 收藏</span><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
+    <div class="px-3 collapsible-content" id="bookmarkSection">
+      <div onclick="toggleBookmarkSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between cursor-pointer hover:text-slate-300 transition-colors select-none">
+        <span><span id="bookmarkArrow">▾</span> ⭐ 收藏</span><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
       </div>
-      <div id="bookmarkList" class="space-y-0.5 mb-2 max-h-24 overflow-y-auto scrollbar-dark text-xs"></div>
+      <div id="bookmarkList" class="space-y-0.5 mb-2 max-h-36 overflow-y-auto scrollbar-dark text-xs"></div>
     </div>
 
     <!-- 🕐 Recent Files -->
-    <div class="px-3" id="recentSection">
+    <div class="px-3 collapsible-content" id="recentSection">
       <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1">🕐 近期文件</div>
       <div id="recentList" class="space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
     </div>
 
-    <!-- Tree -->
+    <!-- Tree (wrapper stays flex-1 to push status bar to bottom) -->
     <div class="flex-1 flex flex-col min-h-0">
+      <div class="collapsible-content flex flex-col flex-1 min-h-0">
       <div class="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider flex justify-between items-center shrink-0">目录树<button class="hover:text-slate-300 transition-colors" title="刷新缓存" onclick="refreshTree()">🔄</button></div>
       <div class="px-3 mb-2 shrink-0"><div class="relative"><span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="fileFilter" placeholder="过滤文件..." oninput="applyFilter()" class="w-full bg-slate-950 border border-slate-800 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"></div></div>
       <div class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-dark" id="tree" role="tree"><div class="text-center py-6 text-slate-500 text-xs">选择一个项目开始</div></div>
+      </div>
     </div>
 
     <!-- 🔎 Global Search -->
-    <div class="px-3 py-2.5 border-t border-slate-800 shrink-0">
+    <div class="px-3 py-2.5 border-t border-slate-800 shrink-0 collapsible-content">
       <div class="relative">
         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔎</span>
         <input id="globalSearch" placeholder="全局搜索..." onkeydown="if(event.key==='Enter')doGlobalSearch()" class="w-full bg-slate-950 border border-slate-700 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600">
@@ -68,9 +71,10 @@
     </div>
 
     <!-- Status -->
-    <div class="px-3 py-2.5 border-t border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50">
-      <div id="sseInd" class="flex items-center gap-1.5 text-xs text-emerald-500 font-medium"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>实时</div>
-      <span class="text-[10px] text-slate-600">v0.2.0</span>
+    <div class="px-3 py-2.5 border-t border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/50">
+      <div id="sseInd" class="flex items-center gap-1.5 text-xs text-emerald-500 font-medium shrink-0"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span><span class="collapsible-content">实时</span></div>
+      <span class="text-[10px] text-slate-600 collapsible-content flex-1 text-right">v0.2.0</span>
+      <button onclick="toggleCollapse()" class="text-slate-500 hover:text-slate-300 transition-colors shrink-0" title="折叠侧栏" id="collapseLeftBtn">☰</button>
     </div>
   </aside>
 

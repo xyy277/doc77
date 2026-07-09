@@ -97,7 +97,7 @@ Doc77 v${VERSION} — 默认安全、对话驱动的智能本地文档管理 Age
   doc77 <command> [options]
 
 核心命令:
-  start [--port <n>] [--no-browser]   启动 Web Dashboard
+  start [--port <n>] [--bind <addr>] [--no-browser]  启动 Web Dashboard
   register <path> [--name <n>]        注册项目
   list [--json]                       列出所有项目
   remove <id>                         按 ID 移除项目
@@ -181,9 +181,18 @@ async function main() {
         // Restart callback: spawn new process with same args, then exit
         const restartServer = () => {
           const argv = process.argv.slice(1); // skip node binary
+          let spawnFailed = false;
           const child = spawn(process.execPath, argv, { detached: true, stdio: 'inherit' });
+          child.on('error', (err) => {
+            spawnFailed = true;
+            console.error('[doc77] Failed to restart server:', err.message);
+          });
           child.unref();
-          process.exit(0);
+          // Defer exit to next event-loop turn so that the async 'error'
+          // event (if any) has a chance to fire before we decide to exit.
+          setImmediate(() => {
+            if (!spawnFailed) process.exit(0);
+          });
         };
         const app = createApp(restartServer, bindAddr);
 

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doc77 — 功能引导</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{}}}</script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+
+<header class="bg-slate-900 dark:bg-slate-950 text-white">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5 text-white font-bold text-lg no-underline">
+      <span class="bg-blue-600 text-white px-2 py-1 rounded-md text-sm shadow-sm">📁</span> Doc77
+    </a>
+    <div class="flex items-center gap-3 text-xs">
+      <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-base" title="切换主题" id="themeBtn">🌙</button>
+      <a href="/" class="text-slate-400 hover:text-white transition-colors text-sm no-underline">🏠 首页</a>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-4xl mx-auto px-6 py-10">
+
+  <!-- Hero -->
+  <div class="text-center mb-12">
+    <h1 class="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-3">🎓 快速入门</h1>
+    <p class="text-slate-500 dark:text-slate-400 max-w-xl mx-auto text-sm leading-relaxed">
+      了解 Doc77 的每个功能。从目录树到 AI 助手，5 分钟掌握所有操作。
+    </p>
+  </div>
+
+  <!-- Quick start steps -->
+  <div class="mb-10">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-5 flex items-center gap-2">🚀 三步开始</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 text-center relative">
+        <div class="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shadow-md">1</div>
+        <div class="text-3xl mb-2">📂</div>
+        <h3 class="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">注册项目</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">在首页添加本地文档目录，Doc77 记住你的每一个项目</p>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 text-center relative">
+        <div class="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shadow-md">2</div>
+        <div class="text-3xl mb-2">📁</div>
+        <h3 class="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">选择文件</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">在左侧目录树中浏览并点击文件，即刻预览</p>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 text-center relative">
+        <div class="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shadow-md">3</div>
+        <div class="text-3xl mb-2">✨</div>
+        <h3 class="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">开始阅读</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">阅读、搜索、听读、AI 总结 — 一站式文档工作台</p>
+      </div>
+    </div>
+    <div class="text-center mt-6">
+      <a href="/" class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium">
+        📂 注册你的第一个项目
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 1: Sidebar -->
+  <div class="mb-10">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-5 flex items-center gap-2">
+      <span class="bg-slate-800 dark:bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs">左侧栏</span> 侧边栏
+    </h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <tbody>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg w-12">💼</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100 w-24">项目切换</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">点击顶部按钮切换已注册的项目目录，每个项目独立管理</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">⭐</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">收藏夹</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">右键文件选择收藏，常用文档快速访问，点击即打开</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">🕐</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">近期文件</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">自动记录最近打开的文件，不必重复翻目录树</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">📁</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">目录树</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">浏览项目文件夹结构，点击目录展开/收起，点击文件即时预览</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">🔍</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">文件过滤</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">在目录树上方输入关键字，快速定位目标文件</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">🔎</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">全局搜索</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">搜索项目内所有文件内容（文件名 + 全文），回车触发</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">◀</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">折叠侧栏</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">收起侧栏为窄条（仅显示 Logo），获得更大阅读空间</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">🌙</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">主题切换</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">一键切换深色 / 浅色模式，保护你的眼睛</td></tr>
+          <tr><td class="px-5 py-3 text-center text-lg">⚙</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">设置</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">配置 AI Token 与模型、网络绑定地址、访问密码、编辑器等全局选项</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 2: Toolbar -->
+  <div class="mb-10">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-5 flex items-center gap-2">
+      <span class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs">顶部工具栏</span> 阅读工具
+    </h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <tbody>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg w-12">🔍</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100 w-28">文档内搜索</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">在当前文档中搜索关键词，支持 ↑↓ 跳转匹配项。快捷键 <kbd class="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono">Ctrl+F</kbd></td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">▶</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">自动滚动</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">自动向下阅读滚动，四档速度可调（慢 / 中 / 快 / 极速），解放双手</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">🔊</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">TTS 朗读</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">语音朗读文档，五档语速调节（0.5x - 2x），眼睛累了就用听的</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">✨</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">AI 总结</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">一键生成文档摘要，支持朗读摘要，快速了解长篇文档核心内容。需配置 AI Token</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">▶</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">运行代码</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">打开 <code class="bg-slate-100 dark:bg-slate-700 px-1 rounded text-[10px]">.js</code> / <code class="bg-slate-100 dark:bg-slate-700 px-1 rounded text-[10px]">.py</code> 文件时，可直接在浏览器 Sandbox / Pyodide 中执行</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">📝</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">编辑器打开</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">一键在 VS Code 或系统默认编辑器中打开当前文件进行编辑</td></tr>
+          <tr><td class="px-5 py-3 text-center text-lg">📂</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">文件夹中显示</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">在系统文件管理器（Finder / 资源管理器）中定位并高亮当前文件</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 3: Right Panel -->
+  <div class="mb-10">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-5 flex items-center gap-2">
+      <span class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs">右侧面板</span> AI 与审批
+    </h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <tbody>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg w-12">📑</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100 w-24">文档大纲</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">根据 Markdown 标题自动生成文档结构导航，点击标题快速跳转</td></tr>
+          <tr class="border-b border-slate-100 dark:border-slate-700"><td class="px-5 py-3 text-center text-lg">💬</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">AI 助手</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">对话式 AI，可针对当前文档提问、请求总结、规划批量文件操作。MCP 协议集成，AI 可安全读写文件（需审批）</td></tr>
+          <tr><td class="px-5 py-3 text-center text-lg">📋</td><td class="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">审批队列</td><td class="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">MCP 写操作（创建/修改/删除文件）默认入队等待审批。你确认后才执行，支持 CLI 与 Web 双通道审批，事务回滚保障安全</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 4: Formats -->
+  <div class="mb-10">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-5 flex items-center gap-2">📋 支持的格式</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">📝</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">Markdown / MDX</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">.md .mdx</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">📄</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">PDF 文档</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">.pdf</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">📊</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">Office 文档</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">.docx .xlsx .xls</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">🖼️</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">图片</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">.png .jpg .gif .svg .webp .avif</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">🔀</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">Mermaid 图表</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">.mermaid .mmd</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">💻</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">代码文件</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">.ts .js .py .go .rs .java 等 44 种</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">▶️</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">可执行代码</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">.js (Sandbox) .py (Pyodide WASM)</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-center">
+        <div class="text-2xl mb-1">📦</div>
+        <div class="text-xs font-medium text-slate-700 dark:text-slate-300">未支持格式</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">显示文件信息卡，非预览</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="text-center py-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">🚀 准备开始了吗？</h2>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mb-5 max-w-md mx-auto leading-relaxed">注册一个本地目录，体验文档预览 + AI 驱动管理的全新工作流。</p>
+    <a href="/" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
+      📂 注册你的第一个项目
+    </a>
+  </div>
+
+</div>
+
+<!-- GitHub Star -->
+<a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener"
+   class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm font-medium no-underline hover:text-white"
+   title="给 Doc77 点个 Star ⭐">
+  ⭐ 点个 Star 吧
+</a>
+
+<script src="js/common.js"></script>
+</body>
+</html>

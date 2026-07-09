@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { exec, execFileSync, execSync } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
@@ -120,7 +120,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   }
 
   // Serve vendor cache (offline CDN resources)
-  const vendorDir = path.join(require('node:os').homedir(), '.doc77', 'vendor');
+  const vendorDir = path.join(process.env.HOME || '/home', '.doc77', 'vendor');
   app.use('/vendor', express.static(vendorDir, { fallthrough: true }));
 
   // CORS — allow all origins (localhost-only binding for security)
@@ -356,14 +356,46 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     }
     dirPath = path.resolve(dirPath);
 
-    // Security: allow browsing / but filter out system directories
-    const BLOCKED_DIRS = new Set([
-      'etc', 'proc', 'sys', 'root', 'var', 'boot', 'dev', 'run', 'snap',
-      'bin', 'sbin', 'lib', 'lib64', 'usr', 'lost+found', '.dockerenv',
-    ]);
-    const SAFE_ROOTS = new Set(['/home', '/mnt', '/tmp', '/Users', '/Volumes', '/opt', '/media', '/srv']);
-    const isRoot = dirPath === '/';
-    const inSafe = SAFE_ROOTS.has(dirPath) || [...SAFE_ROOTS].some(r => dirPath.startsWith(r + '/'));
+    // Determine if request comes from localhost (even when bound to 0.0.0.0)
+    const remoteIp = req.socket.remoteAddress || '';
+    const isLocalRequest = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+    const isLocalBind = !bindAddr || bindAddr === '127.0.0.1' || bindAddr === 'localhost' || bindAddr === '::1';
+    const isLocalAccess = isLocalBind || isLocalRequest;
+
+    // WSL /mnt blocking — only relevant on Linux, and only for remote access
+    const isLinux = process.platform === 'linux';
+    const isMntPath = isLinux && (dirPath === '/mnt' || dirPath.startsWith('/mnt/'));
+    if (!isLocalAccess && isMntPath) {
+      res.json({ path: dirPath, parent: null, roots: ['/home', '/tmp'], entries: [], error: '远程访问模式下不允许浏览 /mnt（Windows 驱动器）' });
+      return;
+    }
+
+    // Security: allow browsing root but filter out system directories
+    const isWin = process.platform === 'win32';
+    const BLOCKED_DIRS = isWin
+      ? new Set(['Windows', 'Program Files', 'Program Files (x86)', 'ProgramData',
+                 '$Recycle.Bin', 'System Volume Information', 'Recovery', 'Config.Msi',
+                 'MSOCache', 'PerfLogs'])
+      : new Set(['etc', 'proc', 'sys', 'root', 'var', 'boot', 'dev', 'run', 'snap',
+                 'bin', 'sbin', 'lib', 'lib64', 'usr', 'lost+found', '.dockerenv']);
+
+    function getSafeRoots(): Set<string> {
+      if (isWin) {
+        const drives = new Set<string>();
+        for (let c = 65; c <= 90; c++) { // A-Z
+          const drive = String.fromCharCode(c) + ':\\';
+          try { if (fs.existsSync(drive)) drives.add(drive); } catch {}
+        }
+        return drives;
+      }
+      return new Set(['/home', '/mnt', '/tmp', '/Users', '/Volumes', '/opt', '/media', '/srv']);
+    }
+    const SAFE_ROOTS = getSafeRoots();
+
+    // Cross-platform root detection (C:\ on Windows, / on Unix)
+    const parsedRoot = path.parse(dirPath).root;
+    const isRoot = parsedRoot === dirPath;
+    const inSafe = SAFE_ROOTS.has(dirPath) || [...SAFE_ROOTS].some(r => dirPath.startsWith(r + path.sep));
     if (!isRoot && !inSafe) {
       res.json({ path: dirPath, parent: null, roots: [...SAFE_ROOTS], entries: [], error: '此目录不在允许访问的范围内' });
       return;
@@ -381,6 +413,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         entries = raw
           .filter(e => !e.name.startsWith('.')) // hide dotfiles
           .filter(e => !(isRoot && (BLOCKED_DIRS.has(e.name) || e.name.includes('usr-is-merged') || e.name === 'init')))
+          .filter(e => !(isRoot && !isLocalAccess && isLinux && e.name === 'mnt')) // hide /mnt in remote mode
           .map(e => ({
             name: e.name,
             type: e.isDirectory() ? 'directory' : 'file',
@@ -400,20 +433,34 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     const parent = path.dirname(dirPath);
     const hasParent = parent !== dirPath;
 
-    // Safe roots for initial view (no /etc, /proc, etc.)
+    // Safe roots for initial view (no system directories)
     const roots: string[] = [];
-    const home = process.env.HOME || '/home';
-    if (fs.existsSync(home)) roots.push(home);
-    try {
-      const isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
-      if (isWsl) {
-        for (const drive of ['d', 'c', 'e']) {
-          try { if (fs.existsSync('/mnt/' + drive)) roots.push('/mnt/' + drive); } catch {}
-        }
+    if (isWin) {
+      // Windows: use USERPROFILE as home, plus available drives
+      const winHome = process.env.USERPROFILE || 'C:\\Users\\Default';
+      if (fs.existsSync(winHome)) roots.push(winHome);
+      for (let c = 65; c <= 90; c++) {
+        const drive = String.fromCharCode(c) + ':\\';
+        try { if (fs.existsSync(drive)) roots.push(drive); } catch {}
       }
-    } catch {}
-    if (process.platform === 'darwin' && !roots.includes('/Users')) roots.push('/Users');
-    if (!roots.includes('/tmp')) roots.push('/tmp');
+    } else {
+      // Unix: use HOME, plus platform-specific paths
+      const home = process.env.HOME || '/home';
+      if (fs.existsSync(home)) roots.push(home);
+      // Only show /mnt mounts on local access (remote blocks them for security)
+      if (isLocalAccess && isLinux) {
+        try {
+          const isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
+          if (isWsl) {
+            for (const drive of ['d', 'c', 'e']) {
+              try { if (fs.existsSync('/mnt/' + drive)) roots.push('/mnt/' + drive); } catch {}
+            }
+          }
+        } catch {}
+      }
+      if (process.platform === 'darwin' && !roots.includes('/Users')) roots.push('/Users');
+      if (!roots.includes('/tmp')) roots.push('/tmp');
+    }
 
     res.json({ path: dirPath, parent: hasParent ? parent : null, roots, entries, error });
   });
@@ -865,7 +912,70 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
   // === Search API ===
 
-  // Full-text search via grep
+  /**
+   * Recursively search text files under `dirPath` for `keyword`.
+   * Pure Node.js — no external dependencies (grep, ripgrep, etc.).
+   * Cross-platform: works on Windows, macOS, and Linux.
+   */
+  function searchInFiles(
+    dirPath: string,
+    keyword: string,
+    maxResults = 50,
+  ): Array<{ file: string; line: number; content: string }> {
+    const results: Array<{ file: string; line: number; content: string }> = [];
+    const lowerKey = keyword.toLowerCase();
+    const SKIP_DIRS = new Set([
+      'node_modules', '.git', '.svn', '__pycache__', '.venv', 'venv',
+      'dist', '.cache', '.next', '.nuxt', 'build', 'target',
+    ]);
+    const SKIP_EXT = new Set([
+      '.exe', '.dll', '.so', '.dylib', '.bin', '.class', '.jar', '.war', '.o', '.wasm',
+      '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.ico', '.bmp', '.avif',
+      '.mp4', '.mp3', '.wav', '.ogg', '.flac', '.aac', '.mov', '.avi', '.mkv',
+      '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz', '.zst',
+      '.pdf', '.docx', '.xlsx', '.pptx', '.epub', '.mobi',
+      '.ttf', '.woff', '.woff2', '.otf', '.eot',
+      '.db', '.sqlite', '.sqlite3',
+    ]);
+
+    function walk(dir: string) {
+      if (results.length >= maxResults) return;
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+      catch { return; }
+
+      for (const entry of entries) {
+        if (results.length >= maxResults) return;
+        if (entry.name.startsWith('.')) continue; // skip dotfiles/dotdirs
+
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!SKIP_DIRS.has(entry.name)) walk(fullPath);
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase();
+          if (SKIP_EXT.has(ext)) continue;
+          try {
+            const content = fs.readFileSync(fullPath, 'utf-8');
+            const lines = content.split('\n');
+            for (let i = 0; i < lines.length && results.length < maxResults; i++) {
+              if (lines[i].toLowerCase().includes(lowerKey)) {
+                results.push({
+                  file: fullPath.slice(dirPath.length + 1), // relative path
+                  line: i + 1,
+                  content: lines[i].substring(0, 200),
+                });
+              }
+            }
+          } catch { /* skip unreadable / binary files */ }
+        }
+      }
+    }
+
+    walk(dirPath);
+    return results;
+  }
+
+  // Full-text search (cross-platform, pure Node.js — no grep dependency)
   app.get('/api/search', (req: Request, res: Response) => {
     const keyword = (req.query.q as string) || '';
     const projectId = parseInt(req.query.project_id as string, 10);
@@ -890,32 +1000,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         return;
       }
 
-      const result = execFileSync(
-        'grep',
-        ['-rnIs', '--exclude-dir=node_modules', '--exclude-dir=.git', '-m', '50', keyword, project.path],
-        { encoding: 'utf-8', timeout: 5000 },
-      );
-
-      const matches = result
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => {
-          const [file, lineNum, ...rest] = line.split(':');
-          return {
-            file: file.replace(project.path + '/', ''),
-            line: parseInt(lineNum, 10),
-            content: rest.join(':').substring(0, 200),
-          };
-        });
-
+      const matches = searchInFiles(project.path, keyword, 50);
       res.json({ keyword, matches });
     } catch (err: unknown) {
-      // grep returns exit code 1 when no matches — not an error
-      if ((err as any)?.code === 1 || (err as any)?.status === 1) {
-        res.json({ keyword, matches: [] });
-        return;
-      }
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
     }

@@ -112,7 +112,7 @@ function switchSettingsTab(tab) {
       '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">当前实际绑定</span><span class="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400" id="runtimeBind">-</span></div>' +
       '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">配置值（重启后生效）</span><span class="text-sm font-mono" id="configBind">-</span></div>' +
       settingRow('','security.bind_address','text','127.0.0.1') +
-      '<input data-key="security.bind_address" type="hidden" id="bindAddrInput" value="">' +
+      '<input type="hidden" id="bindAddrInput" value="">' +
       '</div>' +
       '<div class="text-[10px] text-amber-600 dark:text-amber-400 mt-1 ml-1" id="bindMismatch" style="display:none">⚠️ 配置值与当前实际绑定不一致，重启后生效</div>' +
       '<div class="text-[10px] text-slate-400 mt-1 ml-1">修改后需点击下方「重启服务」生效</div>' +
@@ -225,6 +225,7 @@ async function saveSettings() {
 async function restartServer() {
   if (!await confirmDialog('确定重启服务？正在进行的操作会中断，浏览器需要刷新页面重新连接。')) return;
   try {
+    await saveSettings();
     await fetch('/api/restart', { method: 'POST' });
     toast('服务正在重启，3 秒后自动刷新...', 'info');
     setTimeout(function() { location.reload(); }, 3000);
