@@ -221,6 +221,14 @@ async function loadContent(filePath) {
     if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
       html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
       if (d.type === 'markdown') setTimeout(function(){ buildOutline(); }, 50);
+      // Show Run button for JS and Python files
+      if (d.type === 'code') {
+        var ext = filePath.split('.').pop().toLowerCase();
+        if (ext === 'js' || ext === 'py') {
+          var runBtn = document.getElementById('runBtn');
+          if (runBtn) { runBtn.classList.remove('hidden'); runBtn.disabled = false; runBtn.dataset.lang = ext; runBtn.dataset.code = d.content; }
+        }
+      }
     } else if (d.type === 'image') {
       html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-center"><img src="' + d.rawUrl + '" alt="' + esc(filePath) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="openImageLightbox(\'' + escAttr(d.rawUrl) + '\', \'' + escAttr(filePath) + '\')" /></div>';
     } else if (d.type === 'pdf') {
@@ -873,4 +881,86 @@ function getSiblingImages(filePath) {
       return images.map(function(e){ return { name:e.name, path: (parentDir ? parentDir+'/' : '') + e.name }; });
     })
     .catch(function(){ return []; });
+}
+
+//══════════ Code Execution (Live Preview) ══════════
+function runCode() {
+  var runBtn = document.getElementById('runBtn');
+  var lang = runBtn.dataset.lang;
+  var code = (document.getElementById('docContent') || {}).textContent || runBtn.dataset.code || '';
+  if (!code.trim()) { toast('没有可执行的代码','error'); return; }
+
+  var area = document.getElementById('contentArea');
+  var existing = document.getElementById('codeOutput');
+  if (existing) existing.remove();
+
+  var outputDiv = document.createElement('div');
+  outputDiv.id = 'codeOutput';
+  outputDiv.className = 'max-w-4xl mx-auto mt-4 bg-slate-900 dark:bg-black border border-slate-700 rounded-xl overflow-hidden';
+  outputDiv.innerHTML = '<div class="flex items-center justify-between px-4 py-2 bg-slate-800 dark:bg-slate-950 border-b border-slate-700 text-xs text-slate-300">' +
+    '<span>▶ 输出</span><span class="text-slate-500" id="codeOutputLang">' + lang + '</span>' +
+    '<button onclick="document.getElementById(\'codeOutput\').remove()" class="text-slate-400 hover:text-white">✕</button></div>' +
+    '<div class="p-4 font-mono text-sm text-emerald-400 whitespace-pre-wrap max-h-80 overflow-y-auto" id="codeOutputText">运行中...</div>';
+  area.appendChild(outputDiv);
+  outputDiv.scrollIntoView({ behavior: 'smooth' });
+
+  if (lang === 'js') runJS(code);
+  else if (lang === 'py') runPython(code);
+}
+
+function runJS(code) {
+  var output = [];
+  var iframe = document.createElement('iframe');
+  iframe.sandbox = 'allow-scripts';
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+
+  try {
+    iframe.contentWindow.console = { log: function() { for (var i=0;i<arguments.length;i++) output.push(String(arguments[i])); } };
+    var scriptEl = iframe.contentDocument.createElement('script');
+    scriptEl.textContent = 'try {\n' + code + '\n} catch(e) { console.log("Error: " + e.message); }';
+    iframe.contentDocument.body.appendChild(scriptEl);
+    setTimeout(function() {
+      document.getElementById('codeOutputText').textContent = output.join('\n') || '(无输出)';
+      document.body.removeChild(iframe);
+    }, 500);
+  } catch(e) {
+    document.getElementById('codeOutputText').textContent = 'Error: ' + e.message;
+    document.body.removeChild(iframe);
+  }
+}
+
+function runPython(code) {
+  var outEl = document.getElementById('codeOutputText');
+  loadPyodide(function(pyodide) {
+    try {
+      pyodide.runPython('import sys\nfrom io import StringIO\nsys.stdout = StringIO()');
+      pyodide.runPython(code);
+      var stdout = pyodide.runPython('sys.stdout.getvalue()');
+      outEl.textContent = stdout || '(无输出)';
+    } catch(e) {
+      outEl.textContent = 'Python Error: ' + e.message;
+    }
+  });
+}
+
+function loadPyodide(cb) {
+  if (window._pyodide) { cb(window._pyodide); return; }
+  var outEl = document.getElementById('codeOutputText');
+  if (outEl) outEl.textContent = '正在加载 Python 运行时 (Pyodide ~12MB)...';
+
+  if (typeof loadPyodide !== 'undefined') {
+    loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/' }).then(function(py) {
+      window._pyodide = py; cb(py);
+    });
+  } else {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js';
+    s.onload = function() {
+      loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/' }).then(function(py) {
+        window._pyodide = py; cb(py);
+      });
+    };
+    document.head.appendChild(s);
+  }
 }

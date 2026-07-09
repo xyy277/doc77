@@ -126,10 +126,57 @@ async function openDirDialog(forEditId) {
   btn.disabled = false;
 }
 
-// Browser-side fallback: use webkitdirectory input to pick a folder
+// Browser-side fallback: use File System Access API (showDirectoryPicker)
+// This opens the OS-native folder picker with correct "选择文件夹" button text.
+// Falls back to webkitdirectory input if the API is unavailable.
 var _dirPickTarget = null;
-function browserDirPick(forEditId) {
+async function browserDirPick(forEditId) {
   _dirPickTarget = forEditId;
+
+  // Method 1: File System Access API (Chrome 86+, Edge 86+)
+  if (typeof window.showDirectoryPicker === 'function') {
+    try {
+      var handle = await window.showDirectoryPicker({ mode: 'read' });
+      var folderName = handle.name || '';
+      // Collect file summary from the directory
+      var fileCount = 0, subDirs = {};
+      try {
+        var entries = handle.entries();
+        var _a, entry;
+        while (true) {
+          try { _a = await entries.next(); entry = _a.value; }
+          catch { break; }
+          if (!entry) break;
+          if (_a.done) break;
+          fileCount++;
+          if (entry[1] && entry[1].kind === 'directory' && fileCount <= 30) subDirs[entry[0]] = 1;
+        }
+      } catch(e) { /* best-effort enumeration */ }
+      var dirNames = Object.keys(subDirs);
+      var summary = '已选择文件夹: ' + folderName;
+      if (dirNames.length > 0) summary += ' (含 ' + dirNames.slice(0, 4).join(', ') + (dirNames.length > 4 ? '...' : '') + ', 共 ' + fileCount + ' 项)';
+      else if (fileCount > 0) summary += ' (共 ' + fileCount + ' 项)';
+
+      // Fill the path input
+      var targetId = _dirPickTarget ? 'editPath-' + _dirPickTarget : 'projPath';
+      var input = document.getElementById(targetId);
+      if (input && folderName) {
+        var curVal = input.value.trim();
+        if (curVal && curVal.indexOf('/') >= 0) {
+          input.value = curVal.replace(/\/[^/]*$/, '') + '/' + folderName;
+        } else {
+          input.value = (curVal || '~/projects') + '/' + folderName;
+        }
+      }
+      toast(summary, 'info');
+      return;
+    } catch(e) {
+      // User cancelled or API error — fall through to Method 2
+      if (e.name === 'AbortError') return; // user cancelled, silent
+    }
+  }
+
+  // Method 2: webkitdirectory input (Safari, older browsers)
   var inp = document.createElement('input');
   inp.type = 'file';
   inp.webkitdirectory = true;
@@ -138,30 +185,26 @@ function browserDirPick(forEditId) {
   inp.onchange = function() {
     var files = inp.files;
     if (!files || files.length === 0) return;
-    // Extract common folder name from the first file's relative path
     var firstPath = files[0].webkitRelativePath || files[0].name;
     var folderName = firstPath.split('/')[0] || '';
-    // Collect file summary
-    var dirs = {}, fileCount = 0;
+    var dirs = {}, fc = 0;
     for (var i = 0; i < Math.min(files.length, 50); i++) {
-      var relPath = files[i].webkitRelativePath || files[i].name;
-      var parts = relPath.split('/');
-      if (parts.length > 2) dirs[parts[1]] = 1; // subdir
-      fileCount++;
+      var rp = files[i].webkitRelativePath || files[i].name;
+      var parts = rp.split('/');
+      if (parts.length > 2) dirs[parts[1]] = 1;
+      fc++;
     }
-    var subDirs = Object.keys(dirs);
+    var sub = Object.keys(dirs);
     var summary = '已识别文件夹: ' + folderName;
-    if (subDirs.length > 0) summary += ' (含 ' + subDirs.slice(0, 3).join(', ') + (subDirs.length > 3 ? '... 等子目录' : '') + ', 共 ' + fileCount + ' 项)';
-    else summary += ' (共 ' + fileCount + ' 个文件)';
-    // Auto-fill the input with a suggested path based on folder name
+    if (sub.length > 0) summary += ' (含 ' + sub.slice(0, 3).join(', ') + (sub.length > 3 ? '...' : '') + ', 共 ' + fc + ' 项)';
+    else summary += ' (共 ' + fc + ' 个文件)';
+
     var targetId = _dirPickTarget ? 'editPath-' + _dirPickTarget : 'projPath';
     var input = document.getElementById(targetId);
     if (input && folderName) {
-      // Suggest path: keep existing value's base dir, replace folder name
       var curVal = input.value.trim();
       if (curVal && curVal.indexOf('/') >= 0) {
-        var base = curVal.replace(/\/[^/]*$/, '');
-        input.value = base + '/' + folderName;
+        input.value = curVal.replace(/\/[^/]*$/, '') + '/' + folderName;
       } else {
         input.value = '~/projects/' + folderName;
       }
