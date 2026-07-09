@@ -8,13 +8,14 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={darkMode:'class',theme:{extend:{}}}</script>
 <link rel="stylesheet" href="css/app.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
 <body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
 
 <header class="bg-slate-900 dark:bg-slate-950 text-white">
   <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
     <a href="/" class="flex items-center gap-2.5 text-white font-bold text-lg no-underline">
-      <span class="bg-blue-600 text-white px-2 py-1 rounded-md text-sm shadow-sm">📁</span> Doc77
+      <img src="/assets/logo-dark.svg" alt="Doc77" height="36" class="h-9">
     </a>
     <div class="flex items-center gap-3 text-xs text-emerald-400 font-medium">
       <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
@@ -82,9 +83,9 @@
 </div>
 
 <!-- Settings Overlay -->
-<div id="settingsOverlay" class="hidden fixed inset-0 z-50 flex justify-end" onclick="if(event.target===this)toggleSettings()">
-  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
-  <div class="relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col animate-in" style="animation-duration:0.25s">
+<div id="settingsOverlay" class="fixed inset-0 z-50 flex justify-end pointer-events-none" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="toggleSettings()"></div>
+  <div class="settings-panel relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
     <div class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
       <span class="font-bold text-slate-800 dark:text-slate-100 text-lg">⚙ 设置</span>
       <button onclick="toggleSettings()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl">✕</button>

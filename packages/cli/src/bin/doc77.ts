@@ -89,6 +89,16 @@ async function setPasswordInteractive(): Promise<void> {
   console.log('✅ 密码已设置');
 }
 
+function printBanner() {
+  console.log(`
+  ╔══════════════════════════════════════╗
+  ║         Doc77                       ║
+  ║   默认安全 · 对话驱动                 ║
+  ║   智能本地文档管理 Agent              ║
+  ║                          v${VERSION}  ║
+  ╚══════════════════════════════════════╝`);
+}
+
 function printHelp() {
   console.log(`
 Doc77 v${VERSION} — 默认安全、对话驱动的智能本地文档管理 Agent
@@ -151,6 +161,7 @@ async function main() {
 
   switch (command) {
       case 'start': {
+        printBanner();
         const portIdx = args.indexOf('--port');
         const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 3099;
         const bindIdx = args.indexOf('--bind');

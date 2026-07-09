@@ -11,6 +11,7 @@
 <script>mermaid.initialize({startOnLoad:true,theme:document.documentElement.classList.contains('dark')?'dark':'default'});</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme">
 <link rel="stylesheet" href="css/app.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
 <body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden">
 
@@ -20,8 +21,13 @@
   <aside id="leftPanel" class="bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col z-20 shrink-0 transition-all duration-300 overflow-hidden" style="width:288px">
     <div class="h-14 px-4 border-b border-slate-800 flex items-center justify-between shrink-0">
       <a href="/" class="flex items-center gap-2 text-white font-bold text-lg no-underline shrink-0">
-        <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded text-sm">📁</span>
-        <span class="collapsible-content">Doc77</span>
+        <img src="/assets/logo-dark.svg" alt="Doc77" height="32" class="h-8 collapsible-content">
+        <svg id="logoIconCollapsed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="h-6 w-6 shrink-0" style="display:none">
+          <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#3B82F6"/>
+          <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#93C5FD"/>
+          <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FDE68A"/>
+        </svg>
       </a>
       <div class="flex items-center gap-1">
         <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-sm" title="切换主题" id="themeBtn">🌙</button>
@@ -43,12 +49,14 @@
       <div onclick="toggleBookmarkSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between cursor-pointer hover:text-slate-300 transition-colors select-none">
         <span><span id="bookmarkArrow">▾</span> ⭐ 收藏</span><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
       </div>
-      <div id="bookmarkList" class="space-y-0.5 mb-2 max-h-36 overflow-y-auto scrollbar-dark text-xs"></div>
+      <div id="bookmarkList" class="space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
     </div>
 
     <!-- 🕐 Recent Files -->
     <div class="px-3 collapsible-content" id="recentSection">
-      <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1">🕐 近期文件</div>
+      <div onclick="toggleRecentSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center cursor-pointer hover:text-slate-300 transition-colors select-none">
+        <span><span id="recentArrow">▾</span> 🕐 近期文件</span>
+      </div>
       <div id="recentList" class="space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
     </div>
 
@@ -198,9 +206,9 @@
 </div>
 
 <!-- Settings Overlay -->
-<div id="settingsOverlay" class="hidden fixed inset-0 z-50 flex justify-end" onclick="if(event.target===this)toggleSettings()">
-  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
-  <div class="relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col animate-in" style="animation-duration:0.25s">
+<div id="settingsOverlay" class="fixed inset-0 z-50 flex justify-end pointer-events-none" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="toggleSettings()"></div>
+  <div class="settings-panel relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
     <div class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
       <span class="font-bold text-slate-800 dark:text-slate-100 text-lg">⚙ 设置</span>
       <button onclick="toggleSettings()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl">✕</button>

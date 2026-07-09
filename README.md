@@ -95,7 +95,7 @@ doc77 vendor-install --no-pyodide
 | **Markdown** | `.md` `.mdx` `.markdown` | ✅ TTS/搜索/大纲/进度 |
 | **Mermaid 图表** | `.mermaid` `.mmd` | ✅ |
 | **代码** (~44 种) | `.ts` `.js` `.py` `.go` `.rs` `.java` `.c` `.cpp` `.html` `.css` `.json` … | ✅ 语法高亮 |
-| **PDF** | `.pdf` | ✅ PDF.js 查看器 + TTS/搜索/大纲 |
+| **PDF** | `.pdf` | ✅ 浏览器原生预览 + 一键全屏 |
 | **图片** (9 种) | `.png` `.jpg` `.gif` `.svg` `.webp` `.avif` `.bmp` `.ico` | ✅ Lightbox 缩放/导航 |
 | **Word 文档** | `.docx` | ✅ mammoth.js 渲染 |
 | **Excel 表格** | `.xlsx` `.xls` | ✅ SheetJS 渲染 + Tab 切换 |
@@ -151,7 +151,7 @@ doc77 vendor-install --no-pyodide
 | Web Framework | Express 5.x |
 | Database | SQLite（sql.js） |
 | MCP Protocol | @modelcontextprotocol/sdk |
-| Frontend | 原生 HTML + CSS + JS（marked, Mermaid, PDF.js, highlight.js） |
+| Frontend | 原生 HTML + CSS + JS（marked, Mermaid, highlight.js）+ 浏览器原生 PDF / HTML 预览 |
 | Build | tsup + pnpm workspaces |
 | Test | Vitest |
 

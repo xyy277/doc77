@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<base href="/mobile/">
+<title>Doc77</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* ══════════ Theme Tokens ══════════ */
+  :root {
+    --bg-body: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-header: rgba(248,250,252,0.85);
+    --bg-nav: rgba(255,255,255,0.92);
+    --bg-hover: #f1f5f9;
+    --bg-code: #f1f5f9;
+
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --text-inverse: #ffffff;
+
+    --border-light: #e2e8f0;
+    --border-medium: #cbd5e1;
+
+    --accent: #2563eb;
+    --accent-light-bg: #dbeafe;
+  }
+  .dark {
+    --bg-body: #0f172a;
+    --bg-card: #1e293b;
+    --bg-header: rgba(15,23,42,0.85);
+    --bg-nav: rgba(15,23,42,0.92);
+    --bg-hover: #1e293b;
+    --bg-code: #1e293b;
+
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-inverse: #ffffff;
+
+    --border-light: #334155;
+    --border-medium: #475569;
+
+    --accent: #60a5fa;
+    --accent-light-bg: #1e3a5f;
+  }
+
+  /* ══════════ Reset ══════════ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ══════════ Base ══════════ */
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-body); color: var(--text-primary);
+    min-height: 100vh; min-height: 100dvh;
+    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Header */
+  .header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg-header); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    padding: 16px 20px 12px; border-bottom: 1px solid var(--border-light);
+  }
+  .header h1 { font-size: 22px; font-weight: 700; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: var(--bg-header);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-light);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .topbar .theme-btn {
+    background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px;
+  }
+  .star-badge {
+    font-size: 11px; font-weight: 600; color: #cbd5e1;
+    text-decoration: none; padding: 4px 10px;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 16px;
+    transition: all .2s; position: relative;
+  }
+  .star-badge:hover {
+    background: rgba(255,255,255,0.1); color: #fbbf24; border-color: #fbbf24;
+  }
+  .star-badge:hover::after {
+    content: attr(title);
+    position: absolute; top: 110%; right: 0;
+    background: #1e293b; color: #e2e8f0; font-size: 10px; font-weight: 400;
+    padding: 5px 10px; border-radius: 6px; white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 50;
+  }
+
+  /* Content */
+  .content { padding: 16px 16px 100px; }
+
+  /* Cards */
+  .project-card {
+    display: flex; align-items: center; gap: 14px; padding: 16px;
+    background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-light);
+    margin-bottom: 10px; cursor: pointer; transition: transform .1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .project-card:active { transform: scale(0.97); }
+  .project-icon {
+    width: 48px; height: 48px; border-radius: 12px; background: var(--accent);
+    color: var(--text-inverse); display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .project-info { flex: 1; min-width: 0; }
+  .project-name { font-size: 16px; font-weight: 600; }
+  .project-path { font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .project-arrow { color: var(--border-medium); font-size: 18px; flex-shrink: 0; }
+
+  /* Empty / Loading */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; }
+  .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+
+  /* Bottom Nav */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+    background: var(--bg-nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-light); padding: 8px 24px 20px;
+    display: flex; justify-content: space-around; align-items: flex-start;
+  }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    cursor: pointer; padding: 8px 12px; -webkit-tap-highlight-color: transparent;
+    color: var(--text-muted); transition: color .2s; font-size: 10px; font-weight: 600;
+    border: none; background: none;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-item .nav-icon { font-size: 22px; }
+
+  /* Settings */
+  .settings-section { margin-bottom: 20px; }
+  .settings-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 8px; padding: 0 4px; }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; background: var(--bg-card); border-radius: 12px;
+    border: 1px solid var(--border-light); margin-bottom: 6px; font-size: 14px;
+  }
+  .settings-row .label { font-weight: 500; }
+  .settings-row .value { color: var(--text-muted); font-size: 13px; }
+
+  /* Tabs */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Accent link color for breadcrumb-like elements */
+  .recent-icon { background: var(--bg-code); color: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <!-- Top Bar -->
+  <div class="topbar" id="topbar">
+    <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" style="height:28px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="star-badge" title="xyy277 · 907507646@qq.com">⭐ 点个 Star</a>
+      <button onclick="toggleTheme()" class="theme-btn" title="切换主题" id="themeBtn">🌙</button>
+    </div>
+  </div>
+
+  <div id="app" style="display:none">
+
+    <!-- ═══ Tab: Recent ═══ -->
+    <div id="tab-recent" class="tab-content active">
+      <div class="header"><h1>最近浏览</h1></div>
+      <div class="content" id="recentList">
+        <div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>
+      </div>
+    </div>
+
+    <!-- ═══ Tab: Browse ═══ -->
+    <div id="tab-browse" class="tab-content">
+      <div class="header"><h1>项目</h1></div>
+      <div class="content" id="projectList">
+        <div class="loading">加载中…</div>
+      </div>
+    </div>
+
+    <!-- ═══ Tab: Settings ═══ -->
+    <div id="tab-settings" class="tab-content">
+      <div class="header"><h1>设置</h1></div>
+      <div class="content">
+        <div class="settings-section">
+          <h3>通用</h3>
+          <div class="settings-row" onclick="toggleTheme()" style="cursor:pointer">
+            <span class="label">深色模式</span><span class="value" id="themeLabel">浅色</span>
+          </div>
+          <div class="settings-row" onclick="viewDesktop()" style="cursor:pointer">
+            <span class="label">桌面版</span><span class="value">→</span>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3>关于</h3>
+          <div class="settings-row">
+            <span class="label">Doc77 预览引擎</span><span class="value" id="versionLabel">---</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Bottom Nav ═══ -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="recent" onclick="switchTab('recent')">
+        <span class="nav-icon">🕐</span><span>最近</span>
+      </button>
+      <button class="nav-item" data-tab="browse" onclick="switchTab('browse')">
+        <span class="nav-icon">📂</span><span>项目</span>
+      </button>
+      <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+        <span class="nav-icon">⚙️</span><span>设置</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script>
+    // ══════════ Dashboard Logic ══════════
+
+    function boot() {
+      // Fetch version
+      fetch('/api/health').then(function(r){return r.json()}).then(function(d){
+        var el = document.getElementById('versionLabel');
+        if (el && d.version) el.textContent = 'v' + d.version;
+      }).catch(function(){});
+
+      if (!sessionStorage.getItem('doc77-auth')) {
+        fetch('/api/auth/status').then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.hasPassword) { document.getElementById('app').style.display = 'block'; loadProjects(); return; }
+          if (sessionStorage.getItem('doc77-auth')) { document.getElementById('app').style.display = 'block'; loadProjects(); return; }
+          setTimeout(boot, 500);
+        }).catch(function () { setTimeout(boot, 500); });
+        return;
+      }
+      document.getElementById('app').style.display = 'block';
+      loadProjects();
+    }
+
+    window.switchTab = function (name) {
+      document.querySelectorAll('.tab-content').forEach(function (el) { el.classList.remove('active'); });
+      document.querySelectorAll('.nav-item').forEach(function (el) { el.classList.remove('active'); });
+      var tab = document.getElementById('tab-' + name);
+      if (tab) tab.classList.add('active');
+      var btn = document.querySelector('[data-tab="' + name + '"]');
+      if (btn) btn.classList.add('active');
+    };
+
+    window.viewDesktop = function () {
+      document.cookie = 'doc77-desktop=1;path=/;max-age=86400';
+      location.href = '/';
+    };
+
+    async function loadProjects() {
+      var container = document.getElementById('projectList');
+      try {
+        var r = await fetch('/api/projects');
+        var projects = await r.json();
+        if (!projects.length) {
+          container.innerHTML = '<div class="empty"><div class="empty-icon">📁</div><p>暂无项目</p><p style="font-size:12px;margin-top:4px">请在桌面端注册项目</p></div>';
+          return;
+        }
+        var html = '';
+        projects.forEach(function (p) {
+          html +=
+            '<div class="project-card" onclick="openProject(' + p.id + ')">' +
+              '<div class="project-icon">📁</div>' +
+              '<div class="project-info">' +
+                '<div class="project-name">' + esc(p.name) + '</div>' +
+                '<div class="project-path">' + esc(p.path) + '</div>' +
+                '<div class="project-meta">' + (p.last_opened ? '上次: ' + fmtDate(p.last_opened) : '') + '</div>' +
+              '</div>' +
+              '<span class="project-arrow">›</span>' +
+            '</div>';
+        });
+        container.innerHTML = html;
+        loadRecent();
+      } catch (e) {
+        container.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>加载失败</p></div>';
+      }
+    }
+
+    // ── Load recent files (B3 fixed: theme-aware icon) ──
+    function loadRecent() {
+      var container = document.getElementById('recentList');
+      try {
+        var raw = localStorage.getItem('doc77_recent_files');
+        if (!raw) { container.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>'; return; }
+        var files = JSON.parse(raw);
+        if (!files.length) { container.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>'; return; }
+        var html = '';
+        files.slice(0, 10).forEach(function (f) {
+          html +=
+            '<div class="project-card" onclick="location.href=\'/preview.html?id=' + (f.projectId || '') + '&path=' + encodeURIComponent(f.path || '') + '\'">' +
+              '<div class="project-icon recent-icon" style="font-size:18px">📄</div>' +
+              '<div class="project-info">' +
+                '<div class="project-name" style="font-size:14px">' + esc(f.name || '') + '</div>' +
+                '<div class="project-path">' + esc(f.path || '') + '</div>' +
+              '</div>' +
+              '<span class="project-arrow">›</span>' +
+            '</div>';
+        });
+        container.innerHTML = html;
+      } catch (e) {
+        container.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>';
+      }
+    }
+
+    window.openProject = function (id) {
+      location.href = '/preview.html?id=' + id;
+    };
+
+    function esc(s) {
+      if (!s) return '';
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function fmtDate(d) {
+      try { return new Date(d).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }); } catch (e) { return ''; }
+    }
+
+    // ── Theme label ──
+    // ── Theme: logo + label sync ──
+    function applyThemeUI() {
+      var isDark = document.documentElement.classList.contains('dark');
+      var logo = document.getElementById('siteLogo');
+      if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
+      var tl = document.getElementById('themeLabel');
+      if (tl) tl.textContent = isDark ? '深色' : '浅色';
+    }
+    applyThemeUI();
+    var origToggle = window.toggleTheme;
+    window.toggleTheme = function () { origToggle(); applyThemeUI(); };
+
+    boot();
+  </script>
+</body>
+</html>

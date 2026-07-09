@@ -50,8 +50,22 @@ function fmtSize(b) { return b<1024?b+' B':b<1024*1024?(b/1024).toFixed(1)+' KB'
 function toggleSettings() {
   var ov = document.getElementById('settingsOverlay');
   if (!ov) return;
-  ov.classList.toggle('hidden');
-  if (!ov.classList.contains('hidden')) switchSettingsTab('system');
+  var opening = !ov.classList.contains('visible');
+  ov.classList.toggle('visible');
+  // Show/hide nested elements with transitions
+  var backdrop = ov.querySelector('.settings-backdrop');
+  var panel = ov.querySelector('.settings-panel');
+  if (opening) {
+    ov.classList.remove('pointer-events-none');
+    if (backdrop) backdrop.classList.remove('opacity-0');
+    if (panel) panel.classList.remove('translate-x-full');
+    switchSettingsTab('system');
+  } else {
+    if (backdrop) backdrop.classList.add('opacity-0');
+    if (panel) panel.classList.add('translate-x-full');
+    // Delay pointer events removal to allow transition
+    setTimeout(function() { ov.classList.add('pointer-events-none'); }, 300);
+  }
 }
 function switchSettingsTab(tab) {
   document.querySelectorAll('#settingsTabs button').forEach(function(b) {

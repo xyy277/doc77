@@ -9,8 +9,6 @@
 var VENDOR_MAP = {
   'highlight.min.js': 'highlight.min.js',
   'highlight.js/11.9.0/highlight.min.js': 'highlight.min.js',
-  'pdfjs-dist': 'pdf.min.mjs',
-  'pdf.worker.min.mjs': 'pdf.worker.min.mjs',
   'xlsx.mini.min.js': 'xlsx.mini.min.js',
   'mammoth.browser.min.js': 'mammoth.browser.min.js',
   'pyodide': 'pyodide.js',
@@ -101,7 +99,6 @@ var leftPanelExpandedWidth = 288; // remembered expanded width
 
 function toggleCollapse() {
   var panel = document.getElementById('leftPanel');
-  var btn = document.getElementById('collapseLeftBtn');
   var isCollapsed = panel.classList.contains('collapsed');
 
   if (isCollapsed) {
@@ -121,6 +118,10 @@ function toggleCollapse() {
   panel.querySelectorAll('.collapsible-content').forEach(function(el) {
     el.classList.toggle('hidden', !isCollapsed);
   });
+
+  // Toggle logo: collapsed → icon only, expanded → full logo
+  var logoIcon = document.getElementById('logoIconCollapsed');
+  if (logoIcon) logoIcon.style.display = !isCollapsed ? 'block' : 'none';
 }
 
 function togglePanel(side) {
@@ -152,6 +153,8 @@ function togglePanel(side) {
           lp.style.width = leftPanelExpandedWidth + 'px';
           lp.classList.remove('collapsed');
           lp.querySelectorAll('.collapsible-content').forEach(function(el) { el.classList.remove('hidden'); });
+          var licon = document.getElementById('logoIconCollapsed');
+          if (licon) licon.style.display = 'none';
         }
       }
       r = true; t = i === 0 ? 'left' : 'right';
@@ -258,6 +261,61 @@ function makeNode(entry, parentPath) {
 
 function iconFor(n) { var e = n.split('.').pop().toLowerCase(); return ['md','markdown'].indexOf(e)>=0?'📝':['mermaid','mmd'].indexOf(e)>=0?'📊':e==='pdf'?'📕':['png','jpg','jpeg','gif','svg','webp','bmp'].indexOf(e)>=0?'🖼':['ts','js','py','rb','go','rs','java','c','cpp'].indexOf(e)>=0?'💻':['json','yaml','yml','toml'].indexOf(e)>=0?'⚙':'📄'; }
 
+//══════════ Navigation ══════════
+/** Poll for an element matching selector, up to maxMs. Returns null if not found. */
+async function waitForNode(tree, selector, maxMs) {
+  maxMs = maxMs || 2000;
+  var deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    var el = tree.querySelector(selector);
+    if (el) return el;
+    await new Promise(function(r) { setTimeout(r, 80); });
+  }
+  return tree.querySelector(selector);
+}
+
+async function navigateToFile(filePath) {
+  var parts = filePath.split('/');
+  var tree = document.getElementById('tree');
+  // Ensure left panel is visible
+  var lp = document.getElementById('leftPanel');
+  if (lp.classList.contains('hidden')) togglePanel('left');
+  if (lp.classList.contains('collapsed')) toggleCollapse();
+  // Expand each directory level
+  for (var i = 0; i < parts.length - 1; i++) {
+    var dirPath = parts.slice(0, i + 1).join('/');
+    var selector = '[data-path="' + CSS.escape(dirPath) + '"]';
+    // Expand parent if needed
+    if (i > 0 && !tree.querySelector(selector)) {
+      var parentSelector = '[data-path="' + CSS.escape(parts.slice(0, i).join('/')) + '"]';
+      var parentRow = tree.querySelector(parentSelector);
+      if (parentRow) {
+        var pw = parentRow.nextElementSibling;
+        if (pw && pw.classList.contains('hidden')) parentRow.click();
+        // Wait for parent children to load
+        if (!pw || pw.querySelector('.tree-collapse-btn') === null) {
+          await waitForNode(tree, parentSelector + ' + .ml-4 .tree-collapse-btn', 2000);
+        }
+      }
+    }
+    var row = await waitForNode(tree, selector, 2000);
+    if (!row) break;
+    var wrapper = row.nextElementSibling;
+    if (wrapper && wrapper.classList.contains('hidden')) row.click();
+    // Wait briefly for the click to register + children to start loading
+    await new Promise(function(r) { setTimeout(r, 50); });
+  }
+  // Click the file row
+  var fileSelector = '[data-path="' + CSS.escape(filePath) + '"]';
+  var fileRow = await waitForNode(tree, fileSelector, 2000);
+  if (fileRow) {
+    fileRow.click();
+    fileRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    loadContent(filePath);
+  }
+}
+
 //══════════ Content ══════════
 async function loadContent(filePath) {
   currentFile = filePath; outlineBuilt = false;
@@ -304,25 +362,26 @@ async function loadContent(filePath) {
       // Show Run button for JS and Python files
       if (d.type === 'code') {
         var ext = filePath.split('.').pop().toLowerCase();
+        if (ext === 'html' || ext === 'htm') {
+          html = '<div style="position:relative">' +
+            '<button id="htmlToggleBtn" onclick="toggleHtmlPreview()" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10;padding:6px 16px;border:1px solid #e2e8f0;border-radius:8px;background:rgba(255,255,255,0.9);color:#475569;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);backdrop-filter:blur(4px);white-space:nowrap">👁 预览</button>' +
+            '<div id="htmlCodeView">' + html + '</div>' +
+            '<div id="htmlPreview" style="display:none"><div id="htmlPreviewContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
+            '<button onclick="toggleHtmlPreviewFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
+            '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div></div>' +
+            '</div>';
+        }
         if (ext === 'js' || ext === 'py') {
           var runBtn = document.getElementById('runBtn');
           if (runBtn) { runBtn.classList.remove('hidden'); runBtn.disabled = false; runBtn.dataset.lang = ext; runBtn.dataset.code = d.content; }
         }
       }
     } else if (d.type === 'image') {
-      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-center"><img src="' + d.rawUrl + '" alt="' + esc(filePath) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="openImageLightbox(\'' + escAttr(d.rawUrl) + '\', \'' + escAttr(filePath) + '\')" /></div>';
+      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center" style="min-height:60vh"><img src="' + d.rawUrl + '" alt="' + esc(filePath) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="openImageLightbox(\'' + escAttr(d.rawUrl) + '\', \'' + escAttr(filePath) + '\')" /></div>';
     } else if (d.type === 'pdf') {
-      // Use custom PDF.js viewer if available, fallback to iframe
-      if (typeof pdfjsLib !== 'undefined') {
-        area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">正在加载 PDF 查看器...</div></div>';
-        loadPdfViewer(d.rawUrl, filePath); return;
-      }
-      // Lazy-load PDF.js then retry
-      loadPdfJs(function() {
-        area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">正在渲染 PDF...</div></div>';
-        loadPdfViewer(d.rawUrl, filePath);
-      });
-      return;
+      html = '<div class="pdf-wrapper" id="pdfContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
+        '<button onclick="togglePdfFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
+        '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div>';
     } else if (d.type === 'docx' || d.type === 'xlsx') {
       // Fetch raw binary and render client-side
       area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载中...</div></div>';
@@ -379,7 +438,7 @@ function renderRecentFiles() {
   var el = document.getElementById('recentList');
   if (!rf.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">暂无</div>'; return; }
   el.innerHTML = rf.map(function(f) {
-    return '<div onclick="loadContent(\'' + escAttr(f.path) + '\')" class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-slate-300 truncate text-xs"><span>📄</span><span class="truncate">' + esc(f.path) + '</span></div>';
+    return '<div onclick="navigateToFile(\'' + escAttr(f.path) + '\')" class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-slate-300 truncate text-xs"><span>📄</span><span class="truncate">' + esc(f.path) + '</span></div>';
   }).join('');
 }
 
@@ -543,7 +602,7 @@ async function doGlobalSearch() {
     var d = await res.json();
     if (!d.matches.length) { rdiv.innerHTML = '<div class="text-xs text-slate-500 px-2 py-1">无结果</div>'; return; }
     rdiv.innerHTML = d.matches.slice(0,20).map(function(m) {
-      return '<div onclick="loadContent(\'' + escAttr(m.file) + '\')" class="flex flex-col px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-xs"><span class="text-blue-400 truncate">' + esc(m.file) + ':' + m.line + '</span><span class="text-slate-400 truncate">' + esc(m.content) + '</span></div>';
+      return '<div onclick="navigateToFile(\'' + escAttr(m.file) + '\')" class="flex flex-col px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-xs"><span class="text-blue-400 truncate">' + esc(m.file) + ':' + m.line + '</span><span class="text-slate-400 truncate">' + esc(m.content) + '</span></div>';
     }).join('');
   } catch(e) { rdiv.innerHTML = '<div class="text-xs text-red-500 px-2 py-1">搜索失败</div>'; }
 }
@@ -551,6 +610,12 @@ async function doGlobalSearch() {
 function toggleBookmarkSection() {
   var list = document.getElementById('bookmarkList');
   var arrow = document.getElementById('bookmarkArrow');
+  var collapsed = list.classList.toggle('hidden');
+  if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
+}
+function toggleRecentSection() {
+  var list = document.getElementById('recentList');
+  var arrow = document.getElementById('recentArrow');
   var collapsed = list.classList.toggle('hidden');
   if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
 }
@@ -579,7 +644,7 @@ function renderBookmarks() {
   if (!bm.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">暂无收藏</div>'; return; }
   el.innerHTML = bm.map(function(b) {
     return '<div class="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-800 group cursor-pointer">' +
-      '<span class="truncate flex-1 text-slate-300" onclick="loadContent(\'' + escAttr(b.path) + '\')">⭐ ' + esc(b.path) + '</span>' +
+      '<span class="truncate flex-1 text-slate-300" onclick="navigateToFile(\'' + escAttr(b.path) + '\')">⭐ ' + esc(b.path) + '</span>' +
       '<button class="hidden group-hover:block text-slate-500 hover:text-red-400 text-xs" onclick="event.stopPropagation();removeBookmark(\'' + escAttr(b.path) + '\')">✕</button></div>';
   }).join('');
 }
@@ -713,130 +778,71 @@ async function rejectTask(id) { await fetch('/api/queue/reject',{method:'POST',h
 async function approveAll() { var r = await fetch('/api/queue/status?project_id='+pid); var tasks = await r.json(); for (var i=0; i<tasks.length; i++) { if (tasks[i].status==='pending') await approveTask(tasks[i].id); } }
 async function rejectAll() { var r = await fetch('/api/queue/status?project_id='+pid); var tasks = await r.json(); for (var i=0; i<tasks.length; i++) { if (tasks[i].status==='pending') await rejectTask(tasks[i].id); } }
 
-//══════════ PDF.js Custom Viewer ══════════
-var pdfDoc = null, pdfCurrentPage = 1, pdfExtractedText = '';
-var pdfLoading = false;
-
-function loadPdfJs(cb) {
-  if (typeof pdfjsLib !== 'undefined') { cb(); return; }
-  var s = document.createElement('script');
-  s.src = vsrc('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
-  s.type = 'module';
-  s.onload = function() {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = vsrc('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs');
-    cb();
-  };
-  document.head.appendChild(s);
-}
-
-async function loadPdfViewer(rawUrl, filePath) {
-  if (pdfLoading) return; pdfLoading = true;
-  var area = document.getElementById('contentArea');
-  try {
-    var resp = await fetch(rawUrl);
-    var arrayBuf = await resp.arrayBuffer();
-    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
-    pdfExtractedText = '';
-
-    var totalPages = pdfDoc.numPages;
-    var scale = Math.min(window.devicePixelRatio || 1, 2);
-    var pageContainers = [];
-
-    // Render all pages
-    for (var i = 1; i <= totalPages; i++) {
-      var page = await pdfDoc.getPage(i);
-      var viewport = page.getViewport({ scale: scale });
-      var canvas = document.createElement('canvas');
-      canvas.width = viewport.width * (window.devicePixelRatio || 1);
-      canvas.height = viewport.height * (window.devicePixelRatio || 1);
-      canvas.style.width = viewport.width + 'px';
-      canvas.style.height = viewport.height + 'px';
-      canvas.style.maxWidth = '100%';
-      canvas.className = 'mx-auto shadow-sm';
-      var ctx = canvas.getContext('2d');
-      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-      try {
-        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-      } catch (renderErr) {
-        // Known: unsupported shadingType 1 in some PDFs
-        // Fallback: show a placeholder for this page instead of crashing
-        console.warn('PDF page ' + i + ' render error:', renderErr.message);
-        canvas.remove();
-        var errDiv = document.createElement('div');
-        errDiv.className = 'pdf-page mb-4 flex justify-center';
-        errDiv.dataset.page = i;
-        errDiv.innerHTML = '<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded p-4 text-sm text-amber-700 dark:text-amber-300">⚠️ 第 ' + i + ' 页渲染异常（不兼容的 PDF 元素）</div>';
-        pageContainers.push(errDiv);
-        continue;
-      }
-
-      // Extract text (progressive)
-      page.getTextContent().then(function(tc) {
-        pdfExtractedText += '\n--- Page ' + i + ' ---\n' +
-          tc.items.filter(function(it){ return 'str' in it; }).map(function(it){ return it.str; }).join(' ');
-      }).catch(function(){});
-
-      var container = document.createElement('div');
-      container.className = 'pdf-page mb-4 flex justify-center';
-      container.dataset.page = i;
-      container.appendChild(canvas);
-      pageContainers.push(container);
-    }
-
-    // Page nav
-    var navHtml = '<div class="flex items-center justify-center gap-3 mb-4 text-sm"><button onclick="pdfGoPage(-1)" class="px-3 py-1.5 border rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">◀ 上一页</button><span class="text-slate-600 dark:text-slate-400"><span id="pdfCurrentPage">1</span> / ' + totalPages + '</span><button onclick="pdfGoPage(1)" class="px-3 py-1.5 border rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">下一页 ▶</button></div>';
-
-    area.innerHTML = '<div class="p-4 sm:p-10"><div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">' + navHtml + '<div id="pdfPages">' + pageContainers.map(function(c){ return c.outerHTML; }).join('') + '</div>' + navHtml + '</div></div>';
-
-    // Populate outline
-    pdfDoc.getOutline().then(function(outline) {
-      if (outline && outline.length) {
-        var ol = document.getElementById('outlineList');
-        ol.innerHTML = outline.map(function(item){ return '<div onclick="pdfGoPage('+item.dest+')" class="py-1 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-sm text-slate-600 dark:text-slate-300">📑 '+esc(item.title)+'</div>'; }).join('');
-        outlineBuilt = true;
-      }
-    }).catch(function(){});
-
-    document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-xs text-slate-400">PDF 大纲加载中...</div>';
-    addRecentFile(filePath);
-    pdfLoading = false;
-  } catch(e) {
-    area.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">PDF 加载失败</p></div>';
-    pdfLoading = false;
+// ── PDF Fullscreen ──
+window.togglePdfFullscreen = function () {
+  var el = document.getElementById('pdfContainer');
+  if (!el) return;
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    el.requestFullscreen().catch(function () {});
   }
-}
-
-function pdfGoPage(dirOrNum) {
-  var totalPages = pdfDoc ? pdfDoc.numPages : 0;
-  if (!totalPages) return;
-  if (typeof dirOrNum === 'number' && dirOrNum < 1) {
-    pdfCurrentPage = Math.max(1, pdfCurrentPage + dirOrNum);
-  } else if (typeof dirOrNum === 'number' && dirOrNum > 0) {
-    pdfCurrentPage = dirOrNum;
+};
+var _pdfFsOriginals = null;
+document.addEventListener('fullscreenchange', function () {
+  var el = document.getElementById('pdfContainer');
+  if (!el) return;
+  if (document.fullscreenElement === el) {
+    _pdfFsOriginals = { position: el.style.position, inset: el.style.inset, zIndex: el.style.zIndex, background: el.style.background, borderRadius: el.style.borderRadius, minHeight: el.style.minHeight, padding: el.style.padding };
+    el.style.position = 'fixed'; el.style.inset = '0'; el.style.zIndex = '100';
+    el.style.background = '#525659'; el.style.borderRadius = '0'; el.style.minHeight = '100vh'; el.style.padding = '16px';
+  } else if (!document.fullscreenElement && _pdfFsOriginals) {
+    for (var k in _pdfFsOriginals) { el.style[k] = _pdfFsOriginals[k]; }
+    _pdfFsOriginals = null;
   }
-  var target = document.querySelector('.pdf-page[data-page="' + pdfCurrentPage + '"]');
-  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  var el = document.getElementById('pdfCurrentPage');
-  if (el) el.textContent = pdfCurrentPage;
-}
+});
 
-// Override TTS for PDF: use extracted text instead of DOM text
-(function(){
-  var origToggleTTS = toggleTTS;
-  toggleTTS = function() {
-    if (pdfDoc && pdfExtractedText) {
-      if (ttsActive) { window.speechSynthesis.cancel(); ttsActive = false; return; }
-      ttsActive = true;
-      var rate = parseFloat(document.getElementById('ttsRate').value) || 1;
-      var u = new SpeechSynthesisUtterance(pdfExtractedText.substring(0, 8000));
-      u.lang = 'zh-CN'; u.rate = rate;
-      u.onend = function(){ ttsActive = false; };
-      window.speechSynthesis.speak(u);
-      return;
-    }
-    origToggleTTS();
-  };
-})();
+// HTML preview toggle
+var _htmlPreviewRawUrl = '';
+window.toggleHtmlPreview = function () {
+  var codeView = document.getElementById('htmlCodeView');
+  var preview = document.getElementById('htmlPreview');
+  var btn = document.getElementById('htmlToggleBtn');
+  if (!codeView || !preview) return;
+  if (preview.style.display === 'none') {
+    codeView.style.display = 'none';
+    preview.style.display = 'block';
+    if (btn) btn.innerHTML = '💻 代码';
+  } else {
+    codeView.style.display = 'block';
+    preview.style.display = 'none';
+    if (btn) btn.innerHTML = '👁 预览';
+  }
+};
+window.toggleHtmlPreviewFullscreen = function () {
+  var el = document.getElementById('htmlPreviewContainer');
+  if (!el) return;
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    el.requestFullscreen().catch(function () {});
+  }
+};
+var _htmlFsOriginals = null;
+document.addEventListener('fullscreenchange', function () {
+  var el = document.getElementById('htmlPreviewContainer');
+  if (!el) return;
+  if (document.fullscreenElement === el) {
+    _htmlFsOriginals = { position: el.style.position, inset: el.style.inset, zIndex: el.style.zIndex, background: el.style.background, minHeight: el.style.minHeight, padding: el.style.padding };
+    el.style.position = 'fixed'; el.style.inset = '0'; el.style.zIndex = '100';
+    el.style.background = '#fff'; el.style.minHeight = '100vh'; el.style.padding = '16px';
+  } else if (!document.fullscreenElement && _htmlFsOriginals) {
+    for (var k in _htmlFsOriginals) { el.style[k] = _htmlFsOriginals[k]; }
+    _htmlFsOriginals = null;
+  }
+});
+
+// PDF preview now uses browser-native <iframe> — no PDF.js dependency
 
 //══════════ Office Docs Rendering (DOCX/XLSX) ══════════
 function renderOfficeDoc(d) {

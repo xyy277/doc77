@@ -591,7 +591,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         }
         case 'code': {
           const raw = readFile(absPath);
-          res.json({ path: filePath, type: 'code', content: renderCode(raw, path.extname(filePath).slice(1)) });
+          res.json({ path: filePath, type: 'code', content: renderCode(raw, path.extname(filePath).slice(1)), rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}` });
           return;
         }
         case 'docx': {
