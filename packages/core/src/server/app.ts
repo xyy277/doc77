@@ -14,8 +14,7 @@ import {
   renderCode,
   getRendererForFile,
 } from '../renderers/index.js';
-import { AiProvider, DocAgent, READ_TOOLS } from '@doc77/ai';
-import { getOrCreateSession, resetSession } from './sessions.js';
+import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
 
 const VERSION = '0.1.0';
 
@@ -423,35 +422,38 @@ export function createApp() {
   });
 
   // === AI Test Connection ===
-  // (helper for reading & decrypting AI config — also used by /api/ai/chat)
 
-  function getDecryptedAiConfig(): { token: string; baseUrl: string; model: string } | null {
-    const db = getConnection();
-    const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as { value: string } | undefined;
-    const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as { value: string } | undefined;
-    const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as { value: string } | undefined;
+  // (helper for reading & decrypting AI config)
+  const { getDecryptedAiConfig } = (() => {
+    const fn = (): { token: string; baseUrl: string; model: string } | null => {
+      const db = getConnection();
+      const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as { value: string } | undefined;
+      const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as { value: string } | undefined;
+      const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as { value: string } | undefined;
 
-    if (!tokenRow?.value) return null;
+      if (!tokenRow?.value) return null;
 
-    const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
-    const model = modelRow?.value || 'gpt-4o';
+      const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
+      const model = modelRow?.value || 'gpt-4o';
 
-    let token = tokenRow.value;
-    if (token.startsWith('{')) {
-      try {
-        const encData = JSON.parse(token);
-        if (encData.iv && encData.tag && encData.ciphertext) {
-          const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as { pbkdf2_salt: string } | undefined;
-          if (authRow?.pbkdf2_salt) {
-            const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
-            token = crypto.decrypt(encData, encKey);
+      let token = tokenRow.value;
+      if (token.startsWith('{')) {
+        try {
+          const encData = JSON.parse(token);
+          if (encData.iv && encData.tag && encData.ciphertext) {
+            const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as { pbkdf2_salt: string } | undefined;
+            if (authRow?.pbkdf2_salt) {
+              const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
+              token = crypto.decrypt(encData, encKey);
+            }
           }
-        }
-      } catch { /* not encrypted */ }
-    }
+        } catch { /* not encrypted */ }
+      }
 
-    return { token, baseUrl, model };
-  }
+      return { token, baseUrl, model };
+    };
+    return { getDecryptedAiConfig: fn };
+  })();
 
   app.post('/api/ai/test', async (req: Request, res: Response) => {
     try {
@@ -460,7 +462,6 @@ export function createApp() {
         res.json({ ok: false, error: '请先配置 Base URL 和 API Token' });
         return;
       }
-
       const url = cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions';
       const resp = await fetch(url, {
         method: 'POST',
@@ -468,154 +469,18 @@ export function createApp() {
         body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 5 }),
         signal: AbortSignal.timeout(15000),
       });
-
       if (resp.ok) {
         res.json({ ok: true, status: resp.status });
       } else {
         const errText = await resp.text().catch(() => '');
         let errMsg = `HTTP ${resp.status}`;
-        try {
-          const errJson = JSON.parse(errText);
-          errMsg = errJson.error?.message || errMsg;
-        } catch {}
+        try { const errJson = JSON.parse(errText); errMsg = errJson.error?.message || errMsg; } catch {}
         res.json({ ok: false, error: errMsg });
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Unknown error';
       res.json({ ok: false, error: `网络错误: ${message}` });
     }
-  });
-
-  // === AI Chat API (real — SSE streaming with tool-use) ===
-
-  app.post('/api/ai/chat', async (req: Request, res: Response) => {
-    const { message, project_id, session_id } = req.body;
-    if (!message) {
-      res.status(400).json({ error: 'message is required' });
-      return;
-    }
-
-    // Check AI config
-    const cfg = getDecryptedAiConfig();
-    if (!cfg) {
-      res.status(400).json({ error: 'AI_NOT_CONFIGURED', message: '请先在设置中配置 AI 模型和 API Token' });
-      return;
-    }
-
-    // SSE headers
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-
-    const send = (event: string, data: unknown) => {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    };
-
-    try {
-      // Tool executor — bridges AI agent to MCP read functions
-      const executeTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
-        const pid = (args.project_id as number) || project_id;
-        if (!pid) return 'Error: project_id is required for tool execution';
-
-        switch (name) {
-          case 'list_files': {
-            const dirPath = (args.dir_path as string) || '';
-            const result = scanDirectory(pid, dirPath);
-            const entries = result.entries.slice(0, 50); // limit to 50 entries
-            if (entries.length === 0) return `目录 "${dirPath || '/'}" 为空或不存在`;
-            return entries
-              .map((e) => `${e.type === 'directory' ? '📁' : '📄'} ${e.name} (${e.type}, ${e.size ?? 'N/A'} bytes)`)
-              .join('\n');
-          }
-          case 'read_file': {
-            const filePath = args.file_path as string;
-            if (!filePath) return 'Error: file_path is required';
-            // Security: reject sensitive files
-            const fileName = filePath.split('/').pop() || filePath;
-            if (isSensitiveFile(fileName)) return `Error: Access denied — "${fileName}" is a sensitive file`;
-            try {
-              const db = getConnection();
-              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as { path: string } | undefined;
-              if (!project) return 'Error: Project not found';
-              const absPath = validatePath(project.path, filePath);
-              const content = readFile(absPath);
-              // Truncate to ~4000 chars for LLM context
-              return content.length > 4000
-                ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
-                : content;
-            } catch (e: unknown) {
-              return `Error reading file: ${e instanceof Error ? e.message : 'Unknown error'}`;
-            }
-          }
-          case 'get_file_info': {
-            const filePath = args.file_path as string;
-            if (!filePath) return 'Error: file_path is required';
-            try {
-              const db = getConnection();
-              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as { path: string } | undefined;
-              if (!project) return 'Error: Project not found';
-              const absPath = validatePath(project.path, filePath);
-              const stats = fs.statSync(absPath);
-              return `File: ${filePath}\nType: ${stats.isDirectory() ? 'directory' : 'file'}\nSize: ${stats.size} bytes\nModified: ${stats.mtime.toISOString()}`;
-            } catch (e: unknown) {
-              return `Error: ${e instanceof Error ? e.message : 'Unknown error'}`;
-            }
-          }
-          default:
-            return `Error: Unknown tool "${name}"`;
-        }
-      };
-
-      // Build project context for first message in session
-      const provider = new AiProvider({ apiKey: cfg.token, baseUrl: cfg.baseUrl, model: cfg.model });
-      const { sessionId: sid, agent } = getOrCreateSession(
-        session_id,
-        () => new DocAgent({ provider, model: cfg.model, tools: READ_TOOLS, executeTool, maxSteps: 5 }),
-        project_id,
-      );
-
-      // Inject project context on first message for this session
-      if (project_id && !agent.hasContext) {
-        try {
-          const root = scanDirectory(project_id, '');
-          const fileList = root.entries.slice(0, 30).map(e => `${e.type === 'directory' ? '📁' : '📄'} ${e.name}`).join('\n');
-          const proj = (() => {
-            const db = getConnection();
-            return db.prepare('SELECT name, path FROM projects WHERE id = ?').get(project_id) as { name: string; path: string } | undefined;
-          })();
-          agent.addContext(`当前项目: ${proj?.name || 'Unknown'} (路径: ${proj?.path || 'N/A'})\n根目录内容:\n${fileList || '(空目录)'}`);
-        } catch { /* context injection failure is non-fatal */ }
-      }
-
-      // Send session_id so frontend can reuse it
-      send('session', { session_id: sid });
-
-      // Stream conversation
-      for await (const chunk of agent.chatStream(message)) {
-        switch (chunk.type) {
-          case 'token':
-            send('token', { text: chunk.content });
-            break;
-          case 'tool_call':
-            send('tool_call', { name: chunk.name, arguments: chunk.arguments, status: 'executing' });
-            break;
-          case 'done':
-            send('done', {});
-            break;
-          case 'error':
-            send('error', { message: chunk.message });
-            break;
-        }
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Unknown error';
-      send('error', { message: `AI 服务异常: ${msg}` });
-    }
-
-    res.end();
   });
 
   // === AI Session Reset ===
@@ -638,27 +503,23 @@ export function createApp() {
       res.status(400).json({ error: 'project_id and file_path are required' });
       return;
     }
-
     try {
       const db = getConnection();
       const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(project_id) as
         { path: string } | undefined;
-
-      if (!project) {
-        res.status(404).json({ error: 'Project not found' });
-        return;
-      }
-
+      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
       const absPath = validatePath(project.path, file_path);
       const content = readFile(absPath);
       const summary = `文档摘要（${file_path}）：\n该文档包含 ${content.split('\n').length} 行内容，共 ${content.length} 个字符。主要涉及技术规范和设计文档。`;
-
       res.json({ summary });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
     }
   });
+
+  // === AI Chat API (handled by CLI layer via createAIChatHandler to avoid
+  //     a circular dependency between @doc77/core and @doc77/ai) ===
 
   // === Search API ===
 
@@ -874,5 +735,168 @@ export function createQueueApproveHandler(
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
     }
+  };
+}
+
+/**
+ * Create POST /api/ai/chat handler with SSE streaming + tool-use.
+ *
+ * Accepts AI dependencies as parameters to avoid a circular dependency
+ * between @doc77/core and @doc77/ai. Register from the CLI layer.
+ *
+ * Usage (in CLI start command):
+ *   const { AiProvider, DocAgent, READ_TOOLS } = await import('@doc77/ai');
+ *   app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, READ_TOOLS }));
+ */
+export function createAIChatHandler(deps: {
+  AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => SessionAgent;
+  DocAgent: new (config: {
+    provider: SessionAgent;
+    model: string;
+    tools: unknown[];
+    executeTool: (name: string, args: Record<string, unknown>) => Promise<string>;
+    maxSteps: number;
+  }) => SessionAgent & {
+    hasContext: boolean;
+    addContext(ctx: string): void;
+    chatStream(message: string): AsyncIterable<
+      { type: 'token'; content: string } | { type: 'tool_call'; name: string; arguments: string; status: string } | { type: 'done' } | { type: 'error'; message: string }
+    >;
+  };
+  READ_TOOLS: unknown[];
+}) {
+  const { AiProvider, DocAgent, READ_TOOLS } = deps;
+
+  return async (req: Request, res: Response) => {
+    const { message, project_id, session_id } = req.body;
+    if (!message) {
+      res.status(400).json({ error: 'message is required' });
+      return;
+    }
+
+    const { getDecryptedAiConfig } = (() => {
+      type AiConfig = { token: string; baseUrl: string; model: string } | null;
+      const fn = (): AiConfig => {
+        const db = getConnection();
+        const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as { value: string } | undefined;
+        const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as { value: string } | undefined;
+        const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as { value: string } | undefined;
+        if (!tokenRow?.value) return null;
+        const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
+        const model = modelRow?.value || 'gpt-4o';
+        let token = tokenRow.value;
+        if (token.startsWith('{')) {
+          try {
+            const encData = JSON.parse(token);
+            if (encData.iv && encData.tag && encData.ciphertext) {
+              const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as { pbkdf2_salt: string } | undefined;
+              if (authRow?.pbkdf2_salt) {
+                const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
+                token = crypto.decrypt(encData, encKey);
+              }
+            }
+          } catch { /* not encrypted */ }
+        }
+        return { token, baseUrl, model };
+      };
+      return { getDecryptedAiConfig: fn };
+    })();
+
+    const cfg = getDecryptedAiConfig();
+    if (!cfg) {
+      res.status(400).json({ error: 'AI_NOT_CONFIGURED', message: '请先在设置中配置 AI 模型和 API Token' });
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    const send = (event: string, data: unknown) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      const executeTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
+        const pid = (args.project_id as number) || project_id;
+        if (!pid) return 'Error: project_id is required';
+        switch (name) {
+          case 'list_files': {
+            const dirPath = (args.dir_path as string) || '';
+            const result = scanDirectory(pid, dirPath);
+            const entries = result.entries.slice(0, 50);
+            if (entries.length === 0) return `目录 "${dirPath || '/'}" 为空或不存在`;
+            return entries.map(e => `${e.type === 'directory' ? '📁' : '📄'} ${e.name} (${e.type}, ${e.size ?? 'N/A'} bytes)`).join('\n');
+          }
+          case 'read_file': {
+            const filePath = args.file_path as string;
+            if (!filePath) return 'Error: file_path is required';
+            const fileName = filePath.split('/').pop() || filePath;
+            if (isSensitiveFile(fileName)) return `Error: Access denied — "${fileName}" is a sensitive file`;
+            try {
+              const db = getConnection();
+              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as { path: string } | undefined;
+              if (!project) return 'Error: Project not found';
+              const absPath = validatePath(project.path, filePath);
+              const content = readFile(absPath);
+              return content.length > 4000
+                ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
+                : content;
+            } catch (e: unknown) { return `Error: ${e instanceof Error ? e.message : 'Unknown'}`; }
+          }
+          case 'get_file_info': {
+            const filePath = args.file_path as string;
+            if (!filePath) return 'Error: file_path is required';
+            try {
+              const db = getConnection();
+              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as { path: string } | undefined;
+              if (!project) return 'Error: Project not found';
+              const absPath = validatePath(project.path, filePath);
+              const stats = fs.statSync(absPath);
+              return `File: ${filePath}\nType: ${stats.isDirectory() ? 'directory' : 'file'}\nSize: ${stats.size} bytes\nModified: ${stats.mtime.toISOString()}`;
+            } catch (e: unknown) { return `Error: ${e instanceof Error ? e.message : 'Unknown'}`; }
+          }
+          default: return `Error: Unknown tool "${name}"`;
+        }
+      };
+
+      const provider = new AiProvider({ apiKey: cfg.token, baseUrl: cfg.baseUrl, model: cfg.model });
+      const { sessionId: sid, agent } = getOrCreateSession(
+        session_id,
+        () => new DocAgent({ provider, model: cfg.model, tools: READ_TOOLS as any[], executeTool, maxSteps: 5 }) as any,
+        project_id,
+      );
+
+      if (project_id && !(agent as any).hasContext) {
+        try {
+          const root = scanDirectory(project_id, '');
+          const fileList = root.entries.slice(0, 30).map(e => `${e.type === 'directory' ? '📁' : '📄'} ${e.name}`).join('\n');
+          const proj = (() => {
+            const db = getConnection();
+            return db.prepare('SELECT name, path FROM projects WHERE id = ?').get(project_id) as { name: string; path: string } | undefined;
+          })();
+          (agent as any).addContext(`当前项目: ${proj?.name || 'Unknown'} (路径: ${proj?.path || 'N/A'})\n根目录内容:\n${fileList || '(空目录)'}`);
+        } catch { /* non-fatal */ }
+      }
+
+      send('session', { session_id: sid });
+
+      for await (const chunk of (agent as any).chatStream(message)) {
+        switch (chunk.type) {
+          case 'token': send('token', { text: chunk.content }); break;
+          case 'tool_call': send('tool_call', { name: chunk.name, arguments: chunk.arguments, status: 'executing' }); break;
+          case 'done': send('done', {}); break;
+          case 'error': send('error', { message: chunk.message }); break;
+        }
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      send('error', { message: `AI 服务异常: ${msg}` });
+    }
+
+    res.end();
   };
 }

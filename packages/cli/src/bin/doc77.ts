@@ -117,6 +117,12 @@ async function main() {
         const { executeApprovedTasks } = await import('@doc77/mcp');
         const { createQueueApproveHandler } = await import('@doc77/core');
         app.post('/api/queue/approve', createQueueApproveHandler(executeApprovedTasks));
+
+        // Register AI-dependent routes (avoid circular dep in @doc77/core)
+        const { AiProvider, DocAgent, READ_TOOLS } = await import('@doc77/ai');
+        const { createAIChatHandler } = await import('@doc77/core');
+        app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, READ_TOOLS }));
+
         const server = http.createServer(app);
         server.listen(port, () => {
           console.log(`Doc77 Dashboard: http://localhost:${port}`);
