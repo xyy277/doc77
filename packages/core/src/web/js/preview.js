@@ -932,7 +932,7 @@ function runJS(code) {
 
 function runPython(code) {
   var outEl = document.getElementById('codeOutputText');
-  loadPyodide(function(pyodide) {
+  initPyodide(function(pyodide) {
     try {
       pyodide.runPython('import sys\nfrom io import StringIO\nsys.stdout = StringIO()');
       pyodide.runPython(code);
@@ -944,22 +944,29 @@ function runPython(code) {
   });
 }
 
-function loadPyodide(cb) {
+// Initialize Pyodide: lazy-load CDN if needed, then call callback with pyodide instance
+function initPyodide(cb) {
   if (window._pyodide) { cb(window._pyodide); return; }
   var outEl = document.getElementById('codeOutputText');
-  if (outEl) outEl.textContent = '正在加载 Python 运行时 (Pyodide ~12MB)...';
+  if (outEl) outEl.textContent = '正在加载 Python 运行时 (Pyodide ~12MB, 首次加载较慢)...';
+  var pyodideUrl = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/';
 
-  if (typeof loadPyodide !== 'undefined') {
-    loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/' }).then(function(py) {
+  // Check if the Pyodide CDN has already loaded its global init function
+  if (typeof window.loadPyodide === 'function') {
+    window.loadPyodide({ indexURL: pyodideUrl }).then(function(py) {
       window._pyodide = py; cb(py);
     });
   } else {
     var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js';
+    s.src = pyodideUrl + 'pyodide.js';
     s.onload = function() {
-      loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/' }).then(function(py) {
+      window.loadPyodide({ indexURL: pyodideUrl }).then(function(py) {
         window._pyodide = py; cb(py);
       });
+    };
+    s.onerror = function() {
+      var el = document.getElementById('codeOutputText');
+      if (el) el.textContent = 'Error: 无法加载 Pyodide CDN，请检查网络连接';
     };
     document.head.appendChild(s);
   }
