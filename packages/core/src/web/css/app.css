@@ -32,7 +32,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
   --danger-hover: #b91c1c;
   --danger-light-bg: #fef2f2;
 
-  --max-content-width: 80rem;
+  --max-content-width: 64rem;
   --card-radius: 12px;
   --btn-radius: 8px;
   --transition-fast: 150ms;
@@ -68,7 +68,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 
 /* ═══ Reset ═══ */
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; height: 100%; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 body {
   background: var(--bg-body);
   color: var(--text-primary);
@@ -192,12 +192,16 @@ body {
 /* Content wrapper */
 .content-wrapper {
   max-width: var(--max-content-width); margin: 0 auto; padding: 24px;
+  height: calc(100vh - 56px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
 }
 
 /* ═══ Greeting Bar ═══ */
 .greeting-bar {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+  margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
+  flex-shrink: 0;
 }
 .greeting-text { font-size: 18px; font-weight: 600; }
 .greeting-actions { display: flex; align-items: center; gap: 8px; }
@@ -205,7 +209,8 @@ body {
 /* ═══ Stats Row ═══ */
 .stats-row {
   display: grid; grid-template-columns: 1fr 1fr;
-  gap: 16px; margin-bottom: 20px;
+  gap: 16px; margin-bottom: 16px;
+  flex-shrink: 0;
 }
 .stats-panel {
   padding: 16px; border-radius: var(--card-radius);
@@ -238,17 +243,36 @@ body {
 .recent-file-link:hover { color: var(--accent); }
 
 /* ═══ Favorites Section ═══ */
-.favorites-section { margin-bottom: 20px; }
+.favorites-section {
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  max-height: 30%;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
 .favorites-section .section-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.favorites-section .project-grid {
+  max-height: none;
+  overflow-y: auto;
+  flex: 1;
 }
 
 /* ═══ Projects Section ═══ */
-.projects-section { margin-bottom: 20px; }
+.projects-section {
+  margin-bottom: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
 .projects-section .section-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
+  flex-shrink: 0;
 }
 .section-header-left { display: flex; align-items: center; gap: 10px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
@@ -256,12 +280,15 @@ body {
 /* ═══ Compact Card (grid mode) ═══ */
 .project-grid {
   display: grid; grid-template-columns: repeat(2, 1fr);
-  gap: 12px; max-height: 50vh; overflow-y: auto;
+  gap: 10px;
+  overflow-y: auto;
   padding-right: 4px;
+  flex: 1;
+  align-content: start;
 }
 .card-compact {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 14px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; cursor: pointer;
 }
 .card-compact .fav-star {
   flex-shrink: 0; width: 28px; height: 28px;
@@ -273,14 +300,14 @@ body {
 .card-compact .fav-star:hover { transform: scale(1.2); }
 .card-compact .fav-star.favorited { color: #f59e0b; }
 .card-compact .card-icon {
-  width: 36px; height: 36px; border-radius: 8px;
+  width: 30px; height: 30px; border-radius: 6px;
   background: var(--accent-light-bg); color: var(--accent);
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0;
+  font-size: 16px; flex-shrink: 0;
 }
 .card-compact .card-body { flex: 1; min-width: 0; }
 .card-compact .card-name {
-  font-size: 14px; font-weight: 600; overflow: hidden;
+  font-size: 13px; font-weight: 600; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap;
 }
 .card-compact .card-path {
@@ -296,7 +323,7 @@ body {
 
 /* ═══ List View ═══ */
 .project-grid.list-view {
-  grid-template-columns: 1fr; gap: 4px; max-height: 55vh;
+  grid-template-columns: 1fr; gap: 4px;
 }
 .project-grid.list-view .card-compact {
   border-radius: 0; border-left: none; border-right: none;

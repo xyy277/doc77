@@ -8,9 +8,15 @@ window.toggleFavorite = async function(projectId) {
     var r = await fetch('/api/projects/' + projectId + '/favorite', { method: 'PUT' });
     if (!r.ok) { toast('操作失败', 'error'); return; }
     var d = await r.json();
-    // Update star button in both project grid and favorites grid
+    // Update star buttons in DOM
     updateStarButtons(projectId, d.favorited);
-    // Refresh everything
+    // Update local projects array so filterAndSort picks up the change
+    if (typeof projects !== 'undefined') {
+      projects.forEach(function(p) {
+        if (p.id === projectId) p.favorited = d.favorited ? 1 : 0;
+      });
+    }
+    // Refresh sections
     window.refreshFavorites();
     window.filterAndSort();
     window.refreshStats();
