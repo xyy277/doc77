@@ -257,7 +257,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
       res.json({
         projects,
-        lastActive: lastActiveRow?.last_active || null,
+        lastActive: lastActiveRow?.last_active ? lastActiveRow.last_active + 'Z' : null,
         favoriteCount,
       });
     } catch (err: unknown) {
@@ -331,7 +331,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
           filePath: r.file_path,
           projectId: r.project_id,
           projectName: r.project_name,
-          viewedAt: r.viewed_at,
+          viewedAt: r.viewed_at + 'Z',
         })),
       );
     } catch (err: unknown) {
