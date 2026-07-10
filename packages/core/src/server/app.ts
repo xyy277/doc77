@@ -1,13 +1,28 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import { exec, execSync } from 'node:child_process';
 import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
-import { registerProject, listProjects, removeProject, updateProject, touchProject } from '../db/projects.js';
+import { discoverProjects } from '../scanner/discover.js';
+import {
+  registerProject,
+  listProjects,
+  removeProject,
+  updateProject,
+  touchProject,
+} from '../db/projects.js';
 import { scanDirectory, clearCache } from '../scanner/index.js';
-import { readFile, readFileRaw, isBinaryFile, readFirstNLines, validatePath, resolveProjectPath } from '../fs/index.js';
+import {
+  readFile,
+  readFileRaw,
+  isBinaryFile,
+  readFirstNLines,
+  validatePath,
+  resolveProjectPath,
+} from '../fs/index.js';
 import * as crypto from '../crypto.js';
 import {
   renderMarkdown,
@@ -44,8 +59,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   // === Resolve web directory (unchanged logic) ===
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const webCandidates = [
-    path.join(moduleDir, 'web'),              // dist/web/ (npm publish layout)
-    path.join(moduleDir, '..', 'web'),        // src/web/ (dev via src/server/)
+    path.join(moduleDir, 'web'), // dist/web/ (npm publish layout)
+    path.join(moduleDir, '..', 'web'), // src/web/ (dev via src/server/)
     path.join(moduleDir, '..', 'src', 'web'), // resolve from dist/ to src/web/
   ];
   let webDir = '';
@@ -164,9 +179,16 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   if (process.env.DOC77_ELECTRON) {
     app.post('/api/electron/install', async (req: Request, res: Response) => {
       const mod = (req.body.module as string) || '';
-      if (!['ai','mcp'].includes(mod)) { res.status(400).json({ error: 'invalid module' }); return; }
+      if (!['ai', 'mcp'].includes(mod)) {
+        res.status(400).json({ error: 'invalid module' });
+        return;
+      }
       try {
-        const info = JSON.parse(execSync(`curl -s https://registry.npmjs.org/@doc77/${mod}/latest`, { encoding: 'utf-8' }));
+        const info = JSON.parse(
+          execSync(`curl -s https://registry.npmjs.org/@doc77/${mod}/latest`, {
+            encoding: 'utf-8',
+          }),
+        );
         const dest = path.join(process.env.HOME || '/tmp', '.doc77', 'electron-modules');
         fs.mkdirSync(dest, { recursive: true });
         execSync(`curl -sL "${info.dist.tarball}" -o "${dest}/${mod}.tgz"`);
@@ -177,7 +199,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         fs.renameSync(src, target);
         fs.unlinkSync(path.join(dest, `${mod}.tgz`));
         res.json({ ok: true, message: `@doc77/${mod}@${info.version} 安装完成，重启生效` });
-      } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }); }
+      } catch (e: unknown) {
+        res.status(500).json({ error: (e as Error).message });
+      }
     });
   }
 
@@ -221,9 +245,15 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   app.get('/api/stats', (_req: Request, res: Response) => {
     try {
       const db = getConnection();
-      const projects = (db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number }).count;
-      const lastActiveRow = db.prepare('SELECT MAX(last_opened) as last_active FROM projects').get() as { last_active: string | null };
-      const favoriteCount = (db.prepare('SELECT COUNT(*) as count FROM favorites').get() as { count: number }).count;
+      const projects = (
+        db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number }
+      ).count;
+      const lastActiveRow = db
+        .prepare('SELECT MAX(last_opened) as last_active FROM projects')
+        .get() as { last_active: string | null };
+      const favoriteCount = (
+        db.prepare('SELECT COUNT(*) as count FROM favorites').get() as { count: number }
+      ).count;
 
       res.json({
         projects,
@@ -256,14 +286,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
       // Insert the record
       db.prepare(
-        'INSERT INTO recent_files (project_id, file_name, file_path) VALUES (?, ?, ?)'
+        'INSERT INTO recent_files (project_id, file_name, file_path) VALUES (?, ?, ?)',
       ).run(projectId, fileName, filePath);
 
       // Enforce max 50 records
       db.prepare(
         `DELETE FROM recent_files WHERE id NOT IN (
           SELECT id FROM recent_files ORDER BY viewed_at DESC LIMIT 50
-        )`
+        )`,
       ).run();
 
       res.status(201).json({ ok: true });
@@ -279,24 +309,64 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
     try {
       const db = getConnection();
-      const rows = db.prepare(
-        `SELECT rf.file_name, rf.file_path, rf.project_id, rf.viewed_at, p.name as project_name
+      const rows = db
+        .prepare(
+          `SELECT rf.file_name, rf.file_path, rf.project_id, rf.viewed_at, p.name as project_name
          FROM recent_files rf
          JOIN projects p ON p.id = rf.project_id
          ORDER BY rf.viewed_at DESC
-         LIMIT ?`
-      ).all(limit) as Array<{
-        file_name: string; file_path: string; project_id: number;
-        viewed_at: string; project_name: string;
+         LIMIT ?`,
+        )
+        .all(limit) as Array<{
+        file_name: string;
+        file_path: string;
+        project_id: number;
+        viewed_at: string;
+        project_name: string;
       }>;
 
-      res.json(rows.map(r => ({
-        fileName: r.file_name,
-        filePath: r.file_path,
-        projectId: r.project_id,
-        projectName: r.project_name,
-        viewedAt: r.viewed_at,
-      })));
+      res.json(
+        rows.map((r) => ({
+          fileName: r.file_name,
+          filePath: r.file_path,
+          projectId: r.project_id,
+          projectName: r.project_name,
+          viewedAt: r.viewed_at,
+        })),
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Project auto-discovery
+  app.get('/api/discover', (req: Request, res: Response) => {
+    const dirPath = (req.query.path as string) || '~';
+    const depth = parseInt(req.query.depth as string, 10) || 2;
+
+    // Security: reject blocked roots
+    const blocked = ['/etc', '/sys', '/proc', '/dev', '/boot', '/run',
+                     '/bin', '/sbin', '/usr', '/var',
+                     'C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)'];
+    const expanded = dirPath.startsWith('~') ? os.homedir() + dirPath.slice(1) : dirPath;
+    const resolved = path.resolve(expanded).replace(/\\/g, '/');
+    for (const b of blocked) {
+      const bn = b.replace(/\\/g, '/');
+      if (resolved === bn || resolved.startsWith(bn + '/')) {
+        res.status(400).json({ error: '此目录不允许扫描' });
+        return;
+      }
+    }
+
+    try {
+      // Collect already-registered paths for dedup
+      const db = getConnection();
+      const registered = db.prepare('SELECT path FROM projects').all() as { path: string }[];
+      const existingPaths = new Set(registered.map(r => path.resolve(r.path)));
+
+      const results = discoverProjects(dirPath, Math.min(depth, 5), existingPaths);
+      res.json(results);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
@@ -306,13 +376,15 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   // Project CRUD
   app.get('/api/projects', (_req: Request, res: Response) => {
     const db = getConnection();
-    const projects = db.prepare(
-      `SELECT p.id, p.name, p.path, p.created_at, p.last_opened,
+    const projects = db
+      .prepare(
+        `SELECT p.id, p.name, p.path, p.created_at, p.last_opened,
               CASE WHEN f.project_id IS NOT NULL THEN 1 ELSE 0 END as favorited
        FROM projects p
        LEFT JOIN favorites f ON f.project_id = p.id
-       ORDER BY p.name`
-    ).all();
+       ORDER BY p.name`,
+      )
+      .all();
     res.json(projects);
   });
 
@@ -350,8 +422,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   app.put('/api/projects/:id', (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
     const { name, path: newPath } = req.body;
-    if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!name && !newPath) { res.status(400).json({ error: 'name or path required' }); return; }
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!name && !newPath) {
+      res.status(400).json({ error: 'name or path required' });
+      return;
+    }
     try {
       const resolved = newPath ? resolveProjectPath(newPath) : undefined;
       updateProject(id, { name, path: resolved });
@@ -365,7 +443,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   // Touch project (update last_opened)
   app.post('/api/projects/:id/touch', (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
     touchProject(id);
     res.json({ ok: true });
   });
@@ -373,14 +454,20 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   // Toggle project favorite
   app.put('/api/projects/:id/favorite', (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
 
     try {
       const db = getConnection();
 
       // Verify project exists
       const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
-      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
 
       // Check current favorite status
       const existing = db.prepare('SELECT * FROM favorites WHERE project_id = ?').get(id);
@@ -436,12 +523,19 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     } catch {}
     if (isWsl) {
       for (const drive of ['d', 'c', 'e']) {
-        try { if (fs.existsSync('/mnt/' + drive)) searchRoots.push('/mnt/' + drive); } catch {}
+        try {
+          if (fs.existsSync('/mnt/' + drive)) searchRoots.push('/mnt/' + drive);
+        } catch {}
       }
       try {
         const usersDir = '/mnt/c/Users';
         for (const e of fs.readdirSync(usersDir, { withFileTypes: true })) {
-          if (e.isDirectory() && !e.isSymbolicLink() && !['Public', 'Default', 'Default User', 'All Users', 'WsiAccount'].includes(e.name) && !e.name.startsWith('.')) {
+          if (
+            e.isDirectory() &&
+            !e.isSymbolicLink() &&
+            !['Public', 'Default', 'Default User', 'All Users', 'WsiAccount'].includes(e.name) &&
+            !e.name.startsWith('.')
+          ) {
             searchRoots.push(usersDir + '/' + e.name);
           }
         }
@@ -458,7 +552,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
           try {
             return execSync(
               `find "${root}" -maxdepth 4 -type d -name "${folderName}" 2>/dev/null; true`,
-              { timeout: 4000, encoding: 'utf-8', maxBuffer: 1024 * 1024 }
+              { timeout: 4000, encoding: 'utf-8', maxBuffer: 1024 * 1024 },
             ).trim();
           } catch (e: unknown) {
             // execSync throws on non-zero exit, but stdout may still have results
@@ -471,15 +565,18 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
           if (Date.now() > deadline) break;
           try {
             // Match all fingerprint entries (files + directories)
-            let matched = 0, checked = 0;
+            let matched = 0,
+              checked = 0;
             for (const fp of fingerprint) {
               checked++;
               try {
                 const fpPath = candidate + '/' + fp.name;
                 const st = fs.statSync(fpPath);
-                if (fp.type === 'directory' && st.isDirectory()) { matched++; }
-                else if (fp.type === 'file' && st.isFile()) {
-                  if (fp.size === 0 || st.size === fp.size || Math.abs(st.size - fp.size) < 10) matched++;
+                if (fp.type === 'directory' && st.isDirectory()) {
+                  matched++;
+                } else if (fp.type === 'file' && st.isFile()) {
+                  if (fp.size === 0 || st.size === fp.size || Math.abs(st.size - fp.size) < 10)
+                    matched++;
                 }
               } catch {}
             }
@@ -495,7 +592,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     // Sort by score descending, deduplicate
     matches.sort((a, b) => b.score - a.score);
     const seen = new Set<string>();
-    const unique = matches.filter(m => { if (seen.has(m.path)) return false; seen.add(m.path); return true; });
+    const unique = matches.filter((m) => {
+      if (seen.has(m.path)) return false;
+      seen.add(m.path);
+      return true;
+    });
 
     res.json({ matches: unique.slice(0, 5) });
   });
@@ -511,15 +612,23 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
     // Determine if request comes from localhost (even when bound to 0.0.0.0)
     const remoteIp = req.socket.remoteAddress || '';
-    const isLocalRequest = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
-    const isLocalBind = !bindAddr || bindAddr === '127.0.0.1' || bindAddr === 'localhost' || bindAddr === '::1';
+    const isLocalRequest =
+      remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+    const isLocalBind =
+      !bindAddr || bindAddr === '127.0.0.1' || bindAddr === 'localhost' || bindAddr === '::1';
     const isLocalAccess = isLocalBind || isLocalRequest;
 
     // WSL /mnt blocking — only relevant on Linux, and only for remote access
     const isLinux = process.platform === 'linux';
     const isMntPath = isLinux && (dirPath === '/mnt' || dirPath.startsWith('/mnt/'));
     if (!isLocalAccess && isMntPath) {
-      res.json({ path: dirPath, parent: null, roots: ['/home', '/tmp'], entries: [], error: '远程访问模式下不允许浏览 /mnt（Windows 驱动器）' });
+      res.json({
+        path: dirPath,
+        parent: null,
+        roots: ['/home', '/tmp'],
+        entries: [],
+        error: '远程访问模式下不允许浏览 /mnt（Windows 驱动器）',
+      });
       return;
     }
 
@@ -529,23 +638,36 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     function isPathBlocked(p: string): boolean {
       const BLOCKED_ROOTS: Record<string, string[]> = {
         win32: [
-          'C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)',
-          'C:\\ProgramData', 'C:\\$Recycle.Bin',
-          'C:\\System Volume Information', 'C:\\Recovery',
-          'C:\\Config.Msi', 'C:\\MSOCache', 'C:\\PerfLogs',
+          'C:\\Windows',
+          'C:\\Program Files',
+          'C:\\Program Files (x86)',
+          'C:\\ProgramData',
+          'C:\\$Recycle.Bin',
+          'C:\\System Volume Information',
+          'C:\\Recovery',
+          'C:\\Config.Msi',
+          'C:\\MSOCache',
+          'C:\\PerfLogs',
         ],
         linux: [
-          '/etc', '/proc', '/sys', '/dev', '/run', '/boot',
-          '/var/log', '/var/run', '/var/lock',
-          '/bin', '/sbin', '/usr/bin', '/usr/sbin',
+          '/etc',
+          '/proc',
+          '/sys',
+          '/dev',
+          '/run',
+          '/boot',
+          '/var/log',
+          '/var/run',
+          '/var/lock',
+          '/bin',
+          '/sbin',
+          '/usr/bin',
+          '/usr/sbin',
         ],
-        darwin: [
-          '/System', '/Library', '/private/etc', '/private/var',
-          '/usr/bin', '/usr/sbin',
-        ],
+        darwin: ['/System', '/Library', '/private/etc', '/private/var', '/usr/bin', '/usr/sbin'],
       };
       const blocked = BLOCKED_ROOTS[process.platform] || [];
-      return blocked.some(r => p === r || p.startsWith(r + path.sep));
+      return blocked.some((r) => p === r || p.startsWith(r + path.sep));
     }
     if (isPathBlocked(dirPath)) {
       res.json({ path: dirPath, parent: null, roots: [], entries: [], error: '此目录不允许访问' });
@@ -554,11 +676,36 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
     // Hidden system dirs to filter from root-level listings only
     const BLOCKED_DIRS = isWin
-      ? new Set(['Windows', 'Program Files', 'Program Files (x86)', 'ProgramData',
-                 '$Recycle.Bin', 'System Volume Information', 'Recovery', 'Config.Msi',
-                 'MSOCache', 'PerfLogs'])
-      : new Set(['etc', 'proc', 'sys', 'root', 'var', 'boot', 'dev', 'run', 'snap',
-                 'bin', 'sbin', 'lib', 'lib64', 'usr', 'lost+found', '.dockerenv']);
+      ? new Set([
+          'Windows',
+          'Program Files',
+          'Program Files (x86)',
+          'ProgramData',
+          '$Recycle.Bin',
+          'System Volume Information',
+          'Recovery',
+          'Config.Msi',
+          'MSOCache',
+          'PerfLogs',
+        ])
+      : new Set([
+          'etc',
+          'proc',
+          'sys',
+          'root',
+          'var',
+          'boot',
+          'dev',
+          'run',
+          'snap',
+          'bin',
+          'sbin',
+          'lib',
+          'lib64',
+          'usr',
+          'lost+found',
+          '.dockerenv',
+        ]);
 
     // Cross-platform root detection (C:\ on Windows, / on Unix)
     const parsedRoot = path.parse(dirPath).root;
@@ -574,10 +721,16 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       } else {
         const raw = fs.readdirSync(dirPath, { withFileTypes: true });
         entries = raw
-          .filter(e => !e.name.startsWith('.')) // hide dotfiles
-          .filter(e => !(isRoot && (BLOCKED_DIRS.has(e.name) || e.name.includes('usr-is-merged') || e.name === 'init')))
-          .filter(e => !(isRoot && !isLocalAccess && isLinux && e.name === 'mnt')) // hide /mnt in remote mode
-          .map(e => ({
+          .filter((e) => !e.name.startsWith('.')) // hide dotfiles
+          .filter(
+            (e) =>
+              !(
+                isRoot &&
+                (BLOCKED_DIRS.has(e.name) || e.name.includes('usr-is-merged') || e.name === 'init')
+              ),
+          )
+          .filter((e) => !(isRoot && !isLocalAccess && isLinux && e.name === 'mnt')) // hide /mnt in remote mode
+          .map((e) => ({
             name: e.name,
             type: e.isDirectory() ? 'directory' : 'file',
             size: 0,
@@ -604,12 +757,16 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       // Common user folders
       for (const sub of ['Desktop', 'Documents', 'Downloads']) {
         const p = path.join(winHome, sub);
-        try { if (fs.existsSync(p)) roots.push(p); } catch {}
+        try {
+          if (fs.existsSync(p)) roots.push(p);
+        } catch {}
       }
       // Available drives
       for (let c = 65; c <= 90; c++) {
         const drive = String.fromCharCode(c) + ':\\';
-        try { if (fs.existsSync(drive)) roots.push(drive); } catch {}
+        try {
+          if (fs.existsSync(drive)) roots.push(drive);
+        } catch {}
       }
     } else {
       const home = process.env.HOME || '/home';
@@ -617,7 +774,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       // Common user folders
       for (const sub of ['Desktop', 'Documents', 'Downloads']) {
         const p = path.join(home, sub);
-        try { if (fs.existsSync(p)) roots.push(p); } catch {}
+        try {
+          if (fs.existsSync(p)) roots.push(p);
+        } catch {}
       }
       // /tmp always available
       if (!roots.includes('/tmp')) roots.push('/tmp');
@@ -629,7 +788,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
           const isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
           if (isWsl) {
             for (const drive of ['d', 'c', 'e']) {
-              try { if (fs.existsSync('/mnt/' + drive)) roots.push('/mnt/' + drive); } catch {}
+              try {
+                if (fs.existsSync('/mnt/' + drive)) roots.push('/mnt/' + drive);
+              } catch {}
             }
           }
         } catch {}
@@ -653,7 +814,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   // Refresh tree cache for a project
   app.post('/api/tree/:id/refresh', (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
     try {
       clearCache(projectId);
       res.json({ ok: true });
@@ -705,7 +869,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
         { path: string } | undefined;
 
-      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
 
       const absPath = validatePath(project.path, filePath);
       const stats = fs.statSync(absPath);
@@ -739,7 +906,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       const sizeLimit = FORMAT_SIZE_LIMITS[rendererType] ?? FORMAT_SIZE_LIMITS.text;
       if (sizeLimit > 0 && stats.size > sizeLimit) {
         // For text-based formats: truncate and warn
-        if (['markdown','mermaid','code','text'].includes(rendererType)) {
+        if (['markdown', 'mermaid', 'code', 'text'].includes(rendererType)) {
           const { content, truncated, totalBytes } = readFirstNLines(absPath, 10000);
           res.json({
             path: filePath,
@@ -768,33 +935,56 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       switch (rendererType) {
         case 'markdown': {
           const raw = readFile(absPath);
-          res.json({ path: filePath, type: 'markdown', content: renderMarkdown(raw), size: stats.size, modified: stats.mtime.toISOString() });
+          res.json({
+            path: filePath,
+            type: 'markdown',
+            content: renderMarkdown(raw),
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
+          });
           return;
         }
         case 'mermaid': {
           const raw = readFile(absPath);
-          res.json({ path: filePath, type: 'mermaid', content: renderMermaid(raw), size: stats.size, modified: stats.mtime.toISOString() });
+          res.json({
+            path: filePath,
+            type: 'mermaid',
+            content: renderMermaid(raw),
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
+          });
           return;
         }
         case 'code': {
           const raw = readFile(absPath);
-          res.json({ path: filePath, type: 'code', content: renderCode(raw, path.extname(filePath).slice(1)), rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`, size: stats.size, modified: stats.mtime.toISOString() });
+          res.json({
+            path: filePath,
+            type: 'code',
+            content: renderCode(raw, path.extname(filePath).slice(1)),
+            rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`,
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
+          });
           return;
         }
         case 'docx': {
           // docx is handled later (needs mammoth), for now return unsupported info
           res.json({
-            path: filePath, type: 'docx',
+            path: filePath,
+            type: 'docx',
             rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`,
-            size: stats.size, modified: stats.mtime.toISOString(),
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
           });
           return;
         }
         case 'xlsx': {
           res.json({
-            path: filePath, type: 'xlsx',
+            path: filePath,
+            type: 'xlsx',
             rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`,
-            size: stats.size, modified: stats.mtime.toISOString(),
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
           });
           return;
         }
@@ -813,7 +1003,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      if (message.includes('not found') || message.includes('ENOENT') || message.includes('traversal')) {
+      if (
+        message.includes('not found') ||
+        message.includes('ENOENT') ||
+        message.includes('traversal')
+      ) {
         res.status(404).json({ error: 'File not found' });
         return;
       }
@@ -833,9 +1027,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
     try {
       const db = getConnection();
-      const project = db
-        .prepare('SELECT path FROM projects WHERE id = ?')
-        .get(projectId) as { path: string } | undefined;
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
 
       if (!project) {
         res.status(404).json({ error: 'Project not found' });
@@ -847,9 +1040,15 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
       // Map extension to MIME type
       const mimeTypes: Record<string, string> = {
-        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
-        '.bmp': 'image/bmp', '.ico': 'image/x-icon', '.avif': 'image/avif',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.ico': 'image/x-icon',
+        '.avif': 'image/avif',
         '.pdf': 'application/pdf',
         '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -1003,9 +1202,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   const { getDecryptedAiConfig } = (() => {
     const fn = (): { token: string; baseUrl: string; model: string } | null => {
       const db = getConnection();
-      const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as { value: string } | undefined;
-      const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as { value: string } | undefined;
-      const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as { value: string } | undefined;
+      const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
+        { value: string } | undefined;
+      const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
+        { value: string } | undefined;
+      const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
+        { value: string } | undefined;
 
       if (!tokenRow?.value) return null;
 
@@ -1017,13 +1219,19 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         try {
           const encData = JSON.parse(token);
           if (encData.iv && encData.tag && encData.ciphertext) {
-            const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as { pbkdf2_salt: string } | undefined;
+            const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
+              { pbkdf2_salt: string } | undefined;
             if (authRow?.pbkdf2_salt) {
-              const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
+              const encKey = crypto.deriveKey(
+                'doc77-config-key',
+                Buffer.from(authRow.pbkdf2_salt, 'hex'),
+              );
               token = crypto.decrypt(encData, encKey);
             }
           }
-        } catch { /* not encrypted */ }
+        } catch {
+          /* not encrypted */
+        }
       }
 
       return { token, baseUrl, model };
@@ -1042,7 +1250,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.token}` },
-        body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 5 }),
+        body: JSON.stringify({
+          model: cfg.model,
+          messages: [{ role: 'user', content: 'Hi' }],
+          max_tokens: 5,
+        }),
         signal: AbortSignal.timeout(15000),
       });
       if (resp.ok) {
@@ -1050,7 +1262,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       } else {
         const errText = await resp.text().catch(() => '');
         let errMsg = `HTTP ${resp.status}`;
-        try { const errJson = JSON.parse(errText); errMsg = errJson.error?.message || errMsg; } catch {}
+        try {
+          const errJson = JSON.parse(errText);
+          errMsg = errJson.error?.message || errMsg;
+        } catch {}
         res.json({ ok: false, error: errMsg });
       }
     } catch (e: unknown) {
@@ -1083,7 +1298,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       const db = getConnection();
       const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(project_id) as
         { path: string } | undefined;
-      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
       const absPath = validatePath(project.path, file_path);
       const content = readFile(absPath);
       const summary = `文档摘要（${file_path}）：\n该文档包含 ${content.split('\n').length} 行内容，共 ${content.length} 个字符。主要涉及技术规范和设计文档。`;
@@ -1112,24 +1330,80 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     const results: Array<{ file: string; line: number; content: string }> = [];
     const lowerKey = keyword.toLowerCase();
     const SKIP_DIRS = new Set([
-      'node_modules', '.git', '.svn', '__pycache__', '.venv', 'venv',
-      'dist', '.cache', '.next', '.nuxt', 'build', 'target',
+      'node_modules',
+      '.git',
+      '.svn',
+      '__pycache__',
+      '.venv',
+      'venv',
+      'dist',
+      '.cache',
+      '.next',
+      '.nuxt',
+      'build',
+      'target',
     ]);
     const SKIP_EXT = new Set([
-      '.exe', '.dll', '.so', '.dylib', '.bin', '.class', '.jar', '.war', '.o', '.wasm',
-      '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.ico', '.bmp', '.avif',
-      '.mp4', '.mp3', '.wav', '.ogg', '.flac', '.aac', '.mov', '.avi', '.mkv',
-      '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz', '.zst',
-      '.pdf', '.docx', '.xlsx', '.pptx', '.epub', '.mobi',
-      '.ttf', '.woff', '.woff2', '.otf', '.eot',
-      '.db', '.sqlite', '.sqlite3',
+      '.exe',
+      '.dll',
+      '.so',
+      '.dylib',
+      '.bin',
+      '.class',
+      '.jar',
+      '.war',
+      '.o',
+      '.wasm',
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.svg',
+      '.webp',
+      '.ico',
+      '.bmp',
+      '.avif',
+      '.mp4',
+      '.mp3',
+      '.wav',
+      '.ogg',
+      '.flac',
+      '.aac',
+      '.mov',
+      '.avi',
+      '.mkv',
+      '.zip',
+      '.tar',
+      '.gz',
+      '.7z',
+      '.rar',
+      '.bz2',
+      '.xz',
+      '.zst',
+      '.pdf',
+      '.docx',
+      '.xlsx',
+      '.pptx',
+      '.epub',
+      '.mobi',
+      '.ttf',
+      '.woff',
+      '.woff2',
+      '.otf',
+      '.eot',
+      '.db',
+      '.sqlite',
+      '.sqlite3',
     ]);
 
     function walk(dir: string) {
       if (results.length >= maxResults) return;
       let entries: fs.Dirent[];
-      try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-      catch { return; }
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
 
       for (const entry of entries) {
         if (results.length >= maxResults) return;
@@ -1153,7 +1427,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
                 });
               }
             }
-          } catch { /* skip unreadable / binary files */ }
+          } catch {
+            /* skip unreadable / binary files */
+          }
         }
       }
     }
@@ -1178,9 +1454,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
     try {
       const db = getConnection();
-      const project = db
-        .prepare('SELECT path FROM projects WHERE id = ?')
-        .get(projectId) as { path: string } | undefined;
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
 
       if (!project) {
         res.status(404).json({ error: 'Project not found' });
@@ -1201,9 +1476,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   app.get('/api/auth/status', (_req: Request, res: Response) => {
     try {
       const db = getConnection();
-      const row = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as { password_hash: string } | undefined;
+      const row = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
+        { password_hash: string } | undefined;
       res.json({ hasPassword: !!row?.password_hash });
-    } catch { res.json({ hasPassword: false }); }
+    } catch {
+      res.json({ hasPassword: false });
+    }
   });
 
   // Setup password (first time)
@@ -1215,7 +1493,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     }
     try {
       const db = getConnection();
-      const existing = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as { password_hash: string } | undefined;
+      const existing = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
+        { password_hash: string } | undefined;
       if (existing?.password_hash) {
         res.status(409).json({ error: '密码已设置，请使用修改密码功能' });
         return;
@@ -1223,26 +1502,40 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       const hash = crypto.hashPassword(password);
       const encSalt = crypto.generateSalt().toString('hex');
       const pbkdf2Salt = crypto.generateSalt().toString('hex');
-      db.prepare('INSERT OR REPLACE INTO user_auth (id, password_hash, encryption_salt, pbkdf2_salt) VALUES (1, ?, ?, ?)').run(hash, encSalt, pbkdf2Salt);
+      db.prepare(
+        'INSERT OR REPLACE INTO user_auth (id, password_hash, encryption_salt, pbkdf2_salt) VALUES (1, ?, ?, ?)',
+      ).run(hash, encSalt, pbkdf2Salt);
       res.json({ ok: true });
-    } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }); }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
   });
 
   // Login
   app.post('/api/auth/login', (req: Request, res: Response) => {
     const { password } = req.body;
-    if (!password) { res.status(400).json({ error: '密码不能为空' }); return; }
+    if (!password) {
+      res.status(400).json({ error: '密码不能为空' });
+      return;
+    }
     try {
       const db = getConnection();
-      const row = db.prepare('SELECT * FROM user_auth WHERE id = 1').get() as Record<string, unknown> | undefined;
-      if (!row?.password_hash) { res.status(404).json({ error: '未设置密码' }); return; }
+      const row = db.prepare('SELECT * FROM user_auth WHERE id = 1').get() as
+        Record<string, unknown> | undefined;
+      if (!row?.password_hash) {
+        res.status(404).json({ error: '未设置密码' });
+        return;
+      }
       if (row.locked_until && new Date(row.locked_until as string) > new Date()) {
-        res.status(423).json({ error: '账户已锁定，请稍后再试' }); return;
+        res.status(423).json({ error: '账户已锁定，请稍后再试' });
+        return;
       }
       if (!crypto.verifyPassword(password, row.password_hash as string)) {
         const fails = ((row.failed_attempts as number) || 0) + 1;
         if (fails >= 5) {
-          db.prepare("UPDATE user_auth SET failed_attempts=0, locked_until=datetime('now','+15 minutes') WHERE id=1").run();
+          db.prepare(
+            "UPDATE user_auth SET failed_attempts=0, locked_until=datetime('now','+15 minutes') WHERE id=1",
+          ).run();
           res.status(423).json({ error: '密码错误次数过多，已锁定15分钟' });
         } else {
           db.prepare('UPDATE user_auth SET failed_attempts=? WHERE id=1').run(fails);
@@ -1252,7 +1545,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       }
       db.prepare('UPDATE user_auth SET failed_attempts=0, locked_until=NULL WHERE id=1').run();
       res.json({ ok: true, token: 'session-' + Date.now() });
-    } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }); }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
   });
 
   // === Config API ===
@@ -1260,35 +1555,51 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   app.get('/api/config', (_req: Request, res: Response) => {
     try {
       const db = getConnection();
-      const rows = db.prepare('SELECT key, value FROM config ORDER BY key').all() as { key: string; value: string }[];
+      const rows = db.prepare('SELECT key, value FROM config ORDER BY key').all() as {
+        key: string;
+        value: string;
+      }[];
       const result: Record<string, string> = {};
       for (const r of rows) {
         result[r.key] = crypto.isSensitiveKey(r.key) ? crypto.maskSensitive(r.value) : r.value;
       }
       res.json(result);
-    } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }); }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
   });
 
   app.put('/api/config', (req: Request, res: Response) => {
     const { key, value } = req.body;
-    if (!key || value === undefined) { res.status(400).json({ error: 'key and value required' }); return; }
+    if (!key || value === undefined) {
+      res.status(400).json({ error: 'key and value required' });
+      return;
+    }
     try {
       const db = getConnection();
       let storeValue = value;
       // Encrypt sensitive fields
       if (crypto.isSensitiveKey(key)) {
-        const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as { pbkdf2_salt: string } | undefined;
+        const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
+          { pbkdf2_salt: string } | undefined;
         if (authRow?.pbkdf2_salt) {
           // Use a fixed passphrase for config encryption (derived from user password if available)
           // For now, store encrypted with a local key
-          const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
+          const encKey = crypto.deriveKey(
+            'doc77-config-key',
+            Buffer.from(authRow.pbkdf2_salt, 'hex'),
+          );
           const enc = crypto.encrypt(value, encKey);
           storeValue = JSON.stringify(enc);
         }
       }
-      db.prepare('INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, storeValue);
+      db.prepare(
+        'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ).run(key, storeValue);
       res.json({ ok: true, key });
-    } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }); }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
   });
 
   // --- Error handler ---
@@ -1308,15 +1619,69 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 function getFileCategory(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   const map: Record<string, string> = {
-    '.mp4':'video','.avi':'video','.mov':'video','.mkv':'video','.webm':'video','.wmv':'video','.flv':'video','.m4v':'video',
-    '.mp3':'audio','.wav':'audio','.ogg':'audio','.flac':'audio','.aac':'audio','.wma':'audio','.m4a':'audio','.opus':'audio',
-    '.zip':'archive','.tar':'archive','.gz':'archive','.7z':'archive','.rar':'archive','.bz2':'archive','.xz':'archive','.zst':'archive',
-    '.ttf':'font','.woff':'font','.woff2':'font','.otf':'font','.eot':'font',
-    '.db':'database','.sqlite':'database','.sqlite3':'database','.mdb':'database','.accdb':'database',
-    '.psd':'design','.ai':'design','.sketch':'design','.fig':'design','.xd':'design',
-    '.exe':'binary','.dll':'binary','.so':'binary','.dylib':'binary','.bin':'binary','.class':'binary','.jar':'binary','.war':'binary','.o':'binary','.wasm':'binary',
-    '.shp':'gis','.shx':'gis','.dbf':'gis','.obj':'3d','.stl':'3d','.glb':'3d','.gltf':'3d',
-    '.epub':'ebook','.mobi':'ebook','.pages':'document','.numbers':'spreadsheet','.key':'presentation','.ppt':'presentation','.pptx':'presentation',
+    '.mp4': 'video',
+    '.avi': 'video',
+    '.mov': 'video',
+    '.mkv': 'video',
+    '.webm': 'video',
+    '.wmv': 'video',
+    '.flv': 'video',
+    '.m4v': 'video',
+    '.mp3': 'audio',
+    '.wav': 'audio',
+    '.ogg': 'audio',
+    '.flac': 'audio',
+    '.aac': 'audio',
+    '.wma': 'audio',
+    '.m4a': 'audio',
+    '.opus': 'audio',
+    '.zip': 'archive',
+    '.tar': 'archive',
+    '.gz': 'archive',
+    '.7z': 'archive',
+    '.rar': 'archive',
+    '.bz2': 'archive',
+    '.xz': 'archive',
+    '.zst': 'archive',
+    '.ttf': 'font',
+    '.woff': 'font',
+    '.woff2': 'font',
+    '.otf': 'font',
+    '.eot': 'font',
+    '.db': 'database',
+    '.sqlite': 'database',
+    '.sqlite3': 'database',
+    '.mdb': 'database',
+    '.accdb': 'database',
+    '.psd': 'design',
+    '.ai': 'design',
+    '.sketch': 'design',
+    '.fig': 'design',
+    '.xd': 'design',
+    '.exe': 'binary',
+    '.dll': 'binary',
+    '.so': 'binary',
+    '.dylib': 'binary',
+    '.bin': 'binary',
+    '.class': 'binary',
+    '.jar': 'binary',
+    '.war': 'binary',
+    '.o': 'binary',
+    '.wasm': 'binary',
+    '.shp': 'gis',
+    '.shx': 'gis',
+    '.dbf': 'gis',
+    '.obj': '3d',
+    '.stl': '3d',
+    '.glb': '3d',
+    '.gltf': '3d',
+    '.epub': 'ebook',
+    '.mobi': 'ebook',
+    '.pages': 'document',
+    '.numbers': 'spreadsheet',
+    '.key': 'presentation',
+    '.ppt': 'presentation',
+    '.pptx': 'presentation',
   };
   return map[ext] || 'unknown';
 }
@@ -1348,8 +1713,7 @@ export function createQueueApproveHandler(
       const task = db
         .prepare('SELECT * FROM operation_queue WHERE id = ? AND status = ?')
         .get(task_id, 'pending') as
-        | { id: number; project_id: number; operation_type: string; status: string }
-        | undefined;
+        { id: number; project_id: number; operation_type: string; status: string } | undefined;
 
       if (!task) {
         res.status(404).json({ error: 'Task not found or not pending' });
@@ -1394,8 +1758,13 @@ export function createAIChatHandler(deps: {
   }) => SessionAgent & {
     hasContext: boolean;
     addContext(ctx: string): void;
-    chatStream(message: string): AsyncIterable<
-      { type: 'token'; content: string } | { type: 'tool_call'; name: string; arguments: string; status: string } | { type: 'done' } | { type: 'error'; message: string }
+    chatStream(
+      message: string,
+    ): AsyncIterable<
+      | { type: 'token'; content: string }
+      | { type: 'tool_call'; name: string; arguments: string; status: string }
+      | { type: 'done' }
+      | { type: 'error'; message: string }
     >;
   };
   READ_TOOLS: unknown[];
@@ -1413,9 +1782,12 @@ export function createAIChatHandler(deps: {
       type AiConfig = { token: string; baseUrl: string; model: string } | null;
       const fn = (): AiConfig => {
         const db = getConnection();
-        const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as { value: string } | undefined;
-        const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as { value: string } | undefined;
-        const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as { value: string } | undefined;
+        const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
+          { value: string } | undefined;
+        const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
+          { value: string } | undefined;
+        const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
+          { value: string } | undefined;
         if (!tokenRow?.value) return null;
         const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
         const model = modelRow?.value || 'gpt-4o';
@@ -1424,13 +1796,19 @@ export function createAIChatHandler(deps: {
           try {
             const encData = JSON.parse(token);
             if (encData.iv && encData.tag && encData.ciphertext) {
-              const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as { pbkdf2_salt: string } | undefined;
+              const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
+                { pbkdf2_salt: string } | undefined;
               if (authRow?.pbkdf2_salt) {
-                const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
+                const encKey = crypto.deriveKey(
+                  'doc77-config-key',
+                  Buffer.from(authRow.pbkdf2_salt, 'hex'),
+                );
                 token = crypto.decrypt(encData, encKey);
               }
             }
-          } catch { /* not encrypted */ }
+          } catch {
+            /* not encrypted */
+          }
         }
         return { token, baseUrl, model };
       };
@@ -1439,7 +1817,9 @@ export function createAIChatHandler(deps: {
 
     const cfg = getDecryptedAiConfig();
     if (!cfg) {
-      res.status(400).json({ error: 'AI_NOT_CONFIGURED', message: '请先在设置中配置 AI 模型和 API Token' });
+      res
+        .status(400)
+        .json({ error: 'AI_NOT_CONFIGURED', message: '请先在设置中配置 AI 模型和 API Token' });
       return;
     }
 
@@ -1464,67 +1844,111 @@ export function createAIChatHandler(deps: {
             const result = scanDirectory(pid, dirPath);
             const entries = result.entries.slice(0, 50);
             if (entries.length === 0) return `目录 "${dirPath || '/'}" 为空或不存在`;
-            return entries.map(e => `${e.type === 'directory' ? '📁' : '📄'} ${e.name} (${e.type}, ${e.size ?? 'N/A'} bytes)`).join('\n');
+            return entries
+              .map(
+                (e) =>
+                  `${e.type === 'directory' ? '📁' : '📄'} ${e.name} (${e.type}, ${e.size ?? 'N/A'} bytes)`,
+              )
+              .join('\n');
           }
           case 'read_file': {
             const filePath = args.file_path as string;
             if (!filePath) return 'Error: file_path is required';
             const fileName = filePath.split('/').pop() || filePath;
-            if (isSensitiveFile(fileName)) return `Error: Access denied — "${fileName}" is a sensitive file`;
+            if (isSensitiveFile(fileName))
+              return `Error: Access denied — "${fileName}" is a sensitive file`;
             try {
               const db = getConnection();
-              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as { path: string } | undefined;
+              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+                { path: string } | undefined;
               if (!project) return 'Error: Project not found';
               const absPath = validatePath(project.path, filePath);
               const content = readFile(absPath);
               return content.length > 4000
                 ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
                 : content;
-            } catch (e: unknown) { return `Error: ${e instanceof Error ? e.message : 'Unknown'}`; }
+            } catch (e: unknown) {
+              return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+            }
           }
           case 'get_file_info': {
             const filePath = args.file_path as string;
             if (!filePath) return 'Error: file_path is required';
             try {
               const db = getConnection();
-              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as { path: string } | undefined;
+              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+                { path: string } | undefined;
               if (!project) return 'Error: Project not found';
               const absPath = validatePath(project.path, filePath);
               const stats = fs.statSync(absPath);
               return `File: ${filePath}\nType: ${stats.isDirectory() ? 'directory' : 'file'}\nSize: ${stats.size} bytes\nModified: ${stats.mtime.toISOString()}`;
-            } catch (e: unknown) { return `Error: ${e instanceof Error ? e.message : 'Unknown'}`; }
+            } catch (e: unknown) {
+              return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+            }
           }
-          default: return `Error: Unknown tool "${name}"`;
+          default:
+            return `Error: Unknown tool "${name}"`;
         }
       };
 
-      const provider = new AiProvider({ apiKey: cfg.token, baseUrl: cfg.baseUrl, model: cfg.model });
+      const provider = new AiProvider({
+        apiKey: cfg.token,
+        baseUrl: cfg.baseUrl,
+        model: cfg.model,
+      });
       const { sessionId: sid, agent } = getOrCreateSession(
         session_id,
-        () => new DocAgent({ provider, model: cfg.model, tools: READ_TOOLS as any[], executeTool, maxSteps: 5 }) as any,
+        () =>
+          new DocAgent({
+            provider,
+            model: cfg.model,
+            tools: READ_TOOLS as any[],
+            executeTool,
+            maxSteps: 5,
+          }) as any,
         project_id,
       );
 
       if (project_id && !(agent as any).hasContext) {
         try {
           const root = scanDirectory(project_id, '');
-          const fileList = root.entries.slice(0, 30).map(e => `${e.type === 'directory' ? '📁' : '📄'} ${e.name}`).join('\n');
+          const fileList = root.entries
+            .slice(0, 30)
+            .map((e) => `${e.type === 'directory' ? '📁' : '📄'} ${e.name}`)
+            .join('\n');
           const proj = (() => {
             const db = getConnection();
-            return db.prepare('SELECT name, path FROM projects WHERE id = ?').get(project_id) as { name: string; path: string } | undefined;
+            return db.prepare('SELECT name, path FROM projects WHERE id = ?').get(project_id) as
+              { name: string; path: string } | undefined;
           })();
-          (agent as any).addContext(`当前项目: ${proj?.name || 'Unknown'} (路径: ${proj?.path || 'N/A'})\n根目录内容:\n${fileList || '(空目录)'}`);
-        } catch { /* non-fatal */ }
+          (agent as any).addContext(
+            `当前项目: ${proj?.name || 'Unknown'} (路径: ${proj?.path || 'N/A'})\n根目录内容:\n${fileList || '(空目录)'}`,
+          );
+        } catch {
+          /* non-fatal */
+        }
       }
 
       send('session', { session_id: sid });
 
       for await (const chunk of (agent as any).chatStream(message)) {
         switch (chunk.type) {
-          case 'token': send('token', { text: chunk.content }); break;
-          case 'tool_call': send('tool_call', { name: chunk.name, arguments: chunk.arguments, status: 'executing' }); break;
-          case 'done': send('done', {}); break;
-          case 'error': send('error', { message: chunk.message }); break;
+          case 'token':
+            send('token', { text: chunk.content });
+            break;
+          case 'tool_call':
+            send('tool_call', {
+              name: chunk.name,
+              arguments: chunk.arguments,
+              status: 'executing',
+            });
+            break;
+          case 'done':
+            send('done', {});
+            break;
+          case 'error':
+            send('error', { message: chunk.message });
+            break;
         }
       }
     } catch (e: unknown) {
