@@ -107,4 +107,27 @@ CREATE INDEX IF NOT EXISTS idx_queue_status ON operation_queue(status);
 CREATE INDEX IF NOT EXISTS idx_queue_session ON operation_queue(session_id);
 CREATE INDEX IF NOT EXISTS idx_audit_project_id ON audit_log(project_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_log(created_at);
+
+-- 收藏表
+CREATE TABLE IF NOT EXISTS favorites (
+    project_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (project_id),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- 最近浏览文件表
+CREATE TABLE IF NOT EXISTS recent_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- 索引
+CREATE INDEX IF NOT EXISTS idx_favorites_created ON favorites(created_at);
+CREATE INDEX IF NOT EXISTS idx_recent_files_viewed ON recent_files(viewed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_projects_last_opened ON projects(last_opened);
 `;
