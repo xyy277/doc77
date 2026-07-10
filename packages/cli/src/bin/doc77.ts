@@ -478,7 +478,7 @@ async function main() {
         const { execSync } = await import('node:child_process');
         for (const m of modules) {
           console.log(`安装 @doc77/${m}...`);
-          execSync(`npm install @doc77/${m}@${VERSION}`, { stdio: 'inherit' });
+          execSync(`npm install @doc77/${m}@latest`, { stdio: 'inherit' });
           console.log(`✅ @doc77/${m} 安装完成`);
         }
         console.log('重启 Doc77 服务生效');

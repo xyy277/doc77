@@ -11,7 +11,7 @@
     "doc77": "bin/doc77.js"
   },
   "dependencies": {
-    "@doc77/cli": "^0.4.1"
+    "@doc77/cli": "^0.4.4"
   },
   "publishConfig": {
     "access": "public"

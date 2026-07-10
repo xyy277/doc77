@@ -1,6 +1,6 @@
 {
   "name": "@doc77/cli",
-  "version": "0.4.1",
+  "version": "0.4.5",
   "description": "Doc77 CLI — 默认安全、对话驱动的智能本地文档管理 Agent",
   "license": "MIT",
   "repository": {
@@ -45,9 +45,17 @@
   "dependencies": {
     "@doc77/core": "workspace:^"
   },
-  "optionalDependencies": {
+  "peerDependencies": {
     "@doc77/mcp": "workspace:^",
     "@doc77/ai": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@doc77/mcp": {
+      "optional": true
+    },
+    "@doc77/ai": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public"
