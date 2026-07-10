@@ -54,7 +54,10 @@ export class StatementCompat {
         stmt.free();
         return r;
       }
-    } catch { stmt.free(); return undefined; }
+    } catch {
+      stmt.free();
+      return undefined;
+    }
     stmt.free();
     return undefined;
   }
@@ -63,7 +66,9 @@ export class StatementCompat {
     const stmt = this._db.prepare(this._sql);
     if (params.length > 0) stmt.bind(params);
     const results: T[] = [];
-    try { while (stmt.step()) results.push(stmt.getAsObject() as T); } catch {}
+    try {
+      while (stmt.step()) results.push(stmt.getAsObject() as T);
+    } catch {}
     stmt.free();
     return results;
   }
@@ -79,7 +84,12 @@ export class DatabaseCompat {
   }
 
   get open(): boolean {
-    try { this._db.exec('SELECT 1'); return true; } catch { return false; }
+    try {
+      this._db.exec('SELECT 1');
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   exec(sql: string) {
@@ -100,7 +110,9 @@ export class DatabaseCompat {
         this._db.run('COMMIT');
         return r;
       } catch (err) {
-        try { this._db.run('ROLLBACK'); } catch {}
+        try {
+          this._db.run('ROLLBACK');
+        } catch {}
         throw err;
       }
     };
@@ -164,7 +176,11 @@ export function getConnection(): DatabaseCompat {
 /** Close and save the database. */
 export function closeConnection(): void {
   if (rawDb && dbPath) {
-    try { wrappedDb?._saveAndClose(dbPath); } catch { rawDb.close(); }
+    try {
+      wrappedDb?._saveAndClose(dbPath);
+    } catch {
+      rawDb.close();
+    }
     rawDb = null;
     wrappedDb = null;
     dbPath = null;

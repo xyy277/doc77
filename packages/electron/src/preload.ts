@@ -5,9 +5,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('doc77', {
-  openNativeDialog: (): Promise<string | null> =>
-    ipcRenderer.invoke('dialog:openDirectory'),
-  getPort: (): Promise<number> =>
-    ipcRenderer.invoke('getPort'),
+  openNativeDialog: (): Promise<string | null> => ipcRenderer.invoke('dialog:openDirectory'),
+  getPort: (): Promise<number> => ipcRenderer.invoke('getPort'),
   platform: process.platform,
 });

@@ -46,7 +46,9 @@ describe('Config management', () => {
   describe('setConfig', () => {
     it('should insert a new config entry', () => {
       setConfig('my.key', 'my-value');
-      const row = getConnection().prepare('SELECT value FROM config WHERE key = ?').get('my.key') as {
+      const row = getConnection()
+        .prepare('SELECT value FROM config WHERE key = ?')
+        .get('my.key') as {
         value: string;
       };
       expect(row.value).toBe('my-value');

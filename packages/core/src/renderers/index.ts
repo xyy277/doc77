@@ -87,25 +87,84 @@ const EXTENSION_MAP: Record<string, string> = {
  */
 export const UNSUPPORTED_EXTENSIONS = new Set([
   // Video
-  '.mp4','.avi','.mov','.mkv','.webm','.wmv','.flv','.m4v',
+  '.mp4',
+  '.avi',
+  '.mov',
+  '.mkv',
+  '.webm',
+  '.wmv',
+  '.flv',
+  '.m4v',
   // Audio
-  '.mp3','.wav','.ogg','.flac','.aac','.wma','.m4a','.opus',
+  '.mp3',
+  '.wav',
+  '.ogg',
+  '.flac',
+  '.aac',
+  '.wma',
+  '.m4a',
+  '.opus',
   // Archives
-  '.zip','.tar','.gz','.7z','.rar','.bz2','.xz','.zst',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.7z',
+  '.rar',
+  '.bz2',
+  '.xz',
+  '.zst',
   // GIS / 3D
-  '.shp','.shx','.dbf','.geojson','.geotiff','.obj','.stl','.glb','.gltf',
+  '.shp',
+  '.shx',
+  '.dbf',
+  '.geojson',
+  '.geotiff',
+  '.obj',
+  '.stl',
+  '.glb',
+  '.gltf',
   // Fonts
-  '.ttf','.woff','.woff2','.otf','.eot',
+  '.ttf',
+  '.woff',
+  '.woff2',
+  '.otf',
+  '.eot',
   // Binaries
-  '.exe','.dll','.so','.dylib','.bin','.dat','.class','.jar','.war',
-  '.o','.a','.lib','.pdb','.obj','.wasm',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.dat',
+  '.class',
+  '.jar',
+  '.war',
+  '.o',
+  '.a',
+  '.lib',
+  '.pdb',
+  '.obj',
+  '.wasm',
   // Databases
-  '.db','.sqlite','.sqlite3','.mdb','.accdb',
+  '.db',
+  '.sqlite',
+  '.sqlite3',
+  '.mdb',
+  '.accdb',
   // Design
-  '.psd','.ai','.sketch','.fig','.xd',
+  '.psd',
+  '.ai',
+  '.sketch',
+  '.fig',
+  '.xd',
   // Other proprietary
-  '.epub','.mobi','.pages','.numbers','.key',
-  '.ppt','.pptx',
+  '.epub',
+  '.mobi',
+  '.pages',
+  '.numbers',
+  '.key',
+  '.ppt',
+  '.pptx',
 ]);
 
 /**
@@ -119,8 +178,8 @@ export const FORMAT_SIZE_LIMITS: Record<string, number> = {
   text: 5 * 1024 * 1024,
   docx: 50 * 1024 * 1024,
   xlsx: 10 * 1024 * 1024,
-  pdf: 0,       // unlimited — served via raw/stream
-  image: 0,     // unlimited — served via raw
+  pdf: 0, // unlimited — served via raw/stream
+  image: 0, // unlimited — served via raw
 };
 
 /**

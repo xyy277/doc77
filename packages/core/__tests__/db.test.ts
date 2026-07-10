@@ -10,13 +10,20 @@ describe('Database initialization', () => {
   let dbPath: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `doc77-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `doc77-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
   });
 
   afterEach(async () => {
-    try { closeConnection(); } catch { /* ignore */ }
+    try {
+      closeConnection();
+    } catch {
+      /* ignore */
+    }
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -30,7 +37,9 @@ describe('Database initialization', () => {
     const db = await initDatabase(dbPath);
     runMigrations();
 
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[];
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all() as { name: string }[];
     const tableNames = tables.map((t) => t.name);
     expect(tableNames).toContain('projects');
     expect(tableNames).toContain('config');
@@ -44,7 +53,11 @@ describe('Database initialization', () => {
   it('should create all required indexes', async () => {
     const db = await initDatabase(dbPath);
     runMigrations();
-    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%' ORDER BY name").all() as { name: string }[];
+    const indexes = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%' ORDER BY name",
+      )
+      .all() as { name: string }[];
     const indexNames = indexes.map((i) => i.name);
     expect(indexNames).toContain('idx_projects_path');
     expect(indexNames).toContain('idx_projects_name');
@@ -68,7 +81,9 @@ describe('Database initialization', () => {
   });
 
   it('should throw when getConnection called before init', async () => {
-    try { closeConnection(); } catch {}
+    try {
+      closeConnection();
+    } catch {}
     expect(() => getConnection()).toThrow();
   });
 

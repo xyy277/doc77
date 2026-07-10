@@ -22,7 +22,10 @@ export function findAvailablePort(start: number): Promise<number> {
       if (port >= start + 100) return reject(new Error('No available port in range'));
       const server = net.createServer();
       server.listen(port, '127.0.0.1');
-      server.on('listening', () => { server.close(); resolve(port); });
+      server.on('listening', () => {
+        server.close();
+        resolve(port);
+      });
       server.on('error', () => tryPort(port + 1));
     }
     tryPort(start);
@@ -39,14 +42,10 @@ export interface ServerProcess {
 export function startServer(port: number): Promise<ServerProcess> {
   return new Promise((resolve, reject) => {
     const cliEntry = getCliEntryPath();
-    const child = spawn(
-      process.execPath,
-      [cliEntry, 'start', '--port', String(port)],
-      {
-        env: { ...process.env, DOC77_ELECTRON: '1' },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    );
+    const child = spawn(process.execPath, [cliEntry, 'start', '--port', String(port)], {
+      env: { ...process.env, DOC77_ELECTRON: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
     const timeout = setTimeout(() => {
       child.kill();
@@ -61,7 +60,11 @@ export function startServer(port: number): Promise<ServerProcess> {
         resolve({
           child,
           port,
-          kill: () => { try { child.kill(); } catch {} },
+          kill: () => {
+            try {
+              child.kill();
+            } catch {}
+          },
         });
       }
     });

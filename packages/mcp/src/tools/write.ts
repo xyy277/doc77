@@ -26,35 +26,59 @@ function toWriteTask(q: QueuedTask, opType: string): WriteTask {
  * write_file — create or overwrite a file.
  */
 export async function writeFile(
-  projectId: number, sessionId: string, filePath: string, content: string,
+  projectId: number,
+  sessionId: string,
+  filePath: string,
+  content: string,
 ): Promise<WriteTask> {
   const access = checkPathAccess(projectId, filePath);
   if (!access.allowed) throw new Error(access.reason);
-  return toWriteTask(enqueue(projectId, sessionId, 'write_file', { file_path: filePath, content_length: content.length }), 'write_file');
+  return toWriteTask(
+    enqueue(projectId, sessionId, 'write_file', {
+      file_path: filePath,
+      content_length: content.length,
+    }),
+    'write_file',
+  );
 }
 
 export async function createFolder(
-  projectId: number, sessionId: string, folderPath: string,
+  projectId: number,
+  sessionId: string,
+  folderPath: string,
 ): Promise<WriteTask> {
   const access = checkPathAccess(projectId, folderPath);
   if (!access.allowed) throw new Error(access.reason);
-  return toWriteTask(enqueue(projectId, sessionId, 'create_folder', { folder_path: folderPath }), 'create_folder');
+  return toWriteTask(
+    enqueue(projectId, sessionId, 'create_folder', { folder_path: folderPath }),
+    'create_folder',
+  );
 }
 
 export async function moveFile(
-  projectId: number, sessionId: string, source: string, target: string,
+  projectId: number,
+  sessionId: string,
+  source: string,
+  target: string,
 ): Promise<WriteTask> {
-  if (!checkPathAccess(projectId, source).allowed) throw new Error(checkPathAccess(projectId, source).reason);
-  if (!checkPathAccess(projectId, target).allowed) throw new Error(checkPathAccess(projectId, target).reason);
+  if (!checkPathAccess(projectId, source).allowed)
+    throw new Error(checkPathAccess(projectId, source).reason);
+  if (!checkPathAccess(projectId, target).allowed)
+    throw new Error(checkPathAccess(projectId, target).reason);
   return toWriteTask(enqueue(projectId, sessionId, 'move_file', { source, target }), 'move_file');
 }
 
 export async function deleteFile(
-  projectId: number, sessionId: string, filePath: string,
+  projectId: number,
+  sessionId: string,
+  filePath: string,
 ): Promise<WriteTask> {
   const access = checkPathAccess(projectId, filePath);
   if (!access.allowed) throw new Error(access.reason);
-  return toWriteTask(enqueue(projectId, sessionId, 'delete_file', { file_path: filePath }), 'delete_file');
+  return toWriteTask(
+    enqueue(projectId, sessionId, 'delete_file', { file_path: filePath }),
+    'delete_file',
+  );
 }
 
 /**

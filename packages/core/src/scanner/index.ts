@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { getConnection } from '../db/connection.js';
-import { listDir, type DirEntry } from '../fs/index.js';
+import { listDir, isSensitiveFile, type DirEntry } from '../fs/index.js';
 
 export type { DirEntry };
 
@@ -98,6 +98,7 @@ export function clearCache(projectId: number, dirPath?: string): void {
  * Stats each file in the cached mtime_map and compares against actual mtime.
  */
 function isCacheValid(absDirPath: string, cachedMtimeMap: Record<string, string>): boolean {
+  // Check cached entries still exist with same mtime
   for (const [name, cachedMtime] of Object.entries(cachedMtimeMap)) {
     try {
       const stats = fs.statSync(path.join(absDirPath, name));
@@ -108,6 +109,18 @@ function isCacheValid(absDirPath: string, cachedMtimeMap: Record<string, string>
       // File was removed or is inaccessible — cache invalid
       return false;
     }
+  }
+  // Check for new entries not in cache (added files/dirs that are not ignored)
+  try {
+    var actualEntries = fs.readdirSync(absDirPath);
+    var nonIgnored = actualEntries.filter(function (name) {
+      return !isSensitiveFile(name);
+    });
+    if (nonIgnored.length !== Object.keys(cachedMtimeMap).length) {
+      return false;
+    }
+  } catch {
+    return false;
   }
   return true;
 }

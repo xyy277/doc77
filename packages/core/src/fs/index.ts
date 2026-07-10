@@ -69,12 +69,16 @@ export function isBinaryFile(absolutePath: string): boolean {
 /**
  * Read only the first N lines of a text file. Returns { content, truncated, totalBytes }.
  */
-export function readFirstNLines(absolutePath: string, maxLines: number): { content: string; truncated: boolean; totalBytes: number } {
+export function readFirstNLines(
+  absolutePath: string,
+  maxLines: number,
+): { content: string; truncated: boolean; totalBytes: number } {
   const stats = fs.statSync(absolutePath);
   const totalBytes = stats.size;
   const fd = fs.openSync(absolutePath, 'r');
   const buf = Buffer.alloc(65536); // 64KB chunks
-  let pos = 0, lines = 0;
+  let pos = 0,
+    lines = 0;
   const parts: string[] = [];
 
   while (lines < maxLines && pos < totalBytes) {
@@ -227,7 +231,7 @@ export function resolveProjectPath(rawPath: string): string {
   if (isWinPath && !isWsl()) {
     throw new Error(
       `Windows path "${rawPath}" is not valid on ${process.platform}. ` +
-      'Use a Linux path (e.g., /home/user/docs) or run inside WSL for Windows paths.',
+        'Use a Linux path (e.g., /home/user/docs) or run inside WSL for Windows paths.',
     );
   }
 
@@ -265,4 +269,3 @@ function tryWslPath(windowsPath: string): string | null {
   }
   return null;
 }
-
