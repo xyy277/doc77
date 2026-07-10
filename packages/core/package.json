@@ -1,6 +1,6 @@
 {
   "name": "@doc77/core",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Doc77 核心引擎 — 数据库、文件系统抽象层、预览引擎、Express Server",
   "license": "MIT",
   "repository": {

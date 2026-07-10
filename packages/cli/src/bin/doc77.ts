@@ -297,6 +297,19 @@ async function main() {
 
       const server = http.createServer(app);
 
+      // Handle server errors gracefully
+      server.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`\n❌ 端口 ${port} 已被占用。`);
+          console.error(`   请先关闭占用该端口的程序，或使用其他端口：`);
+          console.error(`   doc77 start --port ${port + 1}`);
+        } else {
+          console.error(`\n❌ 启动失败: ${err.message}`);
+        }
+        closeConnection();
+        process.exit(1);
+      });
+
       // Security: non-localhost binding requires password authentication
       if (!isLocalAddr(bindAddr)) {
         const authRow = getConnection()

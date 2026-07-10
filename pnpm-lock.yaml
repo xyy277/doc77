@@ -85,8 +85,8 @@ importers:
   packages/doc77:
     dependencies:
       '@doc77/cli':
-        specifier: ^0.4.4
-        version: 0.4.4
+        specifier: ^0.5.2
+        version: link:../cli
 
   packages/mcp:
     dependencies:
@@ -101,18 +101,6 @@ importers:
         version: 4.4.3
 
 packages:
-
-  '@doc77/cli@0.4.4':
-    resolution: {integrity: sha512-4LqQRnakhU23aauLYDdfnMbsaIGG3DeUzFemTC4sQwpzkkZQJKF3l9VanC8azTyuH6tVE/rOGSDRMIjVJigb5A==}
-    hasBin: true
-    peerDependencies:
-      '@doc77/ai': workspace:^
-      '@doc77/mcp': workspace:^
-    peerDependenciesMeta:
-      '@doc77/ai':
-        optional: true
-      '@doc77/mcp':
-        optional: true
 
   '@esbuild/aix-ppc64@0.27.7':
     resolution: {integrity: sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg==}
@@ -1837,10 +1825,6 @@ packages:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
-
-  '@doc77/cli@0.4.4':
-    dependencies:
-      '@doc77/core': link:packages/core
 
   '@esbuild/aix-ppc64@0.27.7':
     optional: true

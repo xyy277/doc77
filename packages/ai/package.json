@@ -1,6 +1,6 @@
 {
   "name": "@doc77/ai",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Doc77 AI 模块 — AI Provider 抽象、Agent 核心、对话 API",
   "license": "MIT",
   "repository": {
