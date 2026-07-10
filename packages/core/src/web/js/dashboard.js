@@ -123,64 +123,19 @@ async function openDirDialog(forEditId) {
   btn.disabled = true;
   _dirPickTarget = forEditId;
 
-  // Strategy 1: Browser folder picker + fingerprint match
-  // Fast, native, no server round-trip. Localhost only.
-  if (isLocalMode() && typeof window.showDirectoryPicker === 'function') {
-    var folderName = '';
+  // Strategy 1: Electron native dialog (returns real absolute path)
+  if (window.doc77 && window.doc77.openNativeDialog) {
     try {
-      var handle = await window.showDirectoryPicker({ mode: 'read' });
-      folderName = handle.name || '';
-      toast('🔍 正在识别文件夹位置...', 'info');
-
-      var fingerprint = [];
-      try {
-        var entries = handle.entries();
-        var count = 0;
-        while (count < 20) {
-          try { var nxt = await entries.next(); if (!nxt.value || nxt.done) break; } catch { break; }
-          count++;
-          var entry = nxt.value, eName = entry[0], eHandle = entry[1];
-          var fp = { name: eName, size: 0, type: eHandle.kind === 'directory' ? 'directory' : 'file' };
-          if (eHandle.kind === 'file') {
-            try { var file = await eHandle.getFile(); fp.size = file.size; } catch (e) {}
-          }
-          fingerprint.push(fp);
-        }
-      } catch (e) {}
-
-      // Try fingerprint search
-      if (fingerprint.length > 0) {
-        var fr = await fetch('/api/find-folder', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folderName: folderName, fingerprint: fingerprint })
-        });
-        var fd = await fr.json();
-        if (fd.matches && fd.matches.length > 0) {
-          var best = fd.matches[0];
-          if (best.score >= 0.7) {
-            fillPath(forEditId, best.path);
-            toast('✅ 已识别: ' + best.path, 'success');
-            btn.innerHTML = origHTML; btn.disabled = false;
-            return;
-          }
-          // Low-confidence matches — show picker with "open server browser" option
-          showMatchPicker(folderName, fd.matches, forEditId);
-          btn.innerHTML = origHTML; btn.disabled = false;
-          return;
-        }
+      var nativePath = await window.doc77.openNativeDialog();
+      if (nativePath) {
+        fillPath(forEditId, nativePath);
+        btn.innerHTML = origHTML; btn.disabled = false;
+        return;
       }
-      // Fingerprint failed — fall through to server file browser
-      toast('未自动匹配到路径，请从服务器文件系统中选择', 'info');
-    } catch (e) {
-      if (e.name === 'AbortError') { btn.innerHTML = origHTML; btn.disabled = false; return; }
-      // Other errors → fall through to server file browser
-    }
+    } catch(e) { /* user cancelled or error — fall through */ }
   }
 
-  // Strategy 2: Server-side file browser (always available, only option for remote)
-  if (!isLocalMode()) {
-    toast('远程访问模式，请从服务器文件系统中选择目录', 'info');
-  }
+  // Strategy 2: Server-side file browser (always available)
   showServerFileBrowser(forEditId);
   btn.innerHTML = origHTML;
   btn.disabled = false;
@@ -263,32 +218,6 @@ function fillPath(forEditId, path) {
   var targetId = forEditId ? 'editPath-' + forEditId : 'projPath';
   var input = document.getElementById(targetId);
   if (input) input.value = path;
-}
-
-function showMatchPicker(folderName, matches, forEditId) {
-  var overlay = document.createElement('div');
-  overlay.className = 'confirm-overlay'; overlay.style.zIndex = '101';
-  var items = matches.map(function(m) {
-    return '<button class="match-item w-full text-left px-3 py-2 text-sm rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors mb-1.5" data-path="' + escAttr(m.path) + '"><span class="font-mono text-xs">' + esc(m.path) + '</span><span class="ml-2 text-[10px] text-slate-400">匹配度 ' + Math.round(m.score * 100) + '%</span></button>';
-  }).join('');
-  overlay.innerHTML =
-    '<div class="confirm-box" style="max-width:560px">' +
-    '<p class="text-sm font-semibold mb-1">📂 已选择: <span class="text-blue-600">' + esc(folderName) + '</span></p>' +
-    '<p class="text-xs text-slate-500 mb-3">找到以下匹配路径，请选择一个：</p>' + items +
-    '<button class="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors cancel-btn">打开服务端文件浏览器</button></div>';
-  document.body.appendChild(overlay);
-  overlay.querySelectorAll('.match-item').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      fillPath(forEditId, btn.dataset.path);
-      toast('路径已填入: ' + btn.dataset.path, 'success');
-      overlay.remove();
-    });
-  });
-  overlay.querySelector('.cancel-btn').onclick = function() {
-    overlay.remove();
-    showServerFileBrowser(forEditId);
-  };
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 }
 
 // Remove the old openDirDialog — we redefined it above

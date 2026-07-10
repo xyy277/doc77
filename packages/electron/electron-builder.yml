@@ -1,0 +1,29 @@
+appId: com.doc77.desktop
+productName: Doc77
+directories:
+  output: release
+
+asarUnpack:
+  - "node_modules/@doc77/cli/**"
+  - "node_modules/@doc77/core/**"
+
+extraResources:
+  - from: "node_modules/@doc77/cli/dist"
+    to: "cli/dist"
+
+files:
+  - "dist/**/*"
+  - "node_modules/**/*"
+  - "!node_modules/.cache"
+
+win:
+  target: nsis
+  icon: assets/icon.png
+mac:
+  target: dmg
+  category: public.app-category.productivity
+linux:
+  target: AppImage
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

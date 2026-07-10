@@ -6,7 +6,7 @@ import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
 import { registerProject, listProjects, removeProject, updateProject, touchProject } from '../db/projects.js';
-import { scanDirectory } from '../scanner/index.js';
+import { scanDirectory, clearCache } from '../scanner/index.js';
 import { readFile, readFileRaw, isBinaryFile, readFirstNLines, validatePath, resolveProjectPath } from '../fs/index.js';
 import * as crypto from '../crypto.js';
 import {
@@ -159,6 +159,27 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   app.get('/api/capabilities', (_req: Request, res: Response) => {
     res.json(_capabilities);
   });
+
+  // Electron: one-click install for AI/MCP modules
+  if (process.env.DOC77_ELECTRON) {
+    app.post('/api/electron/install', async (req: Request, res: Response) => {
+      const mod = (req.body.module as string) || '';
+      if (!['ai','mcp'].includes(mod)) { res.status(400).json({ error: 'invalid module' }); return; }
+      try {
+        const info = JSON.parse(execSync(`curl -s https://registry.npmjs.org/@doc77/${mod}/latest`, { encoding: 'utf-8' }));
+        const dest = path.join(process.env.HOME || '/tmp', '.doc77', 'electron-modules');
+        fs.mkdirSync(dest, { recursive: true });
+        execSync(`curl -sL "${info.dist.tarball}" -o "${dest}/${mod}.tgz"`);
+        execSync(`tar -xzf "${dest}/${mod}.tgz" -C "${dest}"`);
+        const src = path.join(dest, 'package');
+        const target = path.join(dest, 'node_modules', '@doc77', mod);
+        fs.rmSync(target, { recursive: true, force: true });
+        fs.renameSync(src, target);
+        fs.unlinkSync(path.join(dest, `${mod}.tgz`));
+        res.json({ ok: true, message: `@doc77/${mod}@${info.version} 安装完成，重启生效` });
+      } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }); }
+    });
+  }
 
   // Server restart (only when callback provided)
   if (restartCallback) {
@@ -508,6 +529,19 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     }
   });
 
+  // Refresh tree cache for a project
+  app.post('/api/tree/:id/refresh', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    try {
+      clearCache(projectId);
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
   // Directory tree
   app.get('/api/tree/:id', (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
@@ -613,17 +647,17 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       switch (rendererType) {
         case 'markdown': {
           const raw = readFile(absPath);
-          res.json({ path: filePath, type: 'markdown', content: renderMarkdown(raw) });
+          res.json({ path: filePath, type: 'markdown', content: renderMarkdown(raw), size: stats.size, modified: stats.mtime.toISOString() });
           return;
         }
         case 'mermaid': {
           const raw = readFile(absPath);
-          res.json({ path: filePath, type: 'mermaid', content: renderMermaid(raw) });
+          res.json({ path: filePath, type: 'mermaid', content: renderMermaid(raw), size: stats.size, modified: stats.mtime.toISOString() });
           return;
         }
         case 'code': {
           const raw = readFile(absPath);
-          res.json({ path: filePath, type: 'code', content: renderCode(raw, path.extname(filePath).slice(1)), rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}` });
+          res.json({ path: filePath, type: 'code', content: renderCode(raw, path.extname(filePath).slice(1)), rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`, size: stats.size, modified: stats.mtime.toISOString() });
           return;
         }
         case 'docx': {

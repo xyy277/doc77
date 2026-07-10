@@ -54,6 +54,18 @@ function esc(s) { var d = document.createElement('div'); d.textContent = String(
 function escAttr(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 function fmtSize(b) { return b<1024?b+' B':b<1024*1024?(b/1024).toFixed(1)+' KB':(b/(1024*1024)).toFixed(1)+' MB'; }
 
+async function installElectronModule(mod) {
+  var btn = document.getElementById('btnInstallAi');
+  if (btn) { btn.disabled = true; btn.textContent = '安装中...'; }
+  try {
+    var r = await fetch('/api/electron/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: mod }) });
+    var d = await r.json();
+    if (d.ok) { toast(d.message, 'success'); setTimeout(function(){ location.reload(); }, 2000); }
+    else { toast('安装失败: ' + (d.error || '未知错误'), 'error'); }
+  } catch(e) { toast('安装失败: ' + e.message, 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = '📦 一键安装 AI 模块'; }
+}
+
 //══════════ Settings ══════════
 function toggleSettings() {
   var ov = document.getElementById('settingsOverlay');
@@ -107,7 +119,10 @@ function switchSettingsTab(tab) {
       settingRow('MCP 端口','transport.mcp_http_port','number','8899')) : '') + '</div>';
   } else if (tab === 'ai') {
     if (!window.__doc77_caps_ai) {
-      c.innerHTML = '<div class="text-center py-8 text-slate-500 text-sm">AI 模块未安装<br><code class="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded mt-2 inline-block">doc77 i ai</code></div>';
+      var electronInstall = (window.doc77) ?
+        '<button onclick="installElectronModule(\'ai\')" id="btnInstallAi" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors">📦 一键安装 AI 模块</button>' :
+        '<code class="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded mt-2 inline-block">doc77 i ai</code>';
+      c.innerHTML = '<div class="text-center py-8 text-slate-500 text-sm">AI 模块未安装<br>' + electronInstall + '</div>';
       return;
     }
     c.innerHTML = '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">AI 提供商</div><div class="space-y-3">' +
