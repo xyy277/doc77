@@ -284,7 +284,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         return;
       }
 
-      // Insert the record
+      // Dedup: remove old entry for same project+file, then insert fresh
+      db.prepare(
+        'DELETE FROM recent_files WHERE project_id = ? AND file_path = ?',
+      ).run(projectId, filePath);
       db.prepare(
         'INSERT INTO recent_files (project_id, file_name, file_path) VALUES (?, ?, ?)',
       ).run(projectId, fileName, filePath);

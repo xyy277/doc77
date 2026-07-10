@@ -22,8 +22,9 @@ window.refreshStats = function() {
 };
 
 function relativeTimeText(epochMs) {
-  if (!epochMs) return '尚无项目';
+  if (!epochMs || isNaN(epochMs)) return '尚无项目';
   var diff = Math.floor((Date.now() - epochMs) / 1000);
+  if (diff < 0) return '尚无项目';
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
   if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';

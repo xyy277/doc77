@@ -208,7 +208,9 @@ window.renderRecent = async function() {
 };
 
 function relativeTime(epochMs) {
+  if (!epochMs || isNaN(epochMs)) return '';
   var diff = Math.floor((Date.now() - epochMs) / 1000);
+  if (diff < 0) return '';
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
   if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
