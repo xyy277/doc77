@@ -32,7 +32,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
   --danger-hover: #b91c1c;
   --danger-light-bg: #fef2f2;
 
-  --max-content-width: 64rem;
+  --max-content-width: 80rem;
   --card-radius: 12px;
   --btn-radius: 8px;
   --transition-fast: 150ms;
@@ -169,11 +169,10 @@ body {
   display: flex; align-items: center; justify-content: space-between;
 }
 .app-header .logo {
-  display: flex; align-items: center; gap: 10px;
-  color: var(--header-text); text-decoration: none;
-  font-weight: 700; font-size: 16px;
+  display: flex; align-items: center;
+  text-decoration: none;
 }
-.app-header .logo img { height: 32px; }
+.app-header .logo img { height: 36px; }
 .header-status {
   font-size: 11px; font-weight: 500; color: var(--header-accent);
   display: flex; align-items: center; gap: 6px;
