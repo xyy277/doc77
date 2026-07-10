@@ -1,6 +1,6 @@
 {
   "name": "@doc77/electron",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Doc77 Desktop — 本地文档预览器 Electron 桌面版",
   "license": "MIT",
   "main": "dist/main.js",

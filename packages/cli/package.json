@@ -1,6 +1,6 @@
 {
   "name": "@doc77/cli",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Doc77 CLI — 默认安全、对话驱动的智能本地文档管理 Agent",
   "license": "MIT",
   "repository": {
