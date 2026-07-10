@@ -1,115 +1,173 @@
 <!DOCTYPE html>
-<html lang="zh-CN" class="h-full">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doc77 — 本地文档预览与管理</title>
-<script>window.__VENDOR_READY=false;fetch('/vendor/.ready').then(r=>{if(r.ok)window.__VENDOR_READY=true}).catch(()=>{});</script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={darkMode:'class',theme:{extend:{}}}</script>
 <link rel="stylesheet" href="css/app.css">
-  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
-<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+<body>
 
-<header class="bg-slate-900 dark:bg-slate-950 text-white">
-  <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-    <a href="/" class="flex items-center gap-2.5 text-white font-bold text-lg no-underline">
-      <img src="/assets/logo-dark.svg" alt="Doc77" height="36" class="h-9">
+<!-- Header -->
+<header class="app-header">
+  <div class="app-header-inner">
+    <a href="/" class="logo">
+      <img src="/assets/logo-dark.svg" alt="Doc77">
+      <span>Doc77</span>
     </a>
-    <div class="flex items-center gap-3 text-xs text-emerald-400 font-medium">
-      <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
-      服务运行中
-      <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-base" title="切换主题" id="themeBtn">🌙</button>
-      <button onclick="document.cookie='doc77-desktop=;path=/;max-age=0';location.href='/mobile/'" class="text-slate-400 hover:text-white transition-colors text-base" title="移动版">📱</button>
-      <button class="text-slate-400 hover:text-white transition-colors text-base" title="设置" onclick="toggleSettings()">⚙</button>
+    <div class="header-actions">
+      <span class="header-status"><span class="header-dot pulse"></span>运行中</span>
+      <button onclick="toggleTheme()" class="btn-icon" id="themeBtn" title="切换主题">🌙</button>
+      <button onclick="document.cookie='doc77-desktop=;path=/;max-age=0';location.href='/mobile/'" class="btn-icon" title="移动版">📱</button>
+      <button class="btn-icon" title="设置" onclick="toggleSettings()">⚙</button>
     </div>
   </div>
 </header>
 
-<div class="max-w-5xl mx-auto px-6 py-10">
-  <!-- Intro Section -->
-  <div class="mb-10 text-center">
-    <h1 class="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-3">本地文档预览与管理 · 开源免费 · 跨平台</h1>
-    <p class="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto text-sm leading-relaxed">
-      注册本地目录即可在浏览器中预览 Markdown、PDF、Office 文档，支持代码高亮、Mermaid 图表。
-      提供 TTS 朗读、AI 摘要、MCP Server 集成。局域网内可安全共享，移动端自适应访问。
-    </p>
-    <div class="mt-5 flex justify-center gap-3">
-      <a id="heroGuideBtn" href="/guide.html" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium">
-        📖 功能引导
-      </a>
-      <span class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 text-sm rounded-lg">
-        👆 注册项目即可开始
-      </span>
+<div class="content-wrapper">
+
+  <!-- Greeting Bar -->
+  <div class="greeting-bar">
+    <span class="greeting-text" id="greeting">👋 下午好</span>
+    <div class="greeting-actions">
+      <button class="btn btn-primary" onclick="showRegisterModal()">➕ 注册项目</button>
     </div>
   </div>
 
-  <div class="mb-10">
-    <h2 class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">注册新项目</h2>
-    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
-      <div class="flex gap-3 items-end flex-wrap">
-        <div class="flex flex-col gap-1.5 flex-1 min-w-[160px]">
-          <label for="projName" class="text-xs font-semibold text-slate-500 dark:text-slate-400">项目名称</label>
-          <input id="projName" placeholder="例如：客户A项目" class="px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 transition-all bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500">
-        </div>
-        <div class="flex flex-col gap-1.5 flex-[2] min-w-[220px]">
-          <label for="projPath" class="text-xs font-semibold text-slate-500 dark:text-slate-400">项目路径（支持 ~ 和 Windows 路径）</label>
-          <div class="flex gap-2"><input id="projPath" placeholder="~/work/my-docs" class="flex-1 px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 transition-all bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"><button onclick="openDirDialog()" class="px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shrink-0" title="浏览文件夹">📂 浏览</button></div>
-        </div>
-        <button onclick="doRegister()" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm shrink-0">注册项目</button>
+  <!-- Stats + Recent Row -->
+  <div class="stats-row">
+    <div class="stats-panel" id="recentPanel">
+      <div class="stats-title">🕐 最近浏览</div>
+      <div id="recentContent">
+        <div class="empty-state"><div class="empty-text">打开项目后自动出现在这里</div></div>
       </div>
-      <div id="regError" class="text-red-500 dark:text-red-400 text-xs mt-2 hidden"></div>
+    </div>
+    <div class="stats-panel" id="statsPanel">
+      <div class="stats-title">📊 统计</div>
+      <div class="stats-items" id="statsContent">
+        <span class="empty-state" style="padding:8px"><span class="empty-text" style="font-size:12px">加载中...</span></span>
+      </div>
     </div>
   </div>
-  <div>
-    <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
-      <h2 class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">已注册项目</h2>
-      <div class="flex items-center gap-2">
-        <div class="relative">
-          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
-          <input placeholder="搜索项目..." oninput="onFilterInput(this.value)" class="pl-8 pr-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-xs outline-none focus:border-blue-500 transition-all bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 w-48 placeholder:text-slate-400">
-        </div>
-        <select onchange="onSortChange(this.value)" class="border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 text-xs bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-400 outline-none">
+
+  <!-- Favorites Section -->
+  <div class="favorites-section" id="favoritesSection" style="display:none">
+    <div class="section-header">
+      <span class="section-title">⭐ 收藏项目 (<span id="favCount">0</span>)</span>
+    </div>
+    <div class="project-grid" id="favGrid"></div>
+  </div>
+
+  <!-- Projects Section -->
+  <div class="projects-section">
+    <div class="section-header">
+      <div class="section-header-left">
+        <span class="section-title">📂 全部项目 (<span id="projCount">0</span>)</span>
+      </div>
+      <div class="section-header-right">
+        <input class="input" placeholder="🔍 搜索项目..." oninput="onFilterInput(this.value)" style="width:180px;font-size:12px">
+        <select onchange="onSortChange(this.value)" class="input" style="width:100px;font-size:12px">
           <option value="last_opened">最近打开</option>
           <option value="name">按名称</option>
           <option value="created">按创建日期</option>
         </select>
+        <div class="view-toggle">
+          <button onclick="setViewMode('grid')" id="btnViewGrid" class="active" title="网格视图">▦</button>
+          <button onclick="setViewMode('list')" id="btnViewList" title="列表视图">☰</button>
+        </div>
       </div>
     </div>
-    <div id="grid"></div>
+    <div class="project-grid" id="projGrid">
+      <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无项目，点击 [+ 注册项目] 开始</div><div class="empty-hint">或使用 doc77 register 命令注册</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Registration Modal -->
+<div class="modal-overlay" id="registerModal" style="display:none" onclick="if(event.target===this)closeRegisterModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>注册项目</h3>
+      <button class="btn-icon" onclick="closeRegisterModal()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-tab="manual" onclick="switchRegisterTab('manual')">✏️ 手动输入</button>
+      <button class="modal-tab" data-tab="discover" onclick="switchRegisterTab('discover')">🔍 扫描发现</button>
+    </div>
+    <div class="modal-body">
+      <!-- Tab: Manual -->
+      <div class="tab-panel active" id="tab-manual">
+        <div class="form-group">
+          <label>项目名称</label>
+          <input class="input" id="regName" placeholder="例如：客户A项目">
+        </div>
+        <div class="form-group">
+          <label>项目路径</label>
+          <div class="form-row">
+            <input class="input" id="regPath" placeholder="~/work/my-docs">
+            <button class="btn" onclick="openDirDialog()">📂 浏览</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <div id="regError" style="color:var(--danger);font-size:12px;display:none"></div>
+        </div>
+        <button class="btn btn-primary" onclick="doRegister()" style="width:100%">注册项目</button>
+      </div>
+      <!-- Tab: Discover -->
+      <div class="tab-panel" id="tab-discover">
+        <div class="form-group">
+          <label>扫描目录</label>
+          <div class="form-row">
+            <input class="input" id="discoverPath" value="~" placeholder="~/projects">
+            <button class="btn btn-primary" id="btnDiscover" onclick="doDiscover()">🔍 扫描</button>
+          </div>
+        </div>
+        <div id="discoverStatus" class="discover-status"></div>
+        <div id="discoverCandidates"></div>
+        <div id="discoverActions" style="margin-top:12px;display:none">
+          <button class="btn btn-primary" onclick="batchRegister()" style="width:100%">📋 批量注册选中</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- Settings Overlay -->
-<div id="settingsOverlay" class="fixed inset-0 z-50 flex justify-end pointer-events-none" onclick="if(event.target===this)toggleSettings()">
-  <div class="settings-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="toggleSettings()"></div>
-  <div class="settings-panel relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
-    <div class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
-      <span class="font-bold text-slate-800 dark:text-slate-100 text-lg">⚙ 设置</span>
-      <button onclick="toggleSettings()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl">✕</button>
+<div id="settingsOverlay" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-backdrop" onclick="toggleSettings()"></div>
+  <div class="settings-panel">
+    <div style="height:56px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0">
+      <span style="font-weight:700;font-size:16px;color:var(--text-primary)">⚙ 设置</span>
+      <button onclick="toggleSettings()" class="btn-icon">✕</button>
     </div>
-    <div class="flex border-b border-slate-200 dark:border-slate-700 shrink-0" id="settingsTabs">
-      <button onclick="switchSettingsTab('system')" class="flex-1 py-2.5 text-xs font-medium transition-colors text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" data-tab="system">💾 系统</button>
-      <button onclick="switchSettingsTab('ai')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" data-tab="ai">🤖 AI</button>
-      <button onclick="switchSettingsTab('account')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" data-tab="account">👤 账户</button>
+    <div style="display:flex;border-bottom:1px solid var(--border-light);flex-shrink:0" id="settingsTabs">
+      <button onclick="switchSettingsTab('system')" class="modal-tab active" data-tab="system" style="border-bottom:none">💾 系统</button>
+      <button onclick="switchSettingsTab('ai')" class="modal-tab" data-tab="ai" style="border-bottom:none">🤖 AI</button>
+      <button onclick="switchSettingsTab('account')" class="modal-tab" data-tab="account" style="border-bottom:none">👤 账户</button>
     </div>
-    <div class="flex-1 overflow-y-auto p-4 space-y-4" id="settingsContent"></div>
-    <div class="p-3 border-t border-slate-200 dark:border-slate-700 shrink-0 flex gap-2">
-      <button onclick="resetDefaults()" class="flex-1 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">恢复默认值</button>
-      <button onclick="saveSettings()" class="flex-1 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">💾 保存设置</button>
+    <div style="flex:1;overflow-y:auto;padding:16px" id="settingsContent"></div>
+    <div style="padding:12px;border-top:1px solid var(--border-light);flex-shrink:0;display:flex;gap:8px">
+      <button onclick="resetDefaults()" class="btn" style="color:var(--danger);flex:1">恢复默认值</button>
+      <button onclick="saveSettings()" class="btn btn-primary" style="flex:1">💾 保存设置</button>
     </div>
   </div>
 </div>
 
 <!-- GitHub Star -->
 <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener"
-   class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm font-medium no-underline hover:text-white"
+   style="position:fixed;bottom:24px;right:24px;z-index:40;display:flex;align-items:center;gap:8px;background:var(--header-bg);color:#fff;padding:10px 18px;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.2);text-decoration:none;font-size:13px;font-weight:500;transition:all .2s"
+   onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'"
    title="给 Doc77 点个 Star ⭐">
   ⭐ 点个 Star 吧
 </a>
 
 <script src="js/common.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/favorites.js"></script>
+<script src="js/discover.js"></script>
+<script src="js/register.js"></script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>
