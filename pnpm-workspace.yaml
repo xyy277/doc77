@@ -1,5 +1,9 @@
 packages:
-  - "packages/*"
+  - "packages/ai"
+  - "packages/cli"
+  - "packages/core"
+  - "packages/doc77"
+  - "packages/mcp"
 linkWorkspacePackages: true
 allowBuilds:
   better-sqlite3: true
