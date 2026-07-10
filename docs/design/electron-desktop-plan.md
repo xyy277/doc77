@@ -180,20 +180,37 @@ async function openDirDialog(forEditId) {
 
 ### AI/MCP 安装流程
 
-桌面版默认不捆绑 AI/MCP。设置页点击"安装 AI 模块" → `/api/electron/install` → 主进程用内嵌 npm 执行安装。
+桌面版默认不捆绑 AI/MCP。设置页点击"安装 AI 模块" → `/api/electron/install` → 用 HTTP 从 npm registry 下载 tgz 并解压（无需捆绑 npm，节省 ~20MB）。
+
+**注册位置**：`app.ts` 中判断 `process.env.DOC77_ELECTRON`，为 true 时注册该路由。
 
 ```typescript
-app.post('/api/electron/install', async (req, res) => {
-  const { module } = req.body;
-  const npmCli = path.join(process.resourcesPath, 'app.asar.unpacked',
-    'node_modules', 'npm', 'bin', 'npm-cli.js');
-  try {
-    execSync(`node "${npmCli}" install @doc77/${module}@latest`,
-      { cwd: app.getPath('userData') });
-    res.json({ ok: true, message: `@doc77/${module} 安装完成，重启生效` });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
+// core/src/server/app.ts — 条件注册（Electron 专有路由）
+if (process.env.DOC77_ELECTRON) {
+  app.post('/api/electron/install', async (req, res) => {
+    const { module } = req.body;
+    const targetDir = path.join(process.env.HOME || '/tmp', '.doc77', 'modules');
+    fs.mkdirSync(targetDir, { recursive: true });
+    try {
+      // 1. 从 npm registry 获取最新版本号
+      const info = JSON.parse(execSync(
+        `curl -s https://registry.npmjs.org/@doc77/${module}/latest`, { encoding: 'utf-8' }
+      ));
+      // 2. 下载 .tgz
+      execSync(`curl -sL "${info.dist.tarball}" -o /tmp/doc77-${module}.tgz`);
+      // 3. 解压到 node_modules
+      execSync(`tar -xzf /tmp/doc77-${module}.tgz -C "${targetDir}"`);
+      // 4. 移动到正确位置
+      const pkgDir = path.join(targetDir, 'node_modules', `@doc77`, module);
+      fs.rmSync(pkgDir, { recursive: true, force: true });
+      fs.renameSync(path.join(targetDir, 'package'), pkgDir);
+      res.json({ ok: true, message: `@doc77/${module}@${info.version} 安装完成，重启生效` });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+}
 ```
+
+> 不用捆绑 npm（省 ~20MB）。`curl` 在 Windows 10+ 和所有 Unix 系统自带，`tar` 同理。
 
 ### 设置页 UI
 
@@ -216,8 +233,13 @@ if (!window.__doc77_caps_ai) {
 ```json
 // packages/electron/package.json — 核心依赖
 "dependencies": {
-  "@doc77/cli": "^0.4.5",
-  "npm": "^10.0.0"   // 内嵌 npm，供 AI/MCP 安装
+  "@doc77/cli": "^0.4.5"
+  // 不捆绑 npm (省 ~20MB)，AI/MCP 安装用 curl+tar
+}
+"devDependencies": {
+  "electron": "^33.0.0",
+  "electron-builder": "^25.0.0",
+  "typescript": "^5.8.0"
 }
 ```
 
@@ -231,7 +253,6 @@ directories:
 asarUnpack:
   - "node_modules/@doc77/cli/**"
   - "node_modules/@doc77/core/**"
-  - "node_modules/npm/**"
 
 extraResources:
   - from: "node_modules/@doc77/cli/dist"
@@ -283,7 +304,39 @@ nsis:
 
 ---
 
-## 十、实施顺序
+## 十、技术补充
+
+### DOC77_ELECTRON 环境变量
+
+由 Electron 主进程在 spawn 时设置。消费方：
+
+| 消费方 | 行为 |
+|---|---|
+| `core/src/server/app.ts` | `process.env.DOC77_ELECTRON` 为真时注册 `/api/electron/install` 路由 |
+| `cli/src/bin/doc77.ts` | 为真时**跳过** "bind 0.0.0.0 需要密码" 检查（Electron 只绑 localhost） |
+
+### tsconfig 配置
+
+Electron 主进程需要 CommonJS，preload 用 ESNext。两份配置：
+
+**tsconfig.main.json** (main.ts, server.ts, tray.ts):
+```json
+{ "compilerOptions": { "target": "ES2022", "module": "commonjs", "outDir": "dist", "rootDir": "src", "strict": true, "esModuleInterop": true, "skipLibCheck": true } }
+```
+
+**tsconfig.preload.json** (preload.ts):
+```json
+{ "compilerOptions": { "target": "ESNext", "module": "ESNext", "outDir": "dist", "strict": true } }
+```
+
+### 图标生成 (P0.1)
+
+```bash
+npx svgexport packages/core/src/web/assets/favicon.svg packages/electron/assets/icon.png 512:512
+npx svgexport packages/core/src/web/assets/favicon.svg packages/electron/assets/tray.png 16:16
+```
+
+## 十一、实施顺序
 
 1. 创建 `packages/electron/` 骨架 + main/preload/server/tray
 2. Web UI 增加 Electron 检测 + 原生对话框 + 安装按钮
@@ -293,7 +346,7 @@ nsis:
 
 ---
 
-## 十一、不做什么
+## 十二、不做什么
 
 - ❌ 不内嵌编辑功能
 - ❌ 不改 core/mcp/ai 包

@@ -4,8 +4,8 @@
 
 ## Phase 0: 前置准备
 
-- [ ] P0.1 从 favicon.svg 生成 icon.png (512x512) + tray.png (16x16)
-- [ ] P0.2 初始化 `packages/electron/` 项目骨架 + package.json + tsconfig
+- [ ] P0.1 从 favicon.svg 生成 icon.png + tray.png: `npx svgexport favicon.svg icon.png 512:512`
+- [ ] P0.2 初始化 `packages/electron/` 骨架: package.json + tsconfig.main.json + tsconfig.preload.json
 
 ## Phase 1: Electron 核心
 
@@ -22,7 +22,7 @@
 - [ ] P2.2 dashboard.js: 删除 `showMatchPicker()`、移除 `showDirectoryPicker` 调用链
 - [ ] P2.3 common.js: AI tab 未安装时根据 `window.doc77` 显示按钮或 CLI 提示
 - [ ] P2.4 所有 HTML: 检测 `window.doc77` 环境标识
-- [ ] P2.5 /api/electron/install 端点（内嵌 npm 安装 AI/MCP）
+- [ ] P2.5 /api/electron/install 端点（curl+tar 安装 AI/MCP，无条件注册在 Electron 环境）
 
 ## Phase 3: 打包 & 分发
 
