@@ -1,11 +1,14 @@
 {
   "name": "idoc77",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "本地文档预览器 · 开源免费 — 一行命令开启文档工作台",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xyy277/doc77.git"
+  },
+  "bin": {
+    "doc77": "bin/doc77.js"
   },
   "dependencies": {
     "@doc77/cli": "^0.4.0"
