@@ -438,6 +438,34 @@ body {
 .settings-panel { position: relative; width: 100%; max-width: 28rem; background: var(--bg-card); height: 100%; box-shadow: -4px 0 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; transform: translateX(100%); transition: transform .3s; }
 #settingsOverlay { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: flex-end; pointer-events: none; }
 
+/* Settings panel content */
+.settings-section + .settings-section { margin-top: 16px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings-row + .settings-row { margin-top: 8px; }
+.settings-label { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+.settings-select {
+  width: 176px; border: 1px solid var(--border-light); border-radius: 6px;
+  padding: 4px 8px; font-size: 13px; background: var(--bg-card); color: var(--text-primary);
+  outline: none;
+}
+.settings-select:focus { border-color: var(--accent); }
+.settings-hint { font-size: 10px; color: var(--text-muted); }
+.settings-tip { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+/* Toggle switch */
+.toggle-track {
+  width: 40px; height: 20px; border-radius: 10px;
+  background: var(--text-muted); border: none; cursor: pointer;
+  position: relative; transition: background var(--transition-fast); flex-shrink: 0;
+}
+.toggle-track.on { background: var(--accent); }
+.toggle-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform var(--transition-fast);
+}
+
 /* ═══ Extra preserved styles (not in brief but needed by preview.html / guide.html) ═══ */
 
 /* AI Summary card */

@@ -299,7 +299,7 @@ window.navigateFsBrowser = function(forEditId, dirPath) {
   overlay.id = overlayId;
   overlay.className = 'confirm-overlay';
   overlay.style.zIndex = '102';
-  overlay.innerHTML = '<div class="confirm-box" style="max-width:600px;max-height:80vh;display:flex;flex-direction:column" id="fsBrowserBox"><div class="flex items-center justify-between mb-3 shrink-0"><span class="font-semibold text-sm">📂 服务端文件浏览</span><button onclick="document.getElementById(\'fsBrowserOverlay\').remove()" class="text-slate-400 hover:text-slate-600 text-lg">✕</button></div><div id="fsBrowserContent" class="text-xs text-slate-400">加载中...</div></div>';
+  overlay.innerHTML = '<div class="confirm-box" style="max-width:600px;max-height:80vh;display:flex;flex-direction:column" id="fsBrowserBox"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0"><span style="font-weight:600;font-size:13px">📂 服务端文件浏览</span><button onclick="document.getElementById(\'fsBrowserOverlay\').remove()" class="btn-icon" style="font-size:18px">✕</button></div><div id="fsBrowserContent" style="font-size:11px;color:var(--text-muted)">加载中...</div></div>';
   document.body.appendChild(overlay);
 
   overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
@@ -308,12 +308,12 @@ window.navigateFsBrowser = function(forEditId, dirPath) {
   var url = '/api/browse-fs' + (dirPath ? '?path=' + encodeURIComponent(dirPath) : '');
   fetch(url).then(function(r) { return r.json(); }).then(function(d) {
     if (d.error) {
-      document.getElementById('fsBrowserContent').innerHTML = '<p class="text-red-500">❌ ' + esc(d.error) + '</p>';
+      document.getElementById('fsBrowserContent').innerHTML = '<p style="color:var(--danger)">❌ ' + esc(d.error) + '</p>';
       return;
     }
     renderFsBrowser(forEditId, d);
   }).catch(function() {
-    document.getElementById('fsBrowserContent').innerHTML = '<p class="text-red-500">加载失败</p>';
+    document.getElementById('fsBrowserContent').innerHTML = '<p style="color:var(--danger)">加载失败</p>';
   });
 };
 
@@ -321,34 +321,34 @@ function renderFsBrowser(forEditId, data) {
   var html = '';
 
   // Breadcrumb + back
-  html += '<div class="flex items-center gap-1 mb-2 text-xs flex-wrap">';
+  html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:8px;flex-wrap:wrap;font-size:12px">';
   if (data.parent) {
-    html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(data.parent) + '\')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">⬆ 上级</button>';
+    html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(data.parent) + '\')" style="padding:2px 8px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-primary)">⬆ 上级</button>';
   }
   // Root shortcuts
   if (data.roots && data.roots.length > 0) {
     for (var ri = 0; ri < data.roots.length; ri++) {
       var root = data.roots[ri];
-      html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(root) + '\')" class="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-[10px]">' + esc(root) + '</button>';
+      html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(root) + '\')" style="padding:2px 8px;border:1px solid var(--accent);border-radius:4px;cursor:pointer;font-size:10px;color:var(--accent);background:var(--accent-light-bg)">' + esc(root) + '</button>';
     }
   }
   html += '</div>';
 
   // Current path
-  html += '<div class="flex items-center gap-2 mb-2"><span class="text-[10px] text-slate-400">当前:</span><span class="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded truncate">' + esc(data.path) + '</span></div>';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:10px;color:var(--text-muted)">当前:</span><span style="font-size:12px;font-family:monospace;color:var(--text-secondary);background:var(--bg-hover);padding:2px 8px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(data.path) + '</span></div>';
 
   // "Select this directory" button
-  html += '<button onclick="fillPath(' + forEditId + ',\'' + escAttr(data.path) + '\');document.getElementById(\'fsBrowserOverlay\').remove();toast(\'路径已选择: ' + escAttr(data.path) + '\',\'success\')" class="w-full py-2 mb-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors font-medium">✅ 选择此目录</button>';
+  html += '<button onclick="fillPath(' + forEditId + ',\'' + escAttr(data.path) + '\');document.getElementById(\'fsBrowserOverlay\').remove();toast(\'路径已选择: ' + escAttr(data.path) + '\',\'success\')" style="width:100%;padding:8px 0;margin-bottom:8px;background:#059669;color:#fff;font-size:13px;border:none;border-radius:6px;cursor:pointer;font-weight:500">✅ 选择此目录</button>';
 
   // Directory listing
   if (data.entries.length === 0) {
-    html += '<p class="text-xs text-slate-400 py-4 text-center">此目录为空</p>';
+    html += '<p style="font-size:12px;color:var(--text-muted);padding:16px 0;text-align:center">此目录为空</p>';
   } else {
-    html += '<div class="overflow-y-auto flex-1" style="max-height:300px"><div class="space-y-0.5">';
+    html += '<div style="overflow-y:auto;flex:1;max-height:300px"><div style="display:flex;flex-direction:column;gap:2px">';
     for (var i = 0; i < data.entries.length; i++) {
       var e = data.entries[i];
       if (e.type === 'directory') {
-        html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(data.path + '/' + e.name) + '\')" class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center gap-2 transition-colors text-slate-700 dark:text-slate-300"><span>📁</span><span class="truncate">' + esc(e.name) + '</span></button>';
+        html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(data.path + '/' + e.name) + '\')" style="width:100%;text-align:left;padding:6px 12px;font-size:13px;border:none;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text-primary);background:transparent" onmouseover="this.style.background=\'var(--accent-light-bg)\'" onmouseout="this.style.background=\'transparent\'"><span>📁</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.name) + '</span></button>';
       }
     }
     html += '</div></div>';

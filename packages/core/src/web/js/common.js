@@ -37,10 +37,10 @@ function toggleTheme() {
   window.confirmDialog = function(msg) {
     return new Promise(function(resolve) {
       var o = document.createElement('div'); o.className = 'confirm-overlay';
-      o.innerHTML = '<div class="confirm-box"><p class="text-sm mb-4">' + msg + '</p>' +
-        '<div class="flex gap-2 justify-end">' +
-        '<button class="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors cancel-btn">取消</button>' +
-        '<button class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ok-btn">确定</button></div></div>';
+      o.innerHTML = '<div class="confirm-box"><p style="font-size:13px;margin-bottom:16px;color:var(--text-primary)">' + msg + '</p>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+        '<button class="btn cancel-btn" style="font-size:12px">取消</button>' +
+        '<button class="btn btn-primary ok-btn" style="font-size:12px">确定</button></div></div>';
       document.body.appendChild(o);
       o.querySelector('.ok-btn').onclick = function(){ o.remove(); resolve(true); };
       o.querySelector('.cancel-btn').onclick = function(){ o.remove(); resolve(false); };
@@ -72,43 +72,34 @@ function toggleSettings() {
   if (!ov) return;
   var opening = !ov.classList.contains('visible');
   ov.classList.toggle('visible');
-  // Show/hide nested elements with transitions
-  var backdrop = ov.querySelector('.settings-backdrop');
-  var panel = ov.querySelector('.settings-panel');
   if (opening) {
-    ov.classList.remove('pointer-events-none');
-    if (backdrop) backdrop.classList.remove('opacity-0');
-    if (panel) panel.classList.remove('translate-x-full');
     switchSettingsTab('system');
-  } else {
-    if (backdrop) backdrop.classList.add('opacity-0');
-    if (panel) panel.classList.add('translate-x-full');
-    // Delay pointer events removal to allow transition
-    setTimeout(function() { ov.classList.add('pointer-events-none'); }, 300);
   }
 }
 function switchSettingsTab(tab) {
   document.querySelectorAll('#settingsTabs button').forEach(function(b) {
-    var a = b.dataset.tab === tab;
-    b.className = 'flex-1 py-2.5 text-xs font-medium transition-colors ' +
-      (a ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400' :
-           'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200');
+    if (b.dataset.tab === tab) {
+      b.classList.add('active');
+    } else {
+      b.classList.remove('active');
+    }
   });
   var c = document.getElementById('settingsContent');
   if (!c) return;
   if (tab === 'system') {
-    c.innerHTML = '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">编辑器</div><div class="space-y-3">' +
-      settingRow('默认编辑器','editor.default','text','vscode') + '</div>' +
-      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">事务</div><div class="space-y-3">' +
+    c.innerHTML =
+      '<div class="section-title">编辑器</div>' +
+      settingRow('默认编辑器','editor.default','text','vscode') +
+      '<div class="section-title" style="margin-top:16px">事务</div>' +
       settingRow('文件大小阈值(MB)','transaction.file_size_threshold_mb','number','50') +
       settingToggle('启用回滚','transaction.rollback_enabled') +
       settingToggle('Shadow GC','transaction.shadow_gc_enabled') +
-      settingRow('孤儿Shadow超时(h)','transaction.shadow_orphan_age_hours','number','24') + '</div>' +
-      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">并发</div><div class="space-y-3">' +
+      settingRow('孤儿Shadow超时(h)','transaction.shadow_orphan_age_hours','number','24') +
+      '<div class="section-title" style="margin-top:16px">并发</div>' +
       settingToggle('项目锁','concurrency.enable_project_lock') +
       settingRow('锁超时(分钟)','concurrency.lock_timeout_minutes','number','10') +
-      settingRow('心跳间隔(秒)','concurrency.lock_heartbeat_seconds','number','30') + '</div>' +
-      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">会话 & 传输</div><div class="space-y-3">' +
+      settingRow('心跳间隔(秒)','concurrency.lock_heartbeat_seconds','number','30') +
+      '<div class="section-title" style="margin-top:16px">会话 & 传输</div>' +
       settingRow('会话超时(分钟)','session.idle_timeout_minutes','number','120') +
       settingRow('清理间隔(分钟)','session.cleanup_interval_minutes','number','60') +
       settingRow('写入限制/会话','rate.write_limit_per_session','number','50') +
@@ -116,52 +107,50 @@ function switchSettingsTab(tab) {
       (window.__doc77_caps_mcp ? (
       settingToggle('MCP stdio','transport.mcp_stdio_enabled') +
       settingToggle('MCP HTTP','transport.mcp_http_enabled') +
-      settingRow('MCP 端口','transport.mcp_http_port','number','8899')) : '') + '</div>';
+      settingRow('MCP 端口','transport.mcp_http_port','number','8899')) : '');
   } else if (tab === 'ai') {
     if (!window.__doc77_caps_ai) {
       var electronInstall = (window.doc77) ?
-        '<button onclick="installElectronModule(\'ai\')" id="btnInstallAi" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors">📦 一键安装 AI 模块</button>' :
-        '<code class="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded mt-2 inline-block">doc77 i ai</code>';
-      c.innerHTML = '<div class="text-center py-8 text-slate-500 text-sm">AI 模块未安装<br>' + electronInstall + '</div>';
+        '<button onclick="installElectronModule(\'ai\')" id="btnInstallAi" class="btn btn-primary" style="display:inline-flex;margin-top:12px;font-size:13px">📦 一键安装 AI 模块</button>' :
+        '<code style="font-size:11px;background:var(--bg-code);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:8px;color:var(--text-primary)">doc77 i ai</code>';
+      c.innerHTML = '<div style="text-align:center;padding:32px 0;font-size:13px;color:var(--text-muted)">AI 模块未安装<br>' + electronInstall + '</div>';
       return;
     }
-    c.innerHTML = '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">AI 提供商</div><div class="space-y-3">' +
-      '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">提供商</span>' +
-      '<select id="aiProvider" onchange="onProviderChange()" class="w-44 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">' +
+    c.innerHTML = '<div class="section-title">AI 提供商</div>' +
+      '<div class="settings-row"><span class="settings-label">提供商</span>' +
+      '<select id="aiProvider" onchange="onProviderChange()" class="settings-select">' +
       '<option value="custom">自定义</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>' +
       '<option value="qwen">Qwen (阿里)</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">GLM (智谱)</option></select></div>' +
       settingRow('Base URL','ai.base_url','text','https://api.deepseek.com') +
-      '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">模型</span>' +
-      '<select id="aiModelSelect" onchange="document.querySelector(\'[data-key=ai.model]\').value=this.value" class="w-44 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">' +
+      '<div class="settings-row"><span class="settings-label">模型</span>' +
+      '<select id="aiModelSelect" onchange="document.querySelector(\'[data-key=ai.model]\').value=this.value" class="settings-select">' +
       '<option value="deepseek-v4-pro">deepseek-v4-pro</option><option value="deepseek-v4-flash">deepseek-v4-flash</option></select></div>' +
       '<input data-key="ai.model" type="hidden" value="deepseek-v4-pro">' +
       settingRow('API Token','ai.token','password','sk-...') +
-      '<div class="text-[10px] text-slate-400 -mt-2 ml-1">🔒 Token 仅保存在本地 SQLite 数据库</div>' +
-      '<button onclick="testConnection()" class="w-full py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">🔗 测试连接</button>' +
-      '<div id="testResult" class="text-xs"></div></div>' +
-      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">AI 行为</div><div class="space-y-3">' +
+      '<div class="settings-tip" style="margin-left:4px">🔒 Token 仅保存在本地 SQLite 数据库</div>' +
+      '<button onclick="testConnection()" style="width:100%;padding:6px 0;font-size:13px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;background:transparent;cursor:pointer;margin-top:8px" onmouseover="this.style.background=\'var(--accent-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🔗 测试连接</button>' +
+      '<div id="testResult" style="font-size:11px;margin-top:4px"></div>' +
+      '<div class="section-title" style="margin-top:16px">AI 行为</div>' +
       settingToggle('启用 AI','ai.enabled') + settingToggle('自动模式','ai.auto_mode') +
       settingRow('风险等级','ai.risk_level','select','medium','low,medium,high') +
       settingToggle('确认删除','ai.confirm_delete') + settingRow('批量大小','ai.batch_size','number','5') +
       settingRow('最大深度','ai.max_depth','number','5') +
-      settingRow('每会话读取限制','ai.read_limit_per_session','number','200') + '</div>';
+      settingRow('每会话读取限制','ai.read_limit_per_session','number','200');
   } else if (tab === 'account') {
-    c.innerHTML = '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">登录密码</div>' +
-      '<div class="space-y-3" id="authSection"><div class="text-xs text-slate-400">检查中...</div></div>' +
-      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">网络绑定 <span id="bindStatus" class="font-normal text-[10px]"></span></div>' +
-      '<div class="text-xs text-slate-500 mb-2 leading-relaxed">控制 Doc77 监听哪些网络接口。<b>127.0.0.1</b> = 仅本机访问（安全）；<b>0.0.0.0</b> = 局域网可访问（需设密码）。</div>' +
-      '<div class="space-y-2">' +
-      '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">当前实际绑定</span><span class="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400" id="runtimeBind">-</span></div>' +
-      '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">配置值（重启后生效）</span><span class="text-sm font-mono" id="configBind">-</span></div>' +
+    c.innerHTML = '<div class="section-title">登录密码</div>' +
+      '<div id="authSection"><div style="font-size:11px;color:var(--text-muted)">检查中...</div></div>' +
+      '<div class="section-title" style="margin-top:16px">网络绑定 <span id="bindStatus" style="font-weight:400;font-size:10px"></span></div>' +
+      '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6">控制 Doc77 监听哪些网络接口。<b>127.0.0.1</b> = 仅本机访问（安全）；<b>0.0.0.0</b> = 局域网可访问（需设密码）。</div>' +
+      '<div class="settings-row"><span class="settings-label">当前实际绑定</span><span style="font-size:13px;font-family:monospace;font-weight:600;color:var(--accent)" id="runtimeBind">-</span></div>' +
+      '<div class="settings-row"><span class="settings-label">配置值（重启后生效）</span><span style="font-size:13px;font-family:monospace" id="configBind">-</span></div>' +
       settingRow('','security.bind_address','text','127.0.0.1') +
       '<input type="hidden" id="bindAddrInput" value="">' +
-      '</div>' +
-      '<div class="text-[10px] text-amber-600 dark:text-amber-400 mt-1 ml-1" id="bindMismatch" style="display:none">⚠️ 配置值与当前实际绑定不一致，重启后生效</div>' +
-      '<div class="text-[10px] text-slate-400 mt-1 ml-1">修改后需点击下方「重启服务」生效</div>' +
-      '<div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-2">其他安全设置</div><div class="space-y-3">' +
+      '<div style="font-size:10px;color:var(--danger);margin-top:4px;display:none" id="bindMismatch">⚠️ 配置值与当前实际绑定不一致，重启后生效</div>' +
+      '<div class="settings-tip">修改后需点击下方「重启服务」生效</div>' +
+      '<div class="section-title" style="margin-top:16px">其他安全设置</div>' +
       settingRow('共享密钥','security.shared_secret','password','') +
-      settingToggle('跟踪符号链接','security.follow_symlinks') + '</div>' +
-      '<div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700"><button onclick="restartServer()" class="w-full py-2 text-sm font-medium text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700 rounded-md hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">🔄 重启服务</button></div>';
+      settingToggle('跟踪符号链接','security.follow_symlinks') +
+      '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)"><button onclick="restartServer()" style="width:100%;padding:8px 0;font-size:13px;font-weight:500;color:var(--danger);border:1px solid var(--danger);border-radius:6px;background:transparent;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🔄 重启服务</button></div>';
     loadAuthStatus();
     loadServerInfo();
   }
@@ -177,7 +166,7 @@ async function loadServerInfo() {
     var configEl = document.getElementById('configBind');
     if (runtimeEl) {
       runtimeEl.textContent = d.bindAddress;
-      runtimeEl.className = 'text-sm font-mono font-semibold ' + (d.isLocal ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400');
+      runtimeEl.style.color = d.isLocal ? 'var(--accent)' : 'var(--danger)';
     }
     // Update config display after a short delay (wait for loadSettingsValues to fill)
     setTimeout(function() {
@@ -193,27 +182,25 @@ async function loadServerInfo() {
 function settingRow(label, key, type, placeholder, opts) {
   if (type === 'toggle') return settingToggle(label, key);
   if (type === 'select') {
-    return '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">' + label + '</span>' +
-      '<select data-key="' + key + '" class="w-40 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">' +
+    return '<div class="settings-row"><span class="settings-label">' + label + '</span>' +
+      '<select data-key="' + key + '" class="settings-select">' +
       (opts||'').split(',').map(function(o){ return '<option value="'+o.trim()+'">'+o.trim()+'</option>'; }).join('') + '</select></div>';
   }
   var tt = type === 'password' ? 'password' : 'text';
   var h = '';
-  if (type === 'password') h = '<button class="absolute right-1 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600" onclick="togglePasswordView(this)">👁</button>';
-  return '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">' + label + '</span>' +
-    '<div class="relative"><input data-key="' + key + '" type="' + tt + '" placeholder="' + (placeholder||'') + '" class="w-44 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">' + h + '</div></div>';
+  if (type === 'password') h = '<button style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text-muted);border:none;background:none;cursor:pointer;line-height:1" onclick="togglePasswordView(this)">👁</button>';
+  return '<div class="settings-row"><span class="settings-label">' + label + '</span>' +
+    '<div style="position:relative"><input data-key="' + key + '" type="' + tt + '" placeholder="' + (placeholder||'') + '" class="input" style="width:176px">' + h + '</div></div>';
 }
 function settingToggle(label, key) {
-  return '<div class="flex items-center justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">' + label + '</span>' +
-    '<button data-key="' + key + '" data-value="false" onclick="toggleSwitch(this)" class="w-10 h-5 rounded-full bg-slate-300 dark:bg-slate-600 relative transition-colors">' +
-    '<span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"></span></button></div>';
+  return '<div class="settings-row"><span class="settings-label">' + label + '</span>' +
+    '<button data-key="' + key + '" data-value="false" onclick="toggleSwitch(this)" class="toggle-track">' +
+    '<span class="toggle-knob"></span></button></div>';
 }
 function toggleSwitch(btn) {
   btn.dataset.value = btn.dataset.value === 'true' ? 'false' : 'true';
-  btn.className = btn.dataset.value === 'true' ?
-    'w-10 h-5 rounded-full bg-blue-600 relative transition-colors' :
-    'w-10 h-5 rounded-full bg-slate-300 dark:bg-slate-600 relative transition-colors';
-  btn.querySelector('span').style.transform = btn.dataset.value === 'true' ? 'translateX(20px)' : 'translateX(0)';
+  btn.classList.toggle('on', btn.dataset.value === 'true');
+  btn.querySelector('span').classList.toggle('on', btn.dataset.value === 'true');
 }
 function togglePasswordView(btn) { var i = btn.previousElementSibling; i.type = i.type === 'password' ? 'text' : 'password'; }
 
@@ -236,11 +223,11 @@ function onProviderChange() {
 }
 async function testConnection() {
   var r = document.getElementById('testResult');
-  r.textContent = '测试中...'; r.className = 'text-xs text-slate-500';
+  r.textContent = '测试中...'; r.style.cssText = 'font-size:11px;color:var(--text-muted)';
   try { var res = await fetch('/api/ai/test',{method:'POST'}); var d = await res.json();
-    if (d.ok) { r.textContent = '✅ 连接成功 ('+d.status+')'; r.className = 'text-xs text-green-500'; }
-    else { r.textContent = '❌ '+d.error; r.className = 'text-xs text-red-500'; }
-  } catch(ex) { r.textContent = '❌ 网络错误: '+ex.message; r.className = 'text-xs text-red-500'; }
+    if (d.ok) { r.textContent = '✅ 连接成功 ('+d.status+')'; r.style.cssText = 'font-size:11px;color:#059669'; }
+    else { r.textContent = '❌ '+d.error; r.style.cssText = 'font-size:11px;color:var(--danger)'; }
+  } catch(ex) { r.textContent = '❌ 网络错误: '+ex.message; r.style.cssText = 'font-size:11px;color:var(--danger)'; }
 }
 async function loadSettingsValues() {
   try { var r = await fetch('/api/config'); var d = await r.json();
@@ -248,7 +235,7 @@ async function loadSettingsValues() {
       var k = el.dataset.key, v = d[k];
       if (v === undefined) return;
       if (el.tagName === 'SELECT') { var opt = el.querySelector('option[value="'+v+'"]'); if (opt) opt.selected = true; }
-      else if (el.tagName === 'BUTTON') { el.dataset.value = v === 'true' ? 'true' : 'false'; el.className = el.dataset.value === 'true' ? 'w-10 h-5 rounded-full bg-blue-600 relative transition-colors' : 'w-10 h-5 rounded-full bg-slate-300 dark:bg-slate-600 relative transition-colors'; el.querySelector('span').style.transform = el.dataset.value === 'true' ? 'translateX(20px)' : 'translateX(0)'; }
+      else if (el.tagName === 'BUTTON') { el.dataset.value = v === 'true' ? 'true' : 'false'; el.classList.toggle('on', v === 'true'); if (el.querySelector('span')) el.querySelector('span').classList.toggle('on', v === 'true'); }
       else el.value = v;
     });
   } catch(e) {}
@@ -283,26 +270,26 @@ async function resetDefaults() {
 async function loadAuthStatus() {
   try { var r = await fetch('/api/auth/status'); var d = await r.json(); var s = document.getElementById('authSection');
     if (d.hasPassword) {
-      s.innerHTML = '<div class="text-xs text-green-600 mb-2">✅ 密码已设置</div><div class="space-y-2">' +
-        '<input id="curPass" type="password" placeholder="当前密码" class="w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">' +
-        '<input id="newPass" type="password" placeholder="新密码（留空不修改）" class="w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" oninput="updateStrength()">' +
-        '<div id="pwStrength" class="text-xs text-slate-400"></div>' +
-        '<button onclick="changePw()" class="w-full py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors">修改密码</button></div>';
+      s.innerHTML = '<div style="font-size:12px;color:#059669;margin-bottom:8px">✅ 密码已设置</div><div style="display:flex;flex-direction:column;gap:8px">' +
+        '<input id="curPass" type="password" placeholder="当前密码" class="input" style="width:100%;padding:6px 12px">' +
+        '<input id="newPass" type="password" placeholder="新密码（留空不修改）" class="input" style="width:100%;padding:6px 12px" oninput="updateStrength()">' +
+        '<div id="pwStrength" style="font-size:11px;color:var(--text-muted)"></div>' +
+        '<button onclick="changePw()" class="btn btn-primary" style="width:100%;font-size:13px">修改密码</button></div>';
     } else {
-      s.innerHTML = '<div class="text-xs text-amber-600 mb-2">⚠️ 尚未设置密码</div><div class="space-y-2">' +
-        '<input id="setupPass" type="password" placeholder="设置密码（至少6位）" class="w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">' +
-        '<button onclick="setupPw()" class="w-full py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors">设置密码</button></div>';
+      s.innerHTML = '<div style="font-size:12px;color:var(--danger);margin-bottom:8px">⚠️ 尚未设置密码</div><div style="display:flex;flex-direction:column;gap:8px">' +
+        '<input id="setupPass" type="password" placeholder="设置密码（至少6位）" class="input" style="width:100%;padding:6px 12px">' +
+        '<button onclick="setupPw()" class="btn btn-primary" style="width:100%;font-size:13px">设置密码</button></div>';
     }
-    s.innerHTML += '<div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">' +
-      '<button onclick="doLogout()" class="w-full py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">🚪 退出登录</button></div>';
+    s.innerHTML += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)">' +
+      '<button onclick="doLogout()" style="width:100%;padding:6px 0;font-size:13px;color:var(--danger);background:transparent;border:1px solid var(--danger);border-radius:6px;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🚪 退出登录</button></div>';
   } catch(e) {}
 }
 function doLogout() { sessionStorage.removeItem("doc77-auth"); location.reload(); }
 function updateStrength() {
   var p = (document.getElementById('newPass') && document.getElementById('newPass').value) || '';
   var s = 0; if (p.length >= 8) s++; if (p.length >= 12) s++; if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++; if (/[0-9]/.test(p)) s++; if (/[^a-zA-Z0-9]/.test(p)) s++;
-  var l = ['非常弱','弱','一般','强','非常强'], c = ['text-red-500','text-orange-500','text-yellow-500','text-lime-500','text-green-500'];
-  var el = document.getElementById('pwStrength'); el.textContent = '强度: ' + l[Math.min(s,4)]; el.className = 'text-xs ' + c[Math.min(s,4)];
+  var l = ['非常弱','弱','一般','强','非常强'], c = ['#ef4444','#f97316','#eab308','#84cc16','#22c55e'];
+  var el = document.getElementById('pwStrength'); el.textContent = '强度: ' + l[Math.min(s,4)]; el.style.cssText = 'font-size:11px;color:' + c[Math.min(s,4)];
 }
 async function setupPw() {
   var p = document.getElementById('setupPass').value;
@@ -327,26 +314,26 @@ async function changePw() {
   fetch("/api/auth/status").then(function(r){ return r.json(); }).then(function(data){ d = data;
     if (!d.hasPassword) { showSecurityPrompt(); return; }
     var o = document.createElement("div"); o.id = "loginGate";
-    o.className = "fixed inset-0 z-[200] bg-slate-50 dark:bg-slate-950 flex items-center justify-center";
-    o.innerHTML = '<div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-8 w-full max-w-sm"><div class="text-center mb-6"><span class="text-4xl">📁</span><h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-2">Doc77</h1><p class="text-sm text-slate-500 dark:text-slate-400">请输入密码解锁</p></div><input id="loginPass" type="password" placeholder="密码" class="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-4 py-3 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 mb-3" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">解锁</button><div id="loginError" class="text-xs text-red-500 mt-2 text-center hidden"></div></div>';
+    o.style.cssText = "position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--bg-body)";
+    o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><span style="font-size:36px">📁</span><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--text-secondary)">请输入密码解锁</p></div><input id="loginPass" type="password" placeholder="密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">解锁</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div></div>';
     document.body.appendChild(o);
     window.unlock = async function() {
       var p = document.getElementById("loginPass").value;
       var e = document.getElementById("loginError");
-      if (!p) { e.textContent = "请输入密码"; e.classList.remove("hidden"); return; }
+      if (!p) { e.textContent = "请输入密码"; e.style.display = 'block'; return; }
       var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
       var d2 = await r2.json();
       if (d2.ok) { sessionStorage.setItem("doc77-auth","1"); o.remove(); }
-      else { e.textContent = d2.error || "密码错误"; e.classList.remove("hidden"); }
+      else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
     };
     showSecurityPrompt();
     async function showSecurityPrompt() {
       try { var sr = await fetch("/api/config"); var sd = await sr.json();
         if ((sd["ai.token"] || sd["ai.enabled"] === "true") && !d.hasPassword) {
           var sb = document.createElement("div"); sb.id = "securityBanner";
-          sb.className = "fixed top-0 left-0 right-0 z-[190] bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-between text-sm";
-          sb.innerHTML = '<span class="text-amber-800 dark:text-amber-200">⚠️ 已配置 AI 模型但未设置访问密码，建议设置密码保护数据安全</span>' +
-            '<button onclick="this.parentElement.remove();toggleSettings();switchSettingsTab(&quot;account&quot;)" class="px-3 py-1 bg-amber-600 text-white text-xs rounded-md hover:bg-amber-700 transition-colors shrink-0 ml-4">设置密码</button>';
+          sb.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:190;background:var(--accent-light-bg);border-bottom:1px solid var(--accent);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px";
+          sb.innerHTML = '<span style="color:var(--accent)">⚠️ 已配置 AI 模型但未设置访问密码，建议设置密码保护数据安全</span>' +
+            '<button onclick="this.parentElement.remove();toggleSettings();switchSettingsTab(&quot;account&quot;)" style="padding:4px 12px;background:var(--accent);color:#fff;font-size:11px;border:none;border-radius:6px;cursor:pointer;margin-left:16px;flex-shrink:0">设置密码</button>';
           document.body.insertBefore(sb, document.body.firstChild);
         }
       } catch(e) {}
