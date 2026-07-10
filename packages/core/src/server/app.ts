@@ -305,7 +305,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
 
   // Project CRUD
   app.get('/api/projects', (_req: Request, res: Response) => {
-    const projects = listProjects();
+    const db = getConnection();
+    const projects = db.prepare(
+      `SELECT p.id, p.name, p.path, p.created_at, p.last_opened,
+              CASE WHEN f.project_id IS NOT NULL THEN 1 ELSE 0 END as favorited
+       FROM projects p
+       LEFT JOIN favorites f ON f.project_id = p.id
+       ORDER BY p.name`
+    ).all();
     res.json(projects);
   });
 
@@ -361,6 +368,34 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
     touchProject(id);
     res.json({ ok: true });
+  });
+
+  // Toggle project favorite
+  app.put('/api/projects/:id/favorite', (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+
+    try {
+      const db = getConnection();
+
+      // Verify project exists
+      const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
+      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+
+      // Check current favorite status
+      const existing = db.prepare('SELECT * FROM favorites WHERE project_id = ?').get(id);
+
+      if (existing) {
+        db.prepare('DELETE FROM favorites WHERE project_id = ?').run(id);
+        res.json({ id, favorited: false });
+      } else {
+        db.prepare('INSERT INTO favorites (project_id) VALUES (?)').run(id);
+        res.json({ id, favorited: true });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
   });
 
   // Environment detection — tells frontend what strategies are available

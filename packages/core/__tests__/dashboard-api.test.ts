@@ -155,4 +155,41 @@ describe('Dashboard 2.0 API endpoints', () => {
     const count = (db.prepare('SELECT COUNT(*) as c FROM recent_files').get() as { c: number }).c;
     expect(count).toBeLessThanOrEqual(50);
   });
+
+  it('PUT /api/projects/:id/favorite toggles favorite on (insert)', async () => {
+    // Project 2 is not favorited yet
+    const res = await fetch(`${baseUrl}/api/projects/2/favorite`, { method: 'PUT' });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.id).toBe(2);
+    expect(data.favorited).toBe(true);
+
+    // Verify in DB
+    const db = getConnection();
+    const fav = db.prepare('SELECT * FROM favorites WHERE project_id = 2').get();
+    expect(fav).toBeTruthy();
+  });
+
+  it('PUT /api/projects/:id/favorite toggles favorite off (delete)', async () => {
+    // Project 1 is already favorited from setup
+    const res = await fetch(`${baseUrl}/api/projects/1/favorite`, { method: 'PUT' });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.id).toBe(1);
+    expect(data.favorited).toBe(false);
+  });
+
+  it('PUT /api/projects/:id/favorite returns 404 for invalid project', async () => {
+    const res = await fetch(`${baseUrl}/api/projects/999/favorite`, { method: 'PUT' });
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /api/projects includes favorited field', async () => {
+    // Re-favorite project 1 first
+    await fetch(`${baseUrl}/api/projects/1/favorite`, { method: 'PUT' });
+    const res = await fetch(`${baseUrl}/api/projects`, { method: 'GET' });
+    const data = await res.json();
+    const p1 = data.find((p: any) => p.id === 1);
+    expect(p1.favorited).toBe(1);
+  });
 });
