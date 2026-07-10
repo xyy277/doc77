@@ -249,7 +249,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number }
       ).count;
       const lastActiveRow = db
-        .prepare('SELECT MAX(last_opened) as last_active FROM projects')
+        .prepare('SELECT COALESCE(MAX(last_opened), MAX(created_at)) as last_active FROM projects')
         .get() as { last_active: string | null };
       const favoriteCount = (
         db.prepare('SELECT COUNT(*) as count FROM favorites').get() as { count: number }

@@ -43,7 +43,7 @@ function updateStarButtons(projectId, favorited) {
 window.renderFavorites = function(projects) {
   var favProjects = projects.filter(function(p) { return p.favorited; });
   var section = document.getElementById('favoritesSection');
-  var grid = document.getElementById('favGrid');
+  var list = document.getElementById('favList');
   var countEl = document.getElementById('favCount');
 
   countEl.textContent = favProjects.length;
@@ -54,9 +54,12 @@ window.renderFavorites = function(projects) {
   }
 
   section.style.display = 'block';
-  grid.innerHTML = favProjects.map(function(p) {
-    return renderCompactCard(p, true);
-  }).join('');
+  var html = '<div class="fav-pills">';
+  favProjects.forEach(function(p) {
+    html += '<a href="/preview.html?id=' + p.id + '" class="fav-pill" onclick="fetch(\'/api/projects/' + p.id + '/touch\',{method:\'POST\'}).catch(function(){})">⭐ ' + esc(p.name) + '</a>';
+  });
+  html += '</div>';
+  list.innerHTML = html;
 };
 
 // ═══ Refresh (called by other modules after state change) ═══

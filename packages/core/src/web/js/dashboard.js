@@ -29,14 +29,16 @@ async function load() {
 
 // ═══ Greeting ═══
 function updateGreeting() {
-  var hour = new Date().getHours();
+  var now = new Date();
+  var hour = now.getHours();
   var greeting;
   if (hour < 6) greeting = '🌙 夜深了';
   else if (hour < 12) greeting = '👋 早上好';
   else if (hour < 14) greeting = '👋 中午好';
   else if (hour < 18) greeting = '👋 下午好';
   else greeting = '🌆 晚上好';
-  document.getElementById('greeting').textContent = greeting;
+  var timeStr = String(hour).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('greeting').innerHTML = greeting + '，现在 ' + timeStr;
 }
 
 // ═══ View Mode ═══

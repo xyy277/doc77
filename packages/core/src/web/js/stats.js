@@ -24,13 +24,14 @@ window.refreshStats = function() {
 };
 
 function relativeTimeText(isoString) {
-  if (!isoString) return '暂无记录';
+  if (!isoString) return '尚无项目';
   var now = Date.now();
   var then = new Date(isoString).getTime();
-  if (isNaN(then)) return '暂无记录';
+  if (isNaN(then)) return '尚无项目';
   var diff = Math.floor((now - then) / 1000);
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
   if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+  if (diff < 172800) return '昨天';
   return Math.floor(diff / 86400) + ' 天前';
 }

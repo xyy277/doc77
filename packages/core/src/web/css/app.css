@@ -255,10 +255,27 @@ body {
   margin-bottom: 8px;
   flex-shrink: 0;
 }
-.favorites-section .project-grid {
-  max-height: none;
+.favorites-section .fav-list {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+}
+
+/* Favorite pills */
+.fav-pills {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  align-content: start;
+}
+.fav-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 16px; font-size: 12px;
+  background: #fef3c7; color: #92400e;
+  text-decoration: none; cursor: pointer;
+  white-space: nowrap;
+}
+.fav-pill:hover { filter: brightness(0.95); }
+.dark .fav-pill {
+  background: #78350f; color: #fde68a;
 }
 
 /* ═══ Projects Section ═══ */
