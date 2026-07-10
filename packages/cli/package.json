@@ -1,6 +1,6 @@
 {
   "name": "@doc77/cli",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Doc77 CLI — 默认安全、对话驱动的智能本地文档管理 Agent",
   "license": "MIT",
   "repository": {
@@ -25,10 +25,13 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./dist/bin/doc77.js": {
+      "import": "./dist/bin/doc77.js"
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
     "doc77": "dist/bin/doc77.js"

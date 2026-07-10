@@ -1,6 +1,6 @@
 {
   "name": "idoc77",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "本地文档预览器 · 开源免费 — 一行命令开启文档工作台",
   "license": "MIT",
   "repository": {
@@ -11,7 +11,7 @@
     "doc77": "bin/doc77.js"
   },
   "dependencies": {
-    "@doc77/cli": "^0.4.0"
+    "@doc77/cli": "^0.4.1"
   },
   "publishConfig": {
     "access": "public"
