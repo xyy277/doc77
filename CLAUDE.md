@@ -99,6 +99,7 @@
 
 ### 安全和质量
 
+3. **必须使用 `pnpm publish`** — 严禁使用 `npm publish`。`pnpm publish` 会自动将 `workspace:^` 协议解析为实际版本号。使用 `npm publish` 会导致发布的包依赖中残留 `workspace:^`，npm 无法安装。
 4. **发布前验证** — 发布前必须完成：
    - 所有测试通过（`pnpm test`）
    - `pnpm build` 全部成功
@@ -155,10 +156,15 @@ Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。
 - **架构**：monorepo（4 个 package：core, mcp, ai, cli）
 - **当前状态**：开发中
 
+## Git 提交规范
+
+- **提交者**：所有 commit 必须包含 `Co-Authored-By: xyy277 <907507646@qq.com>` 作为结尾
+- **提交信息格式**：`type: description`（type = feat / fix / style / refactor / chore / docs）
+
 ## 开发工作流
 
 - **构建**：`pnpm build`
-- **启动开发服务**：`pnpm dev:start`（构建 + 启动，端口 3099，绑定 0.0.0.0 用于测试）
+- **启动开发服务**：`pnpm dev:start`（构建 + 启动，端口 2777，绑定 0.0.0.0 用于测试）
 - **重启开发服务**：`pnpm dev:restart`（杀旧进程 + 构建 + 启动，绑定 0.0.0.0）
 - **运行测试**：`pnpm test`
 - **不要使用** `doc77 start` 全局命令开发，那是生产安装方式
