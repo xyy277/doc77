@@ -165,6 +165,8 @@
     </div>
   </div>
 
+  <div style="padding:8px 20px 0;font-size:16px;font-weight:600" id="mobileGreeting">👋 下午好</div>
+
   <div id="app" style="display:none">
 
     <!-- ═══ Tab: Recent ═══ -->
@@ -177,7 +179,7 @@
 
     <!-- ═══ Tab: Browse ═══ -->
     <div id="tab-browse" class="tab-content">
-      <div class="header"><h1>项目</h1></div>
+      <div class="header"><h1>项目</h1><span id="mobileProjCount" style="font-size:12px;color:var(--text-muted)"></span></div>
       <div class="content" id="projectList">
         <div class="loading">加载中…</div>
       </div>
@@ -275,10 +277,12 @@
                 '<div class="project-path">' + esc(p.path) + '</div>' +
                 '<div class="project-meta">' + (p.last_opened ? '上次: ' + fmtDate(p.last_opened) : '') + '</div>' +
               '</div>' +
+              '<button class="fav-star" style="flex-shrink:0;width:36px;height:36px;border:none;background:none;font-size:20px;cursor:pointer;padding:0" data-id="' + p.id + '" onclick="event.stopPropagation();toggleMobileFavorite(' + p.id + ', this)">' + (p.favorited ? '★' : '☆') + '</button>' +
               '<span class="project-arrow">›</span>' +
             '</div>';
         });
         container.innerHTML = html;
+        document.getElementById('mobileProjCount').textContent = '(' + projects.length + ')';
         loadRecent();
       } catch (e) {
         container.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>加载失败</p></div>';
@@ -335,6 +339,29 @@
     applyThemeUI();
     var origToggle = window.toggleTheme;
     window.toggleTheme = function () { origToggle(); applyThemeUI(); };
+
+    // Greeting
+    (function() {
+      var hour = new Date().getHours();
+      var g;
+      if (hour < 6) g = '🌙 夜深了';
+      else if (hour < 12) g = '👋 早上好';
+      else if (hour < 14) g = '👋 中午好';
+      else if (hour < 18) g = '👋 下午好';
+      else g = '🌆 晚上好';
+      var el = document.getElementById('mobileGreeting');
+      if (el) el.textContent = g;
+    })();
+
+    // Favorite toggle
+    window.toggleMobileFavorite = async function(projectId, btn) {
+      try {
+        var r = await fetch('/api/projects/' + projectId + '/favorite', { method: 'PUT' });
+        if (!r.ok) return;
+        var d = await r.json();
+        btn.textContent = d.favorited ? '★' : '☆';
+      } catch(e) {}
+    };
 
     boot();
   </script>
