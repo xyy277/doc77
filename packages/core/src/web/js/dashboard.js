@@ -110,6 +110,13 @@ window.renderGrid = function(items) {
   }).join('');
 };
 
+// ═══ Path truncation helper ═══
+function shortPath(fullPath) {
+  var parts = fullPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  if (parts.length <= 3) return fullPath;
+  return '…/' + parts.slice(-3).join('/');
+}
+
 // ═══ Shared: Render a compact card (used by dashboard.js and favorites.js) ═══
 function renderCompactCard(p, inFavorites) {
   var starClass = p.favorited ? 'fav-star favorited' : 'fav-star';
@@ -123,7 +130,7 @@ function renderCompactCard(p, inFavorites) {
     '<div class="card-icon">📂</div>' +
     '<div class="card-body">' +
       '<div class="card-name">' + esc(p.name) + '</div>' +
-      '<div class="card-path">' + esc(p.path) + '</div>' +
+      '<div class="card-path" title="' + escAttr(p.path) + '">' + esc(shortPath(p.path)) + '</div>' +
       '<div class="card-date">' + dateLabel + '</div>' +
     '</div>' +
     '<div class="card-actions">' +

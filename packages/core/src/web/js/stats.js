@@ -8,12 +8,10 @@ window.renderStats = async function() {
     var r = await fetch('/api/stats');
     var d = await r.json();
 
-    var html = '';
-    html += '<div class="stats-item"><div class="stats-value">' + d.projects + '</div><div class="stats-label">项目</div></div>';
-    html += '<div class="stats-item"><div class="stats-value">' + d.favoriteCount + '</div><div class="stats-label">收藏</div></div>';
-    html += '<div class="stats-item"><div class="stats-label" style="margin-top:2px">最近活跃</div><div style="font-size:13px;font-weight:500">' + relativeTimeText(d.lastActive) + '</div></div>';
-
-    container.innerHTML = html;
+    container.innerHTML =
+      '<div class="stat-block"><div class="stat-number">' + d.projects + '</div><div class="stat-label">项目</div></div>' +
+      '<div class="stat-block"><div class="stat-number">' + d.favoriteCount + '</div><div class="stat-label">收藏</div></div>' +
+      '<div class="stat-block stat-block-wide"><div class="stat-number stat-number-sm">' + relativeTimeText(d.lastActive) + '</div><div class="stat-label">最近活跃</div></div>';
   } catch(e) {
     container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">加载失败</span>';
   }

@@ -13,7 +13,8 @@
 <header class="app-header">
   <div class="app-header-inner">
     <a href="/" class="logo">
-      <img src="/assets/logo-dark.svg" alt="Doc77" height="36">
+      <img src="/assets/logo.svg" alt="Doc77" height="36" class="logo-light">
+      <img src="/assets/logo-dark.svg" alt="Doc77" height="36" class="logo-dark">
     </a>
     <div class="header-actions">
       <span class="header-status"><span class="header-dot pulse"></span>运行中</span>
@@ -112,7 +113,10 @@
         <div class="form-group">
           <div id="regError" style="color:var(--danger);font-size:12px;display:none"></div>
         </div>
-        <button class="btn btn-primary" onclick="doRegister()" style="width:100%">注册项目</button>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button class="btn" onclick="closeRegisterModal()">取消</button>
+          <button class="btn btn-primary" onclick="doRegister()">注册项目</button>
+        </div>
       </div>
       <!-- Tab: Discover -->
       <div class="tab-panel" id="tab-discover">

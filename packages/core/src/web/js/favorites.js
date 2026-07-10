@@ -56,7 +56,7 @@ window.renderFavorites = function(projects) {
   section.style.display = 'block';
   var html = '<div class="fav-pills">';
   favProjects.forEach(function(p) {
-    html += '<a href="/preview.html?id=' + p.id + '" class="fav-pill" onclick="fetch(\'/api/projects/' + p.id + '/touch\',{method:\'POST\'}).catch(function(){})">⭐ ' + esc(p.name) + '</a>';
+    html += '<a href="/preview.html?id=' + p.id + '" class="fav-pill" onclick="fetch(\'/api/projects/' + p.id + '/touch\',{method:\'POST\'}).catch(function(){})">📂 ' + esc(p.name) + '</a>';
   });
   html += '</div>';
   list.innerHTML = html;
