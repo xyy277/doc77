@@ -37,3 +37,4 @@ scripts/start-test-server.ts
 *.tsbuildinfo
 *.tgz
 release/
+version.gen.ts

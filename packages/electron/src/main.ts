@@ -39,7 +39,7 @@ function createWindow(port: number): void {
 }
 
 async function boot(): Promise<void> {
-  const port = await findAvailablePort(3099);
+  const port = await findAvailablePort(2777);
   server = await startServer(port);
   server.child.on('exit', (code) => {
     if (code !== 0 && !shuttingDown) {
@@ -73,7 +73,7 @@ ipcMain.handle('dialog:openDirectory', async () => {
 });
 
 // IPC: get server port
-ipcMain.handle('getPort', () => server?.port ?? 3099);
+ipcMain.handle('getPort', () => server?.port ?? 2777);
 
 // Single instance lock
 const gotLock = app.requestSingleInstanceLock();

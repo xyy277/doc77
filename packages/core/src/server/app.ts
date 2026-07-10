@@ -35,7 +35,7 @@ import {
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
 import { isMobileRequest } from './mobile-detect.js';
 
-const VERSION = '0.1.0';
+import { VERSION } from '../version.gen.js';
 
 // Module capabilities — set by CLI layer at startup
 let _capabilities = { ai: false, mcp: false };
@@ -165,7 +165,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     res.json({
       bindAddress: addr,
       isLocal,
-      port: 3099,
+      port: 2777,
       version: VERSION,
     });
   });

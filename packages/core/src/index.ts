@@ -4,7 +4,7 @@
  * 提供数据库、文件系统抽象层、预览引擎和 Express Server。
  */
 
-export const VERSION = '0.1.0';
+export { VERSION } from './version.gen.js';
 
 // Crypto
 export {

@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 const SERVER_NAME = 'doc77';
-const SERVER_VERSION = '0.1.0';
+import { VERSION as SERVER_VERSION } from './version.gen.js';
 
 /**
  * Create and configure the Doc77 MCP server.

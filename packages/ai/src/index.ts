@@ -4,7 +4,7 @@
  * 提供 AI Provider 抽象、Agent 核心、MCP 工具定义和对话 API。
  */
 
-export const VERSION = '0.1.0';
+export { VERSION } from './version.gen.js';
 
 // Provider
 export { AiProvider } from './provider/index.js';

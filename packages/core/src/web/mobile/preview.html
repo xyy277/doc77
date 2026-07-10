@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <base href="/mobile/">
-<title>Doc77 — 预览</title>
+<title>预览</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <style>
   /* ══════════ Theme Tokens ══════════ */
@@ -12,6 +12,7 @@
     --bg-body: #f8fafc;
     --bg-card: #ffffff;
     --bg-header-solid: #ffffff;
+    --bg-nav: rgba(255,255,255,0.92);
     --bg-hover: #f1f5f9;
     --bg-code: #f1f5f9;
 
@@ -29,6 +30,7 @@
     --bg-body: #0f172a;
     --bg-card: #1e293b;
     --bg-header-solid: #0f172a;
+    --bg-nav: rgba(15,23,42,0.92);
     --bg-hover: #1e293b;
     --bg-code: #1e293b;
 
@@ -50,9 +52,7 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     background: var(--bg-body); color: var(--text-primary);
-    min-height: 100vh; min-height: 100dvh;
     -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
-    display: flex; flex-direction: column;
   }
 
   /* Header */
@@ -149,7 +149,8 @@
   .reader-toolbar {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
     background: var(--bg-nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border-light); padding: 8px 24px 20px;
+    border-top: 1px solid var(--border-light);
+    padding: 8px 24px calc(20px + env(safe-area-inset-bottom, 0px));
     display: none; justify-content: space-around; align-items: flex-start;
   }
   .reader-toolbar.visible { display: flex; }
@@ -162,10 +163,13 @@
   .toolbar-btn.active { color: var(--accent); }
   .toolbar-btn .tb-icon { font-size: 20px; }
 
-  /* Auto-scroll speed slider */
+  /* Auto-scroll speed slider (fixed above reader toolbar) */
   .speed-slider-wrap {
     display: none; align-items: center; gap: 6px;
-    padding: 4px 12px 16px; justify-content: center;
+    padding: 4px 12px calc(16px + env(safe-area-inset-bottom, 0px)); justify-content: center;
+    position: fixed; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; z-index: 19;
+    background: var(--bg-nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-light);
   }
   .speed-slider-wrap.visible { display: flex; }
   .speed-slider-wrap input[type=range] {
@@ -180,7 +184,7 @@
 
   /* TOC drawer */
   .toc-drawer {
-    position: fixed; bottom: 80px; left: 12px; right: 12px; z-index: 25;
+    position: fixed; bottom: calc(128px + env(safe-area-inset-bottom, 0px)); left: 12px; right: 12px; z-index: 25;
     background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 16px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.12); max-height: 50vh; overflow-y: auto;
     padding: 12px 0; display: none;
@@ -237,15 +241,38 @@
 
   /* Mermaid dark mode */
   body.dark .content-viewer .mermaid { filter: invert(0.85) hue-rotate(180deg); }
+
+  /* ══════════ Responsive: Tablet+ ══════════ */
+  @media (min-width: 640px) {
+    .content-viewer {
+      max-width: 720px; margin: 0 auto;
+      padding: 24px 32px 32px;
+    }
+    .file-list { max-width: 720px; margin: 0 auto; }
+    .header, .breadcrumb {
+      padding-left: calc((100% - 720px) / 2 + 12px);
+      padding-right: calc((100% - 720px) / 2 + 12px);
+    }
+  }
+  @media (min-width: 1024px) {
+    .content-viewer { font-size: 17px; max-width: 800px; }
+    .content-viewer h1 { font-size: 2em; }
+    .file-list { max-width: 800px; }
+    .header, .breadcrumb {
+      padding-left: calc((100% - 800px) / 2 + 12px);
+      padding-right: calc((100% - 800px) / 2 + 12px);
+    }
+  }
+
 </style>
 </head>
 <body>
-  <div id="app" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+  <div id="app" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;flex-direction:column;overflow:hidden">
 
     <!-- Header -->
     <div class="header">
       <button class="btn-back" onclick="goBack()" title="返回">←</button>
-      <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" class="header-logo">
+      <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" class="header-logo" onclick="location.href='/'" style="cursor:pointer">
       <div class="proj-title" id="titleBar">加载中…</div>
       <button class="btn-icon" onclick="toggleTheme()" title="主题" id="themeIcon">🌙</button>
     </div>
@@ -323,7 +350,7 @@
         proj = projects.find(function (p) { return p.id === parseInt(pid); });
         if (!proj) { document.getElementById('fileList').innerHTML = '<div class="empty">项目未找到</div>'; return; }
         document.getElementById('titleBar').textContent = proj.name;
-        document.title = 'Doc77 — ' + proj.name;
+        document.title = proj.name;
         if (directPath) {
           // Open specific file from recent/docs link
           var fileName = directPath.split('/').pop();
@@ -437,7 +464,7 @@
     function renderBreadcrumb() {
       var bc = document.getElementById('breadcrumb');
       var parts = currentPath ? currentPath.split('/') : [];
-      var html = '<a href="#" onclick="loadTree(\'\')">' + esc(proj.name) + '</a>';
+      var html = '<a href="javascript:void(0)" onclick="loadTree(\'\')">' + esc(proj.name) + '</a>';
       var accumulated = '';
       parts.forEach(function (part, i) {
         accumulated += (accumulated ? '/' : '') + part;
@@ -445,7 +472,7 @@
         if (i === parts.length - 1 && !currentFile) {
           html += '<strong>' + esc(part) + '</strong>';
         } else {
-          html += '<a href="#" onclick="loadTree(\'' + escAttr(accumulated) + '\')">' + esc(part) + '</a>';
+          html += '<a href="javascript:void(0)" onclick="loadTree(\'' + escAttr(accumulated) + '\')">' + esc(part) + '</a>';
         }
       });
       if (currentFile) {
@@ -522,9 +549,14 @@
     var fontSizeLabels = ['小', '标准', '大'];
     var fontSizeClasses = ['font-sm', 'font-md', 'font-lg'];
 
+    function getSafeAreaBottom() {
+      var val = getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)');
+      return parseInt(val) || 0;
+    }
+
     function showReaderToolbar() {
       document.getElementById('readerToolbar').classList.add('visible');
-      document.getElementById('contentViewer').style.paddingBottom = '80px';
+      document.getElementById('contentViewer').style.paddingBottom = (80 + getSafeAreaBottom()) + 'px';
     }
     function hideReaderToolbar() {
       // Stop auto-scroll if active
@@ -595,11 +627,12 @@
         document.getElementById('autoScrollLabel').textContent = '阅读';
         document.getElementById('btnAutoScroll').classList.remove('active');
         document.getElementById('speedSliderWrap').classList.remove('visible');
+        // Restore toolbar-only padding
+        document.getElementById('contentViewer').style.paddingBottom = (80 + getSafeAreaBottom()) + 'px';
         return;
       }
       var cv = document.getElementById('contentViewer');
-      // Check if content is scrollable
-      if (cv.scrollHeight <= cv.clientHeight + 2) {
+      if (cv.scrollHeight <= cv.clientHeight + 50) {
         toast('内容太短，无需滚动', 'info');
         return;
       }
@@ -608,6 +641,8 @@
       document.getElementById('autoScrollLabel').textContent = '暂停';
       document.getElementById('btnAutoScroll').classList.add('active');
       document.getElementById('speedSliderWrap').classList.add('visible');
+      // Make room for toolbar + speed slider + safe area
+      document.getElementById('contentViewer').style.paddingBottom = (124 + getSafeAreaBottom()) + 'px';
 
       var lastTime = performance.now();
       function step(time) {

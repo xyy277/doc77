@@ -3,6 +3,6 @@ import { VERSION } from '../src/index.js';
 
 describe('@doc77/core', () => {
   it('should export VERSION', () => {
-    expect(VERSION).toBe('0.1.0');
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 });

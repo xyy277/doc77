@@ -23,7 +23,7 @@ import {
   discoverProjects,
 } from '@doc77/core';
 
-const VERSION = '0.1.0';
+import { VERSION } from '../version.gen.js';
 const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
 
 // Module availability — checked at startup, cached for session
@@ -219,7 +219,7 @@ async function main() {
     case 'start': {
       printBanner();
       const portIdx = args.indexOf('--port');
-      const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 3099;
+      const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 2777;
       const bindIdx = args.indexOf('--bind');
       const cliBind = bindIdx !== -1 ? args[bindIdx + 1] : undefined;
 

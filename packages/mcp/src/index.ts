@@ -4,7 +4,7 @@
  * 提供 MCP 协议实现、安全校验、操作队列和事务系统。
  */
 
-export const VERSION = '0.1.0';
+export { VERSION } from './version.gen.js';
 
 // MCP Server
 export { createMcpServer } from './server.js';

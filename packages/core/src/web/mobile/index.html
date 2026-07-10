@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <base href="/mobile/">
-<title>Doc77</title>
+<title>Doc77 控制台</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <style>
   /* ══════════ Theme Tokens ══════════ */
@@ -110,7 +110,7 @@
     font-size: 22px; flex-shrink: 0;
   }
   .project-info { flex: 1; min-width: 0; }
-  .project-name { font-size: 16px; font-weight: 600; }
+  .project-name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .project-path { font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .project-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
   .project-arrow { color: var(--border-medium); font-size: 18px; flex-shrink: 0; }
@@ -124,7 +124,7 @@
   .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
     background: var(--bg-nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border-light); padding: 8px 24px 20px;
+    border-top: 1px solid var(--border-light); padding: 8px 24px calc(20px + env(safe-area-inset-bottom, 0px));
     display: flex; justify-content: space-around; align-items: flex-start;
   }
   .nav-item {
@@ -153,12 +153,18 @@
 
   /* Accent link color for breadcrumb-like elements */
   .recent-icon { background: var(--bg-code); color: var(--text-secondary); }
+
+  /* Favorite star */
+  .fav-star { color: var(--text-muted); }
+  .fav-star.favorited { color: #f59e0b; }
+  .dark .fav-star { color: #94a3b8; }
+  .dark .fav-star.favorited { color: #fbbf24; }
 </style>
 </head>
 <body>
   <!-- Top Bar -->
   <div class="topbar" id="topbar">
-    <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" style="height:28px">
+    <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" style="height:28px;cursor:pointer" onclick="location.href='/'">
     <div style="display:flex;align-items:center;gap:8px">
       <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="star-badge" title="xyy277 · 907507646@qq.com">⭐ 点个 Star</a>
       <button onclick="toggleTheme()" class="theme-btn" title="切换主题" id="themeBtn">🌙</button>
@@ -170,7 +176,7 @@
   <div id="app" style="display:none">
 
     <!-- ═══ Tab: Recent ═══ -->
-    <div id="tab-recent" class="tab-content active">
+    <div id="tab-recent" class="tab-content">
       <div class="header"><h1>最近浏览</h1></div>
       <div class="content" id="recentList">
         <div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>
@@ -178,8 +184,8 @@
     </div>
 
     <!-- ═══ Tab: Browse ═══ -->
-    <div id="tab-browse" class="tab-content">
-      <div class="header"><h1>项目</h1><span id="mobileProjCount" style="font-size:12px;color:var(--text-muted)"></span></div>
+    <div id="tab-browse" class="tab-content active">
+      <div class="header" style="display:flex;align-items:baseline;gap:6px"><h1 style="margin:0">项目</h1><span id="mobileProjCount" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span></div>
       <div class="content" id="projectList">
         <div class="loading">加载中…</div>
       </div>
@@ -209,10 +215,10 @@
 
     <!-- ═══ Bottom Nav ═══ -->
     <nav class="bottom-nav">
-      <button class="nav-item active" data-tab="recent" onclick="switchTab('recent')">
+      <button class="nav-item" data-tab="recent" onclick="switchTab('recent')">
         <span class="nav-icon">🕐</span><span>最近</span>
       </button>
-      <button class="nav-item" data-tab="browse" onclick="switchTab('browse')">
+      <button class="nav-item active" data-tab="browse" onclick="switchTab('browse')">
         <span class="nav-icon">📂</span><span>项目</span>
       </button>
       <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
@@ -284,6 +290,9 @@
         container.innerHTML = html;
         document.getElementById('mobileProjCount').textContent = '(' + projects.length + ')';
         loadRecent();
+        // Restore saved tab (e.g. coming back from preview)
+        var savedTab = sessionStorage.getItem('doc77-mobile-tab');
+        if (savedTab) { sessionStorage.removeItem('doc77-mobile-tab'); switchTab(savedTab); }
       } catch (e) {
         container.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>加载失败</p></div>';
       }
@@ -303,7 +312,7 @@
             '<div class="project-card" onclick="location.href=\'/preview.html?id=' + (f.projectId || '') + '&path=' + encodeURIComponent(f.path || '') + '\'">' +
               '<div class="project-icon recent-icon" style="font-size:18px">📄</div>' +
               '<div class="project-info">' +
-                '<div class="project-name" style="font-size:14px">' + esc(f.name || '') + '</div>' +
+                '<div class="project-name" style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.name || '') + '</div>' +
                 '<div class="project-path">' + esc(f.path || '') + '</div>' +
               '</div>' +
               '<span class="project-arrow">›</span>' +
@@ -316,6 +325,7 @@
     }
 
     window.openProject = function (id) {
+      sessionStorage.setItem('doc77-mobile-tab', 'browse');
       location.href = '/preview.html?id=' + id;
     };
 
