@@ -394,6 +394,15 @@
       cv.innerHTML = '<div class="loading">加载中…</div>';
       trackRecent(fileName, filePath);
 
+      // Server-side tracking via POST /api/recent-files (fire-and-forget)
+      try {
+        fetch('/api/recent-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: parseInt(pid), fileName: fileName, filePath: filePath }),
+        }).catch(function() {});
+      } catch(e) {}
+
       try {
         var r = await fetch('/api/content/' + pid + '?path=' + encodeURIComponent(filePath));
         if (!r.ok) { cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">⚠️</div><p>无法加载文件</p></div>'; return; }

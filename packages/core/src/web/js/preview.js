@@ -446,6 +446,15 @@ function addRecentFile(fp) {
   if (rf.length > 10) rf = rf.slice(0, 10);
   localStorage.setItem('doc77-recent', JSON.stringify(rf));
   renderRecentFiles();
+
+  // Server-side tracking via POST /api/recent-files (fire-and-forget)
+  try {
+    fetch('/api/recent-files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: parseInt(pid), fileName: fp.split('/').pop(), filePath: fp }),
+    }).catch(function() {});
+  } catch(e) {}
 }
 function renderRecentFiles() {
   var rf = getRecentFiles().filter(function(f) { return f.pid == pid; });
