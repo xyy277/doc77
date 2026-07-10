@@ -249,15 +249,15 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number }
       ).count;
       const lastActiveRow = db
-        .prepare('SELECT COALESCE(MAX(last_opened), MAX(created_at)) as last_active FROM projects')
-        .get() as { last_active: string | null };
+        .prepare("SELECT COALESCE(MAX(strftime('%s',last_opened)), MAX(strftime('%s',created_at))) as last_active FROM projects")
+        .get() as { last_active: number | null };
       const favoriteCount = (
         db.prepare('SELECT COUNT(*) as count FROM favorites').get() as { count: number }
       ).count;
 
       res.json({
         projects,
-        lastActive: lastActiveRow?.last_active ? lastActiveRow.last_active + 'Z' : null,
+        lastActive: lastActiveRow?.last_active ? Number(lastActiveRow.last_active) * 1000 : null,
         favoriteCount,
       });
     } catch (err: unknown) {
@@ -311,7 +311,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       const db = getConnection();
       const rows = db
         .prepare(
-          `SELECT rf.file_name, rf.file_path, rf.project_id, rf.viewed_at, p.name as project_name
+          `SELECT rf.file_name, rf.file_path, rf.project_id, strftime('%s',rf.viewed_at) as viewed_ts, p.name as project_name
          FROM recent_files rf
          JOIN projects p ON p.id = rf.project_id
          ORDER BY rf.viewed_at DESC
@@ -321,7 +321,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         file_name: string;
         file_path: string;
         project_id: number;
-        viewed_at: string;
+        viewed_ts: number;
         project_name: string;
       }>;
 
@@ -331,7 +331,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
           filePath: r.file_path,
           projectId: r.project_id,
           projectName: r.project_name,
-          viewedAt: r.viewed_at + 'Z',
+          viewedAt: Number(r.viewed_ts) * 1000,
         })),
       );
     } catch (err: unknown) {

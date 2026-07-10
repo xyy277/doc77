@@ -155,8 +155,12 @@ function renderCompactCard(p, inFavorites) {
 
 // ═══ Project navigation ═══
 window.openProject = function(id) {
-  // Touch project (update last_opened)
-  fetch('/api/projects/' + id + '/touch', { method: 'POST' }).catch(function() {});
+  // Touch project (update last_opened) — use sendBeacon to ensure delivery before navigation
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon('/api/projects/' + id + '/touch');
+  } else {
+    fetch('/api/projects/' + id + '/touch', { method: 'POST', keepalive: true }).catch(function() {});
+  }
   location.href = '/preview.html?id=' + id;
 };
 
@@ -203,10 +207,8 @@ window.renderRecent = async function() {
   }
 };
 
-function relativeTime(isoString) {
-  var now = Date.now();
-  var then = new Date(isoString).getTime();
-  var diff = Math.floor((now - then) / 1000);
+function relativeTime(epochMs) {
+  var diff = Math.floor((Date.now() - epochMs) / 1000);
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
   if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';

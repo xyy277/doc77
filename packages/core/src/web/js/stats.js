@@ -21,12 +21,9 @@ window.refreshStats = function() {
   window.renderStats();
 };
 
-function relativeTimeText(isoString) {
-  if (!isoString) return '尚无项目';
-  var now = Date.now();
-  var then = new Date(isoString).getTime();
-  if (isNaN(then)) return '尚无项目';
-  var diff = Math.floor((now - then) / 1000);
+function relativeTimeText(epochMs) {
+  if (!epochMs) return '尚无项目';
+  var diff = Math.floor((Date.now() - epochMs) / 1000);
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
   if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
