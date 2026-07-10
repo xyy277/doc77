@@ -217,6 +217,92 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     });
   });
 
+  // Dashboard statistics
+  app.get('/api/stats', (_req: Request, res: Response) => {
+    try {
+      const db = getConnection();
+      const projects = (db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number }).count;
+      const lastActiveRow = db.prepare('SELECT MAX(last_opened) as last_active FROM projects').get() as { last_active: string | null };
+      const favoriteCount = (db.prepare('SELECT COUNT(*) as count FROM favorites').get() as { count: number }).count;
+
+      res.json({
+        projects,
+        lastActive: lastActiveRow?.last_active || null,
+        favoriteCount,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Record a file view
+  app.post('/api/recent-files', (req: Request, res: Response) => {
+    const { projectId, fileName, filePath } = req.body;
+    if (!projectId || !fileName || !filePath) {
+      res.status(400).json({ error: 'projectId, fileName, and filePath are required' });
+      return;
+    }
+
+    try {
+      const db = getConnection();
+
+      // Verify project exists
+      const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+
+      // Insert the record
+      db.prepare(
+        'INSERT INTO recent_files (project_id, file_name, file_path) VALUES (?, ?, ?)'
+      ).run(projectId, fileName, filePath);
+
+      // Enforce max 50 records
+      db.prepare(
+        `DELETE FROM recent_files WHERE id NOT IN (
+          SELECT id FROM recent_files ORDER BY viewed_at DESC LIMIT 50
+        )`
+      ).run();
+
+      res.status(201).json({ ok: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Get recent files
+  app.get('/api/recent-files', (req: Request, res: Response) => {
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 5, 20);
+
+    try {
+      const db = getConnection();
+      const rows = db.prepare(
+        `SELECT rf.file_name, rf.file_path, rf.project_id, rf.viewed_at, p.name as project_name
+         FROM recent_files rf
+         JOIN projects p ON p.id = rf.project_id
+         ORDER BY rf.viewed_at DESC
+         LIMIT ?`
+      ).all(limit) as Array<{
+        file_name: string; file_path: string; project_id: number;
+        viewed_at: string; project_name: string;
+      }>;
+
+      res.json(rows.map(r => ({
+        fileName: r.file_name,
+        filePath: r.file_path,
+        projectId: r.project_id,
+        projectName: r.project_name,
+        viewedAt: r.viewed_at,
+      })));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
   // Project CRUD
   app.get('/api/projects', (_req: Request, res: Response) => {
     const projects = listProjects();
