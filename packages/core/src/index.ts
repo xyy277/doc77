@@ -30,12 +30,7 @@ export {
 } from './db/connection.js';
 export { runMigrations } from './db/migrations.js';
 export { getConfig, setConfig, listConfig, loadDefaults } from './db/config.js';
-export {
-  registerProject,
-  listProjects,
-  removeProject,
-  updateProject,
-} from './db/projects.js';
+export { registerProject, listProjects, removeProject, updateProject } from './db/projects.js';
 export type { Project, ProjectUpdate } from './db/projects.js';
 
 // File System
@@ -55,9 +50,16 @@ export type { DirEntry } from './fs/index.js';
 // Scanner
 export { scanDirectory, clearCache } from './scanner/index.js';
 export type { ScanResult } from './scanner/index.js';
+export { discoverProjects } from './scanner/discover.js';
+export type { DiscoverResult } from './scanner/discover.js';
 
 // Server
-export { createApp, createQueueApproveHandler, createAIChatHandler, setCapabilities } from './server/app.js';
+export {
+  createApp,
+  createQueueApproveHandler,
+  createAIChatHandler,
+  setCapabilities,
+} from './server/app.js';
 
 // Vendor
 export { fetchVendorAssets, isVendorReady, VENDOR_ASSETS } from './server/vendor.js';
