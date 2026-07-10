@@ -42,6 +42,7 @@ function vendorReady(cb) {
 
 //══════════ Data ══════════
 var pid = new URLSearchParams(location.search).get('id');
+var directPath = new URLSearchParams(location.search).get('path') || '';
 if (!pid) location.href = '/';
 var proj = null, projects = [], currentFile = null, activeTab = 'outline';
 
@@ -70,6 +71,8 @@ function applyCapabilities() {
     document.title = 'Doc77 — ' + proj.name;
     renderProjMenu(); loadTree(''); loadTasks(); setActiveTab('outline');
     renderBookmarks(); renderRecentFiles();
+    // Navigate to specific file if path param provided (from recent-files link)
+    if (directPath) { setTimeout(function(){ navigateToFile(directPath); }, 400); }
     fetch('/api/projects/' + pid + '/touch', { method: 'POST' }).catch(function(){});
   } catch(e) { document.getElementById('projName').textContent = '⚠ 加载失败'; }
 })();
@@ -232,7 +235,7 @@ function makeNode(entry, parentPath) {
   row.className = 'flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-slate-800 text-slate-300';
   row.innerHTML = '<span class="w-4 shrink-0 text-center text-slate-500 text-xs">' + (isDir?'▸':'') + '</span>' +
     '<span class="' + (isDir?'text-blue-400':'text-slate-400') + ' shrink-0">' + (isDir?'📁':iconFor(entry.name)) + '</span>' +
-    '<span class="truncate flex-1">' + entry.name + '</span>' +
+    '<span class="truncate flex-1 tree-name">' + entry.name + '</span>' +
     (entry.size ? '<span class="text-[10px] text-slate-500 shrink-0">' + fmtSize(entry.size) + '</span>' : '');
   frag.appendChild(row);
 
@@ -275,6 +278,61 @@ function makeNode(entry, parentPath) {
 
 function iconFor(n) { var e = n.split('.').pop().toLowerCase(); return ['md','markdown'].indexOf(e)>=0?'📝':['mermaid','mmd'].indexOf(e)>=0?'📊':e==='pdf'?'📕':['png','jpg','jpeg','gif','svg','webp','bmp'].indexOf(e)>=0?'🖼':['ts','js','py','rb','go','rs','java','c','cpp'].indexOf(e)>=0?'💻':['json','yaml','yml','toml'].indexOf(e)>=0?'⚙':'📄'; }
 
+
+//────────── Tree Item Hover Tooltip ──────────
+(function initTreeTooltip() {
+  var tooltip = document.createElement('div');
+  tooltip.className = 'tree-tooltip';
+  document.body.appendChild(tooltip);
+  var activeTarget = null;
+  var hideTimer = null;
+
+  function position(e) {
+    var rect = tooltip.getBoundingClientRect();
+    var x = e.clientX + 14;
+    var y = e.clientY + 10;
+    if (x + rect.width > window.innerWidth - 12) x = e.clientX - rect.width - 14;
+    if (y + rect.height > window.innerHeight - 8) y = e.clientY - rect.height - 10;
+    if (x < 4) x = 4;
+    if (y < 4) y = 4;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+  }
+
+  function show(target, e) {
+    if (activeTarget === target && tooltip.classList.contains('visible')) return;
+    clearTimeout(hideTimer);
+    tooltip.textContent = target.textContent || target.innerText || '';
+    tooltip.classList.add('visible');
+    activeTarget = target;
+    position(e);
+  }
+
+  function hide() {
+    hideTimer = setTimeout(function() {
+      tooltip.classList.remove('visible');
+      activeTarget = null;
+    }, 120);
+  }
+
+  document.getElementById('tree').addEventListener('mouseover', function(e) {
+    var nameEl = e.target.closest('.tree-name');
+    if (!nameEl) { hide(); return; }
+    if (nameEl.scrollWidth <= nameEl.clientWidth) return;
+    show(nameEl, e);
+  });
+
+  document.getElementById('tree').addEventListener('mousemove', function(e) {
+    if (tooltip.classList.contains('visible') && activeTarget) {
+      position(e);
+    }
+  });
+
+  document.getElementById('tree').addEventListener('mouseout', function(e) {
+    var nameEl = e.target.closest('.tree-name');
+    if (nameEl && nameEl === activeTarget) hide();
+  });
+})();
 //══════════ Navigation ══════════
 /** Poll for an element matching selector, up to maxMs. Returns null if not found. */
 async function waitForNode(tree, selector, maxMs) {
@@ -288,7 +346,26 @@ async function waitForNode(tree, selector, maxMs) {
   return tree.querySelector(selector);
 }
 
-async function navigateToFile(filePath) {
+var _pendingLine = 0;
+function scrollToLine(lineNum) {
+  var area = document.getElementById('contentArea');
+  if (!area) return;
+  // Estimate scroll position: find total text content and calculate proportion
+  var text = area.textContent || '';
+  var totalLines = text.split('\n').length || 1;
+  var ratio = Math.min(lineNum / totalLines, 1);
+  area.scrollTop = area.scrollHeight * ratio - area.clientHeight * 0.3;
+  // Flash a temporary marker at the estimated position
+  var marker = document.createElement('div');
+  marker.style.cssText = 'position:absolute;left:0;right:0;height:2px;background:var(--accent,#2563eb);opacity:0.8;z-index:10;pointer-events:none;transition:opacity .5s';
+  marker.style.top = (area.scrollHeight * ratio) + 'px';
+  area.style.position = 'relative';
+  area.appendChild(marker);
+  setTimeout(function(){ marker.style.opacity = '0'; }, 800);
+  setTimeout(function(){ marker.remove(); }, 1500);
+}
+async function navigateToFile(filePath, lineNumber) {
+  _pendingLine = lineNumber || 0;
   var parts = filePath.split('/');
   var tree = document.getElementById('tree');
   // Ensure left panel is visible
@@ -407,6 +484,7 @@ async function loadContent(filePath) {
     }
     area.innerHTML = '<div class="p-4 sm:p-10">' + html + '</div>';
     updateReadingTime(d);
+    if (_pendingLine > 0) { setTimeout(function(){ scrollToLine(_pendingLine); _pendingLine = 0; }, 200); }
     setTimeout(highlightCode, 100);
     addRecentFile(filePath);
   } catch(e) { area.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">文件加载失败</p></div>'; }
@@ -625,7 +703,7 @@ async function doGlobalSearch() {
     var d = await res.json();
     if (!d.matches.length) { rdiv.innerHTML = '<div class="text-xs text-slate-500 px-2 py-1">无结果</div>'; return; }
     rdiv.innerHTML = d.matches.slice(0,20).map(function(m) {
-      return '<div onclick="navigateToFile(\'' + escAttr(m.file) + '\')" class="flex flex-col px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-xs"><span class="text-blue-400 truncate">' + esc(m.file) + ':' + m.line + '</span><span class="text-slate-400 truncate">' + esc(m.content) + '</span></div>';
+      return '<div onclick="navigateToFile(\'' + escAttr(m.file) + '\', ' + m.line + ')" class="flex flex-col px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-xs"><span class="text-blue-400 truncate">' + esc(m.file) + ':' + m.line + '</span><span class="text-slate-400 truncate">' + esc(m.content) + '</span></div>';
     }).join('');
   } catch(e) { rdiv.innerHTML = '<div class="text-xs text-red-500 px-2 py-1">搜索失败</div>'; }
 }

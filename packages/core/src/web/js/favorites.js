@@ -56,7 +56,8 @@ window.renderFavorites = function(projects) {
   section.style.display = 'block';
   var html = '<div class="fav-pills">';
   favProjects.forEach(function(p) {
-    html += '<a href="/preview.html?id=' + p.id + '" class="fav-pill" onclick="fetch(\'/api/projects/' + p.id + '/touch\',{method:\'POST\'}).catch(function(){})">📂 ' + esc(p.name) + '</a>';
+    html += '<span class="fav-pill" onclick="location.href=\'/preview.html?id=' + p.id + '\'" style="cursor:pointer">📂 ' + esc(p.name) +
+      '<button class="fav-pill-remove" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')" title="取消收藏">✕</button></span>';
   });
   html += '</div>';
   list.innerHTML = html;
