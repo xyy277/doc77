@@ -46,7 +46,7 @@ jobs:
 
       - name: Build core + CLI
         run: |
-          pnpm --filter @doc77/core --filter @doc77/cli --filter @doc77/mcp --filter @doc77/ai build
+          pnpm --filter @doc77/core --filter @doc77/cli build
 
       - name: Build Electron
         working-directory: packages/electron
