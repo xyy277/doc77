@@ -41,6 +41,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Sync version
+        run: node scripts/sync-version.cjs
+
       - name: Build core + CLI
         run: |
           pnpm --filter @doc77/core --filter @doc77/cli --filter @doc77/mcp --filter @doc77/ai build
