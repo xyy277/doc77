@@ -73,6 +73,11 @@
 
 **严禁默认发布 npm 包。发布是高风险操作，必须逐次授权。**
 
+### Git 提交规范（所有 commit 强制执行）
+
+- **Footer**：每个 commit 必须以 `Co-Authored-By: xyy277 <907507646@qq.com>` 结尾
+- **格式**：`type(scope): description`（type = feat / fix / style / refactor / chore / docs）
+
 ### 授权规则
 
 1. **逐次授权，无持续性** — 用户必须在 **当前对话回合** 中明确说"发布"、"publish"、"推到 npm"等关键词。一次授权只能用于一轮发布（一个或多个 package），发布完成后授权自动失效
@@ -156,10 +161,6 @@ Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。
 - **架构**：monorepo（4 个 package：core, mcp, ai, cli）
 - **当前状态**：开发中
 
-## Git 提交规范
-
-- **提交者**：所有 commit 必须包含 `Co-Authored-By: xyy277 <907507646@qq.com>` 作为结尾
-- **提交信息格式**：`type: description`（type = feat / fix / style / refactor / chore / docs）
 
 ## 开发工作流
 
