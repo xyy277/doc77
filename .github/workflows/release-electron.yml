@@ -30,8 +30,14 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      - name: Install Linux system deps (electron-builder)
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libasound2 libfuse2
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build core + CLI
         run: |
