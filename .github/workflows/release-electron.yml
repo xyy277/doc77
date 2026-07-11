@@ -34,7 +34,7 @@ jobs:
         if: matrix.target == 'linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libasound2 fuse3
+          sudo apt-get install -y -qq libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils fuse3
           # AppImage needs FUSE. Ubuntu 24.04 uses libfuse2t64 or fuse3; install fuse3 + symlink if needed
           sudo ln -sf /usr/bin/fusermount3 /usr/bin/fusermount 2>/dev/null || true
 
