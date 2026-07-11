@@ -7,6 +7,9 @@ import * as path from 'path';
 import { findAvailablePort, startServer, ServerProcess } from './server';
 import { createTray } from './tray';
 
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+
 let mainWindow: BrowserWindow | null = null;
 let server: ServerProcess | null = null;
 let tray: Tray | null = null;
@@ -21,6 +24,8 @@ function createWindow(port: number): void {
     minWidth: 900,
     minHeight: 600,
     title: 'Doc77',
+    show: false,
+    backgroundColor: '#0f172a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -29,6 +34,7 @@ function createWindow(port: number): void {
   });
 
   mainWindow.loadURL(`http://localhost:${port}`);
+  mainWindow.once('ready-to-show', () => mainWindow?.show());
 
   mainWindow.on('close', (e) => {
     if (!shuttingDown) {
