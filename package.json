@@ -6,7 +6,10 @@
   "description": "Doc77 — 默认安全、对话驱动的智能本地文档管理 Agent",
   "scripts": {
     "build": "node scripts/sync-version.cjs && pnpm -r build",
-    "dev:start": "pnpm build && node packages/cli/dist/bin/doc77.js start --bind 0.0.0.0",
+    "dev": "pnpm --filter @doc77/core dev",
+    "dev-electron": "node scripts/sync-version.cjs && pnpm --filter @doc77/core build && pnpm --filter @doc77/electron dev",
+    "electron:dev": "pnpm run dev-electron",
+    "dev:start": "pnpm --filter @doc77/cli... build && node packages/cli/dist/bin/doc77.js start --bind 0.0.0.0",
     "dev:restart": "pkill -f 'doc77.js start' 2>/dev/null || true; sleep 1; pnpm build && node packages/cli/dist/bin/doc77.js start --bind 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest",

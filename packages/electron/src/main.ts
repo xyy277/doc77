@@ -41,11 +41,6 @@ function createWindow(port: number): void {
 async function boot(): Promise<void> {
   const port = await findAvailablePort(2777);
   server = await startServer(port);
-  server.child.on('exit', (code) => {
-    if (code !== 0 && !shuttingDown) {
-      dialog.showErrorBox('服务异常', `Doc77 服务意外退出 (code ${code})`);
-    }
-  });
 
   createWindow(port);
 

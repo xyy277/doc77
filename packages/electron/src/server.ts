@@ -1,18 +1,27 @@
 /**
  * Doc77 Electron — Server lifecycle manager
- * Finds the CLI entry, spawns Express server as child process, monitors health.
+ * Starts the core Express app in-process so Electron stays a thin desktop shell.
  */
 import * as path from 'path';
+import * as os from 'os';
 import * as net from 'net';
-import { spawn, ChildProcess } from 'child_process';
+import * as http from 'http';
 
-/** Resolve CLI entry path (dev: workspace link, prod: extraResource). */
-export function getCliEntryPath(): string {
-  try {
-    return require.resolve('@doc77/cli/dist/bin/doc77.js');
-  } catch {
-    return path.join(process.resourcesPath, 'cli', 'dist', 'bin', 'doc77.js');
-  }
+const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
+
+interface CoreModule {
+  closeConnection: () => void;
+  createApp: (restartCallback?: () => void, bindAddr?: string) => http.RequestListener;
+  initDatabase: (filePath: string) => Promise<unknown>;
+  loadDefaults: () => void;
+  runMigrations: () => void;
+}
+
+async function loadCore(): Promise<CoreModule> {
+  const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+    specifier: string,
+  ) => Promise<CoreModule>;
+  return dynamicImport('@doc77/core');
 }
 
 /** Find an available port starting from `start`, up to `start + 99`. */
@@ -33,52 +42,35 @@ export function findAvailablePort(start: number): Promise<number> {
 }
 
 export interface ServerProcess {
-  child: ChildProcess;
+  server: http.Server;
   port: number;
   kill: () => void;
 }
 
-/** Spawn Doc77 Express server. Resolves when 'Dashboard:' is printed. */
-export function startServer(port: number): Promise<ServerProcess> {
+export async function startServer(port: number): Promise<ServerProcess> {
+  process.env.DOC77_ELECTRON = '1';
+
+  const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } = await loadCore();
+
+  await initDatabase(DB_PATH);
+  runMigrations();
+  loadDefaults();
+
+  const app = createApp(undefined, '127.0.0.1');
+  const server = http.createServer(app);
+
   return new Promise((resolve, reject) => {
-    const cliEntry = getCliEntryPath();
-    const child = spawn(process.execPath, [cliEntry, 'start', '--port', String(port)], {
-      env: { ...process.env, DOC77_ELECTRON: '1' },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const timeout = setTimeout(() => {
-      child.kill();
-      reject(new Error('Server startup timed out (30s)'));
-    }, 30000);
-
-    let started = false;
-    child.stdout.on('data', (chunk: Buffer) => {
-      if (!started && chunk.toString().includes('Dashboard:')) {
-        started = true;
-        clearTimeout(timeout);
-        resolve({
-          child,
-          port,
-          kill: () => {
-            try {
-              child.kill();
-            } catch {}
-          },
-        });
-      }
-    });
-
-    child.on('error', (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-
-    child.on('exit', (code) => {
-      if (!started) {
-        clearTimeout(timeout);
-        reject(new Error(`Server process exited early (code ${code})`));
-      }
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve({
+        server,
+        port,
+        kill: () => {
+          server.close();
+          closeConnection();
+        },
+      });
     });
   });
 }

@@ -3,6 +3,7 @@ packages:
   - "packages/cli"
   - "packages/core"
   - "packages/doc77"
+  - "packages/electron"
   - "packages/mcp"
 linkWorkspacePackages: true
 allowBuilds:
