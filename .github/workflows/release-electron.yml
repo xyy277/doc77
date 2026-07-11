@@ -38,6 +38,9 @@ jobs:
           # AppImage needs FUSE. Ubuntu 24.04 uses libfuse2t64 or fuse3; install fuse3 + symlink if needed
           sudo ln -sf /usr/bin/fusermount3 /usr/bin/fusermount 2>/dev/null || true
 
+      - name: Configure pnpm for electron-builder
+        run: node -e "const fs=require('fs');fs.writeFileSync('.npmrc','node-linker=hoisted\nshamefully-hoist=true\n')"
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
