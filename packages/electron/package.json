@@ -14,7 +14,7 @@
     "dist": "electron-builder"
   },
   "dependencies": {
-    "@doc77/cli": "workspace:^"
+    "@doc77/core": "workspace:^"
   },
   "devDependencies": {
     "electron": "^33.0.0",
