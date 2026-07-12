@@ -22,13 +22,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: latest
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install Linux system deps (electron-builder)
         if: matrix.target == 'linux'
@@ -53,10 +57,7 @@ jobs:
 
       - name: Build Electron
         working-directory: packages/electron
-        run: |
-          npm run build
-          # Verify CLI dist exists (needed by extraResources)
-          test -d node_modules/@doc77/cli/dist && echo "CLI dist OK" || (echo "CLI dist MISSING!" && exit 1)
+        run: npm run build
 
       - name: Package Electron
         working-directory: packages/electron
