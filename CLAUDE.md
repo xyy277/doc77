@@ -153,6 +153,13 @@ git gc --prune=now --aggressive
 
 > GitHub 会将 force-push 前的旧 commits 在 `https://github.com/<org>/<repo>/security/secret-alerts` 中保留。推送清理后，联系 GitHub Support 请求清除缓存。
 
+## CI / CD 规范
+
+- **不熟悉的工具链必须先搜索** — 搭 CI、配构建工具、跨平台打包等场景，先 `WebSearch` 查最佳实践和已知 issue，再动手写。禁止边试边修。
+- **CI 失败后必须记录** — 每次 CI 失败的根因和修复方案写入 `docs/planning/ci-electron-lessons.md`
+- **electron-builder + pnpm** — CI 必须用 `node-linker=hoisted`（已知 #6289），本地保持原生 symlink
+- **GitHub Actions 权限** — Release 上传需要 `permissions: contents: write`
+
 ## 项目概述
 
 Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。
