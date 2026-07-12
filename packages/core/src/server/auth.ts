@@ -265,7 +265,12 @@ export function verifyRecoveryCode(rcInput: string): {
 
   // Unwrap DEK with recovery code
   const rcWrapKey = recoveryCodeToWrapKey(normalized);
-  const dek = crypto.unwrapDEK(wrappedByRc[matchIdx], rcWrapKey);
+  let dek: Buffer;
+  try {
+    dek = crypto.unwrapDEK(wrappedByRc[matchIdx], rcWrapKey);
+  } catch {
+    return { ok: false, error: 'dek_unwrap_failed', status: 500 };
+  }
 
   // Sign reset token — store DEK in in-memory state
   const resetToken = signResetToken(matchIdx, dek);
@@ -363,7 +368,6 @@ export function changePassword(
 
   // Check if legacy mode — migrate to envelope encryption
   let wrappedByPw: crypto.EncryptedData;
-  const pwWrapSaltHex = (row.pw_wrap_salt as string) || crypto.generateSalt().toString('hex');
 
   if (isLegacyMode() || !row.wrapped_dek_by_password) {
     // Legacy mode — generate new DEK and migrate
