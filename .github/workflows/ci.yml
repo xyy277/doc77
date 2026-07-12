@@ -65,4 +65,4 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vitest run --pool=threads
+      - run: pnpm test

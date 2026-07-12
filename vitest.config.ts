@@ -10,8 +10,8 @@ export default defineConfig({
       include: ['packages/**/src/**/*.ts'],
       exclude: ['packages/**/dist/**', 'packages/**/__tests__/**'],
     },
-    // Use threads pool - forks can exhaust process limits on CI runners
-    pool: 'threads',
+    // Run each test file in its own context
+    pool: 'forks',
     testTimeout: 60000,
     hookTimeout: 60000,
   },
