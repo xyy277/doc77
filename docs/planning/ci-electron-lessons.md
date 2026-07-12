@@ -1,6 +1,6 @@
 # Electron CI 发布 — 踩坑总结
 
-> 最终成功发布 `electron-v0.5.3`，经历 8 次迭代。记录所有问题与对策。
+> 最终成功发布 `electron-v0.5.3`，经历 8 次迭代。`electron-v0.6.0` 发布新增 2 个踩坑。记录所有问题与对策。
 
 ## 最终工作流
 
@@ -24,6 +24,8 @@
 | 7 | auto-update 检测失败 | `Cannot read properties of null (reading 'channel')` | 无 publish 配置 | `publish: null` |
 | 8 | Release 无权限 | `Resource not accessible by integration` (403) | GITHUB_TOKEN 默认只读 | `permissions: contents: write` |
 | 9 | 首次安装超时 | CI 6 分钟超时 | hoisted 模式无缓存，下载 600+ 包 | `actions/cache@v4` 缓存 `~/.pnpm-store` |
+| 10 | vitest 超时 | Test timeout (10s) | scrypt N=131072 密码学测试耗时 ~25s | `testTimeout: 60000` + `hookTimeout: 60000` |
+| 11 | pnpm install 失败 | `No matching version found for @doc77/core@^0.5.3` | doc77 umbrella 包用 `^0.5.2` 依赖 CLI，workspace 版本 `0.6.0` 不匹配 semver 范围 | `packages/doc77/package.json` 改用 `workspace:^` |
 
 ## 依赖安装策略
 
