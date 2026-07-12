@@ -1,4 +1,6 @@
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, pbkdf2Sync, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto';
+import { scryptSync } from 'node:crypto';
+export { scryptSync };
 
 export interface EncryptedData {
   iv: string;
@@ -55,6 +57,12 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
+export function extractSalt(storedHash: string): Buffer {
+  const parts = storedHash.split(':');
+  if (parts.length !== 3) throw new Error('Invalid hash format');
+  return Buffer.from(parts[1], 'hex');
+}
+
 export function checkPasswordStrength(password: string): {
   score: number;
   feedback: string[];
@@ -101,6 +109,15 @@ function normalizeKey(key: Buffer): Buffer {
 
 export function hkdf(ikm: Buffer, salt: Buffer, info: string, length: number): Buffer {
   return Buffer.from(hkdfSync('sha256', ikm, salt, info, length));
+}
+
+/**
+ * Derive a password-based wrap key for DEK envelope encryption.
+ * Uses scrypt + HKDF with the domain separator 'doc77-pw-wrap'.
+ */
+export function derivePasswordWrapKey(password: string, pwSalt: Buffer, pwWrapSalt: Buffer): Buffer {
+  const scryptOutput = scryptSync(password, pwSalt, 64);
+  return hkdf(scryptOutput, pwWrapSalt, 'doc77-pw-wrap', 32);
 }
 
 // ---------------------------------------------------------------------------

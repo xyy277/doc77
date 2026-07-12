@@ -17,6 +17,9 @@ export {
   checkPasswordStrength,
   isSensitiveKey,
   maskSensitive,
+  scryptSync,
+  extractSalt,
+  derivePasswordWrapKey,
 } from './crypto.js';
 export type { EncryptedData } from './crypto.js';
 
