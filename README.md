@@ -37,18 +37,19 @@
 - 🐛 **稳定性** — 多平台兼容，消灭体验 bug
 - ✨ **预览质量** — 格式支持、阅读工具、AI 辅助做到极致
 
-## v0.5 能力概览
+## v0.6 能力概览
 
 | 模块 | 内容 |
 |---|---|
-| **Electron 桌面版** | Windows / macOS / Linux 一键安装，原生文件对话框，系统托盘，GPU 加速 |
+| **密码安全** | 信封加密（DEK）、10 个一次性恢复码、忘记密码流程、scrypt 密钥派生（N=131072） |
+| **密码管理 CLI** | `set-password` / `change-password` / `reset-password` / `recovery-codes` |
+| **Electron 桌面版** | Windows / macOS / Linux 一键安装，原生文件对话框，系统托盘 |
 | **模块插件化** | AI / MCP 可选安装（`doc77 i ai`），默认轻量，按需扩展 |
 | **品牌系统** | SVG Logo（favicon + 深浅双模）、Console ASCII Banner |
-| **UI 交互** | 左侧栏折叠（☰）、设置抽屉动画、收藏区折叠、功能引导页 |
-| **Windows 兼容** | 文件浏览器跨平台适配、全局搜索（Node.js 替代 grep）、浏览策略优化 |
-| **安全与权限** | 黑名单路径拦截 + 密码保护、session 管理、审计日志 |
+| **UI 交互** | 左侧栏折叠（☰）、设置抽屉动画、忘记密码 UI、恢复码展示弹窗 |
+| **Windows 兼容** | 文件浏览器跨平台适配、全局搜索（Node.js 替代 grep） |
+| **安全与权限** | 黑名单路径拦截 + 密码保护 + 恢复码重置、暴力破解防护、审计日志 |
 | **性能优化** | Tailwind 本地缓存、GPU 加速、窗口预加载 |
-| **前端体验** | 首页介绍区、GitHub Star、移动端 Logo、Settings 抽屉 |
 
 ## 安装
 
@@ -91,6 +92,11 @@ doc77 start --bind 0.0.0.0           # 或允许局域网访问
 | `doc77 config set <key> <value>` | 设置配置项 |
 | `doc77 config get <key>` | 获取配置项 |
 | `doc77 config list` | 列出所有配置 |
+| `doc77 config set-password` | 设置访问密码（首次） |
+| `doc77 config change-password` | 修改访问密码 |
+| `doc77 config reset-password` | 使用恢复码重置密码 |
+| `doc77 config reset-password --force` | 强制重置（清空加密配置） |
+| `doc77 config recovery-codes` | 重新生成恢复码 |
 
 常用配置项：
 
@@ -171,7 +177,7 @@ doc77 vendor-install --no-pyodide
 | **审批工作流** | 所有写操作默认入队等待用户审批，支持 CLI 和 Web 双通道审批 |
 | **事务回滚** | Pre-flight 检查 + Shadow 备份 + 逆序回滚，批量操作失败时自动恢复 |
 | **AI 文档管理** | 自然语言对话驱动，智能归类建议、批量操作规划、文档总结分析 |
-| **安全设计** | 路径沙箱、敏感文件过滤、Session 管理、Rate Limiting、审计日志 |
+| **安全设计** | 路径沙箱、敏感文件过滤、信封加密（DEK）、恢复码密码重置、暴力破解防护、Session 管理、审计日志 |
 
 ## 设计哲学
 
