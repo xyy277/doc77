@@ -3,6 +3,8 @@ productName: Doc77
 directories:
   output: release
 
+publish: null
+
 files:
   - "dist/**/*"
   - "node_modules/**/*"
@@ -18,6 +20,7 @@ mac:
   category: public.app-category.productivity
 linux:
   target: AppImage
+  category: Utility
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

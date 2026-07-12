@@ -4,6 +4,7 @@
   "description": "Doc77 Desktop — 本地文档预览器 Electron 桌面版",
   "author": "xyy277 <907507646@qq.com>",
   "license": "MIT",
+  "repository": "https://github.com/xyy277/doc77",
   "main": "dist/main.js",
   "scripts": {
     "build:main": "tsc -p tsconfig.main.json",
