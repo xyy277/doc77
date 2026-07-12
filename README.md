@@ -1,3 +1,14 @@
+<p align="center">
+  <img src="packages/core/src/web/assets/logo.svg" width="100" alt="Doc77">
+</p>
+
+<p align="center">
+  <a href="https://github.com/xyy277/doc77/actions"><img src="https://github.com/xyy277/doc77/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/idoc77"><img src="https://img.shields.io/npm/v/idoc77" alt="npm"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node"></a>
+</p>
+
 # Doc77 — 本地文档预览与管理 · Markdown · PDF · MCP Server · 局域网共享
 
 > 文档预览器 | 文档管理器 | Markdown 阅读器 | PDF 查看器 | Code Viewer | 知识库 | 局域网文档服务器
@@ -7,6 +18,18 @@
 **Doc77** 是轻量级本地文档预览器 + MCP 文件操作桥梁 + AI 对话驱动管理 Agent。浏览器即文档工作台，支持 Windows / macOS / Linux / WSL。提供 Electron 桌面版，非技术用户双击即用。密码保护下可安全对外暴露。
 
 只读时是多项目陈列馆，写入时是需你审批的智能管家——所有文件操作经你确认后才执行，内置安全审批、原子化事务回滚与跨盘容错。
+
+## 预览
+
+| Dashboard | 文档预览 |
+|---|---|
+| ![Dashboard](docs/images/dashboard.png) | ![Preview](docs/images/preview.png) |
+
+| 密码登录 | 移动端 |
+|---|---|
+| ![Login](docs/images/login.png) | ![Mobile](docs/images/mobile.png) |
+
+> 实际截图请替换 `docs/images/` 下的占位图片。
 
 ## 适用场景
 
