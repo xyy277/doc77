@@ -5,7 +5,12 @@ import { getConnection, type DatabaseCompat } from './connection.js';
  * SQLite does not support ALTER TABLE ... ADD COLUMN IF NOT EXISTS,
  * so we catch the "duplicate column name" error.
  */
-function addColumnIfNotExists(db: DatabaseCompat, table: string, column: string, definition: string): void {
+function addColumnIfNotExists(
+  db: DatabaseCompat,
+  table: string,
+  column: string,
+  definition: string,
+): void {
   try {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   } catch (e: unknown) {

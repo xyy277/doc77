@@ -480,17 +480,20 @@ async function main() {
         if (force) {
           const readline = await import('node:readline');
           const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-          rl.question('⚠️  此操作将清空所有加密配置（AI Token 等），且不可撤销。\n⚠️  输入 "yes-i-know" 确认: ', async (answer: string) => {
-            rl.close();
-            if (answer.trim() !== 'yes-i-know') {
-              console.error('❌ 操作已取消');
-              process.exit(1);
-            }
-            const { forceResetPassword } = await import('@doc77/core');
-            forceResetPassword();
-            console.log('✅ 密码已重置，加密配置已清空');
-            process.exit(0);
-          });
+          rl.question(
+            '⚠️  此操作将清空所有加密配置（AI Token 等），且不可撤销。\n⚠️  输入 "yes-i-know" 确认: ',
+            async (answer: string) => {
+              rl.close();
+              if (answer.trim() !== 'yes-i-know') {
+                console.error('❌ 操作已取消');
+                process.exit(1);
+              }
+              const { forceResetPassword } = await import('@doc77/core');
+              forceResetPassword();
+              console.log('✅ 密码已重置，加密配置已清空');
+              process.exit(0);
+            },
+          );
           return;
         }
         const readline = await import('node:readline');
@@ -536,7 +539,9 @@ async function main() {
           process.exit(1);
         }
       } else {
-        console.error('Usage: doc77 config set|get|list|set-password|change-password|reset-password|recovery-codes [key] [value]');
+        console.error(
+          'Usage: doc77 config set|get|list|set-password|change-password|reset-password|recovery-codes [key] [value]',
+        );
         process.exit(1);
       }
       break;
@@ -719,9 +724,19 @@ async function main() {
       let discoverPath = '~';
       let depth = 2;
       for (let i = 1; i < args.length; i++) {
-        if (args[i] === '--path' && args[i + 1]) { discoverPath = args[i + 1]; i++; continue; }
-        if (args[i] === '--depth' && args[i + 1]) { depth = parseInt(args[i + 1], 10); i++; continue; }
-        if (!args[i].startsWith('--') && i === 1) { discoverPath = args[i]; }
+        if (args[i] === '--path' && args[i + 1]) {
+          discoverPath = args[i + 1];
+          i++;
+          continue;
+        }
+        if (args[i] === '--depth' && args[i + 1]) {
+          depth = parseInt(args[i + 1], 10);
+          i++;
+          continue;
+        }
+        if (!args[i].startsWith('--') && i === 1) {
+          discoverPath = args[i];
+        }
       }
 
       console.log(`🔍 扫描目录: ${discoverPath} (深度: ${depth})`);

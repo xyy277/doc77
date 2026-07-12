@@ -56,7 +56,7 @@ describe('Crockford Base32', () => {
   });
 
   it('should encode 15 bytes to 24 characters', () => {
-    const bytes = Buffer.alloc(15, 0xAB);
+    const bytes = Buffer.alloc(15, 0xab);
     const encoded = encodeBase32Crockford(bytes);
     expect(encoded).toHaveLength(24);
   });
@@ -85,7 +85,7 @@ describe('DEK envelope', () => {
 
   it('should wrap and unwrap DEK round-trip', () => {
     const dek = generateDEK();
-    const key = Buffer.alloc(32, 0xAA);
+    const key = Buffer.alloc(32, 0xaa);
     const wrapped = wrapDEK(dek, key);
     const unwrapped = unwrapDEK(wrapped, key);
     expect(dek.equals(unwrapped)).toBe(true);
@@ -93,8 +93,8 @@ describe('DEK envelope', () => {
 
   it('should fail unwrap with wrong key', () => {
     const dek = generateDEK();
-    const keyA = Buffer.alloc(32, 0xAA);
-    const keyB = Buffer.alloc(32, 0xBB);
+    const keyA = Buffer.alloc(32, 0xaa);
+    const keyB = Buffer.alloc(32, 0xbb);
     const wrapped = wrapDEK(dek, keyA);
     expect(() => unwrapDEK(wrapped, keyB)).toThrow();
   });
@@ -109,9 +109,7 @@ describe('recovery codes', () => {
 
   it('should format as XXXXX-XXXXX-XXXXX-XXXXX-XXXXX', () => {
     const { formatted } = generateRecoveryCodes(1);
-    expect(formatted[0]).toMatch(
-      /^[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}$/
-    );
+    expect(formatted[0]).toMatch(/^[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}$/);
   });
 
   it('should verify a hashed recovery code', () => {

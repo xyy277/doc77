@@ -250,7 +250,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
         db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number }
       ).count;
       const lastActiveRow = db
-        .prepare("SELECT COALESCE(MAX(strftime('%s',last_opened)), MAX(strftime('%s',created_at))) as last_active FROM projects")
+        .prepare(
+          "SELECT COALESCE(MAX(strftime('%s',last_opened)), MAX(strftime('%s',created_at))) as last_active FROM projects",
+        )
         .get() as { last_active: number | null };
       const favoriteCount = (
         db.prepare('SELECT COUNT(*) as count FROM favorites').get() as { count: number }
@@ -286,9 +288,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       }
 
       // Dedup: remove old entry for same project+file, then insert fresh
-      db.prepare(
-        'DELETE FROM recent_files WHERE project_id = ? AND file_path = ?',
-      ).run(projectId, filePath);
+      db.prepare('DELETE FROM recent_files WHERE project_id = ? AND file_path = ?').run(
+        projectId,
+        filePath,
+      );
       db.prepare(
         'INSERT INTO recent_files (project_id, file_name, file_path) VALUES (?, ?, ?)',
       ).run(projectId, fileName, filePath);
@@ -350,9 +353,21 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     const depth = parseInt(req.query.depth as string, 10) || 2;
 
     // Security: reject blocked roots
-    const blocked = ['/etc', '/sys', '/proc', '/dev', '/boot', '/run',
-                     '/bin', '/sbin', '/usr', '/var',
-                     'C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)'];
+    const blocked = [
+      '/etc',
+      '/sys',
+      '/proc',
+      '/dev',
+      '/boot',
+      '/run',
+      '/bin',
+      '/sbin',
+      '/usr',
+      '/var',
+      'C:\\Windows',
+      'C:\\Program Files',
+      'C:\\Program Files (x86)',
+    ];
     const expanded = dirPath.startsWith('~') ? os.homedir() + dirPath.slice(1) : dirPath;
     const resolved = path.resolve(expanded).replace(/\\/g, '/');
     for (const b of blocked) {
@@ -367,7 +382,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       // Collect already-registered paths for dedup
       const db = getConnection();
       const registered = db.prepare('SELECT path FROM projects').all() as { path: string }[];
-      const existingPaths = new Set(registered.map(r => path.resolve(r.path)));
+      const existingPaths = new Set(registered.map((r) => path.resolve(r.path)));
 
       const results = discoverProjects(dirPath, Math.min(depth, 5), existingPaths);
       res.json(results);

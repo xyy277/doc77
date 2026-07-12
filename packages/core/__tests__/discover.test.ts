@@ -60,7 +60,7 @@ afterAll(() => {
 describe('discoverProjects', () => {
   it('finds valid projects (.git + >=1 .md)', () => {
     const results = discoverProjects(TEST_ROOT, 1, new Set());
-    const names = results.map(r => r.name);
+    const names = results.map((r) => r.name);
     expect(names).toContain('my-project');
     expect(names).not.toContain('no-docs');
     expect(names).not.toContain('just-notes');
@@ -68,26 +68,26 @@ describe('discoverProjects', () => {
 
   it('skips hidden directories (starting with .)', () => {
     const results = discoverProjects(TEST_ROOT, 1, new Set());
-    const names = results.map(r => r.name);
+    const names = results.map((r) => r.name);
     expect(names).not.toContain('.config');
   });
 
   it('skips node_modules and __pycache__', () => {
     const results = discoverProjects(TEST_ROOT, 1, new Set());
-    const names = results.map(r => r.name);
+    const names = results.map((r) => r.name);
     expect(names).not.toContain('node_modules');
     expect(names).not.toContain('__pycache__');
   });
 
   it('finds nested projects at depth 2', () => {
     const results = discoverProjects(TEST_ROOT, 2, new Set());
-    const names = results.map(r => r.name);
+    const names = results.map((r) => r.name);
     expect(names).toContain('nested-project');
   });
 
   it('returns hasReadme and mdCount correctly', () => {
     const results = discoverProjects(TEST_ROOT, 1, new Set());
-    const proj = results.find(r => r.name === 'my-project');
+    const proj = results.find((r) => r.name === 'my-project');
     expect(proj).toBeTruthy();
     expect(proj!.hasReadme).toBe(true);
     expect(proj!.mdCount).toBeGreaterThanOrEqual(1);

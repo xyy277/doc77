@@ -1,4 +1,12 @@
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  hkdfSync,
+  pbkdf2Sync,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 import { scryptSync } from 'node:crypto';
 export { scryptSync };
 
@@ -116,7 +124,11 @@ export function hkdf(ikm: Buffer, salt: Buffer, info: string, length: number): B
  * Derive a password-based wrap key for DEK envelope encryption.
  * Uses scrypt + HKDF with the domain separator 'doc77-pw-wrap'.
  */
-export function derivePasswordWrapKey(password: string, pwSalt: Buffer, pwWrapSalt: Buffer): Buffer {
+export function derivePasswordWrapKey(
+  password: string,
+  pwSalt: Buffer,
+  pwWrapSalt: Buffer,
+): Buffer {
   const scryptOutput = scryptSync(password, pwSalt, 64, SCRYPT_OPTIONS);
   return hkdf(scryptOutput, pwWrapSalt, 'doc77-pw-wrap', 32);
 }
@@ -177,7 +189,7 @@ export function decodeBase32Crockford(encoded: string): Buffer {
 // ---------------------------------------------------------------------------
 
 export function crc16Base32(encoded: string): number {
-  let crc = 0xFFFF;
+  let crc = 0xffff;
   for (let i = 0; i < encoded.length; i++) {
     crc ^= encoded.charCodeAt(i) << 8;
     for (let j = 0; j < 8; j++) {
@@ -188,7 +200,7 @@ export function crc16Base32(encoded: string): number {
       }
     }
   }
-  return (crc & 0xFFFF) % 32; // map to 0-31 for Base32 digit
+  return (crc & 0xffff) % 32; // map to 0-31 for Base32 digit
 }
 
 // ---------------------------------------------------------------------------
@@ -213,8 +225,8 @@ export function unwrapDEK(data: EncryptedData, key: Buffer): Buffer {
 // ---------------------------------------------------------------------------
 
 export interface RecoveryCodeSet {
-  plaintexts: string[];   // 25-char raw Base32 (24 data + 1 checksum)
-  formatted: string[];    // 5-group dashed format (5x5)
+  plaintexts: string[]; // 25-char raw Base32 (24 data + 1 checksum)
+  formatted: string[]; // 5-group dashed format (5x5)
 }
 
 export function generateRecoveryCodes(count: number): RecoveryCodeSet {

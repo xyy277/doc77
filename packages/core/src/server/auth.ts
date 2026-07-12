@@ -10,14 +10,16 @@ function writeAuditLog(
   operationType: string,
   operationData: Record<string, unknown>,
   source: string,
-  status: string
+  status: string,
 ): void {
   try {
     const db = getConnection();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO audit_log (project_id, operation_type, operation_data, source, status, created_at)
       VALUES (0, ?, ?, ?, ?, datetime('now'))
-    `).run(operationType, JSON.stringify(operationData), source, status);
+    `,
+    ).run(operationType, JSON.stringify(operationData), source, status);
   } catch {
     // non-fatal: audit logging should not block operations
   }
@@ -34,9 +36,9 @@ function writeAuditLog(
  */
 export function isLegacyMode(): boolean {
   const db = getConnection();
-  const row = db.prepare(
-    'SELECT password_hash, wrapped_dek_by_password FROM user_auth WHERE id = 1'
-  ).get() as { password_hash: string | null; wrapped_dek_by_password: string | null } | undefined;
+  const row = db
+    .prepare('SELECT password_hash, wrapped_dek_by_password FROM user_auth WHERE id = 1')
+    .get() as { password_hash: string | null; wrapped_dek_by_password: string | null } | undefined;
   return !!(row?.password_hash && !row?.wrapped_dek_by_password);
 }
 
@@ -45,9 +47,8 @@ export function isLegacyMode(): boolean {
 // ---------------------------------------------------------------------------
 
 function getAuthRow(): Record<string, unknown> | undefined {
-  return getConnection()
-    .prepare('SELECT * FROM user_auth WHERE id = 1')
-    .get() as Record<string, unknown> | undefined;
+  return getConnection().prepare('SELECT * FROM user_auth WHERE id = 1').get() as
+    Record<string, unknown> | undefined;
 }
 
 function recoveryCodeToWrapKey(rcPlaintext: string): Buffer {
@@ -58,7 +59,7 @@ function recoveryCodeToWrapKey(rcPlaintext: string): Buffer {
     Buffer.from(rcPlaintext, 'utf-8'),
     Buffer.from(row!.rc_wrap_salt, 'hex'),
     'doc77-rc-wrap',
-    32
+    32,
   );
 }
 
@@ -74,12 +75,10 @@ function signResetToken(codeIndex: number, dekPlaintext: Buffer): string {
       code_index: codeIndex,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-    })
+    }),
   ).toString('base64url');
 
-  const signature = createHmac('sha256', jwtKey)
-    .update(`${header}.${payload}`)
-    .digest('base64url');
+  const signature = createHmac('sha256', jwtKey).update(`${header}.${payload}`).digest('base64url');
 
   return `${header}.${payload}.${signature}`;
 }
@@ -146,11 +145,13 @@ const resetState = new Map<string, { dek: Buffer; codeIndex: number; expiresAt: 
  *
  * Returns null if a password is already set.
  */
-export function setupPasswordWithDEK(password: string, source = 'web'): crypto.RecoveryCodeSet | null {
+export function setupPasswordWithDEK(
+  password: string,
+  source = 'web',
+): crypto.RecoveryCodeSet | null {
   const db = getConnection();
-  const existing = db
-    .prepare('SELECT password_hash FROM user_auth WHERE id = 1')
-    .get() as { password_hash: string } | undefined;
+  const existing = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
+    { password_hash: string } | undefined;
   if (existing?.password_hash) return null; // already set
 
   const dek = crypto.generateDEK();
@@ -176,18 +177,14 @@ export function setupPasswordWithDEK(password: string, source = 'web'): crypto.R
   for (const plaintext of codes.plaintexts) {
     codeHashes.push(crypto.hashRecoveryCode(plaintext));
     indexHashes.push(crypto.hashRecoveryCodeIndex(plaintext));
-    const rcWrapKey = crypto.hkdf(
-      Buffer.from(plaintext, 'utf-8'),
-      rcWrapSalt,
-      'doc77-rc-wrap',
-      32
-    );
+    const rcWrapKey = crypto.hkdf(Buffer.from(plaintext, 'utf-8'), rcWrapSalt, 'doc77-rc-wrap', 32);
     wrappedByRc.push(crypto.wrapDEK(dek, rcWrapKey));
     used.push(false);
   }
 
   // Store everything
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO user_auth (
       id, password_hash, pw_wrap_salt, rc_wrap_salt, jwt_salt,
       pbkdf2_salt, encryption_salt,
@@ -195,7 +192,8 @@ export function setupPasswordWithDEK(password: string, source = 'web'): crypto.R
       recovery_code_hashes, recovery_code_index_hashes,
       recovery_codes_used, recovery_codes_generated_at
     ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-  `).run(
+  `,
+  ).run(
     `scrypt:${pwSalt.toString('hex')}:${scryptOutput.toString('hex')}`,
     pwWrapSalt.toString('hex'),
     rcWrapSalt.toString('hex'),
@@ -239,7 +237,7 @@ export function verifyLogin(password: string): {
     const fails = ((row.failed_attempts as number) || 0) + 1;
     if (fails >= 5) {
       db.prepare(
-        "UPDATE user_auth SET failed_attempts=0, locked_until=datetime('now','+15 minutes') WHERE id=1"
+        "UPDATE user_auth SET failed_attempts=0, locked_until=datetime('now','+15 minutes') WHERE id=1",
       ).run();
       return { ok: false, error: '密码错误次数过多，已锁定15分钟', status: 423 };
     }
@@ -271,7 +269,7 @@ export function verifyRecoveryCode(rcInput: string): {
 
   if (row.recovery_locked_until && new Date(row.recovery_locked_until as string) > new Date()) {
     const mins = Math.ceil(
-      (new Date(row.recovery_locked_until as string).getTime() - Date.now()) / 60000
+      (new Date(row.recovery_locked_until as string).getTime() - Date.now()) / 60000,
     );
     return { ok: false, error: `recovery_locked (${mins} min)`, status: 423 };
   }
@@ -292,7 +290,7 @@ export function verifyRecoveryCode(rcInput: string): {
     const fails = ((row.recovery_attempts as number) || 0) + 1;
     if (fails >= 5) {
       db.prepare(
-        "UPDATE user_auth SET recovery_attempts=0, recovery_locked_until=datetime('now','+15 minutes') WHERE id=1"
+        "UPDATE user_auth SET recovery_attempts=0, recovery_locked_until=datetime('now','+15 minutes') WHERE id=1",
       ).run();
       return { ok: false, error: 'recovery_locked (15 min)', status: 423 };
     }
@@ -309,7 +307,7 @@ export function verifyRecoveryCode(rcInput: string): {
     const fails = ((row.recovery_attempts as number) || 0) + 1;
     if (fails >= 5) {
       db.prepare(
-        "UPDATE user_auth SET recovery_attempts=0, recovery_locked_until=datetime('now','+15 minutes') WHERE id=1"
+        "UPDATE user_auth SET recovery_attempts=0, recovery_locked_until=datetime('now','+15 minutes') WHERE id=1",
       ).run();
       return { ok: false, error: 'recovery_locked (15 min)', status: 423 };
     }
@@ -358,7 +356,7 @@ export function verifyRecoveryCode(rcInput: string): {
 export function resetPasswordWithToken(
   resetToken: string,
   newPassword: string,
-  source = 'web'
+  source = 'web',
 ): { ok: boolean; error?: string; status: number } {
   const { valid, codeIndex } = verifyStoredResetToken(resetToken);
   if (!valid || codeIndex === undefined) {
@@ -380,7 +378,7 @@ export function resetPasswordWithToken(
     scryptOutput,
     Buffer.from(pwWrapSaltHex, 'hex'),
     'doc77-pw-wrap',
-    32
+    32,
   );
   const wrappedByPw = crypto.wrapDEK(dek, pwWrapKey);
 
@@ -388,7 +386,8 @@ export function resetPasswordWithToken(
   const used: boolean[] = JSON.parse(row!.recovery_codes_used as string);
   used[codeIndex] = true;
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE user_auth SET
       password_hash = ?,
       wrapped_dek_by_password = ?,
@@ -398,7 +397,8 @@ export function resetPasswordWithToken(
       recovery_attempts = 0,
       recovery_locked_until = NULL
     WHERE id = 1
-  `).run(
+  `,
+  ).run(
     `scrypt:${pwSalt.toString('hex')}:${scryptOutput.toString('hex')}`,
     JSON.stringify(wrappedByPw),
     JSON.stringify(used),
@@ -419,7 +419,7 @@ export function resetPasswordWithToken(
 export function changePassword(
   oldPassword: string,
   newPassword: string,
-  source = 'web'
+  source = 'web',
 ): { ok: boolean; codes?: crypto.RecoveryCodeSet; error?: string; status: number } {
   const db = getConnection();
   const row = getAuthRow();
@@ -462,7 +462,8 @@ export function changePassword(
       used.push(false);
     }
 
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE user_auth SET
         password_hash = ?,
         pw_wrap_salt = ?,
@@ -475,7 +476,8 @@ export function changePassword(
         recovery_codes_used = ?,
         recovery_codes_generated_at = datetime('now')
       WHERE id = 1
-    `).run(
+    `,
+    ).run(
       `scrypt:${newPwSalt.toString('hex')}:${scryptOutput.toString('hex')}`,
       pwWrapSalt.toString('hex'),
       rcWrapSalt.toString('hex'),
@@ -497,7 +499,7 @@ export function changePassword(
   const oldPwWrapKey = crypto.derivePasswordWrapKey(
     oldPassword,
     oldPwSalt,
-    Buffer.from(row.pw_wrap_salt as string, 'hex')
+    Buffer.from(row.pw_wrap_salt as string, 'hex'),
   );
 
   let dek: Buffer;
@@ -514,16 +516,18 @@ export function changePassword(
     newScryptOutput,
     Buffer.from(row.pw_wrap_salt as string, 'hex'),
     'doc77-pw-wrap',
-    32
+    32,
   );
   wrappedByPw = crypto.wrapDEK(dek, newPwWrapKey);
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE user_auth SET
       password_hash = ?,
       wrapped_dek_by_password = ?
     WHERE id = 1
-  `).run(
+  `,
+  ).run(
     `scrypt:${newPwSalt.toString('hex')}:${newScryptOutput.toString('hex')}`,
     JSON.stringify(wrappedByPw),
   );
@@ -553,7 +557,10 @@ export function getRecoveryStatus(): { remaining: number; total: number; hasReco
 // Regenerate recovery codes
 // ---------------------------------------------------------------------------
 
-export function regenerateRecoveryCodes(password: string, source = 'web'): {
+export function regenerateRecoveryCodes(
+  password: string,
+  source = 'web',
+): {
   ok: boolean;
   codes?: crypto.RecoveryCodeSet;
   error?: string;
@@ -576,7 +583,7 @@ export function regenerateRecoveryCodes(password: string, source = 'web'): {
   const pwWrapKey = crypto.derivePasswordWrapKey(
     password,
     pwSalt,
-    Buffer.from(row.pw_wrap_salt as string, 'hex')
+    Buffer.from(row.pw_wrap_salt as string, 'hex'),
   );
   const wrapped: crypto.EncryptedData = JSON.parse(row.wrapped_dek_by_password as string);
   const dek = crypto.unwrapDEK(wrapped, pwWrapKey);
@@ -595,13 +602,14 @@ export function regenerateRecoveryCodes(password: string, source = 'web'): {
       Buffer.from(pt, 'utf-8'),
       Buffer.from(row.rc_wrap_salt as string, 'hex'),
       'doc77-rc-wrap',
-      32
+      32,
     );
     wrappedByRc.push(crypto.wrapDEK(dek, rcKey));
     used.push(false);
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE user_auth SET
       wrapped_dek_by_recovery = ?,
       recovery_code_hashes = ?,
@@ -609,7 +617,8 @@ export function regenerateRecoveryCodes(password: string, source = 'web'): {
       recovery_codes_used = ?,
       recovery_codes_generated_at = datetime('now')
     WHERE id = 1
-  `).run(
+  `,
+  ).run(
     JSON.stringify(wrappedByRc),
     JSON.stringify(codeHashes),
     JSON.stringify(indexHashes),
@@ -632,7 +641,8 @@ export function regenerateRecoveryCodes(password: string, source = 'web'): {
  */
 export function forceResetPassword(): void {
   const db = getConnection();
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE user_auth SET
       password_hash = NULL,
       pw_wrap_salt = NULL,
@@ -649,7 +659,8 @@ export function forceResetPassword(): void {
       recovery_attempts = 0,
       recovery_locked_until = NULL
     WHERE id = 1
-  `).run();
+  `,
+  ).run();
 
   // Clear encrypted config values (AI token etc.)
   db.prepare("DELETE FROM config WHERE key IN ('ai.token', 'ai.base_url', 'ai.model')").run();

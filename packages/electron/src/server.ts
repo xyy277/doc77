@@ -50,7 +50,8 @@ export interface ServerProcess {
 export async function startServer(port: number): Promise<ServerProcess> {
   process.env.DOC77_ELECTRON = '1';
 
-  const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } = await loadCore();
+  const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } =
+    await loadCore();
 
   await initDatabase(DB_PATH);
   runMigrations();

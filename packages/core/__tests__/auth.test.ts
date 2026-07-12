@@ -21,7 +21,10 @@ let testDir: string;
 let dbPath: string;
 
 beforeAll(async () => {
-  testDir = path.join(os.tmpdir(), `doc77-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  testDir = path.join(
+    os.tmpdir(),
+    `doc77-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   fs.mkdirSync(testDir, { recursive: true });
   dbPath = path.join(testDir, 'data.db');
   await initDatabase(dbPath);
@@ -44,9 +47,7 @@ describe('Password setup with DEK', () => {
     expect(codes!.plaintexts).toHaveLength(10);
     expect(codes!.formatted).toHaveLength(10);
     codes!.formatted.forEach((f) => {
-      expect(f).toMatch(
-        /^[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}$/,
-      );
+      expect(f).toMatch(/^[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}$/);
     });
   });
 
