@@ -1,0 +1,66 @@
+import { describe, it, expect } from 'vitest';
+import {
+  hkdf,
+  encodeBase32Crockford,
+  decodeBase32Crockford,
+  crc16Base32,
+} from '../src/crypto.js';
+
+describe('hkdf', () => {
+  it('should derive a key of the requested length', () => {
+    const ikm = Buffer.from('test-input-key-material');
+    const salt = Buffer.from('test-salt');
+    const key = hkdf(ikm, salt, 'doc77-test', 32);
+    expect(key).toHaveLength(32);
+  });
+
+  it('should produce deterministic output', () => {
+    const ikm = Buffer.from('test-input');
+    const salt = Buffer.from('salt');
+    const a = hkdf(ikm, salt, 'doc77-test', 32);
+    const b = hkdf(ikm, salt, 'doc77-test', 32);
+    expect(a.equals(b)).toBe(true);
+  });
+
+  it('should produce different output with different info', () => {
+    const ikm = Buffer.from('test-input');
+    const salt = Buffer.from('salt');
+    const a = hkdf(ikm, salt, 'doc77-a', 32);
+    const b = hkdf(ikm, salt, 'doc77-b', 32);
+    expect(a.equals(b)).toBe(false);
+  });
+});
+
+describe('Crockford Base32', () => {
+  it('should encode and decode round-trip', () => {
+    const input = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0]);
+    const encoded = encodeBase32Crockford(input);
+    const decoded = decodeBase32Crockford(encoded);
+    expect(decoded.equals(input)).toBe(true);
+  });
+
+  it('should not contain ambiguous characters', async () => {
+    // Generate random bytes and encode
+    const crypto = await import('node:crypto');
+    for (let i = 0; i < 100; i++) {
+      const bytes = crypto.randomBytes(15);
+      const encoded = encodeBase32Crockford(bytes);
+      expect(encoded).not.toMatch(/[ILOUilou]/);
+    }
+  });
+
+  it('should encode 15 bytes to 24 characters', () => {
+    const bytes = Buffer.alloc(15, 0xAB);
+    const encoded = encodeBase32Crockford(bytes);
+    expect(encoded).toHaveLength(24);
+  });
+});
+
+describe('crc16Base32', () => {
+  it('should compute CRC-16 for a base32 string', () => {
+    const result = crc16Base32('ABCDEFGH');
+    expect(typeof result).toBe('number');
+    expect(result).toBeGreaterThanOrEqual(0);
+    expect(result).toBeLessThanOrEqual(31); // 5 bits for Base32 digit
+  });
+});

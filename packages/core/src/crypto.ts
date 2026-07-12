@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, hkdfSync, pbkdf2Sync, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 export interface EncryptedData {
   iv: string;
@@ -93,4 +93,82 @@ export function maskSensitive(value: string): string {
 function normalizeKey(key: Buffer): Buffer {
   if (key.length === KEY_LENGTH) return key;
   return Buffer.from(key.subarray(0, KEY_LENGTH));
+}
+
+// ---------------------------------------------------------------------------
+// HKDF (HMAC-based Key Derivation Function) using Node.js crypto.hkdfSync
+// ---------------------------------------------------------------------------
+
+export function hkdf(ikm: Buffer, salt: Buffer, info: string, length: number): Buffer {
+  return Buffer.from(hkdfSync('sha256', ikm, salt, info, length));
+}
+
+// ---------------------------------------------------------------------------
+// Crockford Base32 encoding/decoding (RFC 4648 variant, no I/L/O/U)
+// ---------------------------------------------------------------------------
+
+export const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+export function encodeBase32Crockford(bytes: Buffer): string {
+  let bits = 0;
+  let value = 0;
+  let output = '';
+
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i];
+    bits += 8;
+
+    while (bits >= 5) {
+      output += CROCKFORD_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+
+  if (bits > 0) {
+    output += CROCKFORD_ALPHABET[(value << (5 - bits)) & 31];
+  }
+
+  return output;
+}
+
+export function decodeBase32Crockford(encoded: string): Buffer {
+  const normalized = encoded.toUpperCase().replace(/-/g, '');
+  const result: number[] = [];
+  let bits = 0;
+  let value = 0;
+
+  for (let i = 0; i < normalized.length; i++) {
+    const idx = CROCKFORD_ALPHABET.indexOf(normalized[i]);
+    if (idx === -1) {
+      throw new Error(`Invalid Crockford Base32 character: ${normalized[i]}`);
+    }
+    value = (value << 5) | idx;
+    bits += 5;
+
+    if (bits >= 8) {
+      result.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+
+  return Buffer.from(result);
+}
+
+// ---------------------------------------------------------------------------
+// CRC-16 (CCITT-1021) returning a 5-bit checksum for Base32
+// ---------------------------------------------------------------------------
+
+export function crc16Base32(encoded: string): number {
+  let crc = 0xFFFF;
+  for (let i = 0; i < encoded.length; i++) {
+    crc ^= encoded.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc = crc << 1;
+      }
+    }
+  }
+  return (crc & 0xFFFF) % 32; // map to 0-31 for Base32 digit
 }
