@@ -151,7 +151,7 @@ function switchSettingsTab(tab) {
       settingRow('共享密钥','security.shared_secret','password','') +
       settingToggle('跟踪符号链接','security.follow_symlinks') +
       '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)"><button onclick="restartServer()" style="width:100%;padding:8px 0;font-size:13px;font-weight:500;color:var(--danger);border:1px solid var(--danger);border-radius:6px;background:transparent;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🔄 重启服务</button></div>';
-    loadAuthStatus();
+    renderAccountSection();
     loadServerInfo();
   }
   loadSettingsValues();
@@ -266,23 +266,38 @@ async function resetDefaults() {
   try { await fetch('/api/config/reset',{method:'POST'}); switchSettingsTab('system'); toast('已恢复默认值','success'); } catch(e) { toast('恢复失败','error'); }
 }
 
-// Auth
-async function loadAuthStatus() {
-  try { var r = await fetch('/api/auth/status'); var d = await r.json(); var s = document.getElementById('authSection');
-    if (d.hasPassword) {
-      s.innerHTML = '<div style="font-size:12px;color:#059669;margin-bottom:8px">✅ 密码已设置</div><div style="display:flex;flex-direction:column;gap:8px">' +
-        '<input id="curPass" type="password" placeholder="当前密码" class="input" style="width:100%;padding:6px 12px">' +
-        '<input id="newPass" type="password" placeholder="新密码（留空不修改）" class="input" style="width:100%;padding:6px 12px" oninput="updateStrength()">' +
-        '<div id="pwStrength" style="font-size:11px;color:var(--text-muted)"></div>' +
-        '<button onclick="changePw()" class="btn btn-primary" style="width:100%;font-size:13px">修改密码</button></div>';
-    } else {
-      s.innerHTML = '<div style="font-size:12px;color:var(--danger);margin-bottom:8px">⚠️ 尚未设置密码</div><div style="display:flex;flex-direction:column;gap:8px">' +
-        '<input id="setupPass" type="password" placeholder="设置密码（至少6位）" class="input" style="width:100%;padding:6px 12px">' +
-        '<button onclick="setupPw()" class="btn btn-primary" style="width:100%;font-size:13px">设置密码</button></div>';
-    }
-    s.innerHTML += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)">' +
-      '<button onclick="doLogout()" style="width:100%;padding:6px 0;font-size:13px;color:var(--danger);background:transparent;border:1px solid var(--danger);border-radius:6px;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🚪 退出登录</button></div>';
-  } catch(e) {}
+// Auth — Account Section
+async function renderAccountSection(){
+  var s = document.getElementById('authSection');
+  var r = await fetch('/api/auth/status');
+  var d = await r.json();
+
+  var rsHtml = '';
+  if(d.hasPassword){
+    try {
+      var rr = await fetch('/api/auth/recovery-status');
+      var rd = await rr.json();
+      if(rd.hasRecovery){
+        rsHtml = '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">剩余恢复码：' + rd.remaining + ' / ' + rd.total + '</div>' +
+          '<button onclick="regenerateRC()" class="btn" style="width:100%;font-size:13px;margin-top:8px">重新生成恢复码</button>';
+      }
+    } catch(e){}
+  }
+
+  if(d.hasPassword){
+    s.innerHTML = '<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">密码已设置</div>' + rsHtml +
+      '<div style="margin-top:16px">' +
+      '<input id="curPass" type="password" placeholder="当前密码" class="input" style="width:100%;padding:6px 12px">' +
+      '<input id="newPass" type="password" placeholder="新密码（留空不修改）" class="input" style="width:100%;padding:6px 12px" oninput="updateStrength()">' +
+      '<div id="pwStrength" style="font-size:11px;margin:4px 0"></div>' +
+      '<button onclick="changePw()" class="btn btn-primary" style="width:100%;font-size:13px">修改密码</button>' +
+      '</div>' +
+      '<button onclick="doLogout()" class="btn" style="color:var(--danger);width:100%;margin-top:16px;font-size:13px">退出登录</button>';
+  } else {
+    s.innerHTML = '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">尚未设置密码</div>' +
+      '<input id="setupPass" type="password" placeholder="设置密码（至少6位）" class="input" style="width:100%;padding:6px 12px">' +
+      '<button onclick="setupPw()" class="btn btn-primary" style="width:100%;font-size:13px">设置密码</button>';
+  }
 }
 function doLogout() { sessionStorage.removeItem("doc77-auth"); location.reload(); }
 function updateStrength() {
@@ -307,13 +322,28 @@ async function setupPw() {
   }
 }
 async function changePw() {
-  var c = document.getElementById('curPass').value, n = document.getElementById('newPass').value;
-  if (!c || !n) { toast('请填写当前密码和新密码','error'); return; }
-  if (n.length < 6) { toast('新密码至少6位','error'); return; }
-  var r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:c})});
-  var d = await r.json(); if (!d.ok) { toast('当前密码错误','error'); return; }
-  var r2 = await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:n})});
-  var d2 = await r2.json(); if (d2.ok) { toast('密码已修改','success'); loadAuthStatus(); } else toast(d2.error,'error');
+  var c = document.getElementById('curPass').value;
+  var n = document.getElementById('newPass').value;
+  if(!c || !n){ toast('请输入当前密码和新密码','error'); return; }
+  if(n.length < 6){ toast('新密码至少6位','error'); return; }
+  var r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:c,new_password:n})});
+  var d = await r.json();
+  if(d.ok){ toast('密码已修改','success'); switchSettingsTab('account'); }
+  else { toast(d.error,'error'); }
+}
+
+async function regenerateRC(){
+  var pw = prompt('请输入当前密码以确认身份：');
+  if(!pw) return;
+  var r = await fetch('/api/auth/recovery-codes?password=' + encodeURIComponent(pw));
+  var d = await r.json();
+  if(d.ok && d.recovery_codes){
+    showRecoveryCodesModal(d.recovery_codes);
+    switchSettingsTab('account');
+    toast('恢复码已重新生成，旧码已作废','success');
+  } else {
+    toast(d.error,'error');
+  }
 }
 
 //══════════ Login Gate ══════════
