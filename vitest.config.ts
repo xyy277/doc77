@@ -11,7 +11,6 @@ export default defineConfig({
       exclude: ['packages/**/dist/**', 'packages/**/__tests__/**'],
     },
     // Ensure each package's tests run with its own context
-    pool: 'forks',
     testTimeout: 60000,
     hookTimeout: 60000,
   },
