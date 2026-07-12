@@ -106,16 +106,17 @@ async function setPasswordInteractive(): Promise<void> {
     console.error('❌ 两次密码不一致');
     process.exit(1);
   }
-  const { hashPassword, generateSalt } = await import('@doc77/core');
-  const hash = hashPassword(pwd);
-  const encSalt = generateSalt();
-  const pbkdf2Salt = generateSalt();
-  getConnection()
-    .prepare(
-      'INSERT OR REPLACE INTO user_auth (id, password_hash, pbkdf2_salt, encryption_salt) VALUES (1, ?, ?, ?)',
-    )
-    .run(hash, pbkdf2Salt, encSalt);
+  const { setupPasswordWithDEK } = await import('@doc77/core');
+  const codes = setupPasswordWithDEK(pwd);
+  if (!codes) {
+    console.error('❌ 密码已设置，如需修改请使用 change-password 命令');
+    process.exit(1);
+  }
   console.log('✅ 密码已设置');
+  console.log('');
+  console.log('📋 以下是您的恢复码，请妥善保管：');
+  codes.formatted.forEach((c: string) => console.log(`   ${c}`));
+  console.log('⚠️  这些恢复码仅在本次显示，关闭后将无法再次查看。');
 }
 
 function printBanner() {
@@ -177,6 +178,11 @@ Doc77 v${VERSION} — 默认安全、对话驱动的智能本地文档管理 Age
   config set <key> <value>            设置配置项
   config get <key>                    获取配置项
   config list                         列出所有配置
+  config set-password                 设置密码
+  config change-password              修改密码
+  config reset-password               重置密码（需要恢复码）
+  config reset-password --force       强制重置密码（清空加密数据）
+  config recovery-codes               重新生成恢复码
 
 MCP 服务:
   mcp serve [--http] [--port <n>]    启动 MCP 服务
@@ -449,8 +455,88 @@ async function main() {
         }
       } else if (sub === 'set-password') {
         await setPasswordInteractive();
+      } else if (sub === 'change-password') {
+        const oldPw = await askPassword('请输入当前密码');
+        const newPw = await askPassword('请输入新密码（至少6位）');
+        if (newPw.length < 6) {
+          console.error('❌ 密码至少6位');
+          process.exit(1);
+        }
+        const confirm = await askPassword('请再次输入新密码');
+        if (newPw !== confirm) {
+          console.error('❌ 两次密码不一致');
+          process.exit(1);
+        }
+        const { changePassword } = await import('@doc77/core');
+        const result = changePassword(oldPw, newPw);
+        if (result.ok) {
+          console.log('✅ 密码已修改');
+        } else {
+          console.error(`❌ ${result.error}`);
+          process.exit(1);
+        }
+      } else if (sub === 'reset-password') {
+        const force = process.argv.includes('--force');
+        if (force) {
+          const readline = await import('node:readline');
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+          rl.question('⚠️  此操作将清空所有加密配置（AI Token 等），且不可撤销。\n⚠️  输入 "yes-i-know" 确认: ', async (answer: string) => {
+            rl.close();
+            if (answer.trim() !== 'yes-i-know') {
+              console.error('❌ 操作已取消');
+              process.exit(1);
+            }
+            const { forceResetPassword } = await import('@doc77/core');
+            forceResetPassword();
+            console.log('✅ 密码已重置，加密配置已清空');
+            process.exit(0);
+          });
+          return;
+        }
+        const readline = await import('node:readline');
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        rl.question('请输入恢复码: ', async (rc: string) => {
+          rl.close();
+          const { verifyRecoveryCode, resetPasswordWithToken } = await import('@doc77/core');
+          const result = verifyRecoveryCode(rc.trim());
+          if (!result.ok) {
+            console.error(`❌ ${result.error}`);
+            process.exit(1);
+          }
+          console.log('✅ 恢复码验证通过');
+          const newPw = await askPassword('请输入新密码（至少6位）');
+          if (newPw.length < 6) {
+            console.error('❌ 密码至少6位');
+            process.exit(1);
+          }
+          const confirm = await askPassword('请再次输入新密码');
+          if (newPw !== confirm) {
+            console.error('❌ 两次密码不一致');
+            process.exit(1);
+          }
+          const resetResult = resetPasswordWithToken(result.resetToken!, newPw);
+          if (resetResult.ok) {
+            console.log(`✅ 密码已重置，该恢复码已失效（剩余 ${result.remaining} 个）`);
+          } else {
+            console.error(`❌ ${resetResult.error}`);
+            process.exit(1);
+          }
+        });
+      } else if (sub === 'recovery-codes') {
+        const password = await askPassword('请输入当前密码');
+        const { regenerateRecoveryCodes } = await import('@doc77/core');
+        const rcResult = regenerateRecoveryCodes(password);
+        if (rcResult.ok && rcResult.codes) {
+          console.log('📋 以下是您的新恢复码，请妥善保管：');
+          rcResult.codes.formatted.forEach((c: string) => console.log(`   ${c}`));
+          console.log('⚠️  旧恢复码已全部作废。');
+          console.log('⚠️  这些恢复码仅在本次显示，关闭后将无法再次查看。');
+        } else {
+          console.error(`❌ ${rcResult.error}`);
+          process.exit(1);
+        }
       } else {
-        console.error('Usage: doc77 config set|get|list|set-password [key] [value]');
+        console.error('Usage: doc77 config set|get|list|set-password|change-password|reset-password|recovery-codes [key] [value]');
         process.exit(1);
       }
       break;
