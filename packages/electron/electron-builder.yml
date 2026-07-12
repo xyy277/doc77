@@ -3,9 +3,6 @@ productName: Doc77
 directories:
   output: release
 
-asarUnpack:
-  - "node_modules/@doc77/core/**"
-
 files:
   - "dist/**/*"
   - "node_modules/**/*"
