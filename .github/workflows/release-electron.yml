@@ -4,6 +4,9 @@ on:
   push:
     tags: ['electron-v*']
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
