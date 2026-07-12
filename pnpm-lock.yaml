@@ -85,7 +85,7 @@ importers:
   packages/doc77:
     dependencies:
       '@doc77/cli':
-        specifier: ^0.5.2
+        specifier: workspace:^
         version: link:../cli
 
   packages/electron:
