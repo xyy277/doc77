@@ -1,12 +1,46 @@
 import { getConnection, type DatabaseCompat } from './connection.js';
 
 /**
+ * Helper: add a column only if it doesn't already exist.
+ * SQLite does not support ALTER TABLE ... ADD COLUMN IF NOT EXISTS,
+ * so we catch the "duplicate column name" error.
+ */
+function addColumnIfNotExists(db: DatabaseCompat, table: string, column: string, definition: string): void {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  } catch (e: unknown) {
+    const msg = (e as Error).message;
+    if (!msg.includes('duplicate column name')) {
+      throw e;
+    }
+  }
+}
+
+/**
  * Run all schema migrations.
  * Uses IF NOT EXISTS to ensure idempotency.
  */
 export function runMigrations(db?: DatabaseCompat): void {
   const conn = db ?? getConnection();
   conn.exec(SCHEMA_SQL);
+
+  // v2: Password recovery — envelope encryption + recovery codes
+  const v2Columns: Array<[string, string]> = [
+    ['pw_wrap_salt', 'TEXT'],
+    ['rc_wrap_salt', 'TEXT'],
+    ['jwt_salt', 'TEXT'],
+    ['wrapped_dek_by_password', 'TEXT'],
+    ['wrapped_dek_by_recovery', 'TEXT'],
+    ['recovery_code_hashes', 'TEXT'],
+    ['recovery_code_index_hashes', 'TEXT'],
+    ['recovery_codes_used', 'TEXT'],
+    ['recovery_codes_generated_at', 'DATETIME'],
+    ['recovery_attempts', 'INTEGER DEFAULT 0'],
+    ['recovery_locked_until', 'DATETIME'],
+  ];
+  for (const [col, def] of v2Columns) {
+    addColumnIfNotExists(conn, 'user_auth', col, def);
+  }
 }
 
 const SCHEMA_SQL = `
