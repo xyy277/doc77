@@ -34,6 +34,7 @@ import {
 } from '../renderers/index.js';
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
 import { isMobileRequest } from './mobile-detect.js';
+import * as auth from './auth.js';
 
 import { VERSION } from '../version.gen.js';
 
@@ -1481,9 +1482,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       const db = getConnection();
       const row = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
         { password_hash: string } | undefined;
-      res.json({ hasPassword: !!row?.password_hash });
+      const recoveryStatus = auth.getRecoveryStatus();
+      res.json({
+        hasPassword: !!row?.password_hash,
+        hasRecovery: recoveryStatus.hasRecovery,
+      });
     } catch {
-      res.json({ hasPassword: false });
+      res.json({ hasPassword: false, hasRecovery: false });
     }
   });
 
@@ -1495,20 +1500,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       return;
     }
     try {
-      const db = getConnection();
-      const existing = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
-        { password_hash: string } | undefined;
-      if (existing?.password_hash) {
+      const codes = auth.setupPasswordWithDEK(password);
+      if (!codes) {
         res.status(409).json({ error: '密码已设置，请使用修改密码功能' });
         return;
       }
-      const hash = crypto.hashPassword(password);
-      const encSalt = crypto.generateSalt().toString('hex');
-      const pbkdf2Salt = crypto.generateSalt().toString('hex');
-      db.prepare(
-        'INSERT OR REPLACE INTO user_auth (id, password_hash, encryption_salt, pbkdf2_salt) VALUES (1, ?, ?, ?)',
-      ).run(hash, encSalt, pbkdf2Salt);
-      res.json({ ok: true });
+      res.json({ ok: true, recovery_codes: codes.formatted });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }
@@ -1548,6 +1545,106 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       }
       db.prepare('UPDATE user_auth SET failed_attempts=0, locked_until=NULL WHERE id=1').run();
       res.json({ ok: true, token: 'session-' + Date.now() });
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Forgot password — verify recovery code
+  app.post('/api/auth/forgot-password/verify', (req: Request, res: Response) => {
+    const { recovery_code } = req.body;
+    if (!recovery_code || typeof recovery_code !== 'string') {
+      res.status(400).json({ error: 'invalid_recovery_code_format' });
+      return;
+    }
+    try {
+      const result = auth.verifyRecoveryCode(recovery_code);
+      if (result.ok) {
+        res.json({
+          ok: true,
+          reset_token: result.resetToken,
+          remaining_codes: result.remaining,
+        });
+      } else {
+        res.status(result.status).json({ error: result.error });
+      }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Forgot password — reset with token
+  app.post('/api/auth/forgot-password/reset', (req: Request, res: Response) => {
+    const { reset_token, new_password } = req.body;
+    if (!reset_token || !new_password) {
+      res.status(400).json({ error: 'reset_token and new_password are required' });
+      return;
+    }
+    if (new_password.length < 6) {
+      res.status(400).json({ error: '密码至少6位' });
+      return;
+    }
+    try {
+      const result = auth.resetPasswordWithToken(reset_token, new_password);
+      if (result.ok) {
+        res.json({ ok: true });
+      } else {
+        res.status(result.status).json({ error: result.error });
+      }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Change password (requires current password)
+  app.post('/api/auth/change-password', (req: Request, res: Response) => {
+    const { old_password, new_password } = req.body;
+    if (!old_password || !new_password) {
+      res.status(400).json({ error: 'old_password and new_password are required' });
+      return;
+    }
+    if (new_password.length < 6) {
+      res.status(400).json({ error: '密码至少6位' });
+      return;
+    }
+    try {
+      const result = auth.changePassword(old_password, new_password);
+      if (result.ok) {
+        const resp: Record<string, unknown> = { ok: true };
+        if (result.codes) resp.recovery_codes = result.codes.formatted;
+        res.json(resp);
+      } else {
+        res.status(result.status).json({ error: result.error });
+      }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Get recovery code status
+  app.get('/api/auth/recovery-status', (_req: Request, res: Response) => {
+    try {
+      const status = auth.getRecoveryStatus();
+      res.json(status);
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Regenerate recovery codes
+  app.get('/api/auth/recovery-codes', (req: Request, res: Response) => {
+    const password = req.query.password as string;
+    if (!password) {
+      res.status(400).json({ error: 'password query parameter is required' });
+      return;
+    }
+    try {
+      const result = auth.regenerateRecoveryCodes(password);
+      if (result.ok) {
+        res.json({ ok: true, recovery_codes: result.codes!.formatted });
+      } else {
+        res.status(result.status).json({ error: result.error });
+      }
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }
