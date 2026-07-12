@@ -295,7 +295,16 @@ async function setupPw() {
   var p = document.getElementById('setupPass').value;
   if (p.length < 6) { toast('密码至少6位','error'); return; }
   var r = await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
-  var d = await r.json(); if (d.ok) { toast('密码已设置','success'); loadAuthStatus(); } else toast(d.error,'error');
+  var d = await r.json();
+  if(d.ok){
+    if(d.recovery_codes){
+      showRecoveryCodesModal(d.recovery_codes);
+    }
+    switchSettingsTab('account');
+    toast('密码设置成功','success');
+  } else {
+    toast(d.error,'error');
+  }
 }
 async function changePw() {
   var c = document.getElementById('curPass').value, n = document.getElementById('newPass').value;
@@ -315,7 +324,7 @@ async function changePw() {
     if (!d.hasPassword) { showSecurityPrompt(); return; }
     var o = document.createElement("div"); o.id = "loginGate";
     o.style.cssText = "position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--bg-body)";
-    o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77"><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--text-secondary)">请输入密码解锁</p></div><input id="loginPass" type="password" placeholder="密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">解锁</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div></div>';
+    o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77"><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--text-secondary)">请输入密码解锁</p></div><input id="loginPass" type="password" placeholder="密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">解锁</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div><div style="text-align:center;margin-top:12px"><a href="javascript:showForgotPassword()" style="font-size:12px;color:var(--text-muted);text-decoration:none">忘记密码？</a></div></div>';
     document.body.appendChild(o);
     window.unlock = async function() {
       var p = document.getElementById("loginPass").value;
@@ -340,3 +349,89 @@ async function changePw() {
     }
   }).catch(function(){});
 })();
+
+//══════════ Forgot Password Flow ══════════
+var forgotState = null; // null | 'verify' | 'reset'
+
+async function showForgotPassword(){
+  forgotState = 'verify';
+  var h = document.getElementById("loginGate");
+  if(!h) return;
+  h.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px">' +
+    '<div style="text-align:center;margin-bottom:24px">' +
+    '<img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77">' +
+    '<h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">找回密码</h1>' +
+    '<p style="font-size:13px;color:var(--text-secondary)">请输入一个恢复码</p></div>' +
+    '<input id="rcInput" type="text" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px;font-family:monospace;font-size:13px" autocomplete="off">' +
+    '<button onclick="verifyRC()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">验证恢复码</button>' +
+    '<div id="rcError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div>' +
+    '<div style="text-align:center;margin-top:16px"><a href="javascript:location.reload()" style="font-size:13px;color:var(--text-muted)">返回登录</a></div></div>';
+}
+
+async function verifyRC(){
+  var rc = document.getElementById("rcInput").value.trim();
+  var e = document.getElementById("rcError");
+  if(!rc){ e.style.display="block"; e.textContent="请输入恢复码"; return; }
+  var r = await fetch("/api/auth/forgot-password/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recovery_code:rc})});
+  var d = await r.json();
+  if(d.ok){
+    forgotState = 'reset';
+    sessionStorage.setItem("doc77-reset-token", d.reset_token);
+    showResetPassword();
+  } else {
+    e.style.display="block"; e.textContent = d.error || "验证失败";
+  }
+}
+
+function showResetPassword(){
+  var h = document.getElementById("loginGate");
+  if(!h) return;
+  h.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px">' +
+    '<div style="text-align:center;margin-bottom:24px">' +
+    '<img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77">' +
+    '<h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">设置新密码</h1>' +
+    '<p style="font-size:13px;color:var(--text-secondary)">恢复码验证通过</p></div>' +
+    '<input id="newPw" type="password" placeholder="新密码（至少6位）" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px">' +
+    '<input id="newPwConfirm" type="password" placeholder="确认新密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px">' +
+    '<button onclick="doReset()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">重置密码</button>' +
+    '<div id="resetError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div></div>';
+}
+
+async function doReset(){
+  var p = document.getElementById("newPw").value;
+  var c = document.getElementById("newPwConfirm").value;
+  var e = document.getElementById("resetError");
+  if(p.length < 6){ e.style.display="block"; e.textContent="密码至少6位"; return; }
+  if(p !== c){ e.style.display="block"; e.textContent="两次密码不一致"; return; }
+  var token = sessionStorage.getItem("doc77-reset-token");
+  var r = await fetch("/api/auth/forgot-password/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reset_token:token,new_password:p})});
+  var d = await r.json();
+  if(d.ok){
+    sessionStorage.removeItem("doc77-reset-token");
+    location.reload();
+  } else {
+    e.style.display="block"; e.textContent = d.error || "重置失败";
+  }
+}
+
+//══════════ Recovery Codes Modal ══════════
+function showRecoveryCodesModal(codes){
+  var list = document.getElementById("rcList");
+  list.innerHTML = codes.map(function(c){ return '<span>' + c + '</span>'; }).join('');
+  document.getElementById("recoveryModal").style.display = "flex";
+}
+
+function closeRecoveryModal(){
+  document.getElementById("recoveryModal").style.display = "none";
+}
+
+async function copyRC(){
+  var spans = document.querySelectorAll("#rcList span");
+  var text = Array.from(spans).map(function(s){ return s.textContent; }).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('已复制到剪贴板','success');
+  } catch(e) {
+    toast('复制失败，请手动记录','error');
+  }
+}

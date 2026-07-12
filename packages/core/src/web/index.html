@@ -167,6 +167,20 @@
   ⭐ 点个 Star 吧
 </a>
 
+<!-- Recovery Codes Modal -->
+<div id="recoveryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:var(--bg-card);border-radius:16px;padding:32px;max-width:480px;width:90%">
+    <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 8px 0">保存恢复码</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px 0">如果忘记密码，可使用恢复码重置密码。每个恢复码只能使用一次。</p>
+    <div id="rcList" style="background:var(--bg-page);border-radius:8px;padding:16px;font-family:monospace;font-size:13px;color:var(--text-primary);margin-bottom:16px;display:flex;flex-direction:column;gap:6px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button onclick="copyRC()" class="btn" style="flex:1;font-size:12px">复制全部</button>
+      <button onclick="closeRecoveryModal()" class="btn btn-primary" style="flex:1;font-size:12px">我知道了</button>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin:0;text-align:center">此页面关闭后将无法再次查看恢复码</p>
+  </div>
+</div>
+
 <script src="js/common.js"></script>
 <script src="js/stats.js"></script>
 <script src="js/favorites.js"></script>
