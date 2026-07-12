@@ -3,6 +3,27 @@ import * as crypto from '../crypto.js';
 import { createHmac } from 'node:crypto';
 
 // ---------------------------------------------------------------------------
+// Audit logging
+// ---------------------------------------------------------------------------
+
+function writeAuditLog(
+  operationType: string,
+  operationData: Record<string, unknown>,
+  source: string,
+  status: string
+): void {
+  try {
+    const db = getConnection();
+    db.prepare(`
+      INSERT INTO audit_log (project_id, operation_type, operation_data, source, status, created_at)
+      VALUES (0, ?, ?, ?, ?, datetime('now'))
+    `).run(operationType, JSON.stringify(operationData), source, status);
+  } catch {
+    // non-fatal: audit logging should not block operations
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Legacy detection
 // ---------------------------------------------------------------------------
 
@@ -148,6 +169,8 @@ export function setupPasswordWithDEK(password: string): crypto.RecoveryCodeSet |
     JSON.stringify(indexHashes),
     JSON.stringify(used),
   );
+
+  writeAuditLog('password_changed', { action: 'initial_setup' }, 'web', 'success');
 
   return codes;
 }
@@ -341,6 +364,8 @@ export function resetPasswordWithToken(
     JSON.stringify(used),
   );
 
+  writeAuditLog('recovery_code_used', { code_index: codeIndex }, 'web', 'success');
+
   // Clean up in-memory state
   resetState.delete(resetToken);
 
@@ -421,6 +446,8 @@ export function changePassword(
       JSON.stringify(used),
     );
 
+    writeAuditLog('password_changed', {}, 'web', 'success');
+
     return { ok: true, codes, status: 200 };
   }
 
@@ -459,6 +486,8 @@ export function changePassword(
     `scrypt:${newPwSalt.toString('hex')}:${newScryptOutput.toString('hex')}`,
     JSON.stringify(wrappedByPw),
   );
+
+  writeAuditLog('password_changed', {}, 'web', 'success');
 
   return { ok: true, status: 200 };
 }
@@ -546,6 +575,8 @@ export function regenerateRecoveryCodes(password: string): {
     JSON.stringify(used),
   );
 
+  writeAuditLog('recovery_codes_regenerated', {}, 'web', 'success');
+
   return { ok: true, codes, status: 200 };
 }
 
@@ -581,4 +612,6 @@ export function forceResetPassword(): void {
 
   // Clear encrypted config values (AI token etc.)
   db.prepare("DELETE FROM config WHERE key IN ('ai.token', 'ai.base_url', 'ai.model')").run();
+
+  writeAuditLog('password_force_reset', {}, 'cli', 'success');
 }
