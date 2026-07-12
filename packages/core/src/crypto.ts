@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, hkdfSync, pbkdf2Sync, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, pbkdf2Sync, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 export interface EncryptedData {
   iv: string;
@@ -171,4 +171,69 @@ export function crc16Base32(encoded: string): number {
     }
   }
   return (crc & 0xFFFF) % 32; // map to 0-31 for Base32 digit
+}
+
+// ---------------------------------------------------------------------------
+// DEK (Data Encryption Key) envelope — wrap/unwrap a random DEK with a key
+// ---------------------------------------------------------------------------
+
+export function generateDEK(): Buffer {
+  return randomBytes(32);
+}
+
+export function wrapDEK(dek: Buffer, key: Buffer): EncryptedData {
+  return encrypt(dek.toString('hex'), key);
+}
+
+export function unwrapDEK(data: EncryptedData, key: Buffer): Buffer {
+  const hex = decrypt(data, key);
+  return Buffer.from(hex, 'hex');
+}
+
+// ---------------------------------------------------------------------------
+// Recovery Code generation — Crockford Base32 with CRC-16 checksum
+// ---------------------------------------------------------------------------
+
+export interface RecoveryCodeSet {
+  plaintexts: string[];   // 25-char raw Base32 (24 data + 1 checksum)
+  formatted: string[];    // 7-group dashed format
+}
+
+export function generateRecoveryCodes(count: number): RecoveryCodeSet {
+  const plaintexts: string[] = [];
+  const formatted: string[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const bytes = randomBytes(15); // 120 bits entropy -> 24 Base32 chars
+    const encoded = encodeBase32Crockford(bytes); // 24 chars
+    const checksum = crc16Base32(encoded);
+    const checksumChar = CROCKFORD_ALPHABET[checksum];
+    const withChecksum = encoded + checksumChar; // 25 chars
+
+    plaintexts.push(withChecksum);
+
+    // 25 chars -> pad to 28 for 7 groups of 4
+    const padded = withChecksum.padEnd(28, '0');
+    const groups: string[] = [];
+    for (let g = 0; g < 7; g++) {
+      groups.push(padded.slice(g * 4, (g + 1) * 4));
+    }
+    formatted.push(groups.join('-'));
+  }
+
+  return { plaintexts, formatted };
+}
+
+export function hashRecoveryCode(plaintext: string): string {
+  const salt = randomBytes(16);
+  const hash = scryptSync(plaintext, salt, SCRYPT_KEY_LENGTH);
+  return `scrypt:${salt.toString('hex')}:${hash.toString('hex')}`;
+}
+
+export function verifyRecoveryCode(plaintext: string, storedHash: string): boolean {
+  return verifyPassword(plaintext, storedHash);
+}
+
+export function hashRecoveryCodeIndex(plaintext: string): string {
+  return createHash('sha256').update(plaintext).digest('hex');
 }

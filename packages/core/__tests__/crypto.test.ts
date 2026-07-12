@@ -4,6 +4,12 @@ import {
   encodeBase32Crockford,
   decodeBase32Crockford,
   crc16Base32,
+  generateDEK,
+  wrapDEK,
+  unwrapDEK,
+  generateRecoveryCodes,
+  hashRecoveryCode,
+  verifyRecoveryCode,
 } from '../src/crypto.js';
 
 describe('hkdf', () => {
@@ -62,5 +68,61 @@ describe('crc16Base32', () => {
     expect(typeof result).toBe('number');
     expect(result).toBeGreaterThanOrEqual(0);
     expect(result).toBeLessThanOrEqual(31); // 5 bits for Base32 digit
+  });
+});
+
+describe('DEK envelope', () => {
+  it('should generate a 32-byte DEK', () => {
+    const dek = generateDEK();
+    expect(dek).toHaveLength(32);
+  });
+
+  it('should generate unique DEKs', () => {
+    const a = generateDEK();
+    const b = generateDEK();
+    expect(a.equals(b)).toBe(false);
+  });
+
+  it('should wrap and unwrap DEK round-trip', () => {
+    const dek = generateDEK();
+    const key = Buffer.alloc(32, 0xAA);
+    const wrapped = wrapDEK(dek, key);
+    const unwrapped = unwrapDEK(wrapped, key);
+    expect(dek.equals(unwrapped)).toBe(true);
+  });
+
+  it('should fail unwrap with wrong key', () => {
+    const dek = generateDEK();
+    const keyA = Buffer.alloc(32, 0xAA);
+    const keyB = Buffer.alloc(32, 0xBB);
+    const wrapped = wrapDEK(dek, keyA);
+    expect(() => unwrapDEK(wrapped, keyB)).toThrow();
+  });
+});
+
+describe('recovery codes', () => {
+  it('should generate 10 recovery codes', () => {
+    const { plaintexts, formatted } = generateRecoveryCodes(10);
+    expect(plaintexts).toHaveLength(10);
+    expect(formatted).toHaveLength(10);
+  });
+
+  it('should format as XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX', () => {
+    const { formatted } = generateRecoveryCodes(1);
+    expect(formatted[0]).toMatch(
+      /^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/
+    );
+  });
+
+  it('should verify a hashed recovery code', () => {
+    const { plaintexts } = generateRecoveryCodes(1);
+    const hash = hashRecoveryCode(plaintexts[0]);
+    expect(verifyRecoveryCode(plaintexts[0], hash)).toBe(true);
+  });
+
+  it('should reject wrong recovery code', () => {
+    const { plaintexts } = generateRecoveryCodes(2);
+    const hash = hashRecoveryCode(plaintexts[0]);
+    expect(verifyRecoveryCode(plaintexts[1], hash)).toBe(false);
   });
 });
