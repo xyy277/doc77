@@ -26,6 +26,8 @@
 | 9 | 首次安装超时 | CI 6 分钟超时 | hoisted 模式无缓存，下载 600+ 包 | `actions/cache@v4` 缓存 `~/.pnpm-store` |
 | 10 | vitest 超时 | Test timeout (10s) | scrypt N=131072 密码学测试耗时 ~25s | `testTimeout: 60000` + `hookTimeout: 60000` |
 | 11 | pnpm install 失败 | `No matching version found for @doc77/core@^0.5.3` | doc77 umbrella 包用 `^0.5.2` 依赖 CLI，workspace 版本 `0.6.0` 不匹配 semver 范围 | `packages/doc77/package.json` 改用 `workspace:^` |
+| 12 | Prettier 检查失败 | `Code style issues found in 10 files` | 提交前未运行 `pnpm format` | 提交前执行 `pnpm format && pnpm format:check` |
+| 13 | AI 包 build/test 崩溃 | `Could not resolve "./tools.js"` | `packages/ai/src/tools.ts` 在清理时被误删 | `git show <commit>^:path > path` 从历史恢复 |
 
 ## 依赖安装策略
 

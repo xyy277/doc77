@@ -158,6 +158,7 @@ git gc --prune=now --aggressive
 - **不熟悉的工具链必须先搜索** — 搭 CI、配构建工具、跨平台打包等场景，先 `WebSearch` 查最佳实践和已知 issue，再动手写。禁止边试边修。
 - **CI 失败后必须记录** — 每次 CI 失败的根因和修复方案写入 `docs/planning/ci-electron-lessons.md`
 - **electron-builder + pnpm** — CI 必须用 `node-linker=hoisted`（已知 #6289），本地保持原生 symlink
+- **提交前 CI 预检** — 每次提交前运行 `pnpm format:check && pnpm lint && pnpm build && pnpm test`，确保 CI 全绿
 - **GitHub Actions 权限** — Release 上传需要 `permissions: contents: write`
 
 ## 项目概述
