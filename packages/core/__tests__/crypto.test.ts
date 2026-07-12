@@ -107,10 +107,10 @@ describe('recovery codes', () => {
     expect(formatted).toHaveLength(10);
   });
 
-  it('should format as XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX', () => {
+  it('should format as XXXXX-XXXXX-XXXXX-XXXXX-XXXXX', () => {
     const { formatted } = generateRecoveryCodes(1);
     expect(formatted[0]).toMatch(
-      /^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/
+      /^[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}$/
     );
   });
 

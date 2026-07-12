@@ -1622,6 +1622,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   });
 
   // Get recovery code status
+  // TODO(I5): Add auth middleware — minor info leak without auth,
+  //           auth middleware is known tech debt per spec Section 11
   app.get('/api/auth/recovery-status', (_req: Request, res: Response) => {
     try {
       const status = auth.getRecoveryStatus();
@@ -1631,11 +1633,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
     }
   });
 
-  // Regenerate recovery codes
-  app.get('/api/auth/recovery-codes', (req: Request, res: Response) => {
-    const password = req.query.password as string;
+  // Regenerate recovery codes (POST with JSON body)
+  app.post('/api/auth/recovery-codes', (req: Request, res: Response) => {
+    const { password } = req.body;
     if (!password) {
-      res.status(400).json({ error: 'password query parameter is required' });
+      res.status(400).json({ error: 'password is required' });
       return;
     }
     try {

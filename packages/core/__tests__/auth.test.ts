@@ -45,7 +45,7 @@ describe('Password setup with DEK', () => {
     expect(codes!.formatted).toHaveLength(10);
     codes!.formatted.forEach((f) => {
       expect(f).toMatch(
-        /^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/,
+        /^[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}$/,
       );
     });
   });

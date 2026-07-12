@@ -328,14 +328,20 @@ async function changePw() {
   if(n.length < 6){ toast('新密码至少6位','error'); return; }
   var r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:c,new_password:n})});
   var d = await r.json();
-  if(d.ok){ toast('密码已修改','success'); switchSettingsTab('account'); }
+  if(d.ok){
+    if(d.recovery_codes){
+      showRecoveryCodesModal(d.recovery_codes);
+    }
+    switchSettingsTab('account');
+    toast('密码已修改','success');
+  }
   else { toast(d.error,'error'); }
 }
 
 async function regenerateRC(){
   var pw = prompt('请输入当前密码以确认身份：');
   if(!pw) return;
-  var r = await fetch('/api/auth/recovery-codes?password=' + encodeURIComponent(pw));
+  var r = await fetch('/api/auth/recovery-codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
   var d = await r.json();
   if(d.ok && d.recovery_codes){
     showRecoveryCodesModal(d.recovery_codes);
@@ -392,7 +398,7 @@ async function showForgotPassword(){
     '<img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77">' +
     '<h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">找回密码</h1>' +
     '<p style="font-size:13px;color:var(--text-secondary)">请输入一个恢复码</p></div>' +
-    '<input id="rcInput" type="text" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px;font-family:monospace;font-size:13px" autocomplete="off">' +
+    '<input id="rcInput" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px;font-family:monospace;font-size:13px" autocomplete="off">' +
     '<button onclick="verifyRC()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">验证恢复码</button>' +
     '<div id="rcError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div>' +
     '<div style="text-align:center;margin-top:16px"><a href="javascript:location.reload()" style="font-size:13px;color:var(--text-muted)">返回登录</a></div></div>';

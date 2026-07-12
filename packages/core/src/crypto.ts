@@ -11,6 +11,7 @@ export interface EncryptedData {
 const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const SCRYPT_KEY_LENGTH = 64;
+export const SCRYPT_OPTIONS = { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
 
 export function generateSalt(length = 16): Buffer {
   return randomBytes(length);
@@ -44,7 +45,7 @@ export function decrypt(data: EncryptedData, key: Buffer): string {
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, SCRYPT_KEY_LENGTH);
+  const hash = scryptSync(password, salt, SCRYPT_KEY_LENGTH, SCRYPT_OPTIONS);
   return `scrypt:${salt.toString('hex')}:${hash.toString('hex')}`;
 }
 
@@ -53,7 +54,7 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   if (algorithm !== 'scrypt' || !saltHex || !hashHex) return false;
 
   const expected = Buffer.from(hashHex, 'hex');
-  const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length, SCRYPT_OPTIONS);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
@@ -116,7 +117,7 @@ export function hkdf(ikm: Buffer, salt: Buffer, info: string, length: number): B
  * Uses scrypt + HKDF with the domain separator 'doc77-pw-wrap'.
  */
 export function derivePasswordWrapKey(password: string, pwSalt: Buffer, pwWrapSalt: Buffer): Buffer {
-  const scryptOutput = scryptSync(password, pwSalt, 64);
+  const scryptOutput = scryptSync(password, pwSalt, 64, SCRYPT_OPTIONS);
   return hkdf(scryptOutput, pwWrapSalt, 'doc77-pw-wrap', 32);
 }
 
@@ -213,7 +214,7 @@ export function unwrapDEK(data: EncryptedData, key: Buffer): Buffer {
 
 export interface RecoveryCodeSet {
   plaintexts: string[];   // 25-char raw Base32 (24 data + 1 checksum)
-  formatted: string[];    // 7-group dashed format
+  formatted: string[];    // 5-group dashed format (5x5)
 }
 
 export function generateRecoveryCodes(count: number): RecoveryCodeSet {
@@ -229,11 +230,10 @@ export function generateRecoveryCodes(count: number): RecoveryCodeSet {
 
     plaintexts.push(withChecksum);
 
-    // 25 chars -> pad to 28 for 7 groups of 4
-    const padded = withChecksum.padEnd(28, '0');
+    // 25 chars -> 5 groups of 5 (no padding needed)
     const groups: string[] = [];
-    for (let g = 0; g < 7; g++) {
-      groups.push(padded.slice(g * 4, (g + 1) * 4));
+    for (let g = 0; g < 5; g++) {
+      groups.push(withChecksum.slice(g * 5, (g + 1) * 5));
     }
     formatted.push(groups.join('-'));
   }
@@ -243,7 +243,7 @@ export function generateRecoveryCodes(count: number): RecoveryCodeSet {
 
 export function hashRecoveryCode(plaintext: string): string {
   const salt = randomBytes(16);
-  const hash = scryptSync(plaintext, salt, SCRYPT_KEY_LENGTH);
+  const hash = scryptSync(plaintext, salt, SCRYPT_KEY_LENGTH, SCRYPT_OPTIONS);
   return `scrypt:${salt.toString('hex')}:${hash.toString('hex')}`;
 }
 

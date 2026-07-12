@@ -20,6 +20,7 @@ export {
   scryptSync,
   extractSalt,
   derivePasswordWrapKey,
+  SCRYPT_OPTIONS,
 } from './crypto.js';
 export type { EncryptedData } from './crypto.js';
 
@@ -63,6 +64,19 @@ export {
   createAIChatHandler,
   setCapabilities,
 } from './server/app.js';
+
+// Auth
+export {
+  isLegacyMode,
+  setupPasswordWithDEK,
+  verifyLogin,
+  verifyRecoveryCode,
+  resetPasswordWithToken,
+  changePassword,
+  getRecoveryStatus,
+  regenerateRecoveryCodes,
+  forceResetPassword,
+} from './server/auth.js';
 
 // Vendor
 export { fetchVendorAssets, isVendorReady, VENDOR_ASSETS } from './server/vendor.js';

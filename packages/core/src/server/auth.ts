@@ -86,10 +86,49 @@ function signResetToken(codeIndex: number, dekPlaintext: Buffer): string {
 
 function verifyStoredResetToken(token: string): { valid: boolean; codeIndex?: number } {
   const state = resetState.get(token);
-  if (!state || Date.now() > state.expiresAt) {
-    if (state) resetState.delete(token);
+  if (!state) {
     return { valid: false };
   }
+
+  // Parse JWT and verify HMAC-SHA256 signature using the DEK-derived key
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    resetState.delete(token);
+    return { valid: false };
+  }
+
+  const db = getConnection();
+  const row = db.prepare('SELECT jwt_salt FROM user_auth WHERE id = 1').get() as
+    { jwt_salt: string } | undefined;
+  if (!row) {
+    resetState.delete(token);
+    return { valid: false };
+  }
+
+  const jwtKey = crypto.hkdf(state.dek, Buffer.from(row.jwt_salt, 'hex'), 'doc77-jwt-sign', 32);
+  const expectedSig = createHmac('sha256', jwtKey)
+    .update(`${parts[0]}.${parts[1]}`)
+    .digest('base64url');
+
+  if (parts[2] !== expectedSig) {
+    resetState.delete(token);
+    return { valid: false };
+  }
+
+  // Check exp claim from JWT payload
+  let payload: { exp?: number };
+  try {
+    payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+  } catch {
+    resetState.delete(token);
+    return { valid: false };
+  }
+
+  if (payload.exp && Date.now() > payload.exp * 1000) {
+    resetState.delete(token);
+    return { valid: false };
+  }
+
   return { valid: true, codeIndex: state.codeIndex };
 }
 
@@ -107,7 +146,7 @@ const resetState = new Map<string, { dek: Buffer; codeIndex: number; expiresAt: 
  *
  * Returns null if a password is already set.
  */
-export function setupPasswordWithDEK(password: string): crypto.RecoveryCodeSet | null {
+export function setupPasswordWithDEK(password: string, source = 'web'): crypto.RecoveryCodeSet | null {
   const db = getConnection();
   const existing = db
     .prepare('SELECT password_hash FROM user_auth WHERE id = 1')
@@ -121,7 +160,7 @@ export function setupPasswordWithDEK(password: string): crypto.RecoveryCodeSet |
   const jwtSalt = crypto.generateSalt();
 
   // Derive wrap key from password
-  const scryptOutput = crypto.scryptSync(password, pwSalt, 64);
+  const scryptOutput = crypto.scryptSync(password, pwSalt, 64, crypto.SCRYPT_OPTIONS);
   const pwWrapKey = crypto.hkdf(scryptOutput, pwWrapSalt, 'doc77-pw-wrap', 32);
   const wrappedByPw = crypto.wrapDEK(dek, pwWrapKey);
 
@@ -170,7 +209,7 @@ export function setupPasswordWithDEK(password: string): crypto.RecoveryCodeSet |
     JSON.stringify(used),
   );
 
-  writeAuditLog('password_changed', { action: 'initial_setup' }, 'web', 'success');
+  writeAuditLog('password_changed', { action: 'initial_setup' }, source, 'success');
 
   return codes;
 }
@@ -318,7 +357,8 @@ export function verifyRecoveryCode(rcInput: string): {
 
 export function resetPasswordWithToken(
   resetToken: string,
-  newPassword: string
+  newPassword: string,
+  source = 'web'
 ): { ok: boolean; error?: string; status: number } {
   const { valid, codeIndex } = verifyStoredResetToken(resetToken);
   if (!valid || codeIndex === undefined) {
@@ -335,7 +375,7 @@ export function resetPasswordWithToken(
 
   const pwSalt = crypto.generateSalt();
   const pwWrapSaltHex = row?.pw_wrap_salt as string;
-  const scryptOutput = crypto.scryptSync(newPassword, pwSalt, 64);
+  const scryptOutput = crypto.scryptSync(newPassword, pwSalt, 64, crypto.SCRYPT_OPTIONS);
   const pwWrapKey = crypto.hkdf(
     scryptOutput,
     Buffer.from(pwWrapSaltHex, 'hex'),
@@ -364,7 +404,7 @@ export function resetPasswordWithToken(
     JSON.stringify(used),
   );
 
-  writeAuditLog('recovery_code_used', { code_index: codeIndex }, 'web', 'success');
+  writeAuditLog('recovery_code_used', { code_index: codeIndex }, source, 'success');
 
   // Clean up in-memory state
   resetState.delete(resetToken);
@@ -378,7 +418,8 @@ export function resetPasswordWithToken(
 
 export function changePassword(
   oldPassword: string,
-  newPassword: string
+  newPassword: string,
+  source = 'web'
 ): { ok: boolean; codes?: crypto.RecoveryCodeSet; error?: string; status: number } {
   const db = getConnection();
   const row = getAuthRow();
@@ -402,7 +443,7 @@ export function changePassword(
     const jwtSalt = crypto.generateSalt();
 
     const newPwSalt = crypto.generateSalt();
-    const scryptOutput = crypto.scryptSync(newPassword, newPwSalt, 64);
+    const scryptOutput = crypto.scryptSync(newPassword, newPwSalt, 64, crypto.SCRYPT_OPTIONS);
     const pwWrapKey = crypto.hkdf(scryptOutput, pwWrapSalt, 'doc77-pw-wrap', 32);
     wrappedByPw = crypto.wrapDEK(dek, pwWrapKey);
 
@@ -446,7 +487,7 @@ export function changePassword(
       JSON.stringify(used),
     );
 
-    writeAuditLog('password_changed', {}, 'web', 'success');
+    writeAuditLog('password_changed', {}, source, 'success');
 
     return { ok: true, codes, status: 200 };
   }
@@ -468,7 +509,7 @@ export function changePassword(
   }
 
   const newPwSalt = crypto.generateSalt();
-  const newScryptOutput = crypto.scryptSync(newPassword, newPwSalt, 64);
+  const newScryptOutput = crypto.scryptSync(newPassword, newPwSalt, 64, crypto.SCRYPT_OPTIONS);
   const newPwWrapKey = crypto.hkdf(
     newScryptOutput,
     Buffer.from(row.pw_wrap_salt as string, 'hex'),
@@ -487,7 +528,7 @@ export function changePassword(
     JSON.stringify(wrappedByPw),
   );
 
-  writeAuditLog('password_changed', {}, 'web', 'success');
+  writeAuditLog('password_changed', {}, source, 'success');
 
   return { ok: true, status: 200 };
 }
@@ -512,7 +553,7 @@ export function getRecoveryStatus(): { remaining: number; total: number; hasReco
 // Regenerate recovery codes
 // ---------------------------------------------------------------------------
 
-export function regenerateRecoveryCodes(password: string): {
+export function regenerateRecoveryCodes(password: string, source = 'web'): {
   ok: boolean;
   codes?: crypto.RecoveryCodeSet;
   error?: string;
@@ -575,7 +616,7 @@ export function regenerateRecoveryCodes(password: string): {
     JSON.stringify(used),
   );
 
-  writeAuditLog('recovery_codes_regenerated', {}, 'web', 'success');
+  writeAuditLog('recovery_codes_regenerated', {}, source, 'success');
 
   return { ok: true, codes, status: 200 };
 }
