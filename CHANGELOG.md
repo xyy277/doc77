@@ -4,6 +4,48 @@
 
 ---
 
+## [2026-07-12]
+
+### @doc77/core `0.6.0`
+
+**Added**
+- 密码恢复功能：信封加密（DEK）+ 一次性恢复码（10 个，Crockford Base32 格式）
+- 密码学扩展：HKDF-SHA256、Crockford Base32 编解码、CRC-16 校验
+- DEK 包裹/解包：AES-256-GCM，密码与恢复码双路径
+- 忘记密码 API：`POST /api/auth/forgot-password/verify` + `/reset`
+- 密码修改 API：`POST /api/auth/change-password`
+- 恢复码管理 API：`GET /api/auth/recovery-status` + `/api/auth/recovery-codes`
+- 审计日志扩展：`password_changed`、`recovery_code_used`、`recovery_codes_regenerated`、`password_force_reset`
+- `user_auth` 表 v2 迁移：11 个新字段支持信封加密
+
+**Security**
+- 密钥派生增强：scrypt N=131072（符合设计规格）+ HKDF 域分离
+- 独立爆破防护：登录 5 次锁定 15 分钟，恢复码独立 5 次锁定 15 分钟
+- 恢复码安全：仅展示一次，scrypt 哈希存储，timingSafeEqual 防时序攻击
+- 遗留模式兼容：旧用户修改密码时自动迁移到信封加密
+
+**Changed**
+- `POST /api/auth/setup` 返回恢复码列表
+- `GET /api/auth/status` 新增 `hasRecovery` 字段
+
+### @doc77/cli `0.2.0`
+
+**Added**
+- `doc77 config set-password` — 输出恢复码
+- `doc77 config change-password` — 交互式修改密码
+- `doc77 config reset-password` — 恢复码重置密码
+- `doc77 config reset-password --force` — 强制重置（清空加密配置）
+- `doc77 config recovery-codes` — 重新生成恢复码
+
+### Web UI `0.6.0`
+
+**Added**
+- 忘记密码流程：登录门增加"忘记密码？"链接 → 恢复码验证 → 新密码设置
+- 恢复码展示弹窗：首次设置密码后展示 10 个恢复码，支持一键复制
+- 账户设置增强：剩余恢复码数量、重新生成按钮、新改密码 API
+
+---
+
 ## [2026-07-08]
 
 ### @doc77/core `0.2.5`

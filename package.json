@@ -1,6 +1,6 @@
 {
   "name": "doc77-monorepo",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Doc77 — 默认安全、对话驱动的智能本地文档管理 Agent",
