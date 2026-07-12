@@ -154,6 +154,8 @@ Doc77 v${VERSION} — 默认安全、对话驱动的智能本地文档管理 Age
 用法:
   doc77 <command> [options]
 
+📦 桌面版下载: https://github.com/xyy277/doc77/releases
+
 核心命令:
   start [--port <n>] [--bind <addr>] [--no-browser]  启动 Web Dashboard
   discover [path]                     扫描发现候选项目
@@ -351,6 +353,7 @@ async function main() {
         console.log(
           `Doc77 Dashboard: http://${bindAddr === '127.0.0.1' || bindAddr === '::1' || bindAddr === 'localhost' ? 'localhost' : bindAddr}:${port}`,
         );
+        console.log('💡 桌面版: https://github.com/xyy277/doc77/releases');
       });
 
       // Graceful shutdown

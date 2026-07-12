@@ -2,9 +2,9 @@
 
 > 文档预览器 | 文档管理器 | Markdown 阅读器 | PDF 查看器 | Code Viewer | 知识库 | 局域网文档服务器
 >
-> 开源 · 免费 · 跨平台 · 移动端适配 · 零配置 · 一命令部署
+> 开源 · 免费 · 跨平台 · 移动端适配 · 零配置 · 📦 桌面版
 
-**Doc77** 是轻量级本地文档预览器 + MCP 文件操作桥梁 + AI 对话驱动管理 Agent。一行命令启动 Web Dashboard，浏览器即文档工作台。支持 Windows / macOS / Linux / WSL，密码保护下可安全对外暴露。
+**Doc77** 是轻量级本地文档预览器 + MCP 文件操作桥梁 + AI 对话驱动管理 Agent。浏览器即文档工作台，支持 Windows / macOS / Linux / WSL。提供 Electron 桌面版，非技术用户双击即用。密码保护下可安全对外暴露。
 
 只读时是多项目陈列馆，写入时是需你审批的智能管家——所有文件操作经你确认后才执行，内置安全审批、原子化事务回滚与跨盘容错。
 
@@ -22,7 +22,7 @@
 | **🐳 Docker 部署** | 挂载文档卷，容器内启动。CI/CD 产物文档即时预览，开发环境文档统一入口 |
 | **📡 局域网会议共享** | 一人 `doc77 start --bind 0.0.0.0`，全屋设备浏览器直接看。会议讨论需求文档、设计方案，各自设备同步浏览 |
 | **📱 移动端随时查阅** | 手机 / 平板自适应 UI，通勤路上、客户现场也能浏览项目文档。响应式设计，桌面端和移动端一致体验 |
-| **🔄 混合环境办公** | WSL / Linux 开发 + Windows 办公。不用 SSH 下载再打开，一行命令局域网内任意设备浏览器直接预览 |
+| **🔄 Win+WSL 混合开发** | WSL 里写代码，Windows 里办公。以前看 MD 要 SSH 下载或用黑终端 less 翻页；现在 `doc77 start --bind 0.0.0.0` 一行命令，Windows 浏览器直接预览，手机平板也能看。效率提升一个量级 |
 | **🤖 Agent / MCP 开发** | 内置 MCP Server（stdio + HTTP），8 个 Tool 暴露文件系统能力。调试 Agent 时直接在 Web 端查看文件变动、审批写操作 |
 | **🪟 纯 Windows 办公** | 完全免费开源的文档预览工具。Markdown、PDF、Office、代码高亮一站搞定，不像某些 GUI 软件读个 MD 还要付费 |
 | **🗄️ 多项目文档管理** | 一次注册永久记住，Dashboard 统一切换。收藏夹、近期文件、全局搜索、目录树，像 IDE 一样浏览本地文档 |
@@ -37,32 +37,38 @@
 - 🐛 **稳定性** — 多平台兼容，消灭体验 bug
 - ✨ **预览质量** — 格式支持、阅读工具、AI 辅助做到极致
 
-## v0.3 里程碑
+## v0.5 能力概览
 
-| 模块 | 完成内容 |
+| 模块 | 内容 |
 |---|---|
+| **Electron 桌面版** | Windows / macOS / Linux 一键安装，原生文件对话框，系统托盘，GPU 加速 |
+| **模块插件化** | AI / MCP 可选安装（`doc77 i ai`），默认轻量，按需扩展 |
 | **品牌系统** | SVG Logo（favicon + 深浅双模）、Console ASCII Banner |
 | **UI 交互** | 左侧栏折叠（☰）、设置抽屉动画、收藏区折叠、功能引导页 |
-| **Windows 兼容** | 文件浏览器跨平台适配、全局搜索（Node.js 原生替代 grep）、浏览策略优化 |
-| **安全与权限** | 黑名单路径拦截 + 密码保护双保险、session 管理、审计日志 |
-| **前端体验** | 首页介绍区、GitHub Star、移动端 Logo、点 backdrop 关闭设置 |
+| **Windows 兼容** | 文件浏览器跨平台适配、全局搜索（Node.js 替代 grep）、浏览策略优化 |
+| **安全与权限** | 黑名单路径拦截 + 密码保护、session 管理、审计日志 |
+| **性能优化** | Tailwind 本地缓存、GPU 加速、窗口预加载 |
+| **前端体验** | 首页介绍区、GitHub Star、移动端 Logo、Settings 抽屉 |
 
-## 快速开始
+## 安装
+
+### 桌面版（推荐普通用户）
+
+| 平台 | 下载 |
+|---|---|
+| Windows | [📦 Doc77-Setup.exe](https://github.com/xyy277/doc77/releases/latest) |
+| macOS | [📦 Doc77.dmg](https://github.com/xyy277/doc77/releases/latest) |
+| Linux | [📦 Doc77.AppImage](https://github.com/xyy277/doc77/releases/latest) |
+
+双击安装，桌面快捷方式启动。原生系统对话框选文件夹，开箱即用。
+
+### 命令行版（推荐开发者）
 
 ```bash
-# 安装
-npm install -g @doc77/cli
-
-# 注册一个项目
-doc77 register ./my-docs --name "我的文档"
-
-# 启动 Dashboard（仅本机访问）
-doc77 start
-
-# 或允许局域网 / 外部访问
-doc77 start --bind 0.0.0.0
-
-# 浏览器打开 http://localhost:3099
+npm install -g idoc77                # 安装
+doc77 register ./my-docs --name "我的文档"   # 注册项目
+doc77 start                          # 启动（127.0.0.1:3099）
+doc77 start --bind 0.0.0.0           # 或允许局域网访问
 ```
 
 ## 命令参考
