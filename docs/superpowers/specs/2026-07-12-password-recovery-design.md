@@ -35,8 +35,8 @@
 ```
 
 - **DEK（Data Encryption Key）**：32 字节随机值，首次设置密码时生成，之后不变
-- **密码包裹 DEK**：用户密码通过 scrypt 派生密钥，用 AES-256-GCM 加密 DEK
-- **恢复码包裹 DEK**：每个恢复码通过 pbkdf2 派生密钥，用 AES-256-GCM 加密 DEK
+- **密码包裹 DEK**：密码 → scrypt → HKDF 域分离 → 派生密钥 → AES-256-GCM 加密 DEK
+- **恢复码包裹 DEK**：恢复码 → SHA-256（快速索引）→ scrypt（验证）→ HKDF（包裹密钥）→ AES-256-GCM 加密 DEK
 
 ### 2.2 场景矩阵
 
@@ -54,20 +54,49 @@
 
 ### 3.1 密钥派生
 
-- **密码派生（慢速 KDF）**：`pw_key = scrypt(password, pw_salt, 64, {N: 2^17, r: 8, p: 1})`
-- **恢复码派生（相对快速）**：`rc_key = pbkdf2(rc_plaintext, rc_salt, 10000, 32, 'sha256')`
-  - 恢复码本身熵够高（120+ bit），不需要 scrypt
+**密码 → 验证哈希 + 包裹密钥（域分离）**
+
+```
+scrypt_output = scryptSync(password, pw_salt, 64, {N: 2^17, r: 8, p: 1})
+pw_verify     = scrypt_output                              // 64 字节，用于登录验证
+pw_wrap_key   = HKDF-SHA256(IKM: scrypt_output,            // 32 字节，用于包裹 DEK
+                            salt: pw_wrap_salt,
+                            info: "doc77-pw-wrap")
+```
+
+> **域分离**：验证密码和包裹 DEK 使用不同的派生路径（不同 salt + info），防止同一密钥材料用于两个目的。
+
+**恢复码 → 验证哈希 + 包裹密钥**
+
+```
+rc_verify     = scryptSync(rc_plaintext, rc_verify_salt, 64)  // 慢速，防暴力破解
+rc_index      = SHA-256(rc_plaintext)                          // 快速索引，定位恢复码位置
+rc_wrap_key   = HKDF-SHA256(IKM: rc_plaintext,                 // 恢复码高熵(120bit)，HKDF 即可
+                            salt: rc_wrap_salt,
+                            info: "doc77-rc-wrap",
+                            len: 32)
+```
+
+> `rc_wrap_salt` 是全局单一随机值（不同恢复码共用 salt，因为 IKM 各不相同且高熵）。`rc_verify_salt` 每个恢复码独立随机。
 
 ### 3.2 DEK 包裹/解包
 
-复用现有 `crypto.ts` 中的 `encrypt()` / `decrypt()` 函数（AES-256-GCM），DEK 作为 plaintext 输入，派生密钥作为 encryption key。
+复用现有 `crypto.ts` 中的 `encrypt()` / `decrypt()` 函数（AES-256-GCM），DEK 作为 plaintext 输入，HKDF 派生的密钥作为 encryption key。
 
 ```
-wrap(dek, key)  → EncryptedData { iv, tag, ciphertext }
-unwrap(data, key) → Buffer
+wrap(dek, hkdf_derived_key)  → EncryptedData { iv, tag, ciphertext }
+unwrap(data, hkdf_derived_key) → Buffer
 ```
 
-### 3.3 恢复码格式
+### 3.3 HKDF 实现
+
+使用 Node.js 内置 `crypto.hkdfSync`（Node 16+），摘要函数为 SHA-256：
+
+```
+hkdfSync('sha256', ikm, salt, info, length)
+```
+
+### 3.4 恢复码格式
 
 ```
 格式: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (8 组，4 字符/组)
@@ -78,7 +107,7 @@ unwrap(data, key) → Buffer
 
 选择 Crockford Base32 而非 hex：更短，字母和数字区分清晰，不易抄错。
 
-### 3.4 恢复码哈希存储
+### 3.5 恢复码哈希存储
 
 每个恢复码用 `scryptSync` 独立哈希（去掉分隔符后计算），格式与密码哈希一致：`scrypt:salt:hash`。验证时使用 `timingSafeEqual` 防时序攻击。
 
@@ -92,11 +121,15 @@ unwrap(data, key) → Buffer
 CREATE TABLE user_auth (
     id INTEGER PRIMARY KEY DEFAULT 1,
     password_hash TEXT,
-    pbkdf2_salt TEXT,              -- 配置加密迁移前的遗留盐值
+    pw_wrap_salt TEXT,              -- 密码包裹 DEK 的 HKDF salt
+    rc_wrap_salt TEXT,              -- 恢复码包裹 DEK 的 HKDF salt（全局单一值）
+    jwt_salt TEXT,                  -- JWT 签名密钥 HKDF salt
+    pbkdf2_salt TEXT,               -- 配置加密迁移前的遗留盐值
     encryption_salt TEXT,           -- 遗留
     wrapped_dek_by_password TEXT,   -- EncryptedData JSON
     wrapped_dek_by_recovery TEXT,   -- EncryptedData[] JSON (10 个)
     recovery_code_hashes TEXT,      -- string[] JSON (10 个 scrypt hash)
+    recovery_code_index_hashes TEXT,-- string[] JSON (10 个 SHA-256 hex)，快速定位恢复码
     recovery_codes_used TEXT,       -- boolean[] JSON (10 个)
     recovery_codes_generated_at DATETIME,
     failed_attempts INTEGER DEFAULT 0,
@@ -127,6 +160,8 @@ CREATE TABLE user_auth (
 | `/api/auth/forgot-password/reset` | POST | **新增**——用临时 reset_token + 新密码，重置密码哈希 + 重新包裹 DEK | 否 |
 | `/api/auth/recovery-codes` | GET | **新增**——已登录状态下重新生成恢复码，旧码作废 | 是 |
 | `/api/auth/recovery-status` | GET | **新增**——已登录状态下查看剩余恢复码数量 | 是 |
+
+> **认证说明**：标记"需要认证"的端点，当前使用登录时返回的 `session-${timestamp}` token 做基本校验——请求需携带 `Authorization: Bearer <token>` header，服务端对比与数据库中存储的当前有效 session token 是否一致。此方案为临时实现，待 auth middleware 技术债（Section 11 #1）解决后统一升级为 JWT-based 认证。
 
 ### 5.2 关键端点详细设计
 
@@ -170,10 +205,13 @@ CREATE TABLE user_auth (
 ```
 
 内部操作：
-1. 去除输入中的分隔符 → scrypt 哈希 → timingSafeEqual 比对
-2. 如果匹配且未被使用 → 生成 JWT reset_token（有效期 5 分钟，包含 `code_index` claim）
-3. 如果匹配但已被使用 → 返回 `recovery_code_already_used`
-4. 如果不匹配 → `recovery_attempts += 1`，5 次失败 → `recovery_locked_until = now + 15 min`
+1. 去除输入中的分隔符
+2. 计算 `SHA-256(rc_plaintext)` → 对比 `recovery_code_index_hashes` 快速定位是第几个恢复码
+3. 如果 SHA-256 无匹配 → `recovery_attempts += 1`（只需 1 次 SHA-256，不做 scrypt）
+4. 如果匹配到索引 `i` → 对 `recovery_code_hashes[i]` 做 scrypt + timingSafeEqual 验证
+5. 验证通过且未被使用 → 用恢复码 + HKDF 解包 `wrapped_dek_by_recovery[i]` 获得 DEK 明文 → 用 DEK 签名 JWT reset_token（有效期 5 分钟，包含 `code_index` claim）
+6. 验证通过但已被使用 → 返回 `recovery_code_already_used`
+7. 验证不通过 → `recovery_attempts += 1`，5 次失败 → `recovery_locked_until = now + 15 min`
 
 #### POST /api/auth/forgot-password/reset
 
@@ -316,7 +354,10 @@ $ doc77 config reset-password --force
 
 ### 9.4 reset_token 安全
 
-- JWT 格式，使用 HMAC-SHA256 签名（密钥为 DEK 前 32 字节）
+- JWT 格式，使用 HMAC-SHA256 签名
+- 签名密钥从 DEK 派生：`jwt_key = HKDF-SHA256(IKM: DEK, salt: jwt_salt, info: "doc77-jwt-sign", len: 32)`
+  - `jwt_salt` 是首次设置密码时生成的随机值，存储在 `user_auth` 表中
+  - verify 端点先解包 DEK 明文，再派生 JWT 签名密钥，然后签发 token
 - 有效期 5 分钟
 - 包含 `code_index` claim 用于标记哪个恢复码被使用
 - 一次性使用（reset 成功后对应的恢复码即被标记已用）
