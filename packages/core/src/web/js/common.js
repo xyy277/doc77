@@ -292,7 +292,10 @@ async function renderAccountSection(){
       '<div id="pwStrength" style="font-size:11px;margin:4px 0"></div>' +
       '<button onclick="changePw()" class="btn btn-primary" style="width:100%;font-size:13px">修改密码</button>' +
       '</div>' +
-      '<button onclick="doLogout()" class="btn" style="color:var(--danger);width:100%;margin-top:16px;font-size:13px">退出登录</button>';
+      '<button onclick="doLogout()" class="btn" style="color:var(--danger);width:100%;margin-top:16px;font-size:13px">退出登录</button>' +
+      '<hr style="margin:16px 0;border-color:var(--border)">' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">危险操作 — 清除所有安全设置（包括AI Token等加密配置）</div>' +
+      '<button onclick="forceResetPw()" class="btn" style="color:var(--danger);width:100%;font-size:11px;border-color:var(--danger)">强制重置密码</button>';
   } else {
     s.innerHTML = '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">尚未设置密码</div>' +
       '<input id="setupPass" type="password" placeholder="设置密码（至少6位）" class="input" style="width:100%;padding:6px 12px">' +
@@ -300,6 +303,21 @@ async function renderAccountSection(){
   }
 }
 function doLogout() { sessionStorage.removeItem("doc77-auth"); location.reload(); }
+async function forceResetPw() {
+  if (!confirm('⚠️ 此操作将清除所有安全设置（密码、恢复码）和加密配置（AI Token 等），且不可撤销。\n\n确定要继续吗？')) return;
+  var pw = prompt('请输入当前密码以验证身份：');
+  if (!pw) return;
+  try {
+    var r = await fetch('/api/auth/force-reset', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: pw, confirm: 'yes-i-know'})
+    });
+    var d = await r.json();
+    if (d.ok) { alert('✅ 安全设置已清除。页面将刷新。'); sessionStorage.removeItem('doc77-auth'); location.reload(); }
+    else { alert('❌ ' + (d.error || '操作失败')); }
+  } catch(e) { alert('❌ 请求失败: ' + e.message); }
+}
 function updateStrength() {
   var p = (document.getElementById('newPass') && document.getElementById('newPass').value) || '';
   var s = 0; if (p.length >= 8) s++; if (p.length >= 12) s++; if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++; if (/[0-9]/.test(p)) s++; if (/[^a-zA-Z0-9]/.test(p)) s++;
@@ -369,6 +387,11 @@ async function regenerateRC(){
       var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
       var d2 = await r2.json();
       if (d2.ok) { sessionStorage.setItem("doc77-auth","1"); o.remove(); }
+      else if (d2.migrationNeeded) {
+        // scrypt params migration: old password hash cleared, guide user to re-set
+        e.innerHTML = d2.error + '<br><a href="javascript:void(0)" onclick="location.reload()" style="color:var(--accent);font-size:11px">刷新页面设置新密码</a>';
+        e.style.display = 'block';
+      }
       else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
     };
     showSecurityPrompt();

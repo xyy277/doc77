@@ -14,6 +14,8 @@ export {
   generateSalt,
   hashPassword,
   verifyPassword,
+  verifyPasswordLegacy,
+  LEGACY_SCRYPT_OPTIONS,
   checkPasswordStrength,
   isSensitiveKey,
   maskSensitive,

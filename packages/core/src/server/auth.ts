@@ -234,6 +234,24 @@ export function verifyLogin(password: string): {
   }
 
   if (!crypto.verifyPassword(password, row.password_hash as string)) {
+    // Fallback: try legacy scrypt params (N=16384, v0.5.x and earlier)
+    if (crypto.verifyPasswordLegacy(password, row.password_hash as string)) {
+      // Legacy hash detected — auto-migrate: wipe auth so user can re-set password
+      forceResetPassword();
+      writeAuditLog(
+        'scrypt_migration',
+        { action: 'legacy_hash_detected_cleared' },
+        'server',
+        'success',
+      );
+      return {
+        ok: false,
+        error:
+          '密码加密算法已升级（v0.6），为安全起见请重新设置密码。旧密码已失效，加密配置（AI Token 等）已清除。',
+        status: 410,
+      };
+    }
+
     const fails = ((row.failed_attempts as number) || 0) + 1;
     if (fails >= 5) {
       db.prepare(
@@ -428,7 +446,11 @@ export function changePassword(
     return { ok: false, error: '未设置密码', status: 404 };
   }
 
-  if (!crypto.verifyPassword(oldPassword, row.password_hash as string)) {
+  // Try new params first (N=131072), then legacy (N=16384)
+  if (
+    !crypto.verifyPassword(oldPassword, row.password_hash as string) &&
+    !crypto.verifyPasswordLegacy(oldPassword, row.password_hash as string)
+  ) {
     return { ok: false, error: 'current_password_wrong', status: 401 };
   }
 
@@ -573,8 +595,11 @@ export function regenerateRecoveryCodes(
     return { ok: false, error: '未设置密码', status: 404 };
   }
 
-  // Verify password
-  if (!crypto.verifyPassword(password, row.password_hash as string)) {
+  // Verify password (try new params first, then legacy)
+  if (
+    !crypto.verifyPassword(password, row.password_hash as string) &&
+    !crypto.verifyPasswordLegacy(password, row.password_hash as string)
+  ) {
     return { ok: false, error: 'current_password_wrong', status: 401 };
   }
 

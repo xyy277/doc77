@@ -261,11 +261,27 @@ async function main() {
       const isLocalAddr = (a: string) => a === '127.0.0.1' || a === 'localhost' || a === '::1';
       const bindAddr = cliBind || getConfig('security.bind_address') || '127.0.0.1';
 
-      // Restart callback: spawn new process with same args, then exit
+      // Restart callback: spawn new process, respecting DB-persisted config
+      // CLI --bind/--port are one-time overrides; on restart, DB config wins.
       const restartServer = () => {
         const argv = process.argv.slice(1); // skip node binary
+        // Strip --bind and --port so DB-persisted values take effect on restart
+        const filtered: string[] = [];
+        for (let i = 0; i < argv.length; i++) {
+          if (argv[i] === '--bind' || argv[i] === '--port') {
+            i++; // skip value too
+            continue;
+          }
+          filtered.push(argv[i]);
+        }
+        // Re-apply DB-persisted values if set
+        const dbBind = getConfig('security.bind_address');
+        if (dbBind) filtered.push('--bind', dbBind);
+        const dbPort = getConfig('server.port');
+        if (dbPort) filtered.push('--port', dbPort);
+
         let spawnFailed = false;
-        const child = spawn(process.execPath, argv, { detached: true, stdio: 'inherit' });
+        const child = spawn(process.execPath, filtered, { detached: true, stdio: 'inherit' });
         child.on('error', (err) => {
           spawnFailed = true;
           console.error('[doc77] Failed to restart server:', err.message);
@@ -277,7 +293,7 @@ async function main() {
           if (!spawnFailed) process.exit(0);
         });
       };
-      const app = createApp(restartServer, bindAddr);
+      const app = createApp(restartServer, bindAddr, port);
 
       // Register MCP-dependent routes (optional)
       try {

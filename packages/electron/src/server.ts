@@ -57,7 +57,7 @@ export async function startServer(port: number): Promise<ServerProcess> {
   runMigrations();
   loadDefaults();
 
-  const app = createApp(undefined, '127.0.0.1');
+  const app = createApp(undefined, '127.0.0.1', port);
   const server = http.createServer(app);
 
   return new Promise((resolve, reject) => {

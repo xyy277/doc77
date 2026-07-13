@@ -15,15 +15,15 @@ let server: ServerProcess | null = null;
 let tray: Tray | null = null;
 let shuttingDown = false;
 
-const isDev = !app.isPackaged;
-
 function createWindow(port: number): void {
+  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     title: 'Doc77',
+    icon: iconPath,
     show: false,
     backgroundColor: '#0f172a',
     webPreferences: {
@@ -50,10 +50,8 @@ async function boot(): Promise<void> {
 
   createWindow(port);
 
-  const iconPath = isDev
-    ? path.join(__dirname, '..', 'assets', 'tray.png')
-    : path.join(process.resourcesPath, 'assets', 'tray.png');
-  tray = createTray(iconPath, () => {
+  const trayIconPath = path.join(__dirname, '..', 'assets', 'tray.png');
+  tray = createTray(trayIconPath, () => {
     if (mainWindow?.isVisible()) {
       mainWindow.hide();
     } else {

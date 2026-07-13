@@ -48,8 +48,9 @@ export function setCapabilities(caps: { ai: boolean; mcp: boolean }) {
  * Create and configure the Express application.
  * @param restartCallback — if provided, enables POST /api/restart endpoint
  * @param bindAddr — actual runtime bind address (for /api/server-info)
+ * @param port — actual runtime port (for /api/server-info)
  */
-export function createApp(restartCallback?: () => void, bindAddr?: string) {
+export function createApp(restartCallback?: () => void, bindAddr?: string, port?: number) {
   const app = express();
 
   // --- Middleware ---
@@ -163,12 +164,31 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
   app.get('/api/server-info', (_req: Request, res: Response) => {
     const addr = bindAddr || '127.0.0.1';
     const isLocal = addr === '127.0.0.1' || addr === '::1' || addr === 'localhost';
-    res.json({
+    const isElectron = process.env.DOC77_ELECTRON === '1';
+    const info: Record<string, unknown> = {
+      version: VERSION,
+      port: port || 2777,
       bindAddress: addr,
       isLocal,
-      port: 2777,
-      version: VERSION,
-    });
+      runningIn: isElectron ? 'electron' : 'cli',
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version,
+    };
+    if (isElectron) (info as any).electronVersion = process.versions.electron || null;
+    try {
+      const db = getConnection();
+      const authRow = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
+        { password_hash: string } | undefined;
+      const projectCount = (
+        db.prepare('SELECT COUNT(*) as cnt FROM projects').get() as { cnt: number }
+      ).cnt;
+      info.projectCount = projectCount;
+      info.capabilities = _capabilities;
+    } catch {
+      /* non-critical */
+    }
+    res.json(info);
   });
 
   // Module capabilities
@@ -1534,32 +1554,16 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       return;
     }
     try {
-      const db = getConnection();
-      const row = db.prepare('SELECT * FROM user_auth WHERE id = 1').get() as
-        Record<string, unknown> | undefined;
-      if (!row?.password_hash) {
-        res.status(404).json({ error: '未设置密码' });
-        return;
+      const result = auth.verifyLogin(password);
+      if (result.ok) {
+        res.json({ ok: true, token: result.token });
+      } else {
+        res.status(result.status).json({
+          ok: false,
+          error: result.error,
+          ...(result.status === 410 ? { migrationNeeded: true } : {}),
+        });
       }
-      if (row.locked_until && new Date(row.locked_until as string) > new Date()) {
-        res.status(423).json({ error: '账户已锁定，请稍后再试' });
-        return;
-      }
-      if (!crypto.verifyPassword(password, row.password_hash as string)) {
-        const fails = ((row.failed_attempts as number) || 0) + 1;
-        if (fails >= 5) {
-          db.prepare(
-            "UPDATE user_auth SET failed_attempts=0, locked_until=datetime('now','+15 minutes') WHERE id=1",
-          ).run();
-          res.status(423).json({ error: '密码错误次数过多，已锁定15分钟' });
-        } else {
-          db.prepare('UPDATE user_auth SET failed_attempts=? WHERE id=1').run(fails);
-          res.status(401).json({ error: `密码错误（${fails}/5）` });
-        }
-        return;
-      }
-      db.prepare('UPDATE user_auth SET failed_attempts=0, locked_until=NULL WHERE id=1').run();
-      res.json({ ok: true, token: 'session-' + Date.now() });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }
@@ -1662,6 +1666,41 @@ export function createApp(restartCallback?: () => void, bindAddr?: string) {
       } else {
         res.status(result.status).json({ error: result.error });
       }
+    } catch (e: unknown) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Force-reset password — wipe all auth state (requires confirmation)
+  // Force-reset password — requires current password verification (defense-in-depth)
+  // No auth middleware exists yet (tech debt per spec Section 11), so we
+  // gate on knowledge of the current password, matching nearby endpoints.
+  app.post('/api/auth/force-reset', (req: Request, res: Response) => {
+    const { password, confirm } = req.body;
+    if (confirm !== 'yes-i-know') {
+      res.status(400).json({ error: '请在请求体中提供 confirm: "yes-i-know" 以确认操作' });
+      return;
+    }
+    try {
+      // Require current password verification if one is set
+      const db = getConnection();
+      const authRow = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
+        { password_hash: string } | undefined;
+      if (authRow?.password_hash) {
+        if (!password) {
+          res.status(400).json({ error: '当前已设置密码，请提供 password 字段' });
+          return;
+        }
+        if (!crypto.verifyPassword(password, authRow.password_hash)) {
+          // Also try legacy params before rejecting
+          if (!crypto.verifyPasswordLegacy(password, authRow.password_hash)) {
+            res.status(401).json({ error: '密码错误' });
+            return;
+          }
+        }
+      }
+      auth.forceResetPassword();
+      res.json({ ok: true, message: '所有安全设置已清除，加密配置（AI Token 等）已失效' });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }
@@ -2075,4 +2114,25 @@ export function createAIChatHandler(deps: {
 
     res.end();
   };
-}
+} // Login
+app.post('/api/auth/login', (req: Request, res: Response) => {
+  const { password } = req.body;
+  if (!password) {
+    res.status(400).json({ error: '密码不能为空' });
+    return;
+  }
+  try {
+    const result = auth.verifyLogin(password);
+    if (result.ok) {
+      res.json({ ok: true, token: result.token });
+    } else {
+      res.status(result.status).json({
+        ok: false,
+        error: result.error,
+        ...(result.status === 410 ? { migrationNeeded: true } : {}),
+      });
+    }
+  } catch (e: unknown) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});

@@ -28,6 +28,11 @@
 | 11 | pnpm install 失败 | `No matching version found for @doc77/core@^0.5.3` | doc77 umbrella 包用 `^0.5.2` 依赖 CLI，workspace 版本 `0.6.0` 不匹配 semver 范围 | `packages/doc77/package.json` 改用 `workspace:^` |
 | 12 | Prettier 检查失败 | `Code style issues found in 10 files` | 提交前未运行 `pnpm format` | 提交前执行 `pnpm format && pnpm format:check` |
 | 13 | AI 包 build/test 崩溃 | `Could not resolve "./tools.js"` | `packages/ai/src/tools.ts` 在清理时被误删 | `git show <commit>^:path > path` 从历史恢复 |
+| 14 | scrypt 参数不兼容 | Electron v0.6 拒绝 v0.5.x 密码 | commit `501bd90` scrypt N 16384→131072，hash 不编码参数 | `verifyPasswordLegacy()` 回退 + `verifyLogin()` 静默迁移 |
+| 15 | npm 安装链断裂 | `@doc77/core@^0.5.3` 不存在 | cli@0.5.3 已发布但 core@0.5.3 未发布 | 补发缺失包；发布脚本加 `doc77` umbrella |
+| 16 | 重启配置不生效 | 改 bind_address 重启仍用旧值 | restart 透传 `--bind` argv 覆盖 DB 配置 | 剥离 CLI 参数，读 DB 持久化值 |
+| 17 | Electron 图标错误 | 窗口/托盘显示默认 Electron 图标 | BrowserWindow 未设 icon；生产用 `process.resourcesPath` 但 assets 在 ASAR | `BrowserWindow.icon` + 统一 `__dirname` |
+| 18 | WSL UNC 路径限制 | `pnpm build` 报找不到脚本 | cmd.exe 不支持 UNC 工作目录 | PowerShell 或 WSL 内构建 |
 
 ## 依赖安装策略
 

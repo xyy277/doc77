@@ -66,6 +66,35 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
+// ---------------------------------------------------------------------------
+// Legacy scrypt verification (v0.5.x and earlier used Node.js defaults)
+// ---------------------------------------------------------------------------
+
+/** scrypt params used in v0.5.x (Node.js crypto.scryptSync defaults). */
+export const LEGACY_SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
+/**
+ * Verify a password against a hash that may have been generated with legacy
+ * scrypt parameters (N=16384, Node.js defaults before v0.6.0).
+ *
+ * Returns `true` only when the password matches **and** the hash was created
+ * with legacy parameters.  Callers should use the normal `verifyPassword` first
+ * and fall back to this when it returns false.
+ */
+export function verifyPasswordLegacy(password: string, storedHash: string): boolean {
+  const [algorithm, saltHex, hashHex] = storedHash.split(':');
+  if (algorithm !== 'scrypt' || !saltHex || !hashHex) return false;
+
+  const expected = Buffer.from(hashHex, 'hex');
+  const actual = scryptSync(
+    password,
+    Buffer.from(saltHex, 'hex'),
+    expected.length,
+    LEGACY_SCRYPT_OPTIONS,
+  );
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
 export function extractSalt(storedHash: string): Buffer {
   const parts = storedHash.split(':');
   if (parts.length !== 3) throw new Error('Invalid hash format');
