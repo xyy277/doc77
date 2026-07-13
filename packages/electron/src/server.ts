@@ -11,7 +11,11 @@ const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
 
 interface CoreModule {
   closeConnection: () => void;
-  createApp: (restartCallback?: () => void, bindAddr?: string, port?: number) => http.RequestListener;
+  createApp: (
+    restartCallback?: () => void,
+    bindAddr?: string,
+    port?: number,
+  ) => http.RequestListener;
   initDatabase: (filePath: string) => Promise<unknown>;
   loadDefaults: () => void;
   runMigrations: () => void;

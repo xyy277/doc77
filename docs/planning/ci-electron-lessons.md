@@ -33,6 +33,11 @@
 | 16 | 重启配置不生效 | 改 bind_address 重启仍用旧值 | restart 透传 `--bind` argv 覆盖 DB 配置 | 剥离 CLI 参数，读 DB 持久化值 |
 | 17 | Electron 图标错误 | 窗口/托盘显示默认 Electron 图标 | BrowserWindow 未设 icon；生产用 `process.resourcesPath` 但 assets 在 ASAR | `BrowserWindow.icon` + 统一 `__dirname` |
 | 18 | WSL UNC 路径限制 | `pnpm build` 报找不到脚本 | cmd.exe 不支持 UNC 工作目录 | PowerShell 或 WSL 内构建 |
+| 19 | CI test job 全绿失败 | vitest `packageEntryFailure` 解析 `@doc77/core` | test job 只 `pnpm install` 未 build，`packages/mcp/__tests__` import 了 `@doc77/core`（解析到 `dist/`），CI 无 dist | `.github/workflows/ci.yml` test job 在 `pnpm test` 前加 `pnpm build` |
+| 20 | 发布后 build 回退版本 | `pnpm build` 把子包版本从 0.7.0 改回 0.6.1 | `publish.sh` 用 `npm version` 逐个 bump 子包，但未改 root `package.json`（`sync-version.cjs` 的版本源）；build 时 sync-version 以 root 版本覆盖子包 | 发布时先 bump root `package.json` 再 `sync-version` 传播；本次已手动把 root 改到 0.7.0 |
+
+> **发布脚本待改进**：`scripts/publish.sh` 应改为「bump root package.json → sync-version → 逐包 publish」，而非逐包 `npm version`，以免与 `sync-version.cjs` 的单一版本源冲突。
+
 
 ## 依赖安装策略
 
