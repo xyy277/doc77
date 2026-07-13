@@ -1,25 +1,44 @@
 <!DOCTYPE html>
-<html lang="zh-CN" class="h-full">
+<html lang="zh-CN" class="h-full tw-loading">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doc77 — 预览</title>
+<!-- 尽早应用主题 + 隐藏内容直到 Tailwind 就绪，避免切换/进入项目时的样式闪烁(FOUC) -->
+<script>(function(){try{var s=localStorage.getItem('doc77-theme');var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();</script>
+<style>
+html{background:#f8fafc}html.dark{background:#0f172a}
+/* Tailwind 就绪前隐藏正文，只显示加载动画，避免样式闪烁(FOUC) */
+html.tw-loading body{visibility:hidden}
+.boot-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;visibility:visible;z-index:9999}
+html:not(.tw-loading) .boot-overlay{display:none}
+.boot-spinner{width:34px;height:34px;border:3px solid rgba(100,116,139,.25);border-top-color:#3b82f6;border-radius:50%;animation:bootspin .7s linear infinite}
+@keyframes bootspin{to{transform:rotate(360deg)}}
+</style>
 <script>window.__VENDOR_READY=false;fetch('/vendor/.ready').then(r=>{if(r.ok)window.__VENDOR_READY=true}).catch(()=>{});</script>
 <script>
 (function(){
+  var revealed = false;
+  function reveal(){ if (revealed) return; revealed = true; document.documentElement.classList.remove('tw-loading'); }
   var s = document.createElement('script');
   s.src = (window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com');
-  s.onload = function() { tailwind.config = { darkMode: 'class', theme: { extend: {} } }; };
+  s.onload = function() {
+    try { tailwind.config = { darkMode: 'class', theme: { extend: {} } }; } catch(e) {}
+    // 等 JIT 应用 config 后再显示，避免闪一下默认样式
+    requestAnimationFrame(function(){ requestAnimationFrame(reveal); });
+  };
+  s.onerror = reveal; // CDN 不可达也不能一直隐藏
   document.head.appendChild(s);
+  setTimeout(reveal, 3000); // 兜底：无论如何 3s 后显示
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-<script>mermaid.initialize({startOnLoad:true,theme:document.documentElement.classList.contains('dark')?'dark':'default'});</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme">
 <link rel="stylesheet" href="css/app.css">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
 <body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden">
+<!-- 加载动画：Tailwind 就绪后由 tw-loading 移除自动隐藏 -->
+<div class="boot-overlay"><div class="boot-spinner"></div></div>
 
 <div class="flex h-screen w-full">
 
@@ -53,17 +72,17 @@
     <!-- ⭐ Bookmarks -->
     <div class="px-3 collapsible-content" id="bookmarkSection">
       <div onclick="toggleBookmarkSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between cursor-pointer hover:text-slate-300 transition-colors select-none">
-        <span><span id="bookmarkArrow">▾</span> ⭐ 收藏</span><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
+        <span><span id="bookmarkArrow">▸</span> ⭐ 收藏</span><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
       </div>
-      <div id="bookmarkList" class="space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
+      <div id="bookmarkList" class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
     </div>
 
     <!-- 🕐 Recent Files -->
     <div class="px-3 collapsible-content" id="recentSection">
       <div onclick="toggleRecentSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center cursor-pointer hover:text-slate-300 transition-colors select-none">
-        <span><span id="recentArrow">▾</span> 🕐 近期文件</span>
+        <span><span id="recentArrow">▸</span> 🕐 近期文件</span>
       </div>
-      <div id="recentList" class="space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
+      <div id="recentList" class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
     </div>
 
     <!-- Tree (wrapper stays flex-1 to push status bar to bottom) -->
@@ -133,8 +152,12 @@
       <button onclick="toggleDocSearch()" class="text-xs text-slate-400 hover:text-slate-600">✕</button>
     </div>
 
+    <!-- Tab Bar (多文档) -->
+    <div id="tabBar" class="hidden items-stretch gap-1 px-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-950 overflow-x-auto scrollbar-thin shrink-0"></div>
+
     <!-- Content -->
     <div class="flex-1 overflow-y-auto scrollbar-light bg-slate-50 dark:bg-slate-900" id="contentArea" onscroll="onContentScroll()">
+      <div id="docPaneHost"></div>
       <div id="emptyState" class="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-8">
         <span class="text-6xl mb-4 text-slate-300 dark:text-slate-600">📄</span>
         <h2 class="text-xl font-medium text-slate-600 dark:text-slate-400 mb-2">Doc77 预览引擎</h2>
@@ -236,6 +259,7 @@
 <div id="ctxMenu" class="ctx-menu hidden"></div>
 
 <script src="js/common.js"></script>
+<script src="js/tabs.js"></script>
 <script src="js/preview.js"></script>
 </body>
 </html>

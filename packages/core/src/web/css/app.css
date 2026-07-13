@@ -586,6 +586,13 @@ body {
 .heading-flash { animation: headingFlash 1.5s ease-out; }
 @keyframes headingFlash { 0% { background: var(--flash-bg); } 100% { background: transparent; } }
 
+/* Breadcrumb → tree reveal flash */
+.breadcrumb-flash { animation: headingFlash 1.5s ease-out; border-radius: 6px; }
+
+/* Tab bar thin scrollbar */
+.scrollbar-thin::-webkit-scrollbar { height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(100,116,139,.4); border-radius: 3px; }
+
 /* Tree tooltip */
 .tree-tooltip {
   position: fixed; z-index: 200;

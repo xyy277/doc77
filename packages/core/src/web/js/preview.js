@@ -9,6 +9,8 @@
 var VENDOR_MAP = {
   'highlight.min.js': 'highlight.min.js',
   'highlight.js/11.9.0/highlight.min.js': 'highlight.min.js',
+  'mermaid.min.js': 'mermaid.min.js',
+  'mermaid@11/dist/mermaid.min.js': 'mermaid.min.js',
   'xlsx.mini.min.js': 'xlsx.mini.min.js',
   'mammoth.browser.min.js': 'mammoth.browser.min.js',
   'pyodide': 'pyodide.js',
@@ -46,6 +48,16 @@ var directPath = new URLSearchParams(location.search).get('path') || '';
 if (!pid) location.href = '/';
 var proj = null, projects = [], currentFile = null, activeTab = 'outline';
 
+//══════════ 多 tab 状态 ══════════
+// tabStore: 纯逻辑（顺序/活动/容量淘汰/渲染 LRU），来自 tabs.js
+var tabStore = TabStore.createTabStore({ maxTabs: 8, maxRendered: 3 });
+var activeTabPath = null;
+var tabDataCache = {}; // path -> /api/content 响应（缓存，切 tab 不重复请求）
+var tabScroll = {}; // path -> contentArea.scrollTop（切 tab 保存/恢复阅读位置）
+var paneCache = {}; // path -> 已渲染的内容 DOM 节点（仅轻量类型进入 LRU）
+function basename(p) { return p.split('/').pop() || p; }
+function tabsStorageKey() { return 'doc77-tabs-' + pid; }
+
 var CAPABILITIES = { ai: false, mcp: false };
 function applyCapabilities() {
   if (!CAPABILITIES.ai) {
@@ -71,7 +83,9 @@ function applyCapabilities() {
     document.title = 'Doc77 — ' + proj.name;
     renderProjMenu(); loadTree(''); loadTasks(); setActiveTab('outline');
     renderBookmarks(); renderRecentFiles();
-    // Navigate to specific file if path param provided (from recent-files link)
+    // 恢复上次打开的 tab 列表（仅活动 tab 立即加载，其余惰性）
+    restoreTabs(directPath || null);
+    // Navigate to specific file if path param provided (from recent-files link) — 展开左侧树
     if (directPath) { setTimeout(function(){ navigateToFile(directPath); }, 400); }
     fetch('/api/projects/' + pid + '/touch', { method: 'POST' }).catch(function(){});
   } catch(e) { document.getElementById('projName').textContent = '⚠ 加载失败'; }
@@ -267,9 +281,7 @@ function makeNode(entry, parentPath) {
     frag.appendChild(wrapper);
   } else {
     row.addEventListener('click', function() {
-      document.querySelectorAll('#tree .active-node').forEach(function(el) { el.classList.remove('active-node','bg-blue-600','text-white'); });
-      row.classList.add('active-node','bg-blue-600','text-white');
-      loadContent(childPath);
+      openTab(childPath);
     });
     row.addEventListener('contextmenu', function(e) { e.preventDefault(); showCtxMenu(e.clientX, e.clientY, childPath); });
   }
@@ -403,91 +415,329 @@ async function navigateToFile(filePath, lineNumber) {
     fileRow.click();
     fileRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } else {
-    loadContent(filePath);
+    openTab(filePath);
   }
 }
 
-//══════════ Content ══════════
-async function loadContent(filePath) {
-  currentFile = filePath; outlineBuilt = false;
-  var empty = document.getElementById('emptyState'); if (empty) empty.classList.add('hidden');
-  var area = document.getElementById('contentArea');
-  var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'];
-  var runBtn = document.getElementById('runBtn'); if (runBtn) runBtn.disabled = true;
-  area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div>';
-  document.getElementById('breadcrumbPath').textContent = filePath;
-  btns.forEach(function(id){ document.getElementById(id).disabled = false; });
-  document.getElementById('readingProgress').style.width = '0%';
-  try {
-    var r = await fetch('/api/content/' + pid + '?path=' + encodeURIComponent(filePath));
-    if (!r.ok) throw new Error('Not found');
-    var d = await r.json(); var html = '';
+//══════════ Content（多 tab + LRU 渲染）══════════
 
-    // --- Unsupported format: file info card ---
-    if (d.type === 'unsupported') {
-      var labels = { video:'🎬 视频', audio:'🎵 音频', archive:'📦 压缩包', font:'🔤 字体',
-        database:'🗄 数据库', design:'🎨 设计文件', binary:'⚙ 二进制', gis:'🗺 GIS数据',
-        '3d':'🧊 3D模型', ebook:'📚 电子书', document:'📄 文档', spreadsheet:'📊 表格',
-        presentation:'📽 演示文稿', too_large:'📦 文件过大', unknown:'📁 未知格式' };
-      var label = labels[d.category] || labels.unknown;
-      var sizeStr = d.size < 1024 ? d.size + ' B' : d.size < 1048576 ? (d.size/1024).toFixed(1) + ' KB' : (d.size/1048576).toFixed(1) + ' MB';
-      html = '<div class="max-w-md mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 text-center">' +
-        '<div class="text-5xl mb-4">' + label.split(' ')[0] + '</div>' +
-        '<h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">' + label + '</h3>' +
-        '<p class="text-sm text-slate-500 dark:text-slate-400 mb-4">' + esc(filePath) + '</p>' +
-        '<div class="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 mb-4 text-xs text-left">' +
-        '<span class="text-slate-500">大小</span><span class="text-slate-700 dark:text-slate-300">' + sizeStr + '</span>' +
-        (d.modified ? '<span class="text-slate-500">修改时间</span><span class="text-slate-700 dark:text-slate-300">' + new Date(d.modified).toLocaleString('zh-CN') + '</span>' : '') +
-        '</div>' +
-        '<p class="text-xs text-amber-600 dark:text-amber-400 mb-4">⚠️ 不支持预览此文件格式</p>' +
-        '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 文件夹中显示</button>' +
-        '</div>';
-      area.innerHTML = '<div class="p-4 sm:p-10">' + html + '</div>';
-      addRecentFile(filePath);
-      return;
+/** 取文档数据：命中缓存直接返回，否则请求 /api/content 并缓存。 */
+function fetchDoc(path) {
+  if (tabDataCache[path]) return Promise.resolve(tabDataCache[path]);
+  return fetch('/api/content/' + pid + '?path=' + encodeURIComponent(path))
+    .then(function(r) { if (!r.ok) throw new Error('Not found'); return r.json(); })
+    .then(function(d) { tabDataCache[path] = d; return d; });
+}
+
+/** 重型类型（PDF/office/含 iframe 的 HTML）不进入 DOM 缓存，切回时按 data 重建。 */
+function isHeavyDoc(path, d) {
+  if (!d) return false;
+  if (d.type === 'pdf' || d.type === 'docx' || d.type === 'xlsx') return true;
+  if (d.type === 'code') {
+    var ext = path.split('.').pop().toLowerCase();
+    if (ext === 'html' || ext === 'htm') return true;
+  }
+  return false;
+}
+
+/** 由数据构建内容 HTML 字符串（不含 office，office 走异步渲染）。 */
+function buildDocHTML(path, d) {
+  var html = '';
+  if (d.type === 'unsupported') {
+    var labels = { video:'🎬 视频', audio:'🎵 音频', archive:'📦 压缩包', font:'🔤 字体',
+      database:'🗄 数据库', design:'🎨 设计文件', binary:'⚙ 二进制', gis:'🗺 GIS数据',
+      '3d':'🧊 3D模型', ebook:'📚 电子书', document:'📄 文档', spreadsheet:'📊 表格',
+      presentation:'📽 演示文稿', too_large:'📦 文件过大', unknown:'📁 未知格式' };
+    var label = labels[d.category] || labels.unknown;
+    var sizeStr = d.size < 1024 ? d.size + ' B' : d.size < 1048576 ? (d.size/1024).toFixed(1) + ' KB' : (d.size/1048576).toFixed(1) + ' MB';
+    html = '<div class="max-w-md mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 text-center">' +
+      '<div class="text-5xl mb-4">' + label.split(' ')[0] + '</div>' +
+      '<h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">' + label + '</h3>' +
+      '<p class="text-sm text-slate-500 dark:text-slate-400 mb-4">' + esc(path) + '</p>' +
+      '<div class="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 mb-4 text-xs text-left">' +
+      '<span class="text-slate-500">大小</span><span class="text-slate-700 dark:text-slate-300">' + sizeStr + '</span>' +
+      (d.modified ? '<span class="text-slate-500">修改时间</span><span class="text-slate-700 dark:text-slate-300">' + new Date(d.modified).toLocaleString('zh-CN') + '</span>' : '') +
+      '</div>' +
+      '<p class="text-xs text-amber-600 dark:text-amber-400 mb-4">⚠️ 不支持预览此文件格式</p>' +
+      '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 文件夹中显示</button>' +
+      '</div>';
+  } else if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
+    html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
+    if (d.type === 'code') {
+      var ext = path.split('.').pop().toLowerCase();
+      if (ext === 'html' || ext === 'htm') {
+        html = '<div style="position:relative">' +
+          '<button id="htmlToggleBtn" onclick="toggleHtmlPreview()" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10;padding:6px 16px;border:1px solid #e2e8f0;border-radius:8px;background:rgba(255,255,255,0.9);color:#475569;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);backdrop-filter:blur(4px);white-space:nowrap">👁 预览</button>' +
+          '<div id="htmlCodeView">' + html + '</div>' +
+          '<div id="htmlPreview" style="display:none"><div id="htmlPreviewContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
+          '<button onclick="toggleHtmlPreviewFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
+          '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div></div>' +
+          '</div>';
+      }
     }
+  } else if (d.type === 'image') {
+    html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center" style="min-height:60vh"><img src="' + d.rawUrl + '" alt="' + esc(path) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="openImageLightbox(\'' + escAttr(d.rawUrl) + '\', \'' + escAttr(path) + '\')" /></div>';
+  } else if (d.type === 'pdf') {
+    html = '<div class="pdf-wrapper" id="pdfContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
+      '<button onclick="togglePdfFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
+      '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div>';
+  } else {
+    html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><pre class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono">' + esc(d.content) + '</pre></div>';
+  }
+  return '<div class="p-4 sm:p-10">' + html + '</div>';
+}
 
-    if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
-      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
-      if (d.type === 'markdown') setTimeout(function(){ buildOutline(); }, 50);
-      // Show Run button for JS and Python files
-      if (d.type === 'code') {
-        var ext = filePath.split('.').pop().toLowerCase();
-        if (ext === 'html' || ext === 'htm') {
-          html = '<div style="position:relative">' +
-            '<button id="htmlToggleBtn" onclick="toggleHtmlPreview()" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10;padding:6px 16px;border:1px solid #e2e8f0;border-radius:8px;background:rgba(255,255,255,0.9);color:#475569;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);backdrop-filter:blur(4px);white-space:nowrap">👁 预览</button>' +
-            '<div id="htmlCodeView">' + html + '</div>' +
-            '<div id="htmlPreview" style="display:none"><div id="htmlPreviewContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
-            '<button onclick="toggleHtmlPreviewFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
-            '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div></div>' +
-            '</div>';
-        }
-        if (ext === 'js' || ext === 'py') {
-          var runBtn = document.getElementById('runBtn');
-          if (runBtn) { runBtn.classList.remove('hidden'); runBtn.disabled = false; runBtn.dataset.lang = ext; runBtn.dataset.code = d.content; }
+/** 生成一个独立的内容 pane DOM 节点。office 类型异步填充。 */
+function renderDocNode(path, d) {
+  var pane = document.createElement('div');
+  pane.className = 'doc-pane';
+  pane.dataset.path = path;
+  if (d.type === 'docx' || d.type === 'xlsx') {
+    pane.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载中...</div></div>';
+    renderOfficeDoc(d, pane, path);
+  } else {
+    pane.innerHTML = buildDocHTML(path, d);
+  }
+  return pane;
+}
+
+/** 把 pane 挂到内容区，隐藏空状态，恢复滚动位置。 */
+function mountPane(pane, path) {
+  var host = document.getElementById('docPaneHost');
+  host.innerHTML = '';
+  host.appendChild(pane);
+  var empty = document.getElementById('emptyState'); if (empty) empty.classList.add('hidden');
+  document.getElementById('contentArea').scrollTop = tabScroll[path] || 0;
+}
+
+/** 激活后统一刷新工具栏/大纲/阅读时长/高亮/面包屑。 */
+function afterActivate(path, d) {
+  var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'];
+  btns.forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = false; });
+  // Run 按钮：仅 js/py 显示
+  var runBtn = document.getElementById('runBtn');
+  if (runBtn) {
+    var ext = path.split('.').pop().toLowerCase();
+    if (d && d.type === 'code' && (ext === 'js' || ext === 'py')) {
+      runBtn.classList.remove('hidden'); runBtn.disabled = false; runBtn.dataset.lang = ext; runBtn.dataset.code = d.content;
+    } else { runBtn.classList.add('hidden'); runBtn.disabled = true; }
+  }
+  updateReadingTime(d);
+  refreshOutline();
+  document.getElementById('readingProgress').style.width = '0%';
+  onContentScroll();
+  setTimeout(highlightCode, 60);
+  setTimeout(renderMermaid, 60);
+  if (_pendingLine > 0) { setTimeout(function(){ scrollToLine(_pendingLine); _pendingLine = 0; }, 200); }
+  renderBreadcrumb(path);
+}
+
+/** 根据当前活动 pane 的内容刷新大纲面板。 */
+function refreshOutline() {
+  outlineBuilt = false;
+  var doc = document.getElementById('docContent');
+  if (doc) { buildOutline(); }
+  else {
+    document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">当前文档不支持大纲</div>';
+    outlineBuilt = true;
+  }
+}
+
+/** 切 tab 前，停止会跨文档串扰的临时状态（TTS/自动滚动/文档内搜索）。 */
+function resetTransientDocState() {
+  if (typeof ttsActive !== 'undefined' && ttsActive) toggleTTS();
+  if (typeof autoScrollActive !== 'undefined' && autoScrollActive) toggleAutoScroll();
+  var bar = document.getElementById('docSearchBar');
+  if (bar && !bar.classList.contains('hidden')) toggleDocSearch();
+}
+
+/** 激活某个已打开的 tab（切换/首次渲染）。 */
+function activateTab(path) {
+  // 保存旧 tab 滚动位置
+  if (activeTabPath && activeTabPath !== path) tabScroll[activeTabPath] = document.getElementById('contentArea').scrollTop;
+  resetTransientDocState();
+  tabStore.activate(path);
+  activeTabPath = path; currentFile = path;
+  renderTabBar(); syncTreeActive(path); saveTabsState();
+
+  var cached = paneCache[path];
+  if (cached) {
+    tabStore.noteRendered(path); // 刷新 LRU
+    mountPane(cached, path);
+    afterActivate(path, tabDataCache[path]);
+    return;
+  }
+  // 需要渲染：先显示骨架
+  var host = document.getElementById('docPaneHost');
+  var empty = document.getElementById('emptyState'); if (empty) empty.classList.add('hidden');
+  host.innerHTML = '<div class="p-4 sm:p-10"><div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div></div>';
+  fetchDoc(path).then(function(d) {
+    if (activeTabPath !== path) return; // 用户已切走
+    var pane = renderDocNode(path, d);
+    if (!isHeavyDoc(path, d)) {
+      paneCache[path] = pane;
+      var evicted = tabStore.noteRendered(path);
+      if (evicted && evicted !== path) delete paneCache[evicted];
+    }
+    mountPane(pane, path);
+    afterActivate(path, d);
+  }).catch(function() {
+    if (activeTabPath !== path) return;
+    host.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">文件加载失败</p></div>';
+  });
+}
+
+/** 打开文件为 tab：已打开则切过去，否则新建。 */
+function openTab(path, opts) {
+  opts = opts || {};
+  if (!tabStore.has(path)) {
+    var r = tabStore.open(path, basename(path));
+    r.evicted.forEach(function(p) { releaseTab(p); });
+    if (!opts.silent) addRecentFile(path);
+  }
+  activateTab(path);
+}
+
+/** 关闭 tab：清资源，激活相邻 tab，或回到空状态。 */
+function closeTab(path) {
+  var r = tabStore.close(path);
+  releaseTab(path);
+  renderTabBar(); saveTabsState();
+  if (r.active) { activeTabPath = null; activateTab(r.active); }
+  else showEmptyState();
+}
+
+/** 释放某 path 的所有缓存资源。 */
+function releaseTab(path) {
+  delete tabDataCache[path];
+  delete paneCache[path];
+  delete tabScroll[path];
+  tabStore.dropRendered(path);
+}
+
+/** 无打开文档时的空状态。 */
+function showEmptyState() {
+  activeTabPath = null; currentFile = null;
+  document.getElementById('docPaneHost').innerHTML = '';
+  var empty = document.getElementById('emptyState'); if (empty) empty.classList.remove('hidden');
+  document.getElementById('tabBar').classList.add('hidden');
+  ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'].forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = true; });
+  var runBtn = document.getElementById('runBtn'); if (runBtn) { runBtn.classList.add('hidden'); runBtn.disabled = true; }
+  var rt = document.getElementById('readTime'); if (rt) rt.classList.add('hidden');
+  document.getElementById('readingProgress').style.width = '0%';
+  renderBreadcrumb(null);
+  syncTreeActive(null);
+  saveTabsState();
+}
+
+/** 渲染 tab 栏。 */
+function renderTabBar() {
+  var bar = document.getElementById('tabBar');
+  var tabs = tabStore.list();
+  if (!tabs.length) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+  bar.classList.remove('hidden'); bar.classList.add('flex');
+  bar.innerHTML = tabs.map(function(t) {
+    var active = t.path === activeTabPath;
+    var cls = 'group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 my-1 rounded-md cursor-pointer text-xs whitespace-nowrap border transition-colors ' +
+      (active ? 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 font-medium shadow-sm'
+              : 'bg-transparent border-transparent text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60');
+    return '<div class="' + cls + '" title="' + escAttr(t.path) + '" onclick="onTabClick(event, \'' + escAttr(t.path) + '\')" onmousedown="onTabMouseDown(event, \'' + escAttr(t.path) + '\')">' +
+      '<span class="shrink-0">' + iconFor(t.title) + '</span>' +
+      '<span class="truncate max-w-[160px]">' + esc(t.title) + '</span>' +
+      '<button class="shrink-0 w-4 h-4 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-red-500" onclick="event.stopPropagation();closeTab(\'' + escAttr(t.path) + '\')" title="关闭">✕</button>' +
+      '</div>';
+  }).join('');
+}
+
+/** tab 左键点击切换。 */
+function onTabClick(e, path) { if (path !== activeTabPath) activateTab(path); }
+/** 中键关闭 tab。 */
+function onTabMouseDown(e, path) { if (e.button === 1) { e.preventDefault(); closeTab(path); } }
+
+/** 同步左侧文件树的 active-node 高亮到当前 tab。 */
+function syncTreeActive(path) {
+  document.querySelectorAll('#tree .active-node').forEach(function(el) { el.classList.remove('active-node','bg-blue-600','text-white'); });
+  if (!path) return;
+  var row = document.querySelector('#tree [data-path="' + CSS.escape(path) + '"]');
+  if (row) row.classList.add('active-node','bg-blue-600','text-white');
+}
+
+/** localStorage 持久化 tab 列表 + 活动 tab。 */
+function saveTabsState() {
+  try {
+    localStorage.setItem(tabsStorageKey(), JSON.stringify({ tabs: tabStore.list().map(function(t){ return t.path; }), active: activeTabPath }));
+  } catch (e) {}
+}
+function loadTabsState() {
+  try { return JSON.parse(localStorage.getItem(tabsStorageKey()) || 'null'); } catch (e) { return null; }
+}
+
+/** boot 时恢复 tab 列表：只建栏位，仅活动 tab 立即加载，其余惰性。 */
+function restoreTabs(preferActivePath) {
+  var st = loadTabsState();
+  var tabs = st && Array.isArray(st.tabs) ? st.tabs : [];
+  var active = preferActivePath || (st && st.active) || (tabs.length ? tabs[tabs.length - 1] : null);
+  if (preferActivePath && tabs.indexOf(preferActivePath) < 0) tabs.push(preferActivePath);
+  if (!tabs.length) { showEmptyState(); return; }
+  tabs.forEach(function(p) { if (!tabStore.has(p)) tabStore.open(p, basename(p)); });
+  renderTabBar();
+  if (active) activateTab(active);
+}
+
+//══════════ 面包屑（可点击跳转到上一级目录）══════════
+/** 渲染面包屑：项目根 + 各目录段可点击，末段（文件名）不可点击。 */
+function renderBreadcrumb(filePath) {
+  var bc = document.getElementById('breadcrumb');
+  if (!bc) return;
+  if (!filePath) { bc.innerHTML = '<span id="breadcrumbPath" class="text-slate-400 text-sm">未选择文件</span>'; return; }
+  var parts = filePath.split('/');
+  var html = '<a href="javascript:void(0)" onclick="revealDirInTree(\'\')" class="hover:text-blue-500 dark:hover:text-blue-400 truncate shrink-0" title="项目根目录">' + esc(proj ? proj.name : '根') + '</a>';
+  var acc = '';
+  parts.forEach(function(part, i) {
+    html += '<span class="text-slate-300 dark:text-slate-600 shrink-0">›</span>';
+    if (i === parts.length - 1) {
+      html += '<strong class="text-slate-700 dark:text-slate-200 truncate">' + esc(part) + '</strong>';
+    } else {
+      acc += (acc ? '/' : '') + part;
+      html += '<a href="javascript:void(0)" onclick="revealDirInTree(\'' + escAttr(acc) + '\')" class="hover:text-blue-500 dark:hover:text-blue-400 truncate shrink-0">' + esc(part) + '</a>';
+    }
+  });
+  bc.innerHTML = html;
+}
+
+/** 在左侧文件树中定位目录：展开祖先节点，滚动并高亮该目录（不加载内容）。 */
+async function revealDirInTree(dirPath) {
+  var tree = document.getElementById('tree');
+  var lp = document.getElementById('leftPanel');
+  if (lp.classList.contains('hidden')) togglePanel('left');
+  if (lp.classList.contains('collapsed')) toggleCollapse();
+  if (!dirPath) { tree.scrollTop = 0; return; }
+  var parts = dirPath.split('/');
+  for (var i = 0; i < parts.length; i++) {
+    var dp = parts.slice(0, i + 1).join('/');
+    var selector = '[data-path="' + CSS.escape(dp) + '"]';
+    if (i > 0 && !tree.querySelector(selector)) {
+      var parentSelector = '[data-path="' + CSS.escape(parts.slice(0, i).join('/')) + '"]';
+      var parentRow = tree.querySelector(parentSelector);
+      if (parentRow) {
+        var pw = parentRow.nextElementSibling;
+        if (pw && pw.classList.contains('hidden')) parentRow.click();
+        if (!pw || pw.querySelector('.tree-collapse-btn') === null) {
+          await waitForNode(tree, parentSelector + ' + .ml-4 .tree-collapse-btn', 2000);
         }
       }
-    } else if (d.type === 'image') {
-      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center" style="min-height:60vh"><img src="' + d.rawUrl + '" alt="' + esc(filePath) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="openImageLightbox(\'' + escAttr(d.rawUrl) + '\', \'' + escAttr(filePath) + '\')" /></div>';
-    } else if (d.type === 'pdf') {
-      html = '<div class="pdf-wrapper" id="pdfContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
-        '<button onclick="togglePdfFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
-        '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div>';
-    } else if (d.type === 'docx' || d.type === 'xlsx') {
-      // Fetch raw binary and render client-side
-      area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载中...</div></div>';
-      renderOfficeDoc(d); return;
-    } else {
-      html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><pre class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono">' + esc(d.content) + '</pre></div>';
-      document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">仅 Markdown 文档支持大纲</div>';
-      outlineBuilt = true;
     }
-    area.innerHTML = '<div class="p-4 sm:p-10">' + html + '</div>';
-    updateReadingTime(d);
-    if (_pendingLine > 0) { setTimeout(function(){ scrollToLine(_pendingLine); _pendingLine = 0; }, 200); }
-    setTimeout(highlightCode, 100);
-    addRecentFile(filePath);
-  } catch(e) { area.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">文件加载失败</p></div>'; }
+    var row = await waitForNode(tree, selector, 2000);
+    if (!row) break;
+    var wrapper = row.nextElementSibling;
+    if (wrapper && wrapper.classList.contains('hidden')) row.click();
+    await new Promise(function(r) { setTimeout(r, 50); });
+    if (i === parts.length - 1) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('breadcrumb-flash');
+      (function(el){ setTimeout(function(){ el.classList.remove('breadcrumb-flash'); }, 1500); })(row);
+    }
+  }
 }
 
 // Feature 1: Code Highlighting
@@ -502,6 +752,36 @@ function loadHighlightJS() {
   s.src = vsrc('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js');
   s.onload = highlightCode;
   document.head.appendChild(s);
+}
+
+// Mermaid：按需懒加载（离线/CDN 不可达时静默降级为源码文本，不阻塞页面）
+var _mermaidLoading = false, _mermaidCbs = [];
+function loadMermaid(cb) {
+  if (window.mermaid) { cb(true); return; }
+  _mermaidCbs.push(cb);
+  if (_mermaidLoading) return;
+  _mermaidLoading = true;
+  var s = document.createElement('script');
+  s.src = vsrc('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js');
+  s.onload = function() {
+    try { window.mermaid.initialize({ startOnLoad: false, theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default' }); } catch (e) {}
+    _mermaidLoading = false;
+    _mermaidCbs.splice(0).forEach(function(fn){ fn(true); });
+  };
+  s.onerror = function() {
+    _mermaidLoading = false;
+    _mermaidCbs.splice(0).forEach(function(fn){ fn(false); }); // 降级：保留 <pre class="mermaid"> 源码
+  };
+  document.head.appendChild(s);
+}
+/** 渲染当前 pane 中尚未处理的 mermaid 图表。 */
+function renderMermaid() {
+  var host = document.getElementById('docPaneHost');
+  if (!host || !host.querySelector('.mermaid:not([data-processed])')) return;
+  loadMermaid(function(ok) {
+    if (!ok || !window.mermaid) return;
+    try { window.mermaid.run({ querySelector: '#docPaneHost .mermaid:not([data-processed])' }); } catch (e) {}
+  });
 }
 
 // Feature 2: Reading Time
@@ -946,32 +1226,29 @@ document.addEventListener('fullscreenchange', function () {
 // PDF preview now uses browser-native <iframe> — no PDF.js dependency
 
 //══════════ Office Docs Rendering (DOCX/XLSX) ══════════
-function renderOfficeDoc(d) {
-  if (d.type === 'docx') renderDocx(d);
-  else if (d.type === 'xlsx') renderXlsx(d);
+function renderOfficeDoc(d, targetEl, path) {
+  if (d.type === 'docx') renderDocx(d, targetEl, path);
+  else if (d.type === 'xlsx') renderXlsx(d, targetEl, path);
 }
 
-function renderDocx(d) {
-  var area = document.getElementById('contentArea');
+function renderDocx(d, area, path) {
   loadMammoth(function() {
     fetch(d.rawUrl).then(function(r){ return r.arrayBuffer(); }).then(function(buf) {
       mammoth.convertToHtml({ arrayBuffer: buf }).then(function(result) {
         var html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + result.value + '</div></div>';
         area.innerHTML = '<div class="p-4 sm:p-10">' + html + '</div>';
         if (result.warnings.length) console.warn('DOCX warnings:', result.warnings);
-        setTimeout(function(){ buildOutline(); }, 50);
-        addRecentFile(currentFile);
+        if (activeTabPath === path) { refreshOutline(); setTimeout(highlightCode, 60); }
       }).catch(function() { area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">DOCX 解析失败</div>'; });
     });
   });
 }
 
-function renderXlsx(d) {
-  var area = document.getElementById('contentArea');
+function renderXlsx(d, area, path) {
   if (typeof XLSX === 'undefined') {
     var s = document.createElement('script');
     s.src = vsrc('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.mini.min.js');
-    s.onload = function(){ renderXlsx(d); };
+    s.onload = function(){ renderXlsx(d, area, path); };
     document.head.appendChild(s);
     area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载 XLSX 查看器...</div></div>';
     return;
@@ -989,7 +1266,6 @@ function renderXlsx(d) {
       sheetsHtml += '<div class="xlsx-sheet ' + (i===0?'':'hidden') + '" data-sheet="' + escAttr(name) + '"><div class="overflow-x-auto">' + html + '</div></div>';
     });
     area.innerHTML = '<div class="p-2 sm:p-4"><div class="max-w-full mx-auto bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">' + tabsHtml + sheetsHtml + '</div></div>';
-    addRecentFile(currentFile);
   }).catch(function(){ area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">XLSX 加载失败</div>'; });
 }
 
@@ -1062,7 +1338,7 @@ function lightboxNav(dir) {
   document.getElementById('lightboxZoomPct').textContent = '100%';
   updateLightboxCount();
   currentFile = next.path;
-  document.getElementById('breadcrumbPath').textContent = next.path;
+  renderBreadcrumb(next.path);
 }
 
 function updateLightboxCount() {
@@ -1097,7 +1373,7 @@ function runCode() {
   var code = (document.getElementById('docContent') || {}).textContent || runBtn.dataset.code || '';
   if (!code.trim()) { toast('没有可执行的代码','error'); return; }
 
-  var area = document.getElementById('contentArea');
+  var area = document.querySelector('#docPaneHost .doc-pane') || document.getElementById('contentArea');
   var existing = document.getElementById('codeOutput');
   if (existing) existing.remove();
 
