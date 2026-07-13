@@ -108,7 +108,7 @@ if $DRY_RUN; then
   echo "[DRY RUN] 不会实际发布"
   for pkg in "${PUBLISH_LIST[@]}"; do
     local_ver=$(node -p "require('./packages/$pkg/package.json').version")
-    echo "  $pkg: $local_ver → $(node -pe "const v=require('./packages/$pkg/package.json').version.split('.');v[2]=parseInt(v[2])+1;v.join('.')")"
+    echo "  $pkg: $local_ver → $(node -pe "const v=require('./packages/$pkg/package.json').version.split('.').map(Number);const b='$BUMP';if(b==='major'){v[0]++;v[1]=0;v[2]=0}else if(b==='minor'){v[1]++;v[2]=0}else{v[2]++}v.join('.')")"
   done
   exit 0
 fi
@@ -145,6 +145,7 @@ for pkg in "${PUBLISH_LIST[@]}"; do
 done
 
 # === 汇总 ===
+cd "$ROOT"   # 发布循环里 cd 进了各包目录，汇总前需回到根目录
 echo ""
 echo "=========================================="
 echo "  发布完成"
