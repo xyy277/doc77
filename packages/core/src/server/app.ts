@@ -2114,25 +2114,4 @@ export function createAIChatHandler(deps: {
 
     res.end();
   };
-} // Login
-app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { password } = req.body;
-  if (!password) {
-    res.status(400).json({ error: '密码不能为空' });
-    return;
-  }
-  try {
-    const result = auth.verifyLogin(password);
-    if (result.ok) {
-      res.json({ ok: true, token: result.token });
-    } else {
-      res.status(result.status).json({
-        ok: false,
-        error: result.error,
-        ...(result.status === 410 ? { migrationNeeded: true } : {}),
-      });
-    }
-  } catch (e: unknown) {
-    res.status(500).json({ error: (e as Error).message });
-  }
-});
+}
