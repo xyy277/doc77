@@ -29,8 +29,6 @@
 |---|---|
 | ![Login](docs/images/login.png) | ![Mobile](docs/images/mobile.png) |
 
-> 实际截图请替换 `docs/images/` 下的占位图片。
-
 ## 适用场景
 
 | 场景 | 说明 |
