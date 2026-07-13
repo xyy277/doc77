@@ -977,7 +977,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
           res.json({
             path: filePath,
             type: 'markdown',
-            content: renderMarkdown(raw),
+            content: renderMarkdown(raw, { projectId, filePath }),
             size: stats.size,
             modified: stats.mtime.toISOString(),
           });

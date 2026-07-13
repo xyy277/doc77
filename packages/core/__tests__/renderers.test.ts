@@ -41,6 +41,100 @@ describe('Markdown renderer', () => {
     const html = renderMarkdown('');
     expect(html).toBe('');
   });
+
+  it('should handle empty url gracefully', () => {
+    const html = renderMarkdown('[]( )', { projectId: 1, filePath: 'docs/readme.md' });
+    expect(html).toContain('<a');
+  });
+});
+
+describe('Markdown renderer — local URL rewriting', () => {
+  const opts = { projectId: 1, filePath: 'docs/notes.md' };
+
+  it('should rewrite Markdown image src to /api/raw', () => {
+    const html = renderMarkdown('![alt](./images/photo.png)', opts);
+    expect(html).toContain('/api/raw/1?path=docs%2Fimages%2Fphoto.png');
+    expect(html).not.toContain('./images/photo.png');
+  });
+
+  it('should rewrite Markdown link to /api/content', () => {
+    const html = renderMarkdown('[doc](./other.md)', opts);
+    expect(html).toContain('/api/content/1?path=docs%2Fother.md');
+  });
+
+  it('should rewrite GIF images', () => {
+    const html = renderMarkdown('![gif](./anim.gif)', opts);
+    expect(html).toContain('/api/raw/1?path=docs%2Fanim.gif');
+  });
+
+  it('should rewrite relative paths with .. traversal', () => {
+    const html = renderMarkdown('![img](../images/logo.png)', opts);
+    expect(html).toContain('images%2Flogo.png');
+    expect(html).not.toContain('..');
+  });
+
+  it('should preserve anchor in rewritten URLs', () => {
+    const html = renderMarkdown('[link](./other.md#section)', opts);
+    expect(html).toContain('/api/content/1?path=docs%2Fother.md#section');
+  });
+
+  it('should not rewrite external https URLs', () => {
+    const md = '[ext](https://example.com/page) ![img](https://cdn.example.com/img.png)';
+    const html = renderMarkdown(md, opts);
+    expect(html).toContain('https://example.com/page');
+    expect(html).toContain('https://cdn.example.com/img.png');
+  });
+
+  it('should not rewrite mailto links', () => {
+    const html = renderMarkdown('[email](mailto:a@b.com)', opts);
+    expect(html).toContain('mailto:a@b.com');
+  });
+
+  it('should not rewrite pure anchor links', () => {
+    const html = renderMarkdown('[top](#top)', opts);
+    expect(html).toContain('href="#top"');
+  });
+
+  it('should not rewrite when no projectId provided (backward compat)', () => {
+    const html = renderMarkdown('![img](./photo.png)');
+    expect(html).toContain('./photo.png');
+    expect(html).not.toContain('/api/raw');
+  });
+
+  it('should rewrite raw HTML img src', () => {
+    const html = renderMarkdown('<img src="./photo.jpg" alt="pic">', opts);
+    expect(html).toContain('/api/raw/1?path=docs%2Fphoto.jpg');
+  });
+
+  it('should rewrite raw HTML video src', () => {
+    const html = renderMarkdown('<video src="./demo.mp4" controls></video>', opts);
+    expect(html).toContain('/api/raw/1?path=docs%2Fdemo.mp4');
+  });
+
+  it('should rewrite raw HTML audio src', () => {
+    const html = renderMarkdown('<audio src="./song.mp3" controls></audio>', opts);
+    expect(html).toContain('/api/raw/1?path=docs%2Fsong.mp3');
+  });
+
+  it('should rewrite raw HTML source src inside video', () => {
+    const html = renderMarkdown('<video><source src="./vid.webm"></video>', opts);
+    expect(html).toContain('/api/raw/1?path=docs%2Fvid.webm');
+  });
+
+  it('should rewrite raw HTML iframe src', () => {
+    const html = renderMarkdown('<iframe src="./page.html"></iframe>', opts);
+    expect(html).toContain('/api/content/1?path=docs%2Fpage.html');
+  });
+
+  it('should rewrite raw HTML embed src', () => {
+    const html = renderMarkdown('<embed src="./doc.pdf">', opts);
+    expect(html).toContain('/api/raw/1?path=docs%2Fdoc.pdf');
+  });
+
+  it('should handle data: URIs as-is', () => {
+    const html = renderMarkdown('<img src="data:image/png;base64,ABC">', opts);
+    expect(html).toContain('data:image/png;base64,ABC');
+  });
 });
 
 describe('Mermaid renderer', () => {
