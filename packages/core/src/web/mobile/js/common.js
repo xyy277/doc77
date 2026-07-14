@@ -1,9 +1,24 @@
 /**
- * Doc77 Mobile — Shared utilities (auth gate, theme, toast, settings).
+ * Doc77 Mobile — Shared utilities (auth gate, theme, toast, settings, loading).
  * Loaded by both mobile/index.html and mobile/preview.html.
  */
 
-// ══════════ Auth Login Gate ══════════
+//══════════ Global Loading Overlay ══════════
+var _loadingOverlay = null;
+window.showLoading = function(msg) {
+  hideLoading();
+  msg = msg || '请稍候...';
+  var o = document.createElement('div');
+  o.className = 'loading-overlay';
+  o.innerHTML = '<div class="loading-spinner"></div><div class="loading-text">' + msg + '</div>';
+  document.body.appendChild(o);
+  _loadingOverlay = o;
+};
+window.hideLoading = function() {
+  if (_loadingOverlay) { _loadingOverlay.remove(); _loadingOverlay = null; }
+};
+
+//══════════ Auth Login Gate ══════════
 (function () {
   if (sessionStorage.getItem('doc77-auth')) return;
 
@@ -37,7 +52,7 @@
           '<h1 style="font-size:24px;font-weight:700;color:'+text+';margin:0 0 8px">Doc77</h1>' +
           '<p style="font-size:14px;color:'+subtext+';margin:0 0 28px">请输入密码解锁</p>' +
           '<input id="loginPass" type="password" placeholder="密码" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:14px 16px;border:1px solid '+inputBd+';border-radius:12px;font-size:16px;background:'+inputBg+';color:'+text+';outline:none;margin-bottom:16px;-webkit-appearance:none" onkeydown="if(event.key===\'Enter\')unlock()">' +
-          '<button onclick="unlock()" style="width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation">解锁</button>' +
+          '<button onclick="unlock()" id="loginBtn" style="width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation">解锁</button>' +
           '<div id="loginError" style="color:#dc2626;font-size:13px;margin-top:12px;display:none"></div>' +
           '<p style="font-size:12px;color:'+muted+';margin-top:40px">Doc77 — 本地文档管理</p>' +
         '</div>' +
@@ -48,19 +63,46 @@
     window.unlock = async function () {
       var p = document.getElementById('loginPass').value;
       var e = document.getElementById('loginError');
+      var btn = document.getElementById('loginBtn');
       if (!p) { e.textContent = '请输入密码'; e.style.display = 'block'; return; }
-      var r = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: p }),
-      });
-      var d = await r.json();
-      if (d.ok) {
-        sessionStorage.setItem('doc77-auth', '1');
-        o.remove();
-      } else {
-        e.textContent = d.error || '密码错误';
+      e.style.display = 'none';
+      // Button loading state
+      if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+      try {
+        var r = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: p }),
+        });
+        var d = await r.json();
+        if (d.ok) {
+          sessionStorage.setItem('doc77-auth', '1');
+          // Glow ripple transition
+          var card = document.querySelector('.login-gate-card') || document.querySelector('[style*="max-width:360px"]');
+          if (card) {
+            var rect = card.getBoundingClientRect();
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            var ripple = document.createElement('div');
+            ripple.className = 'login-gate-ripple';
+            ripple.style.cssText = 'left:' + cx + 'px;top:' + cy + 'px;transform:translate(-50%,-50%)';
+            document.body.appendChild(ripple);
+            setTimeout(function(){ if (ripple) ripple.remove(); }, 600);
+          }
+          var gate = document.getElementById('loginGate');
+          setTimeout(function() {
+            if (gate) gate.classList.add('login-gate-dissolve');
+          }, 120);
+          setTimeout(function() { o.remove(); }, 600);
+        } else {
+          e.textContent = d.error || '密码错误';
+          e.style.display = 'block';
+        }
+      } catch(ex) {
+        e.textContent = '网络错误: ' + ex.message;
         e.style.display = 'block';
+      } finally {
+        if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
       }
     };
   }
@@ -90,7 +132,7 @@
   }
 })();
 
-// ══════════ Toast ══════════
+//══════════ Toast ══════════
 window.toast = function (msg, type) {
   type = type || 'info';
   var container = document.getElementById('toastContainer');
@@ -117,7 +159,7 @@ window.toast = function (msg, type) {
   }, 2500);
 };
 
-// ══════════ Theme Toggle ══════════
+//══════════ Theme Toggle ══════════
 window.toggleTheme = function () {
   var html = document.documentElement;
   var isDark = html.classList.contains('dark');

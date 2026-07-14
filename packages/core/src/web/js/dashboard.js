@@ -241,15 +241,23 @@ window.doUpdate = async function(id) {
   var name = document.getElementById('editName-' + id).value.trim();
   var pth = document.getElementById('editPath-' + id).value.trim();
   var errEl = document.getElementById('editError-' + id);
+  var btn = document.querySelector('#editForm-' + id + ' .btn-primary');
   errEl.style.display = 'none';
   if (!name && !pth) { errEl.textContent = '名称或路径至少填一项'; errEl.style.display = 'block'; return; }
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   var body = {};
   if (name) body.name = name;
   if (pth) body.path = pth;
-  var r = await fetch('/api/projects/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) { var d = await r.json(); errEl.textContent = d.error || '更新失败'; errEl.style.display = 'block'; return; }
-  toast('项目已更新', 'success');
-  load();
+  try {
+    var r = await fetch('/api/projects/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) { var d = await r.json(); errEl.textContent = d.error || '更新失败'; errEl.style.display = 'block'; return; }
+    toast('项目已更新', 'success');
+    load();
+  } catch(e) {
+    errEl.textContent = '网络错误: ' + e.message; errEl.style.display = 'block';
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
 };
 
 window.doDelete = async function(id) {
@@ -262,14 +270,22 @@ window.doRegister = async function() {
   var name = document.getElementById('regName').value.trim();
   var pth = document.getElementById('regPath').value.trim();
   var err = document.getElementById('regError');
+  var btn = document.querySelector('#tab-manual .btn-primary');
   err.style.display = 'none';
   if (!name || !pth) { err.textContent = '请填写项目名称和路径'; err.style.display = 'block'; return; }
-  var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth}) });
-  if (!r.ok) { var d = await r.json(); err.textContent = d.error || '注册失败'; err.style.display = 'block'; return; }
-  document.getElementById('regName').value = '';
-  document.getElementById('regPath').value = '';
-  closeRegisterModal();
-  load();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth}) });
+    if (!r.ok) { var d = await r.json(); err.textContent = d.error || '注册失败'; err.style.display = 'block'; return; }
+    document.getElementById('regName').value = '';
+    document.getElementById('regPath').value = '';
+    closeRegisterModal();
+    load();
+  } catch(e) {
+    err.textContent = '网络错误: ' + e.message; err.style.display = 'block';
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
 };
 
 // ═══ Folder Picker — local/remote dual-mode ═══
