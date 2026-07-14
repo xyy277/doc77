@@ -48,6 +48,10 @@ window.renderFavorites = function(projects) {
 
   countEl.textContent = favProjects.length;
 
+  // Sync header fav count
+  var hfc = document.getElementById('headerFavCount');
+  if (hfc) hfc.textContent = favProjects.length;
+
   if (favProjects.length === 0) {
     section.style.display = 'none';
     return;
@@ -56,7 +60,7 @@ window.renderFavorites = function(projects) {
   section.style.display = 'block';
   var html = '<div class="fav-pills">';
   favProjects.forEach(function(p) {
-    html += '<span class="fav-pill" onclick="location.href=\'/preview.html?id=' + p.id + '\'" style="cursor:pointer">📂 ' + esc(p.name) +
+    html += '<span class="fav-pill" onclick="location.href=\'/preview.html?id=' + p.id + '\'" style="cursor:pointer" title="' + escAttr(p.name) + '">📂 <span class="fav-pill-name">' + esc(p.name) + '</span>' +
       '<button class="fav-pill-remove" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')" title="取消收藏">✕</button></span>';
   });
   html += '</div>';

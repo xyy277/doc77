@@ -1,19 +1,20 @@
 /**
- * Doc77 Stats JS — statistics panel rendering
+ * Doc77 Stats JS — statistics panel rendering (updates header badges)
  */
 
 window.renderStats = async function() {
-  var container = document.getElementById('statsContent');
   try {
     var r = await fetch('/api/stats');
     var d = await r.json();
 
-    container.innerHTML =
-      '<div class="stat-block"><div class="stat-number">' + d.projects + '</div><div class="stat-label">项目</div></div>' +
-      '<div class="stat-block"><div class="stat-number">' + d.favoriteCount + '</div><div class="stat-label">收藏</div></div>' +
-      '<div class="stat-block stat-block-wide"><div class="stat-number stat-number-sm">' + relativeTimeText(d.lastActive) + '</div><div class="stat-label">最近活跃</div></div>';
+    var projEl = document.getElementById('headerProjCount');
+    var favEl = document.getElementById('headerFavCount');
+    var recentEl = document.getElementById('headerRecentCount');
+    if (projEl) projEl.textContent = d.projects;
+    if (favEl) favEl.textContent = d.favoriteCount;
+    // recentCount is synced by dashboard.js renderRecent
   } catch(e) {
-    container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">加载失败</span>';
+    // silent fail — badges just show "0"
   }
 };
 

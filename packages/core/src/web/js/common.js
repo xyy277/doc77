@@ -377,10 +377,10 @@ async function regenerateRC(){
   fetch("/api/auth/status").then(function(r){ return r.json(); }).then(function(data){ d = data;
     if (!d.hasPassword && !d.isLegacy) { showSecurityPrompt(); return; }
     var o = document.createElement("div"); o.id = "loginGate";
-    o.style.cssText = "position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--bg-body)";
+    o.className = 'login-gate-bg';
     if (d.isLegacy) {
       // Legacy password — system upgraded, must re-set password
-      o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77"><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--accent);margin-bottom:4px">系统已升级，请重新设置密码</p></div><input id="setupPass" type="password" placeholder="新密码（至少6位）" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px"><button onclick="setupPwLegacy()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">设置密码</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div></div>';
+      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-badge">系统已升级，请重新设置密码</div></div><input id="setupPass" type="password" placeholder="新密码（至少6位）" class="login-gate-input"><button onclick="setupPwLegacy()" class="login-gate-btn">设置密码</button><div id="loginError" class="login-gate-error"></div></div>';
       window.setupPwLegacy = async function() {
         var p = document.getElementById("setupPass").value;
         var e = document.getElementById("loginError");
@@ -395,7 +395,7 @@ async function regenerateRC(){
       };
     } else {
       // Normal login
-      o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77"><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--text-secondary)">请输入密码解锁</p></div><input id="loginPass" type="password" placeholder="密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">解锁</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div><div style="text-align:center;margin-top:12px"><a href="javascript:showForgotPassword()" style="font-size:12px;color:var(--text-muted);text-decoration:none">忘记密码？</a></div></div>';
+      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">默认安全 &middot; 对话驱动</div></div><input id="loginPass" type="password" placeholder="请输入密码解锁" class="login-gate-input" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="login-gate-btn">解锁</button><div id="loginError" class="login-gate-error"></div><a href="javascript:showForgotPassword()" class="login-gate-link">忘记密码？</a></div>';
       window.unlock = async function() {
         var p = document.getElementById("loginPass").value;
         var e = document.getElementById("loginError");
@@ -419,7 +419,7 @@ async function regenerateRC(){
       try { var sr = await fetch("/api/config"); var sd = await sr.json();
         if ((sd["ai.token"] || sd["ai.enabled"] === "true") && !d.hasPassword) {
           var sb = document.createElement("div"); sb.id = "securityBanner";
-          sb.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:190;background:var(--accent-light-bg);border-bottom:1px solid var(--accent);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px";
+          sb.className = 'login-gate-security-banner';
           sb.innerHTML = '<span style="color:var(--accent)">⚠️ 已配置 AI 模型但未设置访问密码，建议设置密码保护数据安全</span>' +
             '<button onclick="this.parentElement.remove();toggleSettings();switchSettingsTab(&quot;account&quot;)" style="padding:4px 12px;background:var(--accent);color:#fff;font-size:11px;border:none;border-radius:6px;cursor:pointer;margin-left:16px;flex-shrink:0">设置密码</button>';
           document.body.insertBefore(sb, document.body.firstChild);
@@ -436,15 +436,11 @@ async function showForgotPassword(){
   forgotState = 'verify';
   var h = document.getElementById("loginGate");
   if(!h) return;
-  h.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px">' +
-    '<div style="text-align:center;margin-bottom:24px">' +
-    '<img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77">' +
-    '<h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">找回密码</h1>' +
-    '<p style="font-size:13px;color:var(--text-secondary)">请输入一个恢复码</p></div>' +
-    '<input id="rcInput" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px;font-family:monospace;font-size:13px" autocomplete="off">' +
-    '<button onclick="verifyRC()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">验证恢复码</button>' +
-    '<div id="rcError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div>' +
-    '<div style="text-align:center;margin-top:16px"><a href="javascript:location.reload()" style="font-size:13px;color:var(--text-muted)">返回登录</a></div></div>';
+  h.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">找回密码 &middot; 输入恢复码</div></div>' +
+    '<input id="rcInput" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" class="login-gate-input login-gate-mono-input" autocomplete="off">' +
+    '<button onclick="verifyRC()" class="login-gate-btn">验证恢复码</button>' +
+    '<div id="rcError" class="login-gate-error"></div>' +
+    '<a href="javascript:location.reload()" class="login-gate-link">返回登录</a></div>';
 }
 
 async function verifyRC(){
@@ -465,15 +461,11 @@ async function verifyRC(){
 function showResetPassword(){
   var h = document.getElementById("loginGate");
   if(!h) return;
-  h.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px">' +
-    '<div style="text-align:center;margin-bottom:24px">' +
-    '<img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77">' +
-    '<h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">设置新密码</h1>' +
-    '<p style="font-size:13px;color:var(--text-secondary)">恢复码验证通过</p></div>' +
-    '<input id="newPw" type="password" placeholder="新密码（至少6位）" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px">' +
-    '<input id="newPwConfirm" type="password" placeholder="确认新密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px">' +
-    '<button onclick="doReset()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">重置密码</button>' +
-    '<div id="resetError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div></div>';
+  h.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">设置新密码 &middot; 恢复码验证通过</div></div>' +
+    '<input id="newPw" type="password" placeholder="新密码（至少6位）" class="login-gate-input">' +
+    '<input id="newPwConfirm" type="password" placeholder="确认新密码" class="login-gate-input">' +
+    '<button onclick="doReset()" class="login-gate-btn">重置密码</button>' +
+    '<div id="resetError" class="login-gate-error"></div></div>';
 }
 
 async function doReset(){

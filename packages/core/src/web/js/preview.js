@@ -558,13 +558,15 @@ function resetTransientDocState() {
 }
 
 /** 激活某个已打开的 tab（切换/首次渲染）。 */
-function activateTab(path) {
+function activateTab(path, opts) {
+  opts = opts || {};
   // 保存旧 tab 滚动位置
   if (activeTabPath && activeTabPath !== path) tabScroll[activeTabPath] = document.getElementById('contentArea').scrollTop;
   resetTransientDocState();
   tabStore.activate(path);
   activeTabPath = path; currentFile = path;
   renderTabBar(); syncTreeActive(path); saveTabsState();
+  if (!opts.silent) addRecentFile(path);
 
   var cached = paneCache[path];
   if (cached) {
@@ -599,9 +601,8 @@ function openTab(path, opts) {
   if (!tabStore.has(path)) {
     var r = tabStore.open(path, basename(path));
     r.evicted.forEach(function(p) { releaseTab(p); });
-    if (!opts.silent) addRecentFile(path);
   }
-  activateTab(path);
+  activateTab(path, opts);
 }
 
 /** 关闭 tab：清资源，激活相邻 tab，或回到空状态。 */
@@ -609,7 +610,7 @@ function closeTab(path) {
   var r = tabStore.close(path);
   releaseTab(path);
   renderTabBar(); saveTabsState();
-  if (r.active) { activeTabPath = null; activateTab(r.active); }
+  if (r.active) { activeTabPath = null; activateTab(r.active, {silent: true}); }
   else showEmptyState();
 }
 
@@ -870,12 +871,13 @@ function addRecentFile(fp) {
   localStorage.setItem('doc77-recent', JSON.stringify(rf));
   renderRecentFiles();
 
-  // Server-side tracking via POST /api/recent-files (fire-and-forget)
+  // Server-side tracking via fetch + keepalive (survives navigation, reliable Content-Type)
   try {
     fetch('/api/recent-files', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId: parseInt(pid), fileName: fp.split('/').pop(), filePath: fp }),
+      keepalive: true,
     }).catch(function() {});
   } catch(e) {}
 }
@@ -904,6 +906,9 @@ function onContentScroll() {
   if (!a) return;
   var pct = a.scrollTop / (a.scrollHeight - a.clientHeight) * 100;
   document.getElementById('readingProgress').style.width = Math.min(100, Math.max(0, pct)) + '%';
+  // Back to top button
+  var btn = document.getElementById('backToTopBtn');
+  if (btn) { btn.style.display = a.scrollTop > 300 ? 'flex' : 'none'; }
 }
 
 // Feature 5: TTS

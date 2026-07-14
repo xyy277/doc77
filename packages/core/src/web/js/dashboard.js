@@ -16,6 +16,7 @@ async function load() {
     var r = await fetch('/api/projects');
     projects = await r.json();
     document.getElementById('projCount').textContent = projects.length;
+    syncHeaderCounts();
     applyViewMode();
     filterAndSort();
     window.renderFavorites(projects);
@@ -178,32 +179,39 @@ window.renderRecent = async function() {
     var rf = await fetch('/api/recent-files?limit=3');
     var recentFiles = await rf.json();
 
+    // Sync header recent count
+    var hrc = document.getElementById('headerRecentCount');
+    if (hrc) hrc.textContent = recentFiles.filter(function(f) { return f.viewedAt; }).length;
+
     if (!recentProjects.length && !recentFiles.length) {
-      panel.innerHTML = '<div class="empty-state"><div class="empty-text">打开项目或文档后自动出现在这里</div></div>';
+      panel.innerHTML = '<span class="recent-strip-empty">打开文档后自动出现在这里</span>';
       return;
     }
 
-    var html = '';
+    var parts = [];
 
-    // Project pills
+    // Project pills — each pill is a direct flex child
     if (recentProjects.length) {
-      html += '<div class="recent-pills" style="margin-bottom:8px">';
       recentProjects.forEach(function(p) {
-        html += '<a href="/preview.html?id=' + p.id + '" class="recent-pill" onclick="fetch(\'/api/projects/' + p.id + '/touch\',{method:\'POST\'})">📂 ' + esc(p.name) + '</a>';
+        parts.push('<a href="/preview.html?id=' + p.id + '" class="recent-pill" title="' + escAttr(p.name) + '" onclick="fetch(\'/api/projects/' + p.id + '/touch\',{method:\'POST\'})">📂 ' + esc(p.name) + '</a>');
       });
-      html += '</div>';
     }
 
     // File links
     if (recentFiles.length) {
+      // Separator between projects and files
+      if (parts.length) parts.push('<span class="recent-strip-sep"></span>');
+
       recentFiles.forEach(function(f) {
-        html += '<a href="/preview.html?id=' + f.projectId + '&path=' + encodeURIComponent(f.filePath) + '" class="recent-file-link">📄 ' + esc(f.fileName) + ' · ' + esc(f.projectName) + ' · ' + relativeTime(f.viewedAt) + '</a>';
+        var href = '/preview.html?id=' + f.projectId + '&path=' + encodeURIComponent(f.filePath);
+        var label = esc(f.fileName) + ' · ' + esc(f.projectName) + ' · ' + relativeTime(f.viewedAt);
+        parts.push('<a href="' + href + '" class="recent-file-link" title="' + escAttr(f.projectName + ' / ' + f.fileName) + '">📄 ' + label + '</a>');
       });
     }
 
-    panel.innerHTML = html;
+    panel.innerHTML = parts.join('');
   } catch(e) {
-    panel.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div></div>';
+    panel.innerHTML = '<span class="recent-strip-empty">加载失败</span>';
   }
 };
 
@@ -375,6 +383,12 @@ window.fillPath = function(forEditId, path) {
   var input = document.getElementById(targetId);
   if (input) input.value = path;
 };
+
+// ═══ Sync header counts ═══
+function syncHeaderCounts() {
+  var hpc = document.getElementById('headerProjCount');
+  if (hpc) hpc.textContent = projects.length;
+}
 
 // ═══ Init ═══
 load();
