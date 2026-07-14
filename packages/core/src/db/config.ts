@@ -4,6 +4,7 @@ import { getConnection } from './connection.js';
  * Default configuration values defined in architecture doc §7.3.
  */
 const DEFAULTS: Record<string, string> = {
+  'ai.provider': 'custom',
   'ai.enabled': 'false',
   'ai.auto_mode': 'false',
   'ai.risk_level': 'medium',
