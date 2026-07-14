@@ -23,14 +23,14 @@ export function getOrCreateSession<T extends SessionAgent>(
   sessionId: string | undefined,
   createAgent: () => T,
   projectId?: number,
-): { sessionId: string; agent: T } {
+): { sessionId: string; agent: T; isNew: boolean } {
   cleanupExpiredSessions();
 
   if (sessionId) {
     const existing = sessions.get(sessionId);
     if (existing && existing.projectId === projectId) {
       existing.updatedAt = Date.now();
-      return { sessionId, agent: existing.agent as T };
+      return { sessionId, agent: existing.agent as T, isNew: false };
     }
   }
 
@@ -42,7 +42,7 @@ export function getOrCreateSession<T extends SessionAgent>(
     updatedAt: Date.now(),
   });
 
-  return { sessionId: nextSessionId, agent };
+  return { sessionId: nextSessionId, agent, isNew: true };
 }
 
 export function resetSession(sessionId: string): boolean {

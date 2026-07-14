@@ -237,6 +237,13 @@ async function main() {
 
       // Startup maintenance (MCP optional — skip if not installed)
       let maint: ReturnType<typeof setInterval> | undefined;
+      // Prune stale persisted AI chat sessions (core — always available).
+      try {
+        const { pruneAiSessions } = await import('@doc77/core');
+        pruneAiSessions(24);
+      } catch {
+        /* non-fatal */
+      }
       try {
         const mcpMaint = await import('@doc77/mcp');
         const { runShadowGC, rejectExpiredTasks, cleanupExpiredSessions } = mcpMaint;

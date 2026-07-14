@@ -64,6 +64,14 @@ CREATE TABLE IF NOT EXISTS config (
     value TEXT
 );
 
+-- AI 对话会话表（持久化聊天历史，重启后可恢复）
+CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+    session_id TEXT PRIMARY KEY,
+    project_id INTEGER,
+    messages TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 文件树缓存表
 CREATE TABLE IF NOT EXISTS filetree_cache (
     project_id INTEGER NOT NULL,
