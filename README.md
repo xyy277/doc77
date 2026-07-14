@@ -179,6 +179,46 @@ doc77 vendor-install --no-pyodide
 | **Python 执行** | `.py` | ✅ Pyodide WASM 运行 |
 | **不支持的格式** | `.mp4` `.zip` `.exe` `.shp` `.psd` … | ❌ 文件信息卡 + 文件夹中显示 |
 
+### Markdown 语法支持
+
+| 功能 | 语法示例 | 状态 |
+|---|---|---|
+| 标题 / 加粗 / 斜体 / 删除线 | `# H1`, `**b**`, `*i*`, `~~del~~` | ✅ GFM |
+| 列表（嵌套 / 有序 / 无序） | `1.`, `- `, 缩进 | ✅ GFM |
+| 任务列表 | `- [x]` `- [ ]` | ✅ GFM |
+| 表格（含对齐） | `|:---|:---:|---:|` | ✅ GFM |
+| 引用块 / 分割线 | `> quote`, `---` | ✅ GFM |
+| 图片 / 链接 / 图片链接 | `![alt](url)`, `[text](url)` | ✅ 本地路径自动重写为 API |
+| 代码块 + 语法高亮 | ` ```python ` | ✅ highlight.js (44+ 语言) |
+| 代码复制按钮 | hover 右上角 | ✅ |
+| 数学公式（行内 / 块） | `$E=mc^2$`, `$$\int$$` | ✅ KaTeX |
+| Mermaid 图表 | ` ```mermaid ` | ✅ 流程图 / 时序图 / 甘特图 / 类图 / 状态图 / 饼图 |
+| PlantUML 图表 | ` ```plantuml ` | ✅ kroki.io（离线降级源码） |
+| Emoji 短码 | `:smile:` `:rocket:` `:heart:` | ✅ |
+| 高亮标记 | `==highlight==` | ✅ `<mark>` |
+| 脚注 | `[^1]` `[^2]` | ✅ |
+| GitHub 警告框 | `> [!NOTE]` `> [!WARNING]` | ✅ |
+| 折叠块 | `<details><summary>` | ✅ HTML 原生 |
+| 标题锚点 | `## My Heading` → `#my-heading` | ✅ |
+| 原始 HTML | `<kbd>`, `<sup>`, `<audio>`, `<video>` | ✅ 浏览器原生 |
+| 定义列表 | `Term : definition` | ❌ |
+| 自动目录 | `[TOC]` | ⚠️ 前端已有大纲面板替代 |
+
+## 离线可用性
+
+Doc77 通过 vendor 系统提供 CDN → 本地回退。`doc77 vendor-install` 下载资源到 `~/.doc77/vendor/`。Electron 桌面版在构建时已将 vendor 资源打包内置（extraResources）。
+
+| 功能 | 依赖库 | CLI `vendor-install` | Electron 内置 | 离线不可用时 |
+|---|---|---|---|---|
+| **Tailwind CSS** | `tailwind.js` | ✅ | ✅ | 3s 超时降级无样式 |
+| **highlight.js** | `highlight.min.js` | ✅ | ✅ | 代码块无语法高亮 |
+| **Mermaid 图表** | `mermaid.min.js` | ✅ | ✅ | 显示源码 |
+| **KaTeX 数学** | `katex.min.js` | ✅ | ✅ | 显示 LaTeX 原文 |
+| **XLSX 预览** | `xlsx.mini.min.js` | ✅ | ✅ | .xlsx 不可预览 |
+| **DOCX 预览** | `mammoth.browser.min.js` | ✅ | ✅ | .docx 不可预览 |
+| **Python 执行** | `pyodide.js` + wasm | ⚠️ 需额外 ~12MB | ❌ 未内置 | .py 不可执行 |
+| **PlantUML** | kroki.io | ❌ 需联网 | ❌ 需联网 | 显示源码 |
+
 ## 一键重启
 
 ```bash
