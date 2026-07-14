@@ -73,6 +73,24 @@ export const VENDOR_ASSETS: VendorAsset[] = [
     type: 'wasm',
     size: '~2MB',
   },
+  {
+    name: 'katex.min.css',
+    url: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css',
+    type: 'css',
+    size: '~25KB',
+  },
+  {
+    name: 'katex.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js',
+    type: 'js',
+    size: '~280KB',
+  },
+  {
+    name: 'katex-auto-render.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js',
+    type: 'js',
+    size: '~10KB',
+  },
 ];
 
 /**

@@ -14,6 +14,11 @@ var VENDOR_MAP = {
   'xlsx.mini.min.js': 'xlsx.mini.min.js',
   'mammoth.browser.min.js': 'mammoth.browser.min.js',
   'pyodide': 'pyodide.js',
+  'katex.min.css': 'katex.min.css',
+  'katex@0.16.11/dist/katex.min.css': 'katex.min.css',
+  'katex.min.js': 'katex.min.js',
+  'katex@0.16.11/dist/katex.min.js': 'katex.min.js',
+  'katex-auto-render.min.js': 'katex-auto-render.min.js',
 };
 
 /**
@@ -528,6 +533,7 @@ function afterActivate(path, d) {
   onContentScroll();
   setTimeout(highlightCode, 60);
   setTimeout(renderMermaid, 60);
+  setTimeout(renderMath, 80);
   if (_pendingLine > 0) { setTimeout(function(){ scrollToLine(_pendingLine); _pendingLine = 0; }, 200); }
   renderBreadcrumb(path);
 }
@@ -781,6 +787,65 @@ function renderMermaid() {
   loadMermaid(function(ok) {
     if (!ok || !window.mermaid) return;
     try { window.mermaid.run({ querySelector: '#docPaneHost .mermaid:not([data-processed])' }); } catch (e) {}
+  });
+}
+
+// ---- KaTeX math rendering ----
+
+var _katexCbs = [];
+var _katexLoading = false;
+
+function loadKaTeX(cb) {
+  if (window.katex && window.renderMathInElement) { cb(true); return; }
+  _katexCbs.push(cb);
+  if (_katexLoading) return;
+  _katexLoading = true;
+
+  // Load CSS first
+  var css = document.getElementById('katexCss');
+  if (css) { css.href = vsrc('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css', 'katex.min.css'); }
+
+  // Load KaTeX JS
+  var s = document.createElement('script');
+  s.src = vsrc('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js');
+  s.onload = function() {
+    // Load auto-render extension
+    var ar = document.createElement('script');
+    ar.src = vsrc('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js');
+    ar.onload = function() {
+      _katexLoading = false;
+      _katexCbs.splice(0).forEach(function(fn) { fn(true); });
+    };
+    ar.onerror = function() {
+      _katexLoading = false;
+      _katexCbs.splice(0).forEach(function(fn) { fn(false); });
+    };
+    document.head.appendChild(ar);
+  };
+  s.onerror = function() {
+    _katexLoading = false;
+    _katexCbs.splice(0).forEach(function(fn) { fn(false); });
+  };
+  document.head.appendChild(s);
+}
+
+function renderMath() {
+  var host = document.getElementById('docPaneHost');
+  if (!host) return;
+  // Check if there's any math delimiter in the content
+  var html = host.innerHTML;
+  if (html.indexOf('$') === -1 && html.indexOf('\\[') === -1 && html.indexOf('\\(') === -1) return;
+  loadKaTeX(function(ok) {
+    if (!ok || !window.renderMathInElement) return;
+    try {
+      renderMathInElement(host, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+        ],
+        throwOnError: false,
+      });
+    } catch (e) {}
   });
 }
 

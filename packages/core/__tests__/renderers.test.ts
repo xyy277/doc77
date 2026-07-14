@@ -135,6 +135,21 @@ describe('Markdown renderer — local URL rewriting', () => {
     const html = renderMarkdown('<img src="data:image/png;base64,ABC">', opts);
     expect(html).toContain('data:image/png;base64,ABC');
   });
+
+  it('should render mermaid code block as pre.mermaid', () => {
+    const md = '```mermaid\ngraph TD\nA-->B\n```';
+    const html = renderMarkdown(md);
+    expect(html).toContain('<pre class="mermaid">');
+    expect(html).toContain('graph TD');
+    expect(html).not.toContain('doc77-code-block');
+  });
+
+  it('should still render normal code blocks with doc77-code-block', () => {
+    const md = '```typescript\nconst x = 1;\n```';
+    const html = renderMarkdown(md);
+    expect(html).toContain('doc77-code-block');
+    expect(html).toContain('language-typescript');
+  });
 });
 
 describe('Mermaid renderer', () => {

@@ -114,6 +114,10 @@ export function renderMarkdown(
   // Custom renderer: wrap code blocks with theme class
   const renderer = new marked.Renderer();
   renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
+    // Mermaid diagrams — use <pre class="mermaid"> for client-side rendering
+    if (lang === 'mermaid') {
+      return `<pre class="mermaid">${text}</pre>`;
+    }
     const langClass = lang ? ` class="language-${lang}"` : '';
     return `<div class="doc77-code-block"><pre><code${langClass}>${text}</code></pre></div>`;
   };
