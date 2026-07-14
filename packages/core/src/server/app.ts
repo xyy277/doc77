@@ -1515,19 +1515,21 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.get('/api/auth/status', (_req: Request, res: Response) => {
     try {
       const db = getConnection();
-      const row = db.prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
-        { password_hash: string } | undefined;
+      const row = db.prepare(
+        'SELECT password_hash, wrapped_dek_by_password FROM user_auth WHERE id = 1',
+      ).get() as { password_hash: string; wrapped_dek_by_password: string } | undefined;
       const recoveryStatus = auth.getRecoveryStatus();
       res.json({
         hasPassword: !!row?.password_hash,
         hasRecovery: recoveryStatus.hasRecovery,
+        isLegacy: !!(row?.password_hash && !row?.wrapped_dek_by_password),
       });
     } catch {
-      res.json({ hasPassword: false, hasRecovery: false });
+      res.json({ hasPassword: false, hasRecovery: false, isLegacy: false });
     }
   });
 
-  // Setup password (first time)
+  // Setup password (first time, or legacy migration)
   app.post('/api/auth/setup', (req: Request, res: Response) => {
     const { password } = req.body;
     if (!password || password.length < 6) {
@@ -1535,7 +1537,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       return;
     }
     try {
-      const codes = auth.setupPasswordWithDEK(password);
+      // Allow overwrite if legacy mode (old hash, no DEK)
+      const codes = auth.isLegacyMode()
+        ? auth.setupPasswordLegacy(password)
+        : auth.setupPasswordWithDEK(password);
       if (!codes) {
         res.status(409).json({ error: '密码已设置，请使用修改密码功能' });
         return;
@@ -1561,7 +1566,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         res.status(result.status).json({
           ok: false,
           error: result.error,
-          ...(result.status === 410 ? { migrationNeeded: true } : {}),
+          ...(result.legacyMigration ? { legacyMigration: true } : {}),
         });
       }
     } catch (e: unknown) {

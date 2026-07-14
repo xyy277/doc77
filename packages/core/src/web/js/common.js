@@ -375,25 +375,45 @@ async function regenerateRC(){
   if (sessionStorage.getItem("doc77-auth")) return;
   var d;
   fetch("/api/auth/status").then(function(r){ return r.json(); }).then(function(data){ d = data;
-    if (!d.hasPassword) { showSecurityPrompt(); return; }
+    if (!d.hasPassword && !d.isLegacy) { showSecurityPrompt(); return; }
     var o = document.createElement("div"); o.id = "loginGate";
     o.style.cssText = "position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--bg-body)";
-    o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77"><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--text-secondary)">请输入密码解锁</p></div><input id="loginPass" type="password" placeholder="密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">解锁</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div><div style="text-align:center;margin-top:12px"><a href="javascript:showForgotPassword()" style="font-size:12px;color:var(--text-muted);text-decoration:none">忘记密码？</a></div></div>';
+    if (d.isLegacy) {
+      // Legacy password — system upgraded, must re-set password
+      o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77"><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--accent);margin-bottom:4px">系统已升级，请重新设置密码</p></div><input id="setupPass" type="password" placeholder="新密码（至少6位）" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px"><button onclick="setupPwLegacy()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">设置密码</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div></div>';
+      window.setupPwLegacy = async function() {
+        var p = document.getElementById("setupPass").value;
+        var e = document.getElementById("loginError");
+        if (p.length < 6) { e.textContent = "密码至少6位"; e.style.display = 'block'; return; }
+        var r = await fetch("/api/auth/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
+        var rd = await r.json();
+        if (rd.ok) {
+          if (rd.recovery_codes) { showRecoveryCodesModal(rd.recovery_codes); }
+          sessionStorage.setItem("doc77-auth","1");
+          o.remove();
+        } else { e.textContent = rd.error || "设置失败"; e.style.display = 'block'; }
+      };
+    } else {
+      // Normal login
+      o.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.2);padding:32px;width:100%;max-width:384px"><div style="text-align:center;margin-bottom:24px"><img src="/assets/favicon.svg" style="width:48px;height:48px" alt="Doc77"><h1 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-top:8px;margin-bottom:0">Doc77</h1><p style="font-size:13px;color:var(--text-secondary)">请输入密码解锁</p></div><input id="loginPass" type="password" placeholder="密码" class="input" style="width:100%;padding:12px 16px;margin-bottom:12px" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="btn btn-primary" style="width:100%;padding:10px 0;font-size:13px;border-radius:8px">解锁</button><div id="loginError" style="font-size:11px;color:var(--danger);margin-top:8px;text-align:center;display:none"></div><div style="text-align:center;margin-top:12px"><a href="javascript:showForgotPassword()" style="font-size:12px;color:var(--text-muted);text-decoration:none">忘记密码？</a></div></div>';
+      window.unlock = async function() {
+        var p = document.getElementById("loginPass").value;
+        var e = document.getElementById("loginError");
+        if (!p) { e.textContent = "请输入密码"; e.style.display = 'block'; return; }
+        var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
+        var d2 = await r2.json();
+        if (d2.ok) {
+          sessionStorage.setItem("doc77-auth","1");
+          if (d2.recovery_codes) { showRecoveryCodesModal(d2.recovery_codes); }
+          o.remove();
+        } else if (d2.legacyMigration) {
+          // Legacy hash was detected — switch to setup form
+          location.reload();
+        }
+        else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
+      };
+    }
     document.body.appendChild(o);
-    window.unlock = async function() {
-      var p = document.getElementById("loginPass").value;
-      var e = document.getElementById("loginError");
-      if (!p) { e.textContent = "请输入密码"; e.style.display = 'block'; return; }
-      var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
-      var d2 = await r2.json();
-      if (d2.ok) { sessionStorage.setItem("doc77-auth","1"); o.remove(); }
-      else if (d2.migrationNeeded) {
-        // scrypt params migration: old password hash cleared, guide user to re-set
-        e.innerHTML = d2.error + '<br><a href="javascript:void(0)" onclick="location.reload()" style="color:var(--accent);font-size:11px">刷新页面设置新密码</a>';
-        e.style.display = 'block';
-      }
-      else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
-    };
     showSecurityPrompt();
     async function showSecurityPrompt() {
       try { var sr = await fetch("/api/config"); var sd = await sr.json();

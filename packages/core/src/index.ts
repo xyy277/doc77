@@ -71,6 +71,7 @@ export {
 export {
   isLegacyMode,
   setupPasswordWithDEK,
+  setupPasswordLegacy,
   verifyLogin,
   verifyRecoveryCode,
   resetPasswordWithToken,

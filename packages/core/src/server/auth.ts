@@ -213,12 +213,125 @@ export function setupPasswordWithDEK(
 }
 
 // ---------------------------------------------------------------------------
+// Legacy password migration (old scrypt hash + old config encryption → DEK)
+// ---------------------------------------------------------------------------
+
+/**
+ * Set up a password for a legacy user (pre-v0.6).
+ *
+ * Unlike setupPasswordWithDEK, this:
+ * 1. Allows overwriting an existing old-scrypt password hash
+ * 2. Migrates encrypted config values from the old key (deriveKey('doc77-config-key', pbkdf2_salt))
+ *    to the new DEK-based envelope encryption
+ * 3. Clears legacy salt fields after migration
+ *
+ * Returns null only if a non-legacy password is already set.
+ */
+export function setupPasswordLegacy(password: string): crypto.RecoveryCodeSet | null {
+  const db = getConnection();
+  const row = getAuthRow();
+
+  // Only allowed when legacy mode (old hash, no DEK)
+  if (!isLegacyMode()) return null;
+
+  const dek = crypto.generateDEK();
+  const pwSalt = crypto.generateSalt();
+  const pwWrapSalt = crypto.generateSalt();
+  const rcWrapSalt = crypto.generateSalt();
+  const jwtSalt = crypto.generateSalt();
+
+  // Derive wrap key from new password (new scrypt params)
+  const scryptOutput = crypto.scryptSync(password, pwSalt, 64, crypto.SCRYPT_OPTIONS);
+  const pwWrapKey = crypto.hkdf(scryptOutput, pwWrapSalt, 'doc77-pw-wrap', 32);
+  const wrappedByPw = crypto.wrapDEK(dek, pwWrapKey);
+
+  // Generate recovery codes
+  const codes = crypto.generateRecoveryCodes(10);
+  const codeHashes: string[] = [];
+  const indexHashes: string[] = [];
+  const wrappedByRc: crypto.EncryptedData[] = [];
+  const used: boolean[] = [];
+
+  for (const plaintext of codes.plaintexts) {
+    codeHashes.push(crypto.hashRecoveryCode(plaintext));
+    indexHashes.push(crypto.hashRecoveryCodeIndex(plaintext));
+    const rcWrapKey = crypto.hkdf(Buffer.from(plaintext, 'utf-8'), rcWrapSalt, 'doc77-rc-wrap', 32);
+    wrappedByRc.push(crypto.wrapDEK(dek, rcWrapKey));
+    used.push(false);
+  }
+
+  // Migrate encrypted config: old key → DEK
+  const legacySalt = row?.pbkdf2_salt as string | undefined;
+  if (legacySalt) {
+    const oldKey = crypto.deriveKey('doc77-config-key', Buffer.from(legacySalt, 'hex'));
+    const configRows = db.prepare('SELECT key, value FROM config').all() as {
+      key: string;
+      value: string;
+    }[];
+    for (const cr of configRows) {
+      if (crypto.isSensitiveKey(cr.key) && cr.value) {
+        try {
+          // Decrypt with old key
+          const oldEnc: crypto.EncryptedData = JSON.parse(cr.value);
+          const plaintext = crypto.decrypt(oldEnc, oldKey);
+          // Re-encrypt with DEK
+          const newEnc = crypto.encrypt(plaintext, dek);
+          db.prepare('UPDATE config SET value = ? WHERE key = ?').run(
+            JSON.stringify(newEnc),
+            cr.key,
+          );
+        } catch {
+          // Skip non-encrypted or corrupted values
+        }
+      }
+    }
+  }
+
+  // Store everything, clear legacy fields
+  db.prepare(`
+    UPDATE user_auth SET
+      password_hash = ?,
+      pw_wrap_salt = ?,
+      rc_wrap_salt = ?,
+      jwt_salt = ?,
+      pbkdf2_salt = NULL,
+      encryption_salt = NULL,
+      wrapped_dek_by_password = ?,
+      wrapped_dek_by_recovery = ?,
+      recovery_code_hashes = ?,
+      recovery_code_index_hashes = ?,
+      recovery_codes_used = ?,
+      recovery_codes_generated_at = datetime('now'),
+      failed_attempts = 0,
+      locked_until = NULL,
+      recovery_attempts = 0,
+      recovery_locked_until = NULL
+    WHERE id = 1
+  `).run(
+    `scrypt:${pwSalt.toString('hex')}:${scryptOutput.toString('hex')}`,
+    pwWrapSalt.toString('hex'),
+    rcWrapSalt.toString('hex'),
+    jwtSalt.toString('hex'),
+    JSON.stringify(wrappedByPw),
+    JSON.stringify(wrappedByRc),
+    JSON.stringify(codeHashes),
+    JSON.stringify(indexHashes),
+    JSON.stringify(used),
+  );
+
+  writeAuditLog('password_changed', { action: 'legacy_migration' }, 'web', 'success');
+
+  return codes;
+}
+
+// ---------------------------------------------------------------------------
 // Login
 // ---------------------------------------------------------------------------
 
 export function verifyLogin(password: string): {
   ok: boolean;
   token?: string;
+  legacyMigration?: boolean;
   error?: string;
   status: number;
 } {
@@ -236,19 +349,12 @@ export function verifyLogin(password: string): {
   if (!crypto.verifyPassword(password, row.password_hash as string)) {
     // Fallback: try legacy scrypt params (N=16384, v0.5.x and earlier)
     if (crypto.verifyPasswordLegacy(password, row.password_hash as string)) {
-      // Legacy hash detected — auto-migrate: wipe auth so user can re-set password
-      forceResetPassword();
-      writeAuditLog(
-        'scrypt_migration',
-        { action: 'legacy_hash_detected_cleared' },
-        'server',
-        'success',
-      );
+      // Legacy hash detected — user must re-set password with new scrypt params
       return {
         ok: false,
-        error:
-          '密码加密算法已升级（v0.6），为安全起见请重新设置密码。旧密码已失效，加密配置（AI Token 等）已清除。',
+        error: '系统已升级，请重新设置密码',
         status: 410,
+        legacyMigration: true,
       };
     }
 
