@@ -47,6 +47,7 @@ export interface AiCompletionResponse {
 /** Unified chunk type for streaming responses */
 export type StreamChunk =
   | { type: 'token'; content: string }
+  | { type: 'tool_call_start'; name: string }
   | { type: 'tool_call'; id: string; name: string; arguments: string }
   | { type: 'done'; usage?: { prompt_tokens: number; completion_tokens: number } }
   | { type: 'error'; message: string };
@@ -152,6 +153,8 @@ export class AiProvider {
     let buffer = '';
     // Accumulate tool calls from streaming deltas
     const toolCallAcc: Map<number, { id: string; name: string; arguments: string }> = new Map();
+    // Tool-call indices whose name has already been announced via tool_call_start.
+    const started = new Set<number>();
     let finishReason = '';
     let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
@@ -196,6 +199,12 @@ export class AiProvider {
                 if (tc.function?.name) existing.name += tc.function.name;
                 if (tc.function?.arguments) existing.arguments += tc.function.arguments;
                 toolCallAcc.set(idx, existing);
+                // Announce the tool as soon as its name is known — lets the UI
+                // show the indicator in real time instead of at stream end.
+                if (existing.name && !started.has(idx)) {
+                  started.add(idx);
+                  yield { type: 'tool_call_start', name: existing.name };
+                }
               }
             }
 
