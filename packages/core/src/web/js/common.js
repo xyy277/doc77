@@ -244,12 +244,12 @@ function switchSettingsTab(tab) {
     }
     c.innerHTML = '<div class="section-title">AI 提供商</div>' +
       '<div class="settings-row"><span class="settings-label">提供商</span>' +
-      '<select id="aiProvider" onchange="onProviderChange()" class="settings-select">' +
+      '<select id="aiProvider" data-key="ai.provider" onchange="onProviderChange()" class="settings-select">' +
       '<option value="custom">自定义</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>' +
       '<option value="qwen">Qwen (阿里)</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">GLM (智谱)</option></select></div>' +
       settingRow('Base URL','ai.base_url','text','https://api.deepseek.com') +
       '<div class="settings-row"><span class="settings-label">模型</span>' +
-      '<select id="aiModelSelect" onchange="document.querySelector(\'[data-key=ai.model]\').value=this.value" class="settings-select">' +
+      '<select id="aiModelSelect" onchange="onModelSelect(this.value)" class="settings-select">' +
       '<option value="deepseek-v4-pro">deepseek-v4-pro</option><option value="deepseek-v4-flash">deepseek-v4-flash</option></select></div>' +
       '<input data-key="ai.model" type="hidden" value="deepseek-v4-pro">' +
       settingRow('API Token','ai.token','password','sk-...') +
@@ -332,20 +332,33 @@ function togglePasswordView(btn) { var i = btn.previousElementSibling; i.type = 
 
 // AI Providers
 var AI_PROVIDERS = {deepseek:{url:'https://api.deepseek.com',models:['deepseek-v4-pro','deepseek-v4-flash']},openai:{url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-5']},qwen:{url:'https://dashscope.aliyuncs.com/compatible-mode/v1',models:['qwen3-max','qwen-plus','qwen-turbo']},kimi:{url:'https://api.moonshot.cn/v1',models:['kimi-k2.7-code']},doubao:{url:'https://ark.cn-beijing.volces.com/api/v3',models:['doubao-seed-2-1-pro']},glm:{url:'https://open.bigmodel.cn/api/paas/v4',models:['glm-5.2']},custom:{url:'',models:[]}};
+function onModelSelect(v) {
+  var modelEl = document.querySelector('[data-key="ai.model"]');
+  if (!modelEl) return;
+  if (v === '_custom') {
+    var m = prompt('输入模型名称:');
+    if (m) {
+      var sel = document.getElementById('aiModelSelect');
+      var o = document.createElement('option');
+      o.value = m; o.textContent = m; o.selected = true;
+      sel.insertBefore(o, sel.lastChild);
+      modelEl.value = m;
+    }
+  } else {
+    modelEl.value = v;
+  }
+}
 function onProviderChange() {
   var p = document.getElementById('aiProvider').value;
   var info = AI_PROVIDERS[p];
-  var urlEl = document.querySelector('[data-key=ai.base_url]');
+  var urlEl = document.querySelector('[data-key="ai.base_url"]');
   var sel = document.getElementById('aiModelSelect');
-  var modelEl = document.querySelector('[data-key=ai.model]');
+  var modelEl = document.querySelector('[data-key="ai.model"]');
   if (info.url) urlEl.value = info.url;
   sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">(手动输入)</option>') +
     (p !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
   if (info.models.length) { modelEl.value = info.models[0]; sel.value = info.models[0]; }
-  sel.onchange = function() {
-    if (this.value === '_custom') { var m = prompt('输入模型名称:'); if (m) { var o = document.createElement('option'); o.value = m; o.textContent = m; o.selected = true; this.insertBefore(o, this.lastChild); modelEl.value = m; } }
-    else { modelEl.value = this.value; }
-  };
+  sel.onchange = function() { onModelSelect(this.value); };
 }
 async function testConnection() {
   var r = document.getElementById('testResult');
@@ -362,8 +375,32 @@ async function loadSettingsValues() {
       if (v === undefined) return;
       if (el.tagName === 'SELECT') { var opt = el.querySelector('option[value="'+v+'"]'); if (opt) opt.selected = true; }
       else if (el.tagName === 'BUTTON') { el.dataset.value = v === 'true' ? 'true' : 'false'; el.classList.toggle('on', v === 'true'); if (el.querySelector('span')) el.querySelector('span').classList.toggle('on', v === 'true'); }
-      else el.value = v;
+      else {
+        // For password inputs, keep masked values as placeholder (not field value)
+        // to prevent re-saving the mask in place of the real token
+        if (el.type === 'password' && typeof v === 'string' && v.indexOf('•') !== -1) {
+          el.placeholder = v;
+          return;
+        }
+        el.value = v;
+      }
     });
+    // Refresh model dropdown to match the persisted provider
+    var pv = d['ai.provider'];
+    if (pv && AI_PROVIDERS[pv]) {
+      var info = AI_PROVIDERS[pv];
+      var sel = document.getElementById('aiModelSelect');
+      var modelEl = document.querySelector('[data-key="ai.model"]');
+      var savedModel = modelEl ? modelEl.value : '';
+      sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">(手动输入)</option>') +
+        (pv !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
+      if (info.models.length) {
+        var opt = sel.querySelector('option[value="'+savedModel+'"]');
+        if (opt) opt.selected = true;
+        else { modelEl.value = info.models[0]; sel.value = info.models[0]; }
+      }
+      sel.onchange = function() { onModelSelect(this.value); };
+    }
   } catch(e) {}
 }
 async function saveSettings() {
@@ -373,6 +410,12 @@ async function saveSettings() {
     if (el.tagName === 'BUTTON') v = el.dataset.value === 'true' ? 'true' : 'false';
     else if (el.tagName === 'SELECT') v = el.value;
     else v = el.value;
+    // Skip empty or still-masked sensitive fields to avoid overwriting stored values
+    if (v === '' || (typeof v === 'string' && v.indexOf('•') !== -1)) {
+      if (['token','secret','password','apikey','api_key','authorization'].some(function(part){ return k.toLowerCase().indexOf(part) !== -1; })) {
+        continue;
+      }
+    }
     await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
   }
   toast('设置已保存','success');
