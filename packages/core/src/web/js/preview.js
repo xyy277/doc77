@@ -888,6 +888,16 @@ function renderRecentFiles() {
   }).join('');
 }
 
+// Code copy button
+window.copyCode = function(btn) {
+  var code = btn.parentElement.querySelector('code');
+  if (!code) return;
+  navigator.clipboard.writeText(code.innerText || code.textContent || '').then(function() {
+    btn.classList.add('copied');
+    setTimeout(function() { btn.classList.remove('copied'); }, 1500);
+  }).catch(function() {});
+};
+
 // Feature 4: Reading Progress
 function onContentScroll() {
   var a = document.getElementById('contentArea');

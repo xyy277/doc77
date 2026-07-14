@@ -1,5 +1,12 @@
 import { marked } from 'marked';
 import * as path from 'node:path';
+import { deflateSync } from 'node:zlib';
+
+/** Encode PlantUML source for kroki.io GET API (deflate + base64url). */
+function encodePlantUML(text: string): string {
+  const deflated = deflateSync(Buffer.from(text, 'utf-8'));
+  return deflated.toString('base64url');
+}
 
 /**
  * File extensions that should be served via /api/raw (binary/image/media).
@@ -197,8 +204,25 @@ export function renderMarkdown(
     if (lang === 'mermaid') {
       return `<pre class="mermaid">${text}</pre>`;
     }
+    // PlantUML — render via kroki.io, fallback to source on error
+    if (lang === 'plantuml') {
+      const enc = encodePlantUML(text);
+      return (
+        `<div class="doc77-code-block plantuml-block">` +
+        `<img src="https://kroki.io/plantuml/svg/${enc}" ` +
+        `onerror="this.style.display='none';this.nextElementSibling.style.display='block'" ` +
+        `alt="PlantUML diagram" loading="lazy">` +
+        `<pre style="display:none"><code class="language-plantuml">${text}</code></pre>` +
+        `</div>`
+      );
+    }
     const langClass = lang ? ` class="language-${lang}"` : '';
-    return `<div class="doc77-code-block"><pre><code${langClass}>${text}</code></pre></div>`;
+    return (
+      `<div class="doc77-code-block">` +
+      `<button class="code-copy-btn" title="复制" onclick="copyCode(this)"></button>` +
+      `<pre><code${langClass}>${text}</code></pre>` +
+      `</div>`
+    );
   };
 
   // Generate heading IDs for anchor links (e.g. [跳至](#my-heading))

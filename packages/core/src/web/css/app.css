@@ -604,9 +604,23 @@ body {
 .doc-content blockquote { border-left:3px solid var(--border-medium); padding-left:1rem; margin:1rem 0; color: var(--text-secondary); }
 .doc-content code { background:var(--bg-code); color:var(--text-primary); padding:.125rem .375rem; border-radius:.25rem; font-size:.875em; font-family:'Fira Code','Cascadia Code',monospace; }
 
-.doc77-code-block { margin:1rem 0; border-radius:.5rem; overflow:hidden; border:1px solid var(--border-light); }
+.doc77-code-block { margin:1rem 0; border-radius:.5rem; overflow:hidden; border:1px solid var(--border-light); position:relative; }
 .doc77-code-block pre { background:var(--bg-code) !important; color:var(--text-primary) !important; padding:1rem; overflow-x:auto; font-size:.8125rem; margin:0; }
-.doc77-code-block pre code { background:none !important; color:inherit; padding:0; }
+.doc77-code-block pre code { background:none !important; color:inherit; padding:0; padding-right:2.5rem; }
+.code-copy-btn {
+  position:absolute; top:6px; right:6px;
+  width:28px; height:28px; border-radius:4px;
+  border:1px solid var(--border-light); background:var(--bg-card);
+  cursor:pointer; opacity:0; transition:opacity .15s;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Crect x='9' y='9' width='13' height='13' rx='2'/%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:center;
+}
+.doc77-code-block:hover .code-copy-btn { opacity:1; }
+.code-copy-btn:hover { background:var(--bg-hover); border-color:var(--accent); }
+.code-copy-btn.copied {
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2316a34a' stroke-width='2'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  border-color:#16a34a;
+}
 .doc-content pre { background:var(--bg-code); color:var(--text-primary); padding:1rem; border-radius:.5rem; overflow-x:auto; font-size:.8125rem; border:1px solid var(--border-light); }
 .doc-content pre code { background:none; padding:0; color:inherit; }
 
