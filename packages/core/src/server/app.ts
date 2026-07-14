@@ -109,6 +109,19 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     res.type('html').send(fallbackHtml);
   });
 
+  app.get('/guide', (_req: Request, res: Response) => {
+    if (!webDir) {
+      res.status(404).type('html').send('<h1>Not Found</h1>');
+      return;
+    }
+    const target = path.join(webDir, 'guide.html');
+    if (fs.existsSync(target)) {
+      res.sendFile(target);
+      return;
+    }
+    res.status(404).type('html').send('<h1>Not Found</h1>');
+  });
+
   app.get('/preview.html', (_req: Request, res: Response) => {
     if (!webDir) {
       res.status(404).type('html').send('<h1>Not Found</h1>');

@@ -5,31 +5,9 @@ import * as path from 'node:path';
  * File extensions that should be served via /api/raw (binary/image/media).
  */
 const RAW_EXTENSIONS = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.svg',
-  '.webp',
-  '.bmp',
-  '.ico',
-  '.avif',
-  '.mp4',
-  '.webm',
-  '.avi',
-  '.mov',
-  '.mkv',
-  '.flv',
-  '.m4v',
-  '.wmv',
-  '.mp3',
-  '.wav',
-  '.ogg',
-  '.flac',
-  '.aac',
-  '.wma',
-  '.m4a',
-  '.opus',
+  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico', '.avif',
+  '.mp4', '.webm', '.avi', '.mov', '.mkv', '.flv', '.m4v', '.wmv',
+  '.mp3', '.wav', '.ogg', '.flac', '.aac', '.wma', '.m4a', '.opus',
   '.pdf',
 ]);
 
@@ -38,9 +16,104 @@ function isRawExtension(filePath: string): boolean {
   return RAW_EXTENSIONS.has(ext);
 }
 
-/**
- * Rewrite a local file URL to use Doc77 API endpoints.
- */
+// ---------------------------------------------------------------------------
+// Emoji shortcode map (subset of GitHub's :shortcode: set)
+// ---------------------------------------------------------------------------
+const EMOJI_MAP: Record<string, string> = {
+  smile: '😄', laugh: '😆', joy: '😂', blush: '😊', heart_eyes: '😍',
+  heart: '❤️', broken_heart: '💔', star: '⭐', sparkles: '✨',
+  '+1': '👍', '-1': '👎', thumbsup: '👍', thumbsdown: '👎',
+  clap: '👏', wave: '👋', pray: '🙏', ok_hand: '👌', point_up: '👆',
+  rocket: '🚀', fire: '🔥', zap: '⚡', tada: '🎉', gift: '🎁',
+  bulb: '💡', book: '📖', books: '📚', memo: '📝', pencil: '✏️',
+  check: '✔️', x: '❌', warning: '⚠️', info: 'ℹ️', question: '❓',
+  lock: '🔒', unlock: '🔓', key: '🔑', link: '🔗', gear: '⚙️',
+  computer: '💻', phone: '📱', email: '📧', package: '📦',
+  hammer: '🔨', wrench: '🔧', bug: '🐛', eyes: '👀',
+  sun: '☀️', moon: '🌙', cloud: '☁️', rain: '🌧️', snow: '❄️',
+  coffee: '☕', tea: '🍵', beer: '🍺', pizza: '🍕', apple: '🍎',
+  car: '🚗', bike: '🚲', train: '🚆', airplane: '✈️', ship: '🚢',
+  house: '🏠', office: '🏢', hospital: '🏥', school: '🏫', bank: '🏦',
+  arrow_up: '⬆️', arrow_down: '⬇️', arrow_left: '⬅️', arrow_right: '➡️',
+  white_check_mark: '✅', negative_squared_cross_mark: '❎',
+  heavy_check_mark: '✔️', heavy_multiplication_x: '✖️',
+};
+
+// ---------------------------------------------------------------------------
+// Marked extensions
+// ---------------------------------------------------------------------------
+
+/** Inline extension: ==highlighted text== */
+const highlightExtension = {
+  name: 'highlight',
+  level: 'inline' as const,
+  start(src: string) { return src.indexOf('=='); },
+  tokenizer(src: string) {
+    const rule = /^==([^=\n]+)==/;
+    const match = rule.exec(src);
+    if (match) {
+      return { type: 'highlight', raw: match[0], text: match[1] };
+    }
+    return undefined;
+  },
+  renderer(token: { text: string }) {
+    return `<mark>${token.text}</mark>`;
+  },
+};
+
+/** Inline extension: :emoji: shortcodes */
+const emojiExtension = {
+  name: 'emoji',
+  level: 'inline' as const,
+  start(src: string) { return src.indexOf(':'); },
+  tokenizer(src: string) {
+    const rule = /^:([a-z0-9_+-]+):/i;
+    const match = rule.exec(src);
+    if (match && EMOJI_MAP[match[1]]) {
+      return { type: 'emoji', raw: match[0], name: match[1] };
+    }
+    return undefined;
+  },
+  renderer(token: { name: string }) {
+    return EMOJI_MAP[token.name] || `:${token.name}:`;
+  },
+};
+
+/** Block extension: footnotes */
+const footnoteRefRE = /^\[\^([^\]]+)\]/;
+const footnoteDefRE = /^\[\^([^\]]+)\]:\s*/;
+
+const footnoteExtension = {
+  name: 'footnote',
+  level: 'block' as const,
+  start(src: string) { return src.search(footnoteDefRE); },
+  tokenizer(src: string) {
+    const match = footnoteDefRE.exec(src);
+    if (!match) return undefined;
+    const id = match[1];
+    const start = match[0].length;
+    // Consume lines until blank line or next footnote def
+    let end = src.indexOf('\n\n', start);
+    if (end === -1) end = src.length;
+    let body = src.slice(start, end).trim();
+    // Inline footnote refs within body
+    body = body.replace(/\[\^([^\]]+)\]/g, (_, refId: string) =>
+      `<sup class="footnote-ref" id="fnref-${refId}"><a href="#fn-${refId}">${refId}</a></sup>`,
+    );
+    return { type: 'footnote', raw: src.slice(0, end), id, body };
+  },
+  renderer(token: { id: string; body: string }) {
+    return `<div class="footnote" id="fn-${token.id}"><sup>${token.id}</sup> ${token.body} <a href="#fnref-${token.id}" class="footnote-backref">↩</a></div>`;
+  },
+};
+
+// Register extensions
+marked.use({ extensions: [highlightExtension, emojiExtension, footnoteExtension] });
+
+// ---------------------------------------------------------------------------
+// URL rewriting
+// ---------------------------------------------------------------------------
+
 function rewriteLocalUrl(
   url: string,
   projectId: number | undefined,
@@ -51,12 +124,10 @@ function rewriteLocalUrl(
   if (url.startsWith('#')) return url;
   if (projectId == null || !filePath) return url;
 
-  // Split anchor from path
   const hashIndex = url.indexOf('#');
   const anchor = hashIndex >= 0 ? url.slice(hashIndex) : '';
   const pathPart = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
 
-  // Resolve relative path against the document's directory
   const dir = path.dirname(filePath);
   const resolved = path.posix.normalize(path.posix.join(dir, pathPart));
 
@@ -64,24 +135,12 @@ function rewriteLocalUrl(
   return `/api/${endpoint}/${projectId}?path=${encodeURIComponent(resolved)}${anchor}`;
 }
 
-/**
- * Rewrite all local URLs in rendered HTML:
- * - <a href="...">
- * - <img src="...">
- * - <video src="...">
- * - <audio src="...">
- * - <source src="...">
- * - <iframe src="...">
- * - <embed src="...">
- */
 function rewriteHtmlUrls(
   html: string,
   projectId: number | undefined,
   filePath: string | undefined,
 ): string {
   if (projectId == null || !filePath) return html;
-
-  // Match src="..." or href="..." in relevant tags
   return html.replace(
     /<(a|img|video|audio|source|iframe|embed)\b([^>]*?)\s+(src|href)=(["'])([^"']+)\4/gi,
     (match, tag, before, attr, quote, url) => {
@@ -91,18 +150,40 @@ function rewriteHtmlUrls(
   );
 }
 
-/**
- * Render Markdown content to HTML with theme-aware code blocks
- * and local file URL rewriting.
- *
- * Uses marked with GFM (GitHub Flavored Markdown) enabled.
- * Code blocks are wrapped in .doc77-code-block for theme CSS variable support.
- *
- * @param content  Raw Markdown string
- * @param opts     Optional context for rewriting local file URLs
- * @param opts.projectId  Project ID (for /api/raw/:id and /api/content/:id)
- * @param opts.filePath   Path of the document being rendered (for relative path resolution)
- */
+// ---------------------------------------------------------------------------
+// Post-processing
+// ---------------------------------------------------------------------------
+
+/** Convert inline footnote references [^id] to sup links. */
+function renderFootnoteRefs(html: string): string {
+  return html.replace(/\[\^([^\]]+)\]/g, (_, id: string) =>
+    `<sup class="footnote-ref" id="fnref-${id}"><a href="#fn-${id}">${id}</a></sup>`,
+  );
+}
+
+/** Convert GH-style alerts (> [!NOTE]) to styled divs. */
+function renderAlerts(html: string): string {
+  const ALERT_TYPES: Record<string, string> = {
+    NOTE: '📝',
+    TIP: '💡',
+    IMPORTANT: '❗',
+    WARNING: '⚠️',
+    CAUTION: '🔥',
+  };
+  return html.replace(
+    /<blockquote>\s*<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*\n?/gi,
+    (_, type: string) => {
+      const icon = ALERT_TYPES[type.toUpperCase()] || '';
+      const cls = `markdown-alert markdown-alert-${type.toLowerCase()}`;
+      return `<blockquote class="${cls}"><p><strong>${icon} ${type}</strong></p>\n<p>`;
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
+
 export function renderMarkdown(
   content: string,
   opts?: { projectId?: number; filePath?: string },
@@ -111,10 +192,8 @@ export function renderMarkdown(
 
   const { projectId, filePath } = opts || {};
 
-  // Custom renderer: wrap code blocks with theme class
   const renderer = new marked.Renderer();
   renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
-    // Mermaid diagrams — use <pre class="mermaid"> for client-side rendering
     if (lang === 'mermaid') {
       return `<pre class="mermaid">${text}</pre>`;
     }
@@ -122,14 +201,27 @@ export function renderMarkdown(
     return `<div class="doc77-code-block"><pre><code${langClass}>${text}</code></pre></div>`;
   };
 
+  // Generate heading IDs for anchor links (e.g. [跳至](#my-heading))
+  renderer.heading = ({ tokens, depth }: { tokens: { text: string }[]; depth: number }) => {
+    const text = tokens.map((t) => t.text).join('');
+    const id = text
+      .toLowerCase()
+      .replace(/[^\w一-鿿\s-]/g, '')
+      .replace(/\s+/g, '-');
+    return `<h${depth} id="${id}">${text}</h${depth}>`;
+  };
+
   let html = marked.parse(content, {
     gfm: true,
     breaks: false,
+    headerIds: true,
     renderer,
   }) as string;
 
-  // Rewrite all local URLs in the rendered HTML
+  // Post-processing
   html = rewriteHtmlUrls(html, projectId, filePath);
+  html = renderAlerts(html);
+  html = renderFootnoteRefs(html);
 
   return html;
 }

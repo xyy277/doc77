@@ -152,6 +152,47 @@ describe('Markdown renderer — local URL rewriting', () => {
   });
 });
 
+describe('Markdown renderer — extensions', () => {
+  it('should render emoji shortcodes', () => {
+    const html = renderMarkdown(':smile: :rocket: :heart:');
+    expect(html).toContain('😄');
+    expect(html).toContain('🚀');
+    expect(html).toContain('❤️');
+  });
+
+  it('should render highlighted text', () => {
+    const html = renderMarkdown('some ==highlighted== text');
+    expect(html).toContain('<mark>highlighted</mark>');
+  });
+
+  it('should render footnote definitions', () => {
+    const md = 'text[^1]\n\n[^1]: footnote content';
+    const html = renderMarkdown(md);
+    expect(html).toContain('fn-1');
+  });
+
+  it('should render GH-style note alert', () => {
+    const html = renderMarkdown('> [!NOTE]\n> a note');
+    expect(html).toContain('markdown-alert');
+    expect(html).toContain('markdown-alert-note');
+  });
+
+  it('should render GH-style warning alert', () => {
+    const html = renderMarkdown('> [!WARNING]\n> a warning');
+    expect(html).toContain('markdown-alert-warning');
+  });
+
+  it('should generate heading IDs', () => {
+    const html = renderMarkdown('## My Heading');
+    expect(html).toMatch(/id="[^"]*my-heading[^"]*"/i);
+  });
+
+  it('should not render unknown emoji shortcodes', () => {
+    const html = renderMarkdown(':nonexistent:');
+    expect(html).not.toContain('😄');
+  });
+});
+
 describe('Mermaid renderer', () => {
   it('should wrap mermaid content in a pre.mermaid tag', () => {
     const diagram = 'graph TD\nA-->B';

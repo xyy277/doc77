@@ -27,6 +27,57 @@
 
 <div class="content-wrapper">
 
+  <!-- System Introduction -->
+  <div class="intro-section">
+    <div class="intro-content">
+      <h1 class="intro-headline">Doc77 &mdash; 本地文档预览与管理 Agent</h1>
+      <p class="intro-description">
+        默认安全、对话驱动的智能文档工作台。支持 Markdown、PDF、Office、代码文件等多种格式，
+        集成 AI 助手、TTS 朗读、全局搜索、MCP 协议等强大功能。
+      </p>
+      <div class="intro-actions">
+        <a href="/guide" class="intro-btn intro-btn-primary" id="btnGuide">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          快速入门
+        </a>
+        <button class="intro-btn intro-btn-secondary" onclick="showRegisterModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          注册项目
+        </button>
+        <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="intro-btn intro-btn-outline">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+    <div class="intro-features">
+      <div class="intro-feature">
+        <div class="intro-feature-icon" style="background:var(--accent-light-bg);color:var(--accent)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div><div class="intro-feature-text">24 种格式</div><div class="intro-feature-desc">Markdown / PDF / Office</div></div>
+      </div>
+      <div class="intro-feature">
+        <div class="intro-feature-icon" style="background:color-mix(in srgb, var(--accent) 10%, transparent);color:var(--accent)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        </div>
+        <div><div class="intro-feature-text">AI 助手</div><div class="intro-feature-desc">总结 / 问答 / 批量操作</div></div>
+      </div>
+      <div class="intro-feature">
+        <div class="intro-feature-icon" style="background:color-mix(in srgb, var(--accent) 10%, transparent);color:var(--accent)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <div><div class="intro-feature-text">MCP 协议</div><div class="intro-feature-desc">AI 安全读写 + 审批</div></div>
+      </div>
+      <div class="intro-feature">
+        <div class="intro-feature-icon" style="background:color-mix(in srgb, var(--accent) 10%, transparent);color:var(--accent)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 8 14 13 16 21 12 14 20 9 18 5 11 5"/></svg>
+        </div>
+        <div><div class="intro-feature-text">TTS 朗读</div><div class="intro-feature-desc">语速可调 / 解放双眼</div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Greeting Bar -->
   <div class="greeting-bar">
     <span class="greeting-text" id="greeting">👋 下午好</span>
