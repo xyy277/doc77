@@ -64,11 +64,3 @@ export const READ_TOOLS: ToolDefinition[] = [
     },
   },
 ];
-
-/**
- * Tool execution result helper — formats success and error results
- * consistently for the LLM to consume.
- */
-export function formatToolResult(success: boolean, data: string): string {
-  return success ? data : `Error: ${data}`;
-}

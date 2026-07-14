@@ -959,7 +959,7 @@ async function doAISummary() {
   var txt = document.getElementById('summaryText');
   card.classList.remove('hidden'); txt.textContent = '生成中...';
   try {
-    var body = JSON.stringify({ message: '请用100字以内简洁总结这个文档的核心内容，文件名：' + currentFile, project_id: parseInt(pid) });
+    var body = JSON.stringify({ message: '请用100字以内简洁总结这个文档的核心内容', project_id: parseInt(pid), context_file: currentFile });
     var res = await fetch('/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: body });
     if (!res.ok) { txt.textContent = 'AI 服务不可用，请检查设置'; return; }
     var reader = res.body.getReader(), decoder = new TextDecoder(), buf = '', summary = '';
@@ -1124,7 +1124,7 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
-function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容：' + currentFile); } }
+function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容', currentFile); } }
 
 // Outline
 var outlineHeadings = [], outlineBuilt = false;
@@ -1161,17 +1161,22 @@ function scrollToHeading(id) {
 
 // Chat — SSE streaming
 var chatSessionId = null;
+// Set by sendQuickMsg to attach the opened file's content to the NEXT request
+// only (consumed and cleared in sendMessage). Lets the backend answer
+// "summarize this file" directly instead of crawling the project with tools.
+var pendingContextFile = null;
 document.getElementById('chatInput').addEventListener('input', function(){ document.getElementById('sendBtn').disabled = !this.value.trim(); });
 
 async function sendMessage() {
   var input = document.getElementById('chatInput'), msg = input.value.trim();
   if (!msg) return;
+  var ctxFile = pendingContextFile; pendingContextFile = null;
   var wc = document.getElementById('welcomeCard'); if (wc) wc.remove();
   appendChatMsg('user', msg);
   input.value = ''; document.getElementById('sendBtn').disabled = true;
   var aiMsg = appendChatMsg('ai', ''), aiBody = aiMsg.querySelector('.msg-body');
   try {
-    var body = JSON.stringify({ message: msg, project_id: parseInt(pid), session_id: chatSessionId || undefined });
+    var body = JSON.stringify({ message: msg, project_id: parseInt(pid), session_id: chatSessionId || undefined, context_file: ctxFile || undefined });
     var response = await fetch('/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:body });
     if (!response.ok) {
       var errData = await response.json().catch(function(){ return {}; });
@@ -1213,7 +1218,7 @@ function appendChatMsg(role, content) {
     '<div class="p-3 rounded-lg text-sm max-w-[85%] whitespace-pre-wrap leading-relaxed msg-body ' + (role==='user'?'bg-blue-600 text-white rounded-tr-none shadow-sm':'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-tl-none shadow-sm') + '">' + (content||'') + '</div>';
   c.appendChild(d); c.scrollTop = c.scrollHeight; return d;
 }
-function sendQuickMsg(m) { document.getElementById('chatInput').value = m; sendMessage(); }
+function sendQuickMsg(m, contextFile) { pendingContextFile = contextFile || null; document.getElementById('chatInput').value = m; sendMessage(); }
 
 // Queue
 async function loadTasks() {

@@ -12,9 +12,31 @@ function encodePlantUML(text: string): string {
  * File extensions that should be served via /api/raw (binary/image/media).
  */
 const RAW_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico', '.avif',
-  '.mp4', '.webm', '.avi', '.mov', '.mkv', '.flv', '.m4v', '.wmv',
-  '.mp3', '.wav', '.ogg', '.flac', '.aac', '.wma', '.m4a', '.opus',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.svg',
+  '.webp',
+  '.bmp',
+  '.ico',
+  '.avif',
+  '.mp4',
+  '.webm',
+  '.avi',
+  '.mov',
+  '.mkv',
+  '.flv',
+  '.m4v',
+  '.wmv',
+  '.mp3',
+  '.wav',
+  '.ogg',
+  '.flac',
+  '.aac',
+  '.wma',
+  '.m4a',
+  '.opus',
   '.pdf',
 ]);
 
@@ -27,23 +49,80 @@ function isRawExtension(filePath: string): boolean {
 // Emoji shortcode map (subset of GitHub's :shortcode: set)
 // ---------------------------------------------------------------------------
 const EMOJI_MAP: Record<string, string> = {
-  smile: '😄', laugh: '😆', joy: '😂', blush: '😊', heart_eyes: '😍',
-  heart: '❤️', broken_heart: '💔', star: '⭐', sparkles: '✨',
-  '+1': '👍', '-1': '👎', thumbsup: '👍', thumbsdown: '👎',
-  clap: '👏', wave: '👋', pray: '🙏', ok_hand: '👌', point_up: '👆',
-  rocket: '🚀', fire: '🔥', zap: '⚡', tada: '🎉', gift: '🎁',
-  bulb: '💡', book: '📖', books: '📚', memo: '📝', pencil: '✏️',
-  check: '✔️', x: '❌', warning: '⚠️', info: 'ℹ️', question: '❓',
-  lock: '🔒', unlock: '🔓', key: '🔑', link: '🔗', gear: '⚙️',
-  computer: '💻', phone: '📱', email: '📧', package: '📦',
-  hammer: '🔨', wrench: '🔧', bug: '🐛', eyes: '👀',
-  sun: '☀️', moon: '🌙', cloud: '☁️', rain: '🌧️', snow: '❄️',
-  coffee: '☕', tea: '🍵', beer: '🍺', pizza: '🍕', apple: '🍎',
-  car: '🚗', bike: '🚲', train: '🚆', airplane: '✈️', ship: '🚢',
-  house: '🏠', office: '🏢', hospital: '🏥', school: '🏫', bank: '🏦',
-  arrow_up: '⬆️', arrow_down: '⬇️', arrow_left: '⬅️', arrow_right: '➡️',
-  white_check_mark: '✅', negative_squared_cross_mark: '❎',
-  heavy_check_mark: '✔️', heavy_multiplication_x: '✖️',
+  smile: '😄',
+  laugh: '😆',
+  joy: '😂',
+  blush: '😊',
+  heart_eyes: '😍',
+  heart: '❤️',
+  broken_heart: '💔',
+  star: '⭐',
+  sparkles: '✨',
+  '+1': '👍',
+  '-1': '👎',
+  thumbsup: '👍',
+  thumbsdown: '👎',
+  clap: '👏',
+  wave: '👋',
+  pray: '🙏',
+  ok_hand: '👌',
+  point_up: '👆',
+  rocket: '🚀',
+  fire: '🔥',
+  zap: '⚡',
+  tada: '🎉',
+  gift: '🎁',
+  bulb: '💡',
+  book: '📖',
+  books: '📚',
+  memo: '📝',
+  pencil: '✏️',
+  check: '✔️',
+  x: '❌',
+  warning: '⚠️',
+  info: 'ℹ️',
+  question: '❓',
+  lock: '🔒',
+  unlock: '🔓',
+  key: '🔑',
+  link: '🔗',
+  gear: '⚙️',
+  computer: '💻',
+  phone: '📱',
+  email: '📧',
+  package: '📦',
+  hammer: '🔨',
+  wrench: '🔧',
+  bug: '🐛',
+  eyes: '👀',
+  sun: '☀️',
+  moon: '🌙',
+  cloud: '☁️',
+  rain: '🌧️',
+  snow: '❄️',
+  coffee: '☕',
+  tea: '🍵',
+  beer: '🍺',
+  pizza: '🍕',
+  apple: '🍎',
+  car: '🚗',
+  bike: '🚲',
+  train: '🚆',
+  airplane: '✈️',
+  ship: '🚢',
+  house: '🏠',
+  office: '🏢',
+  hospital: '🏥',
+  school: '🏫',
+  bank: '🏦',
+  arrow_up: '⬆️',
+  arrow_down: '⬇️',
+  arrow_left: '⬅️',
+  arrow_right: '➡️',
+  white_check_mark: '✅',
+  negative_squared_cross_mark: '❎',
+  heavy_check_mark: '✔️',
+  heavy_multiplication_x: '✖️',
 };
 
 // ---------------------------------------------------------------------------
@@ -54,7 +133,9 @@ const EMOJI_MAP: Record<string, string> = {
 const highlightExtension = {
   name: 'highlight',
   level: 'inline' as const,
-  start(src: string) { return src.indexOf('=='); },
+  start(src: string) {
+    return src.indexOf('==');
+  },
   tokenizer(src: string) {
     const rule = /^==([^=\n]+)==/;
     const match = rule.exec(src);
@@ -72,7 +153,9 @@ const highlightExtension = {
 const emojiExtension = {
   name: 'emoji',
   level: 'inline' as const,
-  start(src: string) { return src.indexOf(':'); },
+  start(src: string) {
+    return src.indexOf(':');
+  },
   tokenizer(src: string) {
     const rule = /^:([a-z0-9_+-]+):/i;
     const match = rule.exec(src);
@@ -93,7 +176,9 @@ const footnoteDefRE = /^\[\^([^\]]+)\]:\s*/;
 const footnoteExtension = {
   name: 'footnote',
   level: 'block' as const,
-  start(src: string) { return src.search(footnoteDefRE); },
+  start(src: string) {
+    return src.search(footnoteDefRE);
+  },
   tokenizer(src: string) {
     const match = footnoteDefRE.exec(src);
     if (!match) return undefined;
@@ -104,8 +189,10 @@ const footnoteExtension = {
     if (end === -1) end = src.length;
     let body = src.slice(start, end).trim();
     // Inline footnote refs within body
-    body = body.replace(/\[\^([^\]]+)\]/g, (_, refId: string) =>
-      `<sup class="footnote-ref" id="fnref-${refId}"><a href="#fn-${refId}">${refId}</a></sup>`,
+    body = body.replace(
+      /\[\^([^\]]+)\]/g,
+      (_, refId: string) =>
+        `<sup class="footnote-ref" id="fnref-${refId}"><a href="#fn-${refId}">${refId}</a></sup>`,
     );
     return { type: 'footnote', raw: src.slice(0, end), id, body };
   },
@@ -163,8 +250,10 @@ function rewriteHtmlUrls(
 
 /** Convert inline footnote references [^id] to sup links. */
 function renderFootnoteRefs(html: string): string {
-  return html.replace(/\[\^([^\]]+)\]/g, (_, id: string) =>
-    `<sup class="footnote-ref" id="fnref-${id}"><a href="#fn-${id}">${id}</a></sup>`,
+  return html.replace(
+    /\[\^([^\]]+)\]/g,
+    (_, id: string) =>
+      `<sup class="footnote-ref" id="fnref-${id}"><a href="#fn-${id}">${id}</a></sup>`,
   );
 }
 
