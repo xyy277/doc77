@@ -71,6 +71,8 @@ function applyCapabilities() {
   }
   if (!CAPABILITIES.mcp) {
     var tabQueue = document.getElementById('tabQueue'); if (tabQueue) tabQueue.style.display = 'none';
+    // 智能归类 relies on write tools (batch_operations) — hide when MCP absent.
+    var btnClassify = document.getElementById('btnClassify'); if (btnClassify) btnClassify.style.display = 'none';
   }
 }
 
@@ -1203,6 +1205,8 @@ function handleSSE(event, data, aiBody) {
     case 'session': chatSessionId = data.session_id; break;
     case 'token': aiBody.textContent += data.text; document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight; break;
     case 'tool_call':
+      // tool_call_start + final tool_call both arrive as this event; show one indicator per tool.
+      if (aiBody.querySelector('[data-tool="' + data.name + '"]')) break;
       var isWriteOp = ['move_file','create_folder','delete_file','batch_operations'].indexOf(data.name) >= 0;
       var ind = document.createElement('div'); ind.dataset.tool = data.name;
       if (isWriteOp) {
@@ -1228,6 +1232,14 @@ function appendChatMsg(role, content) {
   c.appendChild(d); c.scrollTop = c.scrollHeight; return d;
 }
 function sendQuickMsg(m, contextFile) { pendingContextFile = contextFile || null; document.getElementById('chatInput').value = m; sendMessage(); }
+// 智能归类：让 AI 分析文件组织并用 batch_operations 提交一个待审批的整理方案（依赖 Phase 2 写工具）。
+function doSmartClassify() {
+  if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; }
+  if (!CAPABILITIES.mcp) { toast('智能归类需要 MCP 模块，运行: doc77 i mcp', 'info'); return; }
+  sendQuickMsg('请分析当前项目的文件组织，提出一个整理归类方案：把相关文件归入合适的分类目录。' +
+    '对需要新建的目录和移动的文件，请直接调用 batch_operations 工具一次性提交到审批队列，不要只给文字建议。' +
+    '提交后请告诉我任务ID以及你的归类思路，我会前往「审批」标签页确认。');
+}
 
 // Queue
 async function loadTasks() {

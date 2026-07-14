@@ -121,6 +121,9 @@ export class DocAgent {
         if (chunk.type === 'token') {
           hasContent = true;
           yield chunk;
+        } else if (chunk.type === 'tool_call_start') {
+          // UI-only signal — forward for real-time indicator, not for execution.
+          yield chunk;
         } else if (chunk.type === 'tool_call') {
           hasToolCalls = true;
           toolCalls.push({

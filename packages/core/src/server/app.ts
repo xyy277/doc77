@@ -1930,6 +1930,7 @@ export function createAIChatHandler(deps: {
       opts?: { noTools?: boolean },
     ): AsyncIterable<
       | { type: 'token'; content: string }
+      | { type: 'tool_call_start'; name: string }
       | { type: 'tool_call'; name: string; arguments: string; status: string }
       | { type: 'done' }
       | { type: 'error'; message: string }
@@ -2157,6 +2158,10 @@ export function createAIChatHandler(deps: {
         switch (chunk.type) {
           case 'token':
             send('token', { text: chunk.content });
+            break;
+          case 'tool_call_start':
+            // Real-time indicator the moment the tool name is known.
+            send('tool_call', { name: chunk.name, arguments: '', status: 'executing' });
             break;
           case 'tool_call':
             send('tool_call', {
