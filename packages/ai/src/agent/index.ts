@@ -212,6 +212,17 @@ export class DocAgent {
   getHistory(): AiMessage[] {
     return [...this.messages];
   }
+
+  /**
+   * Replace the conversation history — used to rehydrate a persisted session
+   * after a server restart. An empty array is ignored so the default system
+   * prompt is never wiped out by a corrupt/empty record.
+   */
+  setHistory(messages: AiMessage[]): void {
+    if (!messages || messages.length === 0) return;
+    this.messages = [...messages];
+    this._hasContext = true;
+  }
 }
 
 /**

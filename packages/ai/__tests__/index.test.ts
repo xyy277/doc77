@@ -53,3 +53,25 @@ describe('DocAgent.chatStream tool gating', () => {
     expect(seenTools[0]).toBeUndefined();
   });
 });
+
+describe('DocAgent history persistence', () => {
+  it('setHistory replaces the conversation, and getHistory round-trips it', () => {
+    const { provider } = makeRecordingProvider();
+    const agent = new DocAgent({ provider });
+    const restored = [
+      { role: 'system' as const, content: 'sys' },
+      { role: 'user' as const, content: 'hi' },
+      { role: 'assistant' as const, content: 'hello' },
+    ];
+    agent.setHistory(restored);
+    expect(agent.getHistory()).toEqual(restored);
+  });
+
+  it('ignores an empty history (keeps the default system prompt)', () => {
+    const { provider } = makeRecordingProvider();
+    const agent = new DocAgent({ provider });
+    const before = agent.getHistory();
+    agent.setHistory([]);
+    expect(agent.getHistory()).toEqual(before);
+  });
+});

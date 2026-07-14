@@ -35,6 +35,8 @@ import {
 } from '../renderers/index.js';
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
 import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.js';
+import { createRateLimiter } from './rate-limit.js';
+import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 
@@ -1943,6 +1945,8 @@ export function createAIChatHandler(deps: {
   writeFns?: AiWriteFns;
 }) {
   const { AiProvider, DocAgent, READ_TOOLS } = deps;
+  // One limiter for the lifetime of the handler (persists across requests).
+  const aiRateLimiter = createRateLimiter();
 
   return async (req: Request, res: Response) => {
     const { message, project_id, session_id, context_file } = req.body;
@@ -2100,7 +2104,11 @@ export function createAIChatHandler(deps: {
         baseUrl: cfg.baseUrl,
         model: cfg.model,
       });
-      const { sessionId: sid, agent } = getOrCreateSession(
+      const {
+        sessionId: sid,
+        agent,
+        isNew,
+      } = getOrCreateSession(
         session_id,
         () =>
           new DocAgent({
@@ -2116,6 +2124,34 @@ export function createAIChatHandler(deps: {
         project_id,
       );
       toolSessionId = sid;
+
+      // Rehydrate a persisted conversation when the client reconnects to a
+      // session that isn't in the in-memory cache (e.g. after a server restart).
+      if (isNew && session_id) {
+        try {
+          const stored = loadAiSession(session_id);
+          if (stored && stored.messages.length) (agent as any).setHistory(stored.messages);
+        } catch {
+          /* corrupt record — start fresh */
+        }
+      }
+
+      // Per-session rate limit (message ceiling over a 5-minute window).
+      const rlLimit = (() => {
+        try {
+          const row = getConnection()
+            .prepare("SELECT value FROM config WHERE key = 'ai.read_limit_per_session'")
+            .get() as { value: string } | undefined;
+          return parseInt(row?.value || '200', 10) || 200;
+        } catch {
+          return 200;
+        }
+      })();
+      if (!aiRateLimiter.check(sid, rlLimit, 5 * 60 * 1000, Date.now()).allowed) {
+        send('error', { message: '请求过于频繁，请稍后再试' });
+        res.end();
+        return;
+      }
 
       if (project_id && !(agent as any).hasContext) {
         try {
@@ -2177,6 +2213,13 @@ export function createAIChatHandler(deps: {
             send('error', { message: chunk.message });
             break;
         }
+      }
+
+      // Persist the updated conversation so it survives a server restart.
+      try {
+        saveAiSession(sid, project_id, (agent as any).getHistory());
+      } catch {
+        /* non-fatal */
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
