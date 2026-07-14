@@ -64,3 +64,92 @@ export const READ_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+/**
+ * MCP Write Tool Definitions — OpenAI Function Calling format.
+ *
+ * These let the AI agent *propose* file mutations. They never execute directly:
+ * the executor enqueues each as a pending task in the approval queue, and the
+ * user approves it in the UI before the transactional executor runs it. Every
+ * description states that approval is required so the model sets expectations.
+ */
+export const WRITE_TOOLS: ToolDefinition[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'move_file',
+      description:
+        '移动或重命名文件/目录：把 source 移动到 target。该操作会加入审批队列，需用户在「审批」标签页批准后才会执行。',
+      parameters: {
+        type: 'object',
+        properties: {
+          source: { type: 'string', description: '源路径（相对于项目根目录）' },
+          target: { type: 'string', description: '目标路径（相对于项目根目录）' },
+        },
+        required: ['source', 'target'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_folder',
+      description:
+        '创建新目录（可多级）。该操作会加入审批队列，需用户在「审批」标签页批准后才会执行。',
+      parameters: {
+        type: 'object',
+        properties: {
+          folder_path: { type: 'string', description: '要创建的目录路径（相对于项目根目录）' },
+        },
+        required: ['folder_path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_file',
+      description:
+        '删除文件或空目录（非空目录无法删除）。该操作会加入审批队列，需用户在「审批」标签页批准后才会执行。',
+      parameters: {
+        type: 'object',
+        properties: {
+          file_path: { type: 'string', description: '要删除的路径（相对于项目根目录）' },
+        },
+        required: ['file_path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'batch_operations',
+      description:
+        '批量执行多个文件操作（move_file/create_folder/delete_file）。作为一个事务整体审批、整体执行，任一步失败则全部回滚。该操作会加入审批队列，需用户批准后才会执行。',
+      parameters: {
+        type: 'object',
+        properties: {
+          operations: {
+            type: 'array',
+            description: '操作数组，每个元素含 type 和对应路径字段',
+            items: {
+              type: 'object',
+              properties: {
+                type: {
+                  type: 'string',
+                  enum: ['move_file', 'create_folder', 'delete_file'],
+                },
+                source: { type: 'string', description: 'move_file 的源路径' },
+                target: { type: 'string', description: 'move_file 的目标路径' },
+                folder_path: { type: 'string', description: 'create_folder 的路径' },
+                file_path: { type: 'string', description: 'delete_file 的路径' },
+              },
+              required: ['type'],
+            },
+          },
+        },
+        required: ['operations'],
+      },
+    },
+  },
+];

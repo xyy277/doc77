@@ -280,6 +280,9 @@ async function main() {
         const dbPort = getConfig('server.port');
         if (dbPort) filtered.push('--port', dbPort);
 
+        // Persist in-memory DB to disk before spawning replacement process
+        closeConnection();
+
         let spawnFailed = false;
         const child = spawn(process.execPath, filtered, { detached: true, stdio: 'inherit' });
         child.on('error', (err) => {
@@ -306,9 +309,18 @@ async function main() {
 
       // Register AI-dependent routes (optional)
       try {
-        const { AiProvider, DocAgent, READ_TOOLS } = await import('@doc77/ai');
+        const { AiProvider, DocAgent, READ_TOOLS, WRITE_TOOLS } = await import('@doc77/ai');
         const { createAIChatHandler } = await import('@doc77/core');
-        app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, READ_TOOLS }));
+        const aiDeps: Record<string, unknown> = { AiProvider, DocAgent, READ_TOOLS };
+        // When MCP is installed, let the AI propose writes through the approval
+        // queue by injecting its write functions + tool schemas.
+        if (mcpAvailable) {
+          const { createFolder, moveFile, deleteFile, batchOperations } =
+            await import('@doc77/mcp');
+          aiDeps.WRITE_TOOLS = WRITE_TOOLS;
+          aiDeps.writeFns = { createFolder, moveFile, deleteFile, batchOperations };
+        }
+        app.post('/api/ai/chat', createAIChatHandler(aiDeps as any));
       } catch {
         /* AI not installed */
       }

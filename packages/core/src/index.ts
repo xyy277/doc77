@@ -66,6 +66,8 @@ export {
   createAIChatHandler,
   setCapabilities,
 } from './server/app.js';
+export { executeAiWriteTool, isAiWriteTool } from './server/ai-tools.js';
+export type { AiWriteFns, AiWriteDeps, AiWriteCtx } from './server/ai-tools.js';
 
 // Auth
 export {

@@ -1203,10 +1203,19 @@ function handleSSE(event, data, aiBody) {
     case 'session': chatSessionId = data.session_id; break;
     case 'token': aiBody.textContent += data.text; document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight; break;
     case 'tool_call':
-      var ind = document.createElement('div'); ind.className = 'text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1';
-      ind.innerHTML = '<span>🔍 ' + esc(data.name) + '...</span>'; ind.dataset.tool = data.name; aiBody.appendChild(ind); break;
+      var isWriteOp = ['move_file','create_folder','delete_file','batch_operations'].indexOf(data.name) >= 0;
+      var ind = document.createElement('div'); ind.dataset.tool = data.name;
+      if (isWriteOp) {
+        ind.dataset.write = '1';
+        ind.className = 'text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-2';
+        ind.innerHTML = '<span>📋 ' + esc(data.name) + '（待审批）</span><a onclick="setActiveTab(\'queue\');loadTasks();" class="text-blue-600 dark:text-blue-400 underline cursor-pointer">查看审批队列</a>';
+      } else {
+        ind.className = 'text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1';
+        ind.innerHTML = '<span>🔍 ' + esc(data.name) + '...</span>';
+      }
+      aiBody.appendChild(ind); break;
     case 'done':
-      aiBody.querySelectorAll('[data-tool]').forEach(function(el){ el.innerHTML = '<span>✅ 已完成 ' + esc(el.dataset.tool) + '</span>'; el.className = 'text-xs text-green-600 dark:text-green-400 mt-1'; }); break;
+      aiBody.querySelectorAll('[data-tool]:not([data-write])').forEach(function(el){ el.innerHTML = '<span>✅ 已完成 ' + esc(el.dataset.tool) + '</span>'; el.className = 'text-xs text-green-600 dark:text-green-400 mt-1'; }); break;
     case 'error':
       var ed = document.createElement('div'); ed.className = 'text-xs text-red-500 mt-1'; ed.textContent = '❌ ' + (data.message||'未知错误'); aiBody.appendChild(ed); break;
   }

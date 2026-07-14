@@ -34,6 +34,7 @@ import {
   FORMAT_SIZE_LIMITS,
 } from '../renderers/index.js';
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
+import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.js';
 import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 
@@ -1935,6 +1936,10 @@ export function createAIChatHandler(deps: {
     >;
   };
   READ_TOOLS: unknown[];
+  // Optional write integration — injected by the CLI layer only when @doc77/mcp
+  // is installed. When absent, the AI agent stays read-only.
+  WRITE_TOOLS?: unknown[];
+  writeFns?: AiWriteFns;
 }) {
   const { AiProvider, DocAgent, READ_TOOLS } = deps;
 
@@ -1956,8 +1961,8 @@ export function createAIChatHandler(deps: {
         const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
           { value: string } | undefined;
         if (!tokenRow?.value) return null;
-        const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
-        const model = modelRow?.value || 'gpt-4o';
+        const baseUrl = baseRow?.value || 'https://api.deepseek.com';
+        const model = modelRow?.value || 'deepseek-v4-pro';
         let token = tokenRow.value;
         if (token.startsWith('{')) {
           try {
@@ -2026,9 +2031,34 @@ export function createAIChatHandler(deps: {
         }
       };
 
+      // Session id is assigned after getOrCreateSession below; write tools read
+      // it via this closure variable (they only run during chatStream, later).
+      let toolSessionId = '';
+
+      const getRiskLevel = (): string => {
+        try {
+          const row = getConnection()
+            .prepare("SELECT value FROM config WHERE key = 'ai.risk_level'")
+            .get() as { value: string } | undefined;
+          return row?.value || 'medium';
+        } catch {
+          return 'medium';
+        }
+      };
+
       const executeTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
         const pid = (args.project_id as number) || project_id;
         if (!pid) return 'Error: project_id is required';
+        // Write tools enqueue into the approval queue; they never execute here.
+        if (isAiWriteTool(name)) {
+          if (!deps.writeFns) return 'Error: 写操作不可用（需安装 @doc77/mcp 模块）';
+          return executeAiWriteTool(
+            name,
+            args,
+            { projectId: pid, sessionId: toolSessionId },
+            { writeFns: deps.writeFns, isSensitiveFile, getRiskLevel },
+          );
+        }
         switch (name) {
           case 'list_files': {
             const dirPath = (args.dir_path as string) || '';
@@ -2075,12 +2105,16 @@ export function createAIChatHandler(deps: {
           new DocAgent({
             provider,
             model: cfg.model,
-            tools: READ_TOOLS as any[],
+            // Expose write tools only when MCP write functions were injected.
+            tools: (deps.writeFns
+              ? [...(READ_TOOLS as any[]), ...((deps.WRITE_TOOLS as any[]) || [])]
+              : (READ_TOOLS as any[])) as any[],
             executeTool,
             maxSteps: 5,
           }) as any,
         project_id,
       );
+      toolSessionId = sid;
 
       if (project_id && !(agent as any).hasContext) {
         try {
