@@ -5,6 +5,10 @@ directories:
 
 publish: null
 
+extraResources:
+  - from: "vendor"
+    to: "vendor"
+
 files:
   - "dist/**/*"
   - "assets/**/*"

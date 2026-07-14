@@ -53,6 +53,12 @@ export interface ServerProcess {
 
 export async function startServer(port: number): Promise<ServerProcess> {
   process.env.DOC77_ELECTRON = '1';
+  // Local dev fallback: use ~/.doc77/vendor/ (process.resourcesPath points
+  // to Electron binary dir in dev, not our project). In production packaging,
+  // extraResources puts vendor at resources/vendor/ which is correct.
+  if (!process.env.DOC77_VENDOR_DIR) {
+    process.env.DOC77_VENDOR_DIR = path.join(os.homedir(), '.doc77', 'vendor');
+  }
 
   const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } =
     await loadCore();

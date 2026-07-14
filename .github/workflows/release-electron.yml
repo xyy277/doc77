@@ -61,6 +61,12 @@ jobs:
         run: |
           pnpm --filter @doc77/core --filter @doc77/cli build
 
+      - name: Download vendor assets
+        run: |
+          node packages/cli/dist/bin/doc77.js vendor-install
+          mkdir -p packages/electron/vendor
+          cp -r ~/.doc77/vendor/* packages/electron/vendor/
+
       - name: Build Electron
         working-directory: packages/electron
         run: npm run build

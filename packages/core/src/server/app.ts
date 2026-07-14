@@ -142,8 +142,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     app.use(express.static(webDir));
   }
 
-  // Serve vendor cache (offline CDN resources)
-  const vendorDir = path.join(process.env.HOME || '/home', '.doc77', 'vendor');
+  // Serve vendor cache (offline CDN resources).
+  // Electron: bundled in resources/vendor/ (via extraResources).
+  // CLI / dev: ~/.doc77/vendor/ (populated by `doc77 vendor-install`).
+  const vendorDir = process.env.DOC77_ELECTRON
+    ? (process.env.DOC77_VENDOR_DIR || path.join(process.resourcesPath!, 'vendor'))
+    : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
   app.use('/vendor', express.static(vendorDir, { fallthrough: true }));
 
   // CORS — allow all origins (localhost-only binding for security)
