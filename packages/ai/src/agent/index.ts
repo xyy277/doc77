@@ -85,10 +85,20 @@ export class DocAgent {
    * Yields StreamChunks for token-by-token output and tool call status.
    * Automatically executes tools when the LLM requests them, then
    * continues the conversation with tool results injected.
+   *
+   * @param opts.noTools When true, tools are withheld from the provider for
+   *   this call, forcing a single-turn answer with no ReAct tool loop. Use it
+   *   when the relevant content is already injected into context (e.g. the
+   *   user asked to summarize a file that's already been read), so the model
+   *   answers directly instead of re-discovering the file via list_files/read_file.
    */
-  async *chatStream(userMessage: string): AsyncGenerator<StreamChunk> {
+  async *chatStream(
+    userMessage: string,
+    opts?: { noTools?: boolean },
+  ): AsyncGenerator<StreamChunk> {
     this.messages.push({ role: 'user', content: userMessage });
 
+    const useTools = !opts?.noTools && this.tools.length > 0;
     let step = 0;
 
     while (step < this.maxSteps) {
@@ -102,7 +112,7 @@ export class DocAgent {
       for await (const chunk of this.provider.chatStream({
         model: this.model,
         messages: this.messages,
-        tools: this.tools.length > 0 ? this.tools : undefined,
+        tools: useTools ? this.tools : undefined,
       })) {
         if (chunk.type === 'token') {
           hasContent = true;
@@ -200,14 +210,6 @@ export class DocAgent {
 /**
  * Quick AI capabilities — prompt generators.
  */
-export function createSummarizePrompt(content: string): string {
-  return `请用简洁的中文总结以下文档内容（不超过200字）：\n\n${content.slice(0, 4000)}`;
-}
-
 export function createClassifyPrompt(fileList: string): string {
   return `请分析以下文件列表，给出归类建议：\n\n${fileList}\n\n请按类别分组，并说明每组文件的特征。`;
-}
-
-export function createProjectSummaryPrompt(structure: string): string {
-  return `请根据以下项目结构生成一个简短的摘要（不超过150字）：\n\n${structure}`;
 }

@@ -1,6 +1,7 @@
-import { checkPathAccess } from '../security/guard.js';
+import { checkPathAccess, checkSensitiveFile } from '../security/guard.js';
 import { enqueueOperation as enqueue } from '../queue/index.js';
 import type { QueuedTask } from '../queue/index.js';
+import { getConnection } from '@doc77/core';
 
 /**
  * Task returned by write operations.
@@ -23,6 +24,20 @@ function toWriteTask(q: QueuedTask, opType: string): WriteTask {
 }
 
 /**
+ * Assert a path is inside the project boundary AND is not a sensitive file.
+ * Throws on either failure. Sensitive-file blocking previously applied only to
+ * reads (readonly.ts); writes went through checkPathAccess (sandbox only), so a
+ * write/move/delete targeting .env / *.key was not blocked. This closes that gap.
+ */
+function assertPathAllowed(projectId: number, filePath: string): void {
+  const access = checkPathAccess(projectId, filePath);
+  if (!access.allowed) throw new Error(access.reason);
+  const fileName = filePath.split('/').pop() || filePath;
+  const sensitive = checkSensitiveFile(fileName);
+  if (!sensitive.allowed) throw new Error(sensitive.reason);
+}
+
+/**
  * write_file — create or overwrite a file.
  */
 export async function writeFile(
@@ -31,8 +46,7 @@ export async function writeFile(
   filePath: string,
   content: string,
 ): Promise<WriteTask> {
-  const access = checkPathAccess(projectId, filePath);
-  if (!access.allowed) throw new Error(access.reason);
+  assertPathAllowed(projectId, filePath);
   return toWriteTask(
     enqueue(projectId, sessionId, 'write_file', {
       file_path: filePath,
@@ -47,8 +61,7 @@ export async function createFolder(
   sessionId: string,
   folderPath: string,
 ): Promise<WriteTask> {
-  const access = checkPathAccess(projectId, folderPath);
-  if (!access.allowed) throw new Error(access.reason);
+  assertPathAllowed(projectId, folderPath);
   return toWriteTask(
     enqueue(projectId, sessionId, 'create_folder', { folder_path: folderPath }),
     'create_folder',
@@ -61,10 +74,8 @@ export async function moveFile(
   source: string,
   target: string,
 ): Promise<WriteTask> {
-  if (!checkPathAccess(projectId, source).allowed)
-    throw new Error(checkPathAccess(projectId, source).reason);
-  if (!checkPathAccess(projectId, target).allowed)
-    throw new Error(checkPathAccess(projectId, target).reason);
+  assertPathAllowed(projectId, source);
+  assertPathAllowed(projectId, target);
   return toWriteTask(enqueue(projectId, sessionId, 'move_file', { source, target }), 'move_file');
 }
 
@@ -73,8 +84,7 @@ export async function deleteFile(
   sessionId: string,
   filePath: string,
 ): Promise<WriteTask> {
-  const access = checkPathAccess(projectId, filePath);
-  if (!access.allowed) throw new Error(access.reason);
+  assertPathAllowed(projectId, filePath);
   return toWriteTask(
     enqueue(projectId, sessionId, 'delete_file', { file_path: filePath }),
     'delete_file',
@@ -91,16 +101,18 @@ export async function batchOperations(
 ): Promise<WriteTask> {
   for (const op of operations) {
     const opPath = (op.file_path || op.folder_path || op.source) as string;
-    if (opPath) {
-      const access = checkPathAccess(projectId, opPath);
-      if (!access.allowed) throw new Error(`Batch operation "${op.type}": ${access.reason}`);
-    }
+    if (opPath) assertPathAllowed(projectId, opPath);
+    // move_file carries a second path (target) that must also be validated.
+    if (op.target) assertPathAllowed(projectId, op.target as string);
   }
 
-  return enqueueOperation(projectId, sessionId, 'batch_operations', {
-    operations,
-    count: operations.length,
-  });
+  return toWriteTask(
+    enqueue(projectId, sessionId, 'batch_operations', {
+      operations,
+      count: operations.length,
+    }),
+    'batch_operations',
+  );
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   readFirstNLines,
   validatePath,
   resolveProjectPath,
+  isSensitiveFile,
 } from '../fs/index.js';
 import * as crypto from '../crypto.js';
 import {
@@ -159,7 +160,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   // Electron: bundled in resources/vendor/ (via extraResources).
   // CLI / dev: ~/.doc77/vendor/ (populated by `doc77 vendor-install`).
   const vendorDir = process.env.DOC77_ELECTRON
-    ? (process.env.DOC77_VENDOR_DIR || path.join(process.resourcesPath!, 'vendor'))
+    ? process.env.DOC77_VENDOR_DIR || path.join(process.resourcesPath!, 'vendor')
     : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
   app.use('/vendor', express.static(vendorDir, { fallthrough: true }));
 
@@ -1267,8 +1268,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
       if (!tokenRow?.value) return null;
 
-      const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
-      const model = modelRow?.value || 'gpt-4o';
+      const baseUrl = baseRow?.value || 'https://api.deepseek.com';
+      const model = modelRow?.value || 'deepseek-v4-pro';
 
       let token = tokenRow.value;
       if (token.startsWith('{')) {
@@ -1300,6 +1301,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       const cfg = getDecryptedAiConfig();
       if (!cfg) {
         res.json({ ok: false, error: '请先配置 Base URL 和 API Token' });
+        return;
+      }
+      // Guard: reject non-latin-1 tokens that would crash the HTTP header build
+      if (cfg.token && [...cfg.token].some((c) => c.charCodeAt(0) > 255)) {
+        res.json({ ok: false, error: 'Token 包含无效字符，请重新输入并保存' });
         return;
       }
       const url = cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions';
@@ -1340,32 +1346,6 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
     const ok = resetSession(session_id);
     res.json({ ok });
-  });
-
-  // === AI Quick Capabilities ===
-
-  app.post('/api/ai/summarize', async (req: Request, res: Response) => {
-    const { project_id, file_path } = req.body;
-    if (!project_id || !file_path) {
-      res.status(400).json({ error: 'project_id and file_path are required' });
-      return;
-    }
-    try {
-      const db = getConnection();
-      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(project_id) as
-        { path: string } | undefined;
-      if (!project) {
-        res.status(404).json({ error: 'Project not found' });
-        return;
-      }
-      const absPath = validatePath(project.path, file_path);
-      const content = readFile(absPath);
-      const summary = `文档摘要（${file_path}）：\n该文档包含 ${content.split('\n').length} 行内容，共 ${content.length} 个字符。主要涉及技术规范和设计文档。`;
-      res.json({ summary });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      res.status(500).json({ error: message });
-    }
   });
 
   // === AI Chat API (handled by CLI layer via createAIChatHandler to avoid
@@ -1532,9 +1512,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.get('/api/auth/status', (_req: Request, res: Response) => {
     try {
       const db = getConnection();
-      const row = db.prepare(
-        'SELECT password_hash, wrapped_dek_by_password FROM user_auth WHERE id = 1',
-      ).get() as { password_hash: string; wrapped_dek_by_password: string } | undefined;
+      const row = db
+        .prepare('SELECT password_hash, wrapped_dek_by_password FROM user_auth WHERE id = 1')
+        .get() as { password_hash: string; wrapped_dek_by_password: string } | undefined;
       const recoveryStatus = auth.getRecoveryStatus();
       res.json({
         hasPassword: !!row?.password_hash,
@@ -1755,6 +1735,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
     try {
       const db = getConnection();
+
+      // Guard: reject masked sensitive values (e.g. "sk-1••••cdef") to
+      // prevent corruption from the load→save round-trip on the client side.
+      if (typeof value === 'string' && value.includes('•') && crypto.isSensitiveKey(key)) {
+        res.json({ ok: true, key, skipped: true });
+        return;
+      }
+
       let storeValue = value;
       // Encrypt sensitive fields
       if (crypto.isSensitiveKey(key)) {
@@ -1938,6 +1926,7 @@ export function createAIChatHandler(deps: {
     addContext(ctx: string): void;
     chatStream(
       message: string,
+      opts?: { noTools?: boolean },
     ): AsyncIterable<
       | { type: 'token'; content: string }
       | { type: 'tool_call'; name: string; arguments: string; status: string }
@@ -1950,7 +1939,7 @@ export function createAIChatHandler(deps: {
   const { AiProvider, DocAgent, READ_TOOLS } = deps;
 
   return async (req: Request, res: Response) => {
-    const { message, project_id, session_id } = req.body;
+    const { message, project_id, session_id, context_file } = req.body;
     if (!message) {
       res.status(400).json({ error: 'message is required' });
       return;
@@ -2013,6 +2002,30 @@ export function createAIChatHandler(deps: {
     };
 
     try {
+      // Reads a project-relative file for AI consumption: enforces sensitive-file
+      // blocking, path sandboxing, and 4000-char truncation. Returns the content
+      // or an "Error: ..." string (never throws) so the read_file tool and the
+      // context_file fast-path share identical semantics.
+      const readProjectFileContent = (pid: number, filePath: string): string => {
+        if (!filePath) return 'Error: file_path is required';
+        const fileName = filePath.split('/').pop() || filePath;
+        if (isSensitiveFile(fileName))
+          return `Error: Access denied — "${fileName}" is a sensitive file`;
+        try {
+          const db = getConnection();
+          const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+            { path: string } | undefined;
+          if (!project) return 'Error: Project not found';
+          const absPath = validatePath(project.path, filePath);
+          const content = readFile(absPath);
+          return content.length > 4000
+            ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
+            : content;
+        } catch (e: unknown) {
+          return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+        }
+      };
+
       const executeTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
         const pid = (args.project_id as number) || project_id;
         if (!pid) return 'Error: project_id is required';
@@ -2029,26 +2042,8 @@ export function createAIChatHandler(deps: {
               )
               .join('\n');
           }
-          case 'read_file': {
-            const filePath = args.file_path as string;
-            if (!filePath) return 'Error: file_path is required';
-            const fileName = filePath.split('/').pop() || filePath;
-            if (isSensitiveFile(fileName))
-              return `Error: Access denied — "${fileName}" is a sensitive file`;
-            try {
-              const db = getConnection();
-              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-                { path: string } | undefined;
-              if (!project) return 'Error: Project not found';
-              const absPath = validatePath(project.path, filePath);
-              const content = readFile(absPath);
-              return content.length > 4000
-                ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
-                : content;
-            } catch (e: unknown) {
-              return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
-            }
-          }
+          case 'read_file':
+            return readProjectFileContent(pid, args.file_path as string);
           case 'get_file_info': {
             const filePath = args.file_path as string;
             if (!filePath) return 'Error: file_path is required';
@@ -2109,7 +2104,22 @@ export function createAIChatHandler(deps: {
 
       send('session', { session_id: sid });
 
-      for await (const chunk of (agent as any).chatStream(message)) {
+      // Fast-path for "summarize the file I have open": the frontend passes the
+      // opened file's path as context_file. We read its content directly and
+      // embed it into the prompt, then disable tools for this turn — otherwise
+      // the agent, seeing only a path, would burn tokens crawling directories
+      // (list_files) and re-reading files to rediscover what's already open.
+      let outgoing = message;
+      let noTools = false;
+      if (context_file && project_id) {
+        const content = readProjectFileContent(project_id, context_file as string);
+        if (!content.startsWith('Error:')) {
+          outgoing = `${message}\n\n以下是文档「${context_file}」的完整内容，请直接基于它作答，无需调用任何工具：\n\n${content}`;
+          noTools = true;
+        }
+      }
+
+      for await (const chunk of (agent as any).chatStream(outgoing, { noTools })) {
         switch (chunk.type) {
           case 'token':
             send('token', { text: chunk.content });
