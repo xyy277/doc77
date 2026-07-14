@@ -58,19 +58,21 @@
 - 🐛 **稳定性** — 多平台兼容，消灭体验 bug
 - ✨ **预览质量** — 格式支持、阅读工具、AI 辅助做到极致
 
-## v0.6 能力概览
+## v0.7 能力概览
 
 | 模块 | 内容 |
 |---|---|
-| **密码安全** | 信封加密（DEK）、10 个一次性恢复码、忘记密码流程、scrypt 密钥派生（N=131072） |
-| **密码管理 CLI** | `set-password` / `change-password` / `reset-password` / `recovery-codes` |
-| **Electron 桌面版** | Windows / macOS / Linux 一键安装，原生文件对话框，系统托盘 |
-| **模块插件化** | AI / MCP 可选安装（`doc77 i ai`），默认轻量，按需扩展 |
-| **品牌系统** | SVG Logo（favicon + 深浅双模）、Console ASCII Banner |
-| **UI 交互** | 左侧栏折叠（☰）、设置抽屉动画、忘记密码 UI、恢复码展示弹窗 |
-| **Windows 兼容** | 文件浏览器跨平台适配、全局搜索（Node.js 替代 grep） |
-| **安全与权限** | 黑名单路径拦截 + 密码保护 + 恢复码重置、暴力破解防护、审计日志 |
-| **性能优化** | Tailwind 本地缓存、GPU 加速、窗口预加载 |
+| **Markdown 增强** | Emoji 短码（`:smile:`）、高亮标记（`==highlight==`）、GitHub 警告框（`[!NOTE]`）、脚注、标题自动锚点 |
+| **图表与公式** | Mermaid 流程图 / 时序图 / 甘特图 + KaTeX 数学公式 + PlantUML（kroki.io，离线降级源码） |
+| **代码交互** | 代码块右上角一键复制按钮，44+ 语言语法高亮 |
+| **离线优先** | `doc77 vendor-install` 下载 CDN 资源到本地，Electron 构建时已打包内置，无网可用 |
+| **Dashboard 重新设计** | 渐变景深背景 + 登录页毛玻璃效果 + 回到顶部按钮 + 最近浏览 bug 修复 |
+| **文档格式矩阵** | 支持格式一览表 + 离线可用性对照表 |
+| **多 Tab 预览** | 同一浏览器多 Tab 打开文档，面包屑可点击导航 |
+| **本地路径自动重写** | Markdown 中的本地文件路径自动转成 API 端点，保证预览可用 |
+| **密码升级迁移** | 旧版哈希自动检测并引导重新设置密码，配置数据安全迁移 |
+| **Electron 离线打包** | Vendor 资源通过 extraResources 内置，双击安装即含全部依赖 |
+| **版本号同步脚本** | `scripts/sync-version.cjs` 自动同步 monorepo 各包版本 |
 
 ## 安装
 
