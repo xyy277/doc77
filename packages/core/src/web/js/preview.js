@@ -64,6 +64,32 @@ function basename(p) { return p.split('/').pop() || p; }
 function tabsStorageKey() { return 'doc77-tabs-' + pid; }
 
 var CAPABILITIES = { ai: false, mcp: false };
+// Server-pushed write-task lifecycle events (executed/failed) via SSE.
+var taskEventSrc = null;
+function initTaskEvents() {
+  if (taskEventSrc || typeof EventSource === 'undefined') return;
+  try {
+    taskEventSrc = new EventSource('/api/events');
+    taskEventSrc.addEventListener('task:executed', function(e){
+      var d = {}; try { d = JSON.parse(e.data); } catch(_){}
+      toast('✅ 操作已执行（任务 #' + (d.task_id||'?') + '）', 'success');
+      loadTasks(); appendTaskReceipt('✅ 任务 #' + (d.task_id||'?') + ' 已执行完成');
+    });
+    taskEventSrc.addEventListener('task:failed', function(e){
+      var d = {}; try { d = JSON.parse(e.data); } catch(_){}
+      toast('❌ 操作失败（任务 #' + (d.task_id||'?') + '）', 'error');
+      loadTasks(); appendTaskReceipt('❌ 任务 #' + (d.task_id||'?') + ' 执行失败' + (d.error_message ? ('：' + d.error_message) : ''));
+    });
+    taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
+  } catch(_){}
+}
+// 在聊天区追加一条居中的任务回执（若聊天区存在）
+function appendTaskReceipt(text) {
+  var msgs = document.getElementById('chatMessages'); if (!msgs) return;
+  var div = document.createElement('div');
+  div.className = 'text-xs text-slate-500 dark:text-slate-400 my-2 text-center';
+  div.textContent = text; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
 function applyCapabilities() {
   if (!CAPABILITIES.ai) {
     var aiBtn = document.getElementById('aiBtn'); if (aiBtn) aiBtn.style.display = 'none';
@@ -80,6 +106,7 @@ function applyCapabilities() {
   // Fetch capabilities first (non-blocking, apply when ready)
   fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c){
     CAPABILITIES = c; applyCapabilities();
+    if (CAPABILITIES.mcp) initTaskEvents();
   }).catch(function(){});
   try {
     var r = await fetch('/api/projects');

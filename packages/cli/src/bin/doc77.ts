@@ -300,9 +300,11 @@ async function main() {
 
       // Register MCP-dependent routes (optional)
       try {
-        const { executeApprovedTasks } = await import('@doc77/mcp');
-        const { createQueueApproveHandler } = await import('@doc77/core');
+        const { executeApprovedTasks, getEventBus } = await import('@doc77/mcp');
+        const { createQueueApproveHandler, createEventsHandler } = await import('@doc77/core');
         app.post('/api/queue/approve', createQueueApproveHandler(executeApprovedTasks));
+        // Push write-task lifecycle events (executed/failed) to the browser.
+        app.get('/api/events', createEventsHandler(getEventBus()));
       } catch {
         /* MCP not installed */
       }
