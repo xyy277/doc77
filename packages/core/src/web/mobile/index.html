@@ -159,6 +159,95 @@
   .fav-star.favorited { color: #f59e0b; }
   .dark .fav-star { color: #94a3b8; }
   .dark .fav-star.favorited { color: #fbbf24; }
+
+  /* Loading overlay */
+  .loading-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: fadeIn .2s ease-out;
+  }
+  .loading-overlay .loading-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  .loading-overlay .loading-text {
+    font-size: 14px; font-weight: 500;
+    color: #fff; text-align: center;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Login exit transition */
+  @keyframes loginRippleExpand {
+    0%   { width: 0; height: 0; opacity: 1; }
+    70%  { width: 200vmax; height: 200vmax; opacity: 0.6; }
+    100% { width: 200vmax; height: 200vmax; opacity: 0; }
+  }
+  .login-gate-ripple {
+    position: fixed; pointer-events: none; z-index: 201;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.3) 30%, transparent 65%);
+    animation: loginRippleExpand 0.5s cubic-bezier(0.15, 0.6, 0.35, 1) forwards;
+  }
+  @keyframes loginGateDissolve { from { opacity: 1; } to { opacity: 0; } }
+  .login-gate-dissolve { animation: loginGateDissolve 0.35s ease-out forwards; }
+  @keyframes loginCardFadeUp {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(-24px) scale(0.97); }
+  }
+  .login-gate-dissolve .login-gate-card {
+    animation: loginCardFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Button loading state */
+  .btn-loading {
+    position: relative; pointer-events: none;
+    color: transparent !important;
+  }
+  .btn-loading::after {
+    content: '';
+    position: absolute; width: 20px; height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin .6s linear infinite;
+    top: 50%; left: 50%; margin-top: -10px; margin-left: -10px;
+  }
+
+  /* Progress overlay */
+  .progress-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: fadeIn .25s ease-out;
+  }
+  .progress-card {
+    background: var(--bg-card); border-radius: 18px;
+    padding: 28px 24px; max-width: 360px; width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .dark .progress-card {
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .progress-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 20px; text-align: center; }
+  .progress-steps { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+  .progress-step { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-muted); transition: color .3s; }
+  .progress-step .step-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; background: var(--bg-hover); color: var(--text-muted); border: 1px solid var(--border-light); transition: all .3s; }
+  .progress-step.active { color: var(--text-primary); }
+  .progress-step.active .step-icon { background: var(--accent-light-bg); color: var(--accent); border-color: var(--accent); }
+  .progress-step.completed { color: #059669; }
+  .progress-step.completed .step-icon { background: rgba(5,150,105,0.1); color: #059669; border-color: #059669; }
+  .progress-bar-track { width: 100%; height: 4px; background: var(--bg-hover); border-radius: 2px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .5s cubic-bezier(0.16, 1, 0.3, 1); }
 </style>
 </head>
 <body>

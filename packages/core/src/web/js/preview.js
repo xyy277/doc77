@@ -666,7 +666,10 @@ function syncTreeActive(path) {
   document.querySelectorAll('#tree .active-node').forEach(function(el) { el.classList.remove('active-node','bg-blue-600','text-white'); });
   if (!path) return;
   var row = document.querySelector('#tree [data-path="' + CSS.escape(path) + '"]');
-  if (row) row.classList.add('active-node','bg-blue-600','text-white');
+  if (row) {
+    row.classList.add('active-node','bg-blue-600','text-white');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 /** localStorage 持久化 tab 列表 + 活动 tab。 */

@@ -11,6 +11,20 @@ fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c
   window.__doc77_caps_mcp = c.mcp;
 }).catch(function(){});
 
+// Version badge
+(function loadVersion() {
+  var badge = document.getElementById('versionBadge');
+  if (!badge) return;
+  fetch('/api/server-info').then(function(r){ return r.json(); }).then(function(d){
+    badge.textContent = 'v' + d.version;
+    badge.title = 'Doc77 v' + d.version + ' — ' + d.nodeVersion + ' / ' + d.platform;
+    badge.classList.add('loaded');
+  }).catch(function(){
+    badge.textContent = '--';
+    badge.title = '无法获取版本号';
+  });
+})();
+
 //══════════ Theme ══════════
 (function initTheme() {
   const saved = localStorage.getItem('doc77-theme');
@@ -24,6 +38,87 @@ function toggleTheme() {
   const btn = document.getElementById('themeBtn');
   if (btn) btn.textContent = isDark ? '☀️' : '🌙';
 }
+
+//══════════ Global Loading Overlay ══════════
+var _loadingOverlay = null;
+window.showLoading = function(msg) {
+  hideLoading();
+  msg = msg || '请稍候...';
+  var o = document.createElement('div');
+  o.className = 'loading-overlay';
+  o.innerHTML = '<div class="loading-spinner"></div><div class="loading-text">' + msg + '</div>';
+  document.body.appendChild(o);
+  _loadingOverlay = o;
+};
+window.hideLoading = function() {
+  if (_loadingOverlay) { _loadingOverlay.remove(); _loadingOverlay = null; }
+};
+
+//══════════ Progress Overlay (Multi-step) ══════════
+window.showProgressOverlay = function(title, steps) {
+  hideLoading();
+  // Remove existing progress overlay
+  var existing = document.getElementById('progressOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'progressOverlay';
+  overlay.className = 'progress-overlay';
+
+  var stepsHtml = steps.map(function(s, i) {
+    var icon = s.icon || '○';
+    return '<div class="progress-step" data-step="' + i + '"><span class="step-icon">' + icon + '</span><span class="step-label">' + s.label + '</span></div>';
+  }).join('');
+
+  overlay.innerHTML = '<div class="progress-card">' +
+    '<div class="progress-title">' + title + '</div>' +
+    '<div class="progress-steps">' + stepsHtml + '</div>' +
+    '<div class="progress-bar-track"><div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div></div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  // Activate first step after mount
+  setTimeout(function() {
+    var first = overlay.querySelector('.progress-step');
+    if (first) first.classList.add('active');
+  }, 100);
+
+  return {
+    advance: function(stepIndex) {
+      var all = overlay.querySelectorAll('.progress-step');
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.remove('active');
+        if (i < stepIndex) all[i].classList.add('completed');
+      }
+      if (all[stepIndex]) all[stepIndex].classList.add('active');
+      // Update progress bar
+      var fill = document.getElementById('progressBarFill');
+      if (fill) fill.style.width = Math.min(100, Math.round((stepIndex / (all.length - 1)) * 100)) + '%';
+    },
+    complete: function(callback) {
+      var all = overlay.querySelectorAll('.progress-step');
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.remove('active');
+        all[i].classList.add('completed');
+      }
+      var fill = document.getElementById('progressBarFill');
+      if (fill) fill.style.width = '100%';
+      // Delay then remove + callback
+      setTimeout(function() {
+        overlay.remove();
+        if (callback) callback();
+      }, 600);
+    },
+    error: function(msg) {
+      overlay.innerHTML = '<div class="progress-card" style="text-align:center">' +
+        '<div style="font-size:40px;margin-bottom:12px;color:var(--danger)">✕</div>' +
+        '<div class="progress-title" style="color:var(--danger)">操作失败</div>' +
+        '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px 0">' + msg + '</p>' +
+        '<button onclick="this.closest(\'.progress-overlay\').remove()" class="btn" style="width:100%">关闭</button></div>';
+    }
+  };
+};
 
 //══════════ Toast & Confirm ══════════
 (function(){
@@ -45,6 +140,37 @@ function toggleTheme() {
       o.querySelector('.ok-btn').onclick = function(){ o.remove(); resolve(true); };
       o.querySelector('.cancel-btn').onclick = function(){ o.remove(); resolve(false); };
       o.addEventListener('click', function(e){ if (e.target === o) { o.remove(); resolve(false); } });
+    });
+  };
+  // In-app prompt dialog (replaces browser-native prompt()). Resolves to input value, or null if cancelled.
+  window.promptDialog = function(opts) {
+    opts = opts || {};
+    var title = opts.title || '';
+    var msg = opts.message || '';
+    var type = opts.type || 'text';
+    var placeholder = opts.placeholder || '';
+    var okText = opts.okText || '确定';
+    var cancelText = opts.cancelText || '取消';
+    return new Promise(function(resolve) {
+      var o = document.createElement('div'); o.className = 'confirm-overlay';
+      o.innerHTML = '<div class="confirm-box">' +
+        (title ? '<div style="font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text-primary)">' + esc(title) + '</div>' : '') +
+        (msg ? '<p style="font-size:13px;margin-bottom:12px;color:var(--text-secondary)">' + esc(msg) + '</p>' : '') +
+        '<input class="input prompt-input" type="' + type + '" placeholder="' + escAttr(placeholder) + '" style="width:100%;padding:8px 12px;margin-bottom:16px">' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+        '<button class="btn cancel-btn" style="font-size:12px">' + esc(cancelText) + '</button>' +
+        '<button class="btn btn-primary ok-btn" style="font-size:12px">' + esc(okText) + '</button></div></div>';
+      document.body.appendChild(o);
+      var input = o.querySelector('.prompt-input');
+      var done = function(val){ o.remove(); resolve(val); };
+      o.querySelector('.ok-btn').onclick = function(){ done(input.value); };
+      o.querySelector('.cancel-btn').onclick = function(){ done(null); };
+      o.addEventListener('click', function(e){ if (e.target === o) done(null); });
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') { e.preventDefault(); done(input.value); }
+        else if (e.key === 'Escape') { e.preventDefault(); done(null); }
+      });
+      setTimeout(function(){ input.focus(); }, 50);
     });
   };
 })();
@@ -327,47 +453,50 @@ function updateStrength() {
 async function setupPw() {
   var p = document.getElementById('setupPass').value;
   if (p.length < 6) { toast('密码至少6位','error'); return; }
-  var r = await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
-  var d = await r.json();
-  if(d.ok){
-    if(d.recovery_codes){
-      showRecoveryCodesModal(d.recovery_codes);
-    }
-    switchSettingsTab('account');
-    toast('密码设置成功','success');
-  } else {
-    toast(d.error,'error');
-  }
+  showLoading('正在设置密码...');
+  try {
+    var r = await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
+    var d = await r.json();
+    if(d.ok){
+      if(d.recovery_codes){ showRecoveryCodesModal(d.recovery_codes); }
+      switchSettingsTab('account');
+      toast('密码设置成功','success');
+    } else { toast(d.error,'error'); }
+  } catch(e) { toast('设置失败: ' + e.message,'error'); }
+  hideLoading();
 }
 async function changePw() {
   var c = document.getElementById('curPass').value;
   var n = document.getElementById('newPass').value;
   if(!c || !n){ toast('请输入当前密码和新密码','error'); return; }
   if(n.length < 6){ toast('新密码至少6位','error'); return; }
-  var r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:c,new_password:n})});
-  var d = await r.json();
-  if(d.ok){
-    if(d.recovery_codes){
-      showRecoveryCodesModal(d.recovery_codes);
-    }
-    switchSettingsTab('account');
-    toast('密码已修改','success');
-  }
-  else { toast(d.error,'error'); }
+  showLoading('正在修改密码...');
+  try {
+    var r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:c,new_password:n})});
+    var d = await r.json();
+    if(d.ok){
+      if(d.recovery_codes){ showRecoveryCodesModal(d.recovery_codes); }
+      switchSettingsTab('account');
+      toast('密码已修改','success');
+    } else { toast(d.error,'error'); }
+  } catch(e) { toast('修改失败: ' + e.message,'error'); }
+  hideLoading();
 }
 
 async function regenerateRC(){
-  var pw = prompt('请输入当前密码以确认身份：');
+  var pw = await promptDialog({ title: '重新生成恢复码', message: '请输入当前密码以确认身份：', type: 'password', placeholder: '当前密码', okText: '确认' });
   if(!pw) return;
-  var r = await fetch('/api/auth/recovery-codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-  var d = await r.json();
-  if(d.ok && d.recovery_codes){
-    showRecoveryCodesModal(d.recovery_codes);
-    switchSettingsTab('account');
-    toast('恢复码已重新生成，旧码已作废','success');
-  } else {
-    toast(d.error,'error');
-  }
+  showLoading('正在重新生成恢复码...');
+  try {
+    var r = await fetch('/api/auth/recovery-codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+    var d = await r.json();
+    if(d.ok && d.recovery_codes){
+      showRecoveryCodesModal(d.recovery_codes);
+      switchSettingsTab('account');
+      toast('恢复码已重新生成，旧码已作废','success');
+    } else { toast(d.error,'error'); }
+  } catch(e) { toast('操作失败: ' + e.message,'error'); }
+  hideLoading();
 }
 
 //══════════ Login Gate ══════════
@@ -379,19 +508,90 @@ async function regenerateRC(){
     var o = document.createElement("div"); o.id = "loginGate";
     o.className = 'login-gate-bg';
     if (d.isLegacy) {
-      // Legacy password — system upgraded, must re-set password
+      // Legacy password — system upgraded, must re-set password with migration progress
       o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-badge">系统已升级，请重新设置密码</div></div><input id="setupPass" type="password" placeholder="新密码（至少6位）" class="login-gate-input"><button onclick="setupPwLegacy()" class="login-gate-btn">设置密码</button><div id="loginError" class="login-gate-error"></div></div>';
       window.setupPwLegacy = async function() {
         var p = document.getElementById("setupPass").value;
         var e = document.getElementById("loginError");
+        var btn = document.querySelector('.login-gate-btn');
         if (p.length < 6) { e.textContent = "密码至少6位"; e.style.display = 'block'; return; }
-        var r = await fetch("/api/auth/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
-        var rd = await r.json();
-        if (rd.ok) {
-          if (rd.recovery_codes) { showRecoveryCodesModal(rd.recovery_codes); }
-          sessionStorage.setItem("doc77-auth","1");
-          o.remove();
-        } else { e.textContent = rd.error || "设置失败"; e.style.display = 'block'; }
+        e.style.display = 'none';
+
+        // Show migration progress overlay
+        var prog = showProgressOverlay('正在更新系统安全配置', [
+          { icon: '🔐', label: '正在初始化加密系统...' },
+          { icon: '🔄', label: '正在迁移加密数据...' },
+          { icon: '🔑', label: '正在生成恢复码...' },
+          { icon: '✅', label: '配置完成！' }
+        ]);
+
+        // Simulate step 1 → 2 (init → migrate)
+        prog.advance(1);
+        // Small delay to show progress visually before the (potentially fast) API call
+        await new Promise(function(r){ setTimeout(r, 400); });
+
+        try {
+          var r = await fetch("/api/auth/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
+          var rd = await r.json();
+          if (rd.ok) {
+            // Step 2 → 3 (codes generation)
+            prog.advance(2);
+            await new Promise(function(r){ setTimeout(r, 300); });
+            // Step 3 → 4 (complete)
+            prog.advance(3);
+            prog.complete(function() {
+              if (rd.recovery_codes) { showRecoveryCodesModal(rd.recovery_codes); }
+              sessionStorage.setItem("doc77-auth","1");
+              // Smooth exit transition
+              var gate = document.getElementById("loginGate");
+
+              // Phase 1: Glow ripple at card center
+              var card = document.querySelector('.login-gate-card');
+              if (card) {
+                var rect = card.getBoundingClientRect();
+                var cx = rect.left + rect.width / 2;
+                var cy = rect.top + rect.height / 2;
+                var ripple = document.createElement('div');
+                ripple.className = 'login-gate-ripple';
+                ripple.style.cssText = 'left:' + cx + 'px;top:' + cy + 'px;transform:translate(-50%,-50%)';
+                document.body.appendChild(ripple);
+                setTimeout(function(){ if (ripple) ripple.remove(); }, 600);
+              }
+
+              // Phase 2: Gate dissolve + content reveal
+              setTimeout(function() {
+                if (gate) gate.classList.add('login-gate-dissolve');
+                var cw = document.querySelector('.content-wrapper');
+                if (cw) cw.classList.add('content-reveal');
+              }, 120);
+
+              // Phase 3: Staggered entries
+              setTimeout(function() {
+                var staggers = [
+                  document.querySelector('.app-header'),
+                  document.querySelector('.hero-banner'),
+                  document.querySelector('.register-cta'),
+                  document.querySelector('.recent-strip'),
+                  document.querySelector('.projects-section')
+                ];
+                for (var si = 0; si < staggers.length; si++) {
+                  if (staggers[si]) {
+                    staggers[si].classList.add('stagger-in', 'stagger-delay-' + si);
+                  }
+                }
+              }, 220);
+
+              // Remove gate after all animations
+              setTimeout(function() {
+                if (o) o.remove();
+              }, 700);
+            });
+          } else {
+            prog.error(rd.error || "设置失败");
+          }
+        } catch(ex) {
+          prog.error('网络错误: ' + ex.message);
+        }
       };
     } else {
       // Normal login
@@ -399,18 +599,71 @@ async function regenerateRC(){
       window.unlock = async function() {
         var p = document.getElementById("loginPass").value;
         var e = document.getElementById("loginError");
+        var btn = document.querySelector('.login-gate-btn');
         if (!p) { e.textContent = "请输入密码"; e.style.display = 'block'; return; }
-        var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
-        var d2 = await r2.json();
-        if (d2.ok) {
-          sessionStorage.setItem("doc77-auth","1");
-          if (d2.recovery_codes) { showRecoveryCodesModal(d2.recovery_codes); }
-          o.remove();
-        } else if (d2.legacyMigration) {
-          // Legacy hash was detected — switch to setup form
-          location.reload();
+        // Button loading state
+        if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+        e.style.display = 'none';
+        try {
+          var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
+          var d2 = await r2.json();
+          if (d2.ok) {
+            sessionStorage.setItem("doc77-auth","1");
+            if (d2.recovery_codes) { showRecoveryCodesModal(d2.recovery_codes); }
+
+            // ── Glow Ripple: 3-phase login transition ──
+            var gate = document.getElementById("loginGate");
+
+            // Phase 1: Create glow ripple at card center (expands 0→full screen)
+            var card = document.querySelector('.login-gate-card');
+            if (card) {
+              var rect = card.getBoundingClientRect();
+              var cx = rect.left + rect.width / 2;
+              var cy = rect.top + rect.height / 2;
+              var ripple = document.createElement('div');
+              ripple.className = 'login-gate-ripple';
+              ripple.style.cssText = 'left:' + cx + 'px;top:' + cy + 'px;transform:translate(-50%,-50%)';
+              document.body.appendChild(ripple);
+              setTimeout(function(){ if (ripple) ripple.remove(); }, 600);
+            }
+
+            // Phase 2: Dissolve gate + reveal content (staggered after ripple)
+            setTimeout(function() {
+              if (gate) gate.classList.add('login-gate-dissolve');
+              var cw = document.querySelector('.content-wrapper');
+              if (cw) cw.classList.add('content-reveal');
+            }, 120);
+
+            // Phase 3: Staggered element entries
+            setTimeout(function() {
+              var staggers = [
+                document.querySelector('.app-header'),
+                document.querySelector('.hero-banner'),
+                document.querySelector('.register-cta'),
+                document.querySelector('.recent-strip'),
+                document.querySelector('.projects-section')
+              ];
+              for (var si = 0; si < staggers.length; si++) {
+                if (staggers[si]) {
+                  staggers[si].classList.add('stagger-in', 'stagger-delay-' + si);
+                }
+              }
+            }, 220);
+
+            // Remove gate from DOM after all transitions finish
+            setTimeout(function() {
+              if (o) o.remove();
+            }, 700);
+          } else if (d2.legacyMigration) {
+            // Legacy hash was detected — switch to setup form
+            location.reload();
+          }
+          else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
+        } catch(ex) {
+          e.textContent = '网络错误: ' + ex.message; e.style.display = 'block';
+        } finally {
+          if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
         }
-        else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
       };
     }
     document.body.appendChild(o);
@@ -446,16 +699,20 @@ async function showForgotPassword(){
 async function verifyRC(){
   var rc = document.getElementById("rcInput").value.trim();
   var e = document.getElementById("rcError");
+  var btn = document.querySelector('.login-gate-btn');
   if(!rc){ e.style.display="block"; e.textContent="请输入恢复码"; return; }
-  var r = await fetch("/api/auth/forgot-password/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recovery_code:rc})});
-  var d = await r.json();
-  if(d.ok){
-    forgotState = 'reset';
-    sessionStorage.setItem("doc77-reset-token", d.reset_token);
-    showResetPassword();
-  } else {
-    e.style.display="block"; e.textContent = d.error || "验证失败";
-  }
+  e.style.display = 'none';
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    var r = await fetch("/api/auth/forgot-password/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recovery_code:rc})});
+    var d = await r.json();
+    if(d.ok){
+      forgotState = 'reset';
+      sessionStorage.setItem("doc77-reset-token", d.reset_token);
+      showResetPassword();
+    } else { e.style.display="block"; e.textContent = d.error || "验证失败"; }
+  } catch(ex) { e.style.display="block"; e.textContent = '网络错误: ' + ex.message; }
+  if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
 }
 
 function showResetPassword(){
@@ -472,17 +729,22 @@ async function doReset(){
   var p = document.getElementById("newPw").value;
   var c = document.getElementById("newPwConfirm").value;
   var e = document.getElementById("resetError");
+  var btn = document.querySelector('.login-gate-btn');
   if(p.length < 6){ e.style.display="block"; e.textContent="密码至少6位"; return; }
   if(p !== c){ e.style.display="block"; e.textContent="两次密码不一致"; return; }
-  var token = sessionStorage.getItem("doc77-reset-token");
-  var r = await fetch("/api/auth/forgot-password/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reset_token:token,new_password:p})});
-  var d = await r.json();
-  if(d.ok){
-    sessionStorage.removeItem("doc77-reset-token");
-    location.reload();
-  } else {
-    e.style.display="block"; e.textContent = d.error || "重置失败";
-  }
+  e.style.display = 'none';
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    var token = sessionStorage.getItem("doc77-reset-token");
+    var r = await fetch("/api/auth/forgot-password/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reset_token:token,new_password:p})});
+    var d = await r.json();
+    if(d.ok){
+      sessionStorage.removeItem("doc77-reset-token");
+      // Show loading overlay before reload
+      showLoading('密码已重置，正在重新登录...');
+      setTimeout(function() { location.reload(); }, 600);
+    } else { e.style.display="block"; e.textContent = d.error || "重置失败"; if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
+  } catch(ex) { e.style.display="block"; e.textContent = '网络错误: ' + ex.message; if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
 }
 
 //══════════ Recovery Codes Modal ══════════

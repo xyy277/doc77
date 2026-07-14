@@ -16,7 +16,8 @@ window.doDiscover = async function() {
   candidates.innerHTML = '';
   actions.style.display = 'none';
   btn.disabled = true;
-  btn.textContent = '⏳ 扫描中...';
+  btn.innerHTML = '⏳ 扫描中...';
+  btn.classList.add('btn-loading');
 
   try {
     var r = await fetch('/api/discover?path=' + encodeURIComponent(scanPath) + '&depth=2');
@@ -24,7 +25,8 @@ window.doDiscover = async function() {
       var err = await r.json();
       status.textContent = '❌ ' + (err.error || '扫描失败');
       btn.disabled = false;
-      btn.textContent = '🔍 扫描';
+      btn.innerHTML = '🔍 扫描';
+      btn.classList.remove('btn-loading');
       return;
     }
     discoverResults = await r.json();
@@ -32,7 +34,8 @@ window.doDiscover = async function() {
     if (!discoverResults.length) {
       status.textContent = '未发现候选项目（需要 .git + 至少 1 个 .md 文件）';
       btn.disabled = false;
-      btn.textContent = '🔍 扫描';
+      btn.innerHTML = '🔍 扫描';
+      btn.classList.remove('btn-loading');
       return;
     }
 
@@ -44,7 +47,8 @@ window.doDiscover = async function() {
   }
 
   btn.disabled = false;
-  btn.textContent = '🔍 扫描';
+  btn.innerHTML = '🔍 扫描';
+  btn.classList.remove('btn-loading');
 };
 
 function renderDiscoverCandidates() {
@@ -79,6 +83,7 @@ window.batchRegister = async function() {
   var checked = document.querySelectorAll('#discoverCandidates input:checked');
   if (!checked.length) { toast('请至少选择一个项目', 'info'); return; }
 
+  showLoading('正在批量注册 ' + checked.length + ' 个项目...');
   var successCount = 0;
   var failCount = 0;
 
@@ -102,6 +107,8 @@ window.batchRegister = async function() {
       failCount++;
     }
   }
+
+  hideLoading();
 
   if (successCount > 0) {
     toast('成功注册 ' + successCount + ' 个项目', 'success');
