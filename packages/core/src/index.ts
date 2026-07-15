@@ -66,6 +66,15 @@ export {
   createAIChatHandler,
   setCapabilities,
 } from './server/app.js';
+export { executeAiWriteTool, isAiWriteTool } from './server/ai-tools.js';
+export type { AiWriteFns, AiWriteDeps, AiWriteCtx } from './server/ai-tools.js';
+export { createEventsHandler } from './server/events.js';
+export {
+  saveAiSession,
+  loadAiSession,
+  deleteAiSession,
+  pruneAiSessions,
+} from './db/ai-sessions.js';
 
 // Auth
 export {

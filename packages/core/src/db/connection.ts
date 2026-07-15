@@ -16,6 +16,41 @@ let rawDb: SqlJsDatabase | null = null;
 let dbPath: string | null = null;
 let wrappedDb: DatabaseCompat | null = null;
 
+// ── Debounced auto-persist ─────────────────────────────
+
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _persistDb(): void {
+  if (rawDb && dbPath) {
+    const data = rawDb.export();
+    const buf = Buffer.from(data);
+    const tmp = dbPath + '.tmp';
+    fs.writeFileSync(tmp, buf);
+    fs.renameSync(tmp, dbPath);
+  }
+}
+
+function _scheduleSave(): void {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    _persistDb();
+  }, 500);
+  _saveTimer?.unref();
+}
+
+/**
+ * Force-sync all pending writes to disk immediately.
+ * Used by restart/shutdown paths that need durability before exit.
+ */
+export function flushDatabase(): void {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+  _persistDb();
+}
+
 // ── Statement wrapper ──────────────────────────────────
 
 export class StatementCompat {
@@ -42,6 +77,12 @@ export class StatementCompat {
       changes = this._db.getRowsModified();
     }
     stmt.free();
+
+    // Auto-persist to disk after any write mutation
+    if (/^\s*(INSERT|UPDATE|DELETE)\b/i.test(this._sql.trim())) {
+      _scheduleSave();
+    }
+
     return { changes, lastInsertRowid };
   }
 
@@ -118,13 +159,18 @@ export class DatabaseCompat {
     };
   }
 
-  /** Internal: save to disk and close */
-  _saveAndClose(filePath: string) {
+  /** Internal: persist to disk without closing */
+  _persist(filePath: string) {
     const data = this._db.export();
     const buf = Buffer.from(data);
     const tmp = filePath + '.tmp';
     fs.writeFileSync(tmp, buf);
     fs.renameSync(tmp, filePath);
+  }
+
+  /** Internal: persist to disk and close */
+  _saveAndClose(filePath: string) {
+    this._persist(filePath);
     this._db.close();
   }
 }
@@ -176,6 +222,11 @@ export function getConnection(): DatabaseCompat {
 /** Close and save the database. */
 export function closeConnection(): void {
   if (rawDb && dbPath) {
+    // Cancel pending debounced save — we'll sync-persist right now
+    if (_saveTimer) {
+      clearTimeout(_saveTimer);
+      _saveTimer = null;
+    }
     try {
       wrappedDb?._saveAndClose(dbPath);
     } catch {

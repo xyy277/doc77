@@ -288,7 +288,8 @@ export function setupPasswordLegacy(password: string): crypto.RecoveryCodeSet | 
   }
 
   // Store everything, clear legacy fields
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE user_auth SET
       password_hash = ?,
       pw_wrap_salt = ?,
@@ -307,7 +308,8 @@ export function setupPasswordLegacy(password: string): crypto.RecoveryCodeSet | 
       recovery_attempts = 0,
       recovery_locked_until = NULL
     WHERE id = 1
-  `).run(
+  `,
+  ).run(
     `scrypt:${pwSalt.toString('hex')}:${scryptOutput.toString('hex')}`,
     pwWrapSalt.toString('hex'),
     rcWrapSalt.toString('hex'),

@@ -22,6 +22,7 @@ import {
   readFirstNLines,
   validatePath,
   resolveProjectPath,
+  isSensitiveFile,
 } from '../fs/index.js';
 import * as crypto from '../crypto.js';
 import {
@@ -33,6 +34,9 @@ import {
   FORMAT_SIZE_LIMITS,
 } from '../renderers/index.js';
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
+import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.js';
+import { createRateLimiter } from './rate-limit.js';
+import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 
@@ -159,7 +163,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   // Electron: bundled in resources/vendor/ (via extraResources).
   // CLI / dev: ~/.doc77/vendor/ (populated by `doc77 vendor-install`).
   const vendorDir = process.env.DOC77_ELECTRON
-    ? (process.env.DOC77_VENDOR_DIR || path.join(process.resourcesPath!, 'vendor'))
+    ? process.env.DOC77_VENDOR_DIR || path.join(process.resourcesPath!, 'vendor')
     : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
   app.use('/vendor', express.static(vendorDir, { fallthrough: true }));
 
@@ -1267,8 +1271,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
       if (!tokenRow?.value) return null;
 
-      const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
-      const model = modelRow?.value || 'gpt-4o';
+      const baseUrl = baseRow?.value || 'https://api.deepseek.com';
+      const model = modelRow?.value || 'deepseek-v4-pro';
 
       let token = tokenRow.value;
       if (token.startsWith('{')) {
@@ -1300,6 +1304,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       const cfg = getDecryptedAiConfig();
       if (!cfg) {
         res.json({ ok: false, error: '请先配置 Base URL 和 API Token' });
+        return;
+      }
+      // Guard: reject non-latin-1 tokens that would crash the HTTP header build
+      if (cfg.token && [...cfg.token].some((c) => c.charCodeAt(0) > 255)) {
+        res.json({ ok: false, error: 'Token 包含无效字符，请重新输入并保存' });
         return;
       }
       const url = cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions';
@@ -1340,32 +1349,6 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
     const ok = resetSession(session_id);
     res.json({ ok });
-  });
-
-  // === AI Quick Capabilities ===
-
-  app.post('/api/ai/summarize', async (req: Request, res: Response) => {
-    const { project_id, file_path } = req.body;
-    if (!project_id || !file_path) {
-      res.status(400).json({ error: 'project_id and file_path are required' });
-      return;
-    }
-    try {
-      const db = getConnection();
-      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(project_id) as
-        { path: string } | undefined;
-      if (!project) {
-        res.status(404).json({ error: 'Project not found' });
-        return;
-      }
-      const absPath = validatePath(project.path, file_path);
-      const content = readFile(absPath);
-      const summary = `文档摘要（${file_path}）：\n该文档包含 ${content.split('\n').length} 行内容，共 ${content.length} 个字符。主要涉及技术规范和设计文档。`;
-      res.json({ summary });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      res.status(500).json({ error: message });
-    }
   });
 
   // === AI Chat API (handled by CLI layer via createAIChatHandler to avoid
@@ -1532,9 +1515,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.get('/api/auth/status', (_req: Request, res: Response) => {
     try {
       const db = getConnection();
-      const row = db.prepare(
-        'SELECT password_hash, wrapped_dek_by_password FROM user_auth WHERE id = 1',
-      ).get() as { password_hash: string; wrapped_dek_by_password: string } | undefined;
+      const row = db
+        .prepare('SELECT password_hash, wrapped_dek_by_password FROM user_auth WHERE id = 1')
+        .get() as { password_hash: string; wrapped_dek_by_password: string } | undefined;
       const recoveryStatus = auth.getRecoveryStatus();
       res.json({
         hasPassword: !!row?.password_hash,
@@ -1755,6 +1738,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
     try {
       const db = getConnection();
+
+      // Guard: reject masked sensitive values (e.g. "sk-1••••cdef") to
+      // prevent corruption from the load→save round-trip on the client side.
+      if (typeof value === 'string' && value.includes('•') && crypto.isSensitiveKey(key)) {
+        res.json({ ok: true, key, skipped: true });
+        return;
+      }
+
       let storeValue = value;
       // Encrypt sensitive fields
       if (crypto.isSensitiveKey(key)) {
@@ -1938,19 +1929,27 @@ export function createAIChatHandler(deps: {
     addContext(ctx: string): void;
     chatStream(
       message: string,
+      opts?: { noTools?: boolean },
     ): AsyncIterable<
       | { type: 'token'; content: string }
+      | { type: 'tool_call_start'; name: string }
       | { type: 'tool_call'; name: string; arguments: string; status: string }
       | { type: 'done' }
       | { type: 'error'; message: string }
     >;
   };
   READ_TOOLS: unknown[];
+  // Optional write integration — injected by the CLI layer only when @doc77/mcp
+  // is installed. When absent, the AI agent stays read-only.
+  WRITE_TOOLS?: unknown[];
+  writeFns?: AiWriteFns;
 }) {
   const { AiProvider, DocAgent, READ_TOOLS } = deps;
+  // One limiter for the lifetime of the handler (persists across requests).
+  const aiRateLimiter = createRateLimiter();
 
   return async (req: Request, res: Response) => {
-    const { message, project_id, session_id } = req.body;
+    const { message, project_id, session_id, context_file } = req.body;
     if (!message) {
       res.status(400).json({ error: 'message is required' });
       return;
@@ -1967,8 +1966,8 @@ export function createAIChatHandler(deps: {
         const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
           { value: string } | undefined;
         if (!tokenRow?.value) return null;
-        const baseUrl = baseRow?.value || 'https://api.openai.com/v1';
-        const model = modelRow?.value || 'gpt-4o';
+        const baseUrl = baseRow?.value || 'https://api.deepseek.com';
+        const model = modelRow?.value || 'deepseek-v4-pro';
         let token = tokenRow.value;
         if (token.startsWith('{')) {
           try {
@@ -2013,9 +2012,58 @@ export function createAIChatHandler(deps: {
     };
 
     try {
+      // Reads a project-relative file for AI consumption: enforces sensitive-file
+      // blocking, path sandboxing, and 4000-char truncation. Returns the content
+      // or an "Error: ..." string (never throws) so the read_file tool and the
+      // context_file fast-path share identical semantics.
+      const readProjectFileContent = (pid: number, filePath: string): string => {
+        if (!filePath) return 'Error: file_path is required';
+        const fileName = filePath.split('/').pop() || filePath;
+        if (isSensitiveFile(fileName))
+          return `Error: Access denied — "${fileName}" is a sensitive file`;
+        try {
+          const db = getConnection();
+          const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+            { path: string } | undefined;
+          if (!project) return 'Error: Project not found';
+          const absPath = validatePath(project.path, filePath);
+          const content = readFile(absPath);
+          return content.length > 4000
+            ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
+            : content;
+        } catch (e: unknown) {
+          return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+        }
+      };
+
+      // Session id is assigned after getOrCreateSession below; write tools read
+      // it via this closure variable (they only run during chatStream, later).
+      let toolSessionId = '';
+
+      const getRiskLevel = (): string => {
+        try {
+          const row = getConnection()
+            .prepare("SELECT value FROM config WHERE key = 'ai.risk_level'")
+            .get() as { value: string } | undefined;
+          return row?.value || 'medium';
+        } catch {
+          return 'medium';
+        }
+      };
+
       const executeTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
         const pid = (args.project_id as number) || project_id;
         if (!pid) return 'Error: project_id is required';
+        // Write tools enqueue into the approval queue; they never execute here.
+        if (isAiWriteTool(name)) {
+          if (!deps.writeFns) return 'Error: 写操作不可用（需安装 @doc77/mcp 模块）';
+          return executeAiWriteTool(
+            name,
+            args,
+            { projectId: pid, sessionId: toolSessionId },
+            { writeFns: deps.writeFns, isSensitiveFile, getRiskLevel },
+          );
+        }
         switch (name) {
           case 'list_files': {
             const dirPath = (args.dir_path as string) || '';
@@ -2029,26 +2077,8 @@ export function createAIChatHandler(deps: {
               )
               .join('\n');
           }
-          case 'read_file': {
-            const filePath = args.file_path as string;
-            if (!filePath) return 'Error: file_path is required';
-            const fileName = filePath.split('/').pop() || filePath;
-            if (isSensitiveFile(fileName))
-              return `Error: Access denied — "${fileName}" is a sensitive file`;
-            try {
-              const db = getConnection();
-              const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-                { path: string } | undefined;
-              if (!project) return 'Error: Project not found';
-              const absPath = validatePath(project.path, filePath);
-              const content = readFile(absPath);
-              return content.length > 4000
-                ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
-                : content;
-            } catch (e: unknown) {
-              return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
-            }
-          }
+          case 'read_file':
+            return readProjectFileContent(pid, args.file_path as string);
           case 'get_file_info': {
             const filePath = args.file_path as string;
             if (!filePath) return 'Error: file_path is required';
@@ -2074,18 +2104,54 @@ export function createAIChatHandler(deps: {
         baseUrl: cfg.baseUrl,
         model: cfg.model,
       });
-      const { sessionId: sid, agent } = getOrCreateSession(
+      const {
+        sessionId: sid,
+        agent,
+        isNew,
+      } = getOrCreateSession(
         session_id,
         () =>
           new DocAgent({
             provider,
             model: cfg.model,
-            tools: READ_TOOLS as any[],
+            // Expose write tools only when MCP write functions were injected.
+            tools: (deps.writeFns
+              ? [...(READ_TOOLS as any[]), ...((deps.WRITE_TOOLS as any[]) || [])]
+              : (READ_TOOLS as any[])) as any[],
             executeTool,
             maxSteps: 5,
           }) as any,
         project_id,
       );
+      toolSessionId = sid;
+
+      // Rehydrate a persisted conversation when the client reconnects to a
+      // session that isn't in the in-memory cache (e.g. after a server restart).
+      if (isNew && session_id) {
+        try {
+          const stored = loadAiSession(session_id);
+          if (stored && stored.messages.length) (agent as any).setHistory(stored.messages);
+        } catch {
+          /* corrupt record — start fresh */
+        }
+      }
+
+      // Per-session rate limit (message ceiling over a 5-minute window).
+      const rlLimit = (() => {
+        try {
+          const row = getConnection()
+            .prepare("SELECT value FROM config WHERE key = 'ai.read_limit_per_session'")
+            .get() as { value: string } | undefined;
+          return parseInt(row?.value || '200', 10) || 200;
+        } catch {
+          return 200;
+        }
+      })();
+      if (!aiRateLimiter.check(sid, rlLimit, 5 * 60 * 1000, Date.now()).allowed) {
+        send('error', { message: '请求过于频繁，请稍后再试' });
+        res.end();
+        return;
+      }
 
       if (project_id && !(agent as any).hasContext) {
         try {
@@ -2109,10 +2175,29 @@ export function createAIChatHandler(deps: {
 
       send('session', { session_id: sid });
 
-      for await (const chunk of (agent as any).chatStream(message)) {
+      // Fast-path for "summarize the file I have open": the frontend passes the
+      // opened file's path as context_file. We read its content directly and
+      // embed it into the prompt, then disable tools for this turn — otherwise
+      // the agent, seeing only a path, would burn tokens crawling directories
+      // (list_files) and re-reading files to rediscover what's already open.
+      let outgoing = message;
+      let noTools = false;
+      if (context_file && project_id) {
+        const content = readProjectFileContent(project_id, context_file as string);
+        if (!content.startsWith('Error:')) {
+          outgoing = `${message}\n\n以下是文档「${context_file}」的完整内容，请直接基于它作答，无需调用任何工具：\n\n${content}`;
+          noTools = true;
+        }
+      }
+
+      for await (const chunk of (agent as any).chatStream(outgoing, { noTools })) {
         switch (chunk.type) {
           case 'token':
             send('token', { text: chunk.content });
+            break;
+          case 'tool_call_start':
+            // Real-time indicator the moment the tool name is known.
+            send('tool_call', { name: chunk.name, arguments: '', status: 'executing' });
             break;
           case 'tool_call':
             send('tool_call', {
@@ -2128,6 +2213,13 @@ export function createAIChatHandler(deps: {
             send('error', { message: chunk.message });
             break;
         }
+      }
+
+      // Persist the updated conversation so it survives a server restart.
+      try {
+        saveAiSession(sid, project_id, (agent as any).getHistory());
+      } catch {
+        /* non-fatal */
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';

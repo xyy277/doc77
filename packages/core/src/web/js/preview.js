@@ -64,6 +64,32 @@ function basename(p) { return p.split('/').pop() || p; }
 function tabsStorageKey() { return 'doc77-tabs-' + pid; }
 
 var CAPABILITIES = { ai: false, mcp: false };
+// Server-pushed write-task lifecycle events (executed/failed) via SSE.
+var taskEventSrc = null;
+function initTaskEvents() {
+  if (taskEventSrc || typeof EventSource === 'undefined') return;
+  try {
+    taskEventSrc = new EventSource('/api/events');
+    taskEventSrc.addEventListener('task:executed', function(e){
+      var d = {}; try { d = JSON.parse(e.data); } catch(_){}
+      toast('✅ 操作已执行（任务 #' + (d.task_id||'?') + '）', 'success');
+      loadTasks(); appendTaskReceipt('✅ 任务 #' + (d.task_id||'?') + ' 已执行完成');
+    });
+    taskEventSrc.addEventListener('task:failed', function(e){
+      var d = {}; try { d = JSON.parse(e.data); } catch(_){}
+      toast('❌ 操作失败（任务 #' + (d.task_id||'?') + '）', 'error');
+      loadTasks(); appendTaskReceipt('❌ 任务 #' + (d.task_id||'?') + ' 执行失败' + (d.error_message ? ('：' + d.error_message) : ''));
+    });
+    taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
+  } catch(_){}
+}
+// 在聊天区追加一条居中的任务回执（若聊天区存在）
+function appendTaskReceipt(text) {
+  var msgs = document.getElementById('chatMessages'); if (!msgs) return;
+  var div = document.createElement('div');
+  div.className = 'text-xs text-slate-500 dark:text-slate-400 my-2 text-center';
+  div.textContent = text; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
 function applyCapabilities() {
   if (!CAPABILITIES.ai) {
     var aiBtn = document.getElementById('aiBtn'); if (aiBtn) aiBtn.style.display = 'none';
@@ -71,6 +97,8 @@ function applyCapabilities() {
   }
   if (!CAPABILITIES.mcp) {
     var tabQueue = document.getElementById('tabQueue'); if (tabQueue) tabQueue.style.display = 'none';
+    // 智能归类 relies on write tools (batch_operations) — hide when MCP absent.
+    var btnClassify = document.getElementById('btnClassify'); if (btnClassify) btnClassify.style.display = 'none';
   }
 }
 
@@ -78,6 +106,7 @@ function applyCapabilities() {
   // Fetch capabilities first (non-blocking, apply when ready)
   fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c){
     CAPABILITIES = c; applyCapabilities();
+    if (CAPABILITIES.mcp) initTaskEvents();
   }).catch(function(){});
   try {
     var r = await fetch('/api/projects');
@@ -666,7 +695,10 @@ function syncTreeActive(path) {
   document.querySelectorAll('#tree .active-node').forEach(function(el) { el.classList.remove('active-node','bg-blue-600','text-white'); });
   if (!path) return;
   var row = document.querySelector('#tree [data-path="' + CSS.escape(path) + '"]');
-  if (row) row.classList.add('active-node','bg-blue-600','text-white');
+  if (row) {
+    row.classList.add('active-node','bg-blue-600','text-white');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 /** localStorage 持久化 tab 列表 + 活动 tab。 */
@@ -956,7 +988,7 @@ async function doAISummary() {
   var txt = document.getElementById('summaryText');
   card.classList.remove('hidden'); txt.textContent = '生成中...';
   try {
-    var body = JSON.stringify({ message: '请用100字以内简洁总结这个文档的核心内容，文件名：' + currentFile, project_id: parseInt(pid) });
+    var body = JSON.stringify({ message: '请用100字以内简洁总结这个文档的核心内容', project_id: parseInt(pid), context_file: currentFile });
     var res = await fetch('/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: body });
     if (!res.ok) { txt.textContent = 'AI 服务不可用，请检查设置'; return; }
     var reader = res.body.getReader(), decoder = new TextDecoder(), buf = '', summary = '';
@@ -1121,7 +1153,7 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
-function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容：' + currentFile); } }
+function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容', currentFile); } }
 
 // Outline
 var outlineHeadings = [], outlineBuilt = false;
@@ -1158,17 +1190,22 @@ function scrollToHeading(id) {
 
 // Chat — SSE streaming
 var chatSessionId = null;
+// Set by sendQuickMsg to attach the opened file's content to the NEXT request
+// only (consumed and cleared in sendMessage). Lets the backend answer
+// "summarize this file" directly instead of crawling the project with tools.
+var pendingContextFile = null;
 document.getElementById('chatInput').addEventListener('input', function(){ document.getElementById('sendBtn').disabled = !this.value.trim(); });
 
 async function sendMessage() {
   var input = document.getElementById('chatInput'), msg = input.value.trim();
   if (!msg) return;
+  var ctxFile = pendingContextFile; pendingContextFile = null;
   var wc = document.getElementById('welcomeCard'); if (wc) wc.remove();
   appendChatMsg('user', msg);
   input.value = ''; document.getElementById('sendBtn').disabled = true;
   var aiMsg = appendChatMsg('ai', ''), aiBody = aiMsg.querySelector('.msg-body');
   try {
-    var body = JSON.stringify({ message: msg, project_id: parseInt(pid), session_id: chatSessionId || undefined });
+    var body = JSON.stringify({ message: msg, project_id: parseInt(pid), session_id: chatSessionId || undefined, context_file: ctxFile || undefined });
     var response = await fetch('/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:body });
     if (!response.ok) {
       var errData = await response.json().catch(function(){ return {}; });
@@ -1195,10 +1232,21 @@ function handleSSE(event, data, aiBody) {
     case 'session': chatSessionId = data.session_id; break;
     case 'token': aiBody.textContent += data.text; document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight; break;
     case 'tool_call':
-      var ind = document.createElement('div'); ind.className = 'text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1';
-      ind.innerHTML = '<span>🔍 ' + esc(data.name) + '...</span>'; ind.dataset.tool = data.name; aiBody.appendChild(ind); break;
+      // tool_call_start + final tool_call both arrive as this event; show one indicator per tool.
+      if (aiBody.querySelector('[data-tool="' + data.name + '"]')) break;
+      var isWriteOp = ['move_file','create_folder','delete_file','batch_operations'].indexOf(data.name) >= 0;
+      var ind = document.createElement('div'); ind.dataset.tool = data.name;
+      if (isWriteOp) {
+        ind.dataset.write = '1';
+        ind.className = 'text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-2';
+        ind.innerHTML = '<span>📋 ' + esc(data.name) + '（待审批）</span><a onclick="setActiveTab(\'queue\');loadTasks();" class="text-blue-600 dark:text-blue-400 underline cursor-pointer">查看审批队列</a>';
+      } else {
+        ind.className = 'text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1';
+        ind.innerHTML = '<span>🔍 ' + esc(data.name) + '...</span>';
+      }
+      aiBody.appendChild(ind); break;
     case 'done':
-      aiBody.querySelectorAll('[data-tool]').forEach(function(el){ el.innerHTML = '<span>✅ 已完成 ' + esc(el.dataset.tool) + '</span>'; el.className = 'text-xs text-green-600 dark:text-green-400 mt-1'; }); break;
+      aiBody.querySelectorAll('[data-tool]:not([data-write])').forEach(function(el){ el.innerHTML = '<span>✅ 已完成 ' + esc(el.dataset.tool) + '</span>'; el.className = 'text-xs text-green-600 dark:text-green-400 mt-1'; }); break;
     case 'error':
       var ed = document.createElement('div'); ed.className = 'text-xs text-red-500 mt-1'; ed.textContent = '❌ ' + (data.message||'未知错误'); aiBody.appendChild(ed); break;
   }
@@ -1210,7 +1258,15 @@ function appendChatMsg(role, content) {
     '<div class="p-3 rounded-lg text-sm max-w-[85%] whitespace-pre-wrap leading-relaxed msg-body ' + (role==='user'?'bg-blue-600 text-white rounded-tr-none shadow-sm':'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-tl-none shadow-sm') + '">' + (content||'') + '</div>';
   c.appendChild(d); c.scrollTop = c.scrollHeight; return d;
 }
-function sendQuickMsg(m) { document.getElementById('chatInput').value = m; sendMessage(); }
+function sendQuickMsg(m, contextFile) { pendingContextFile = contextFile || null; document.getElementById('chatInput').value = m; sendMessage(); }
+// 智能归类：让 AI 分析文件组织并用 batch_operations 提交一个待审批的整理方案（依赖 Phase 2 写工具）。
+function doSmartClassify() {
+  if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; }
+  if (!CAPABILITIES.mcp) { toast('智能归类需要 MCP 模块，运行: doc77 i mcp', 'info'); return; }
+  sendQuickMsg('请分析当前项目的文件组织，提出一个整理归类方案：把相关文件归入合适的分类目录。' +
+    '对需要新建的目录和移动的文件，请直接调用 batch_operations 工具一次性提交到审批队列，不要只给文字建议。' +
+    '提交后请告诉我任务ID以及你的归类思路，我会前往「审批」标签页确认。');
+}
 
 // Queue
 async function loadTasks() {

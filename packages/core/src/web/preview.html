@@ -208,6 +208,7 @@ html:not(.tw-loading) .boot-overlay{display:none}
               <button onclick="sendQuickMsg('请分析当前项目的目录结构')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">📊 分析项目结构</button>
               <button onclick="sendQuickMsg('请总结当前打开的文档内容')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">📝 总结当前文档</button>
               <button onclick="sendQuickMsg('请检查项目中是否有重复或冗余的文件')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">🔍 查找重复文件</button>
+              <button id="btnClassify" onclick="doSmartClassify()" class="w-full text-left text-xs bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 p-2 rounded-md transition-colors">🗂️ 智能归类（生成待审批方案）</button>
             </div>
           </div>
         </div>

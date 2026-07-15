@@ -40,7 +40,6 @@
   },
   "dependencies": {
     "@doc77/core": "workspace:^",
-    "@doc77/mcp": "workspace:^",
-    "openai": "^5.0.0"
+    "@doc77/mcp": "workspace:^"
   }
 }

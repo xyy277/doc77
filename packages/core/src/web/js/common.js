@@ -11,6 +11,20 @@ fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c
   window.__doc77_caps_mcp = c.mcp;
 }).catch(function(){});
 
+// Version badge
+(function loadVersion() {
+  var badge = document.getElementById('versionBadge');
+  if (!badge) return;
+  fetch('/api/server-info').then(function(r){ return r.json(); }).then(function(d){
+    badge.textContent = 'v' + d.version;
+    badge.title = 'Doc77 v' + d.version + ' — ' + d.nodeVersion + ' / ' + d.platform;
+    badge.classList.add('loaded');
+  }).catch(function(){
+    badge.textContent = '--';
+    badge.title = '无法获取版本号';
+  });
+})();
+
 //══════════ Theme ══════════
 (function initTheme() {
   const saved = localStorage.getItem('doc77-theme');
@@ -24,6 +38,87 @@ function toggleTheme() {
   const btn = document.getElementById('themeBtn');
   if (btn) btn.textContent = isDark ? '☀️' : '🌙';
 }
+
+//══════════ Global Loading Overlay ══════════
+var _loadingOverlay = null;
+window.showLoading = function(msg) {
+  hideLoading();
+  msg = msg || '请稍候...';
+  var o = document.createElement('div');
+  o.className = 'loading-overlay';
+  o.innerHTML = '<div class="loading-spinner"></div><div class="loading-text">' + msg + '</div>';
+  document.body.appendChild(o);
+  _loadingOverlay = o;
+};
+window.hideLoading = function() {
+  if (_loadingOverlay) { _loadingOverlay.remove(); _loadingOverlay = null; }
+};
+
+//══════════ Progress Overlay (Multi-step) ══════════
+window.showProgressOverlay = function(title, steps) {
+  hideLoading();
+  // Remove existing progress overlay
+  var existing = document.getElementById('progressOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'progressOverlay';
+  overlay.className = 'progress-overlay';
+
+  var stepsHtml = steps.map(function(s, i) {
+    var icon = s.icon || '○';
+    return '<div class="progress-step" data-step="' + i + '"><span class="step-icon">' + icon + '</span><span class="step-label">' + s.label + '</span></div>';
+  }).join('');
+
+  overlay.innerHTML = '<div class="progress-card">' +
+    '<div class="progress-title">' + title + '</div>' +
+    '<div class="progress-steps">' + stepsHtml + '</div>' +
+    '<div class="progress-bar-track"><div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div></div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  // Activate first step after mount
+  setTimeout(function() {
+    var first = overlay.querySelector('.progress-step');
+    if (first) first.classList.add('active');
+  }, 100);
+
+  return {
+    advance: function(stepIndex) {
+      var all = overlay.querySelectorAll('.progress-step');
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.remove('active');
+        if (i < stepIndex) all[i].classList.add('completed');
+      }
+      if (all[stepIndex]) all[stepIndex].classList.add('active');
+      // Update progress bar
+      var fill = document.getElementById('progressBarFill');
+      if (fill) fill.style.width = Math.min(100, Math.round((stepIndex / (all.length - 1)) * 100)) + '%';
+    },
+    complete: function(callback) {
+      var all = overlay.querySelectorAll('.progress-step');
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.remove('active');
+        all[i].classList.add('completed');
+      }
+      var fill = document.getElementById('progressBarFill');
+      if (fill) fill.style.width = '100%';
+      // Delay then remove + callback
+      setTimeout(function() {
+        overlay.remove();
+        if (callback) callback();
+      }, 600);
+    },
+    error: function(msg) {
+      overlay.innerHTML = '<div class="progress-card" style="text-align:center">' +
+        '<div style="font-size:40px;margin-bottom:12px;color:var(--danger)">✕</div>' +
+        '<div class="progress-title" style="color:var(--danger)">操作失败</div>' +
+        '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px 0">' + msg + '</p>' +
+        '<button onclick="this.closest(\'.progress-overlay\').remove()" class="btn" style="width:100%">关闭</button></div>';
+    }
+  };
+};
 
 //══════════ Toast & Confirm ══════════
 (function(){
@@ -45,6 +140,37 @@ function toggleTheme() {
       o.querySelector('.ok-btn').onclick = function(){ o.remove(); resolve(true); };
       o.querySelector('.cancel-btn').onclick = function(){ o.remove(); resolve(false); };
       o.addEventListener('click', function(e){ if (e.target === o) { o.remove(); resolve(false); } });
+    });
+  };
+  // In-app prompt dialog (replaces browser-native prompt()). Resolves to input value, or null if cancelled.
+  window.promptDialog = function(opts) {
+    opts = opts || {};
+    var title = opts.title || '';
+    var msg = opts.message || '';
+    var type = opts.type || 'text';
+    var placeholder = opts.placeholder || '';
+    var okText = opts.okText || '确定';
+    var cancelText = opts.cancelText || '取消';
+    return new Promise(function(resolve) {
+      var o = document.createElement('div'); o.className = 'confirm-overlay';
+      o.innerHTML = '<div class="confirm-box">' +
+        (title ? '<div style="font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text-primary)">' + esc(title) + '</div>' : '') +
+        (msg ? '<p style="font-size:13px;margin-bottom:12px;color:var(--text-secondary)">' + esc(msg) + '</p>' : '') +
+        '<input class="input prompt-input" type="' + type + '" placeholder="' + escAttr(placeholder) + '" style="width:100%;padding:8px 12px;margin-bottom:16px">' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+        '<button class="btn cancel-btn" style="font-size:12px">' + esc(cancelText) + '</button>' +
+        '<button class="btn btn-primary ok-btn" style="font-size:12px">' + esc(okText) + '</button></div></div>';
+      document.body.appendChild(o);
+      var input = o.querySelector('.prompt-input');
+      var done = function(val){ o.remove(); resolve(val); };
+      o.querySelector('.ok-btn').onclick = function(){ done(input.value); };
+      o.querySelector('.cancel-btn').onclick = function(){ done(null); };
+      o.addEventListener('click', function(e){ if (e.target === o) done(null); });
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') { e.preventDefault(); done(input.value); }
+        else if (e.key === 'Escape') { e.preventDefault(); done(null); }
+      });
+      setTimeout(function(){ input.focus(); }, 50);
     });
   };
 })();
@@ -118,12 +244,12 @@ function switchSettingsTab(tab) {
     }
     c.innerHTML = '<div class="section-title">AI 提供商</div>' +
       '<div class="settings-row"><span class="settings-label">提供商</span>' +
-      '<select id="aiProvider" onchange="onProviderChange()" class="settings-select">' +
+      '<select id="aiProvider" data-key="ai.provider" onchange="onProviderChange()" class="settings-select">' +
       '<option value="custom">自定义</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>' +
       '<option value="qwen">Qwen (阿里)</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">GLM (智谱)</option></select></div>' +
       settingRow('Base URL','ai.base_url','text','https://api.deepseek.com') +
       '<div class="settings-row"><span class="settings-label">模型</span>' +
-      '<select id="aiModelSelect" onchange="document.querySelector(\'[data-key=ai.model]\').value=this.value" class="settings-select">' +
+      '<select id="aiModelSelect" onchange="onModelSelect(this.value)" class="settings-select">' +
       '<option value="deepseek-v4-pro">deepseek-v4-pro</option><option value="deepseek-v4-flash">deepseek-v4-flash</option></select></div>' +
       '<input data-key="ai.model" type="hidden" value="deepseek-v4-pro">' +
       settingRow('API Token','ai.token','password','sk-...') +
@@ -206,20 +332,33 @@ function togglePasswordView(btn) { var i = btn.previousElementSibling; i.type = 
 
 // AI Providers
 var AI_PROVIDERS = {deepseek:{url:'https://api.deepseek.com',models:['deepseek-v4-pro','deepseek-v4-flash']},openai:{url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-5']},qwen:{url:'https://dashscope.aliyuncs.com/compatible-mode/v1',models:['qwen3-max','qwen-plus','qwen-turbo']},kimi:{url:'https://api.moonshot.cn/v1',models:['kimi-k2.7-code']},doubao:{url:'https://ark.cn-beijing.volces.com/api/v3',models:['doubao-seed-2-1-pro']},glm:{url:'https://open.bigmodel.cn/api/paas/v4',models:['glm-5.2']},custom:{url:'',models:[]}};
+function onModelSelect(v) {
+  var modelEl = document.querySelector('[data-key="ai.model"]');
+  if (!modelEl) return;
+  if (v === '_custom') {
+    var m = prompt('输入模型名称:');
+    if (m) {
+      var sel = document.getElementById('aiModelSelect');
+      var o = document.createElement('option');
+      o.value = m; o.textContent = m; o.selected = true;
+      sel.insertBefore(o, sel.lastChild);
+      modelEl.value = m;
+    }
+  } else {
+    modelEl.value = v;
+  }
+}
 function onProviderChange() {
   var p = document.getElementById('aiProvider').value;
   var info = AI_PROVIDERS[p];
-  var urlEl = document.querySelector('[data-key=ai.base_url]');
+  var urlEl = document.querySelector('[data-key="ai.base_url"]');
   var sel = document.getElementById('aiModelSelect');
-  var modelEl = document.querySelector('[data-key=ai.model]');
+  var modelEl = document.querySelector('[data-key="ai.model"]');
   if (info.url) urlEl.value = info.url;
   sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">(手动输入)</option>') +
     (p !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
   if (info.models.length) { modelEl.value = info.models[0]; sel.value = info.models[0]; }
-  sel.onchange = function() {
-    if (this.value === '_custom') { var m = prompt('输入模型名称:'); if (m) { var o = document.createElement('option'); o.value = m; o.textContent = m; o.selected = true; this.insertBefore(o, this.lastChild); modelEl.value = m; } }
-    else { modelEl.value = this.value; }
-  };
+  sel.onchange = function() { onModelSelect(this.value); };
 }
 async function testConnection() {
   var r = document.getElementById('testResult');
@@ -236,8 +375,32 @@ async function loadSettingsValues() {
       if (v === undefined) return;
       if (el.tagName === 'SELECT') { var opt = el.querySelector('option[value="'+v+'"]'); if (opt) opt.selected = true; }
       else if (el.tagName === 'BUTTON') { el.dataset.value = v === 'true' ? 'true' : 'false'; el.classList.toggle('on', v === 'true'); if (el.querySelector('span')) el.querySelector('span').classList.toggle('on', v === 'true'); }
-      else el.value = v;
+      else {
+        // For password inputs, keep masked values as placeholder (not field value)
+        // to prevent re-saving the mask in place of the real token
+        if (el.type === 'password' && typeof v === 'string' && v.indexOf('•') !== -1) {
+          el.placeholder = v;
+          return;
+        }
+        el.value = v;
+      }
     });
+    // Refresh model dropdown to match the persisted provider
+    var pv = d['ai.provider'];
+    if (pv && AI_PROVIDERS[pv]) {
+      var info = AI_PROVIDERS[pv];
+      var sel = document.getElementById('aiModelSelect');
+      var modelEl = document.querySelector('[data-key="ai.model"]');
+      var savedModel = modelEl ? modelEl.value : '';
+      sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">(手动输入)</option>') +
+        (pv !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
+      if (info.models.length) {
+        var opt = sel.querySelector('option[value="'+savedModel+'"]');
+        if (opt) opt.selected = true;
+        else { modelEl.value = info.models[0]; sel.value = info.models[0]; }
+      }
+      sel.onchange = function() { onModelSelect(this.value); };
+    }
   } catch(e) {}
 }
 async function saveSettings() {
@@ -247,6 +410,12 @@ async function saveSettings() {
     if (el.tagName === 'BUTTON') v = el.dataset.value === 'true' ? 'true' : 'false';
     else if (el.tagName === 'SELECT') v = el.value;
     else v = el.value;
+    // Skip empty or still-masked sensitive fields to avoid overwriting stored values
+    if (v === '' || (typeof v === 'string' && v.indexOf('•') !== -1)) {
+      if (['token','secret','password','apikey','api_key','authorization'].some(function(part){ return k.toLowerCase().indexOf(part) !== -1; })) {
+        continue;
+      }
+    }
     await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
   }
   toast('设置已保存','success');
@@ -327,47 +496,50 @@ function updateStrength() {
 async function setupPw() {
   var p = document.getElementById('setupPass').value;
   if (p.length < 6) { toast('密码至少6位','error'); return; }
-  var r = await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
-  var d = await r.json();
-  if(d.ok){
-    if(d.recovery_codes){
-      showRecoveryCodesModal(d.recovery_codes);
-    }
-    switchSettingsTab('account');
-    toast('密码设置成功','success');
-  } else {
-    toast(d.error,'error');
-  }
+  showLoading('正在设置密码...');
+  try {
+    var r = await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
+    var d = await r.json();
+    if(d.ok){
+      if(d.recovery_codes){ showRecoveryCodesModal(d.recovery_codes); }
+      switchSettingsTab('account');
+      toast('密码设置成功','success');
+    } else { toast(d.error,'error'); }
+  } catch(e) { toast('设置失败: ' + e.message,'error'); }
+  hideLoading();
 }
 async function changePw() {
   var c = document.getElementById('curPass').value;
   var n = document.getElementById('newPass').value;
   if(!c || !n){ toast('请输入当前密码和新密码','error'); return; }
   if(n.length < 6){ toast('新密码至少6位','error'); return; }
-  var r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:c,new_password:n})});
-  var d = await r.json();
-  if(d.ok){
-    if(d.recovery_codes){
-      showRecoveryCodesModal(d.recovery_codes);
-    }
-    switchSettingsTab('account');
-    toast('密码已修改','success');
-  }
-  else { toast(d.error,'error'); }
+  showLoading('正在修改密码...');
+  try {
+    var r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:c,new_password:n})});
+    var d = await r.json();
+    if(d.ok){
+      if(d.recovery_codes){ showRecoveryCodesModal(d.recovery_codes); }
+      switchSettingsTab('account');
+      toast('密码已修改','success');
+    } else { toast(d.error,'error'); }
+  } catch(e) { toast('修改失败: ' + e.message,'error'); }
+  hideLoading();
 }
 
 async function regenerateRC(){
-  var pw = prompt('请输入当前密码以确认身份：');
+  var pw = await promptDialog({ title: '重新生成恢复码', message: '请输入当前密码以确认身份：', type: 'password', placeholder: '当前密码', okText: '确认' });
   if(!pw) return;
-  var r = await fetch('/api/auth/recovery-codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-  var d = await r.json();
-  if(d.ok && d.recovery_codes){
-    showRecoveryCodesModal(d.recovery_codes);
-    switchSettingsTab('account');
-    toast('恢复码已重新生成，旧码已作废','success');
-  } else {
-    toast(d.error,'error');
-  }
+  showLoading('正在重新生成恢复码...');
+  try {
+    var r = await fetch('/api/auth/recovery-codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+    var d = await r.json();
+    if(d.ok && d.recovery_codes){
+      showRecoveryCodesModal(d.recovery_codes);
+      switchSettingsTab('account');
+      toast('恢复码已重新生成，旧码已作废','success');
+    } else { toast(d.error,'error'); }
+  } catch(e) { toast('操作失败: ' + e.message,'error'); }
+  hideLoading();
 }
 
 //══════════ Login Gate ══════════
@@ -379,19 +551,90 @@ async function regenerateRC(){
     var o = document.createElement("div"); o.id = "loginGate";
     o.className = 'login-gate-bg';
     if (d.isLegacy) {
-      // Legacy password — system upgraded, must re-set password
+      // Legacy password — system upgraded, must re-set password with migration progress
       o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-badge">系统已升级，请重新设置密码</div></div><input id="setupPass" type="password" placeholder="新密码（至少6位）" class="login-gate-input"><button onclick="setupPwLegacy()" class="login-gate-btn">设置密码</button><div id="loginError" class="login-gate-error"></div></div>';
       window.setupPwLegacy = async function() {
         var p = document.getElementById("setupPass").value;
         var e = document.getElementById("loginError");
+        var btn = document.querySelector('.login-gate-btn');
         if (p.length < 6) { e.textContent = "密码至少6位"; e.style.display = 'block'; return; }
-        var r = await fetch("/api/auth/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
-        var rd = await r.json();
-        if (rd.ok) {
-          if (rd.recovery_codes) { showRecoveryCodesModal(rd.recovery_codes); }
-          sessionStorage.setItem("doc77-auth","1");
-          o.remove();
-        } else { e.textContent = rd.error || "设置失败"; e.style.display = 'block'; }
+        e.style.display = 'none';
+
+        // Show migration progress overlay
+        var prog = showProgressOverlay('正在更新系统安全配置', [
+          { icon: '🔐', label: '正在初始化加密系统...' },
+          { icon: '🔄', label: '正在迁移加密数据...' },
+          { icon: '🔑', label: '正在生成恢复码...' },
+          { icon: '✅', label: '配置完成！' }
+        ]);
+
+        // Simulate step 1 → 2 (init → migrate)
+        prog.advance(1);
+        // Small delay to show progress visually before the (potentially fast) API call
+        await new Promise(function(r){ setTimeout(r, 400); });
+
+        try {
+          var r = await fetch("/api/auth/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
+          var rd = await r.json();
+          if (rd.ok) {
+            // Step 2 → 3 (codes generation)
+            prog.advance(2);
+            await new Promise(function(r){ setTimeout(r, 300); });
+            // Step 3 → 4 (complete)
+            prog.advance(3);
+            prog.complete(function() {
+              if (rd.recovery_codes) { showRecoveryCodesModal(rd.recovery_codes); }
+              sessionStorage.setItem("doc77-auth","1");
+              // Smooth exit transition
+              var gate = document.getElementById("loginGate");
+
+              // Phase 1: Glow ripple at card center
+              var card = document.querySelector('.login-gate-card');
+              if (card) {
+                var rect = card.getBoundingClientRect();
+                var cx = rect.left + rect.width / 2;
+                var cy = rect.top + rect.height / 2;
+                var ripple = document.createElement('div');
+                ripple.className = 'login-gate-ripple';
+                ripple.style.cssText = 'left:' + cx + 'px;top:' + cy + 'px;transform:translate(-50%,-50%)';
+                document.body.appendChild(ripple);
+                setTimeout(function(){ if (ripple) ripple.remove(); }, 600);
+              }
+
+              // Phase 2: Gate dissolve + content reveal
+              setTimeout(function() {
+                if (gate) gate.classList.add('login-gate-dissolve');
+                var cw = document.querySelector('.content-wrapper');
+                if (cw) cw.classList.add('content-reveal');
+              }, 120);
+
+              // Phase 3: Staggered entries
+              setTimeout(function() {
+                var staggers = [
+                  document.querySelector('.app-header'),
+                  document.querySelector('.hero-banner'),
+                  document.querySelector('.register-cta'),
+                  document.querySelector('.recent-strip'),
+                  document.querySelector('.projects-section')
+                ];
+                for (var si = 0; si < staggers.length; si++) {
+                  if (staggers[si]) {
+                    staggers[si].classList.add('stagger-in', 'stagger-delay-' + si);
+                  }
+                }
+              }, 220);
+
+              // Remove gate after all animations
+              setTimeout(function() {
+                if (o) o.remove();
+              }, 700);
+            });
+          } else {
+            prog.error(rd.error || "设置失败");
+          }
+        } catch(ex) {
+          prog.error('网络错误: ' + ex.message);
+        }
       };
     } else {
       // Normal login
@@ -399,18 +642,71 @@ async function regenerateRC(){
       window.unlock = async function() {
         var p = document.getElementById("loginPass").value;
         var e = document.getElementById("loginError");
+        var btn = document.querySelector('.login-gate-btn');
         if (!p) { e.textContent = "请输入密码"; e.style.display = 'block'; return; }
-        var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
-        var d2 = await r2.json();
-        if (d2.ok) {
-          sessionStorage.setItem("doc77-auth","1");
-          if (d2.recovery_codes) { showRecoveryCodesModal(d2.recovery_codes); }
-          o.remove();
-        } else if (d2.legacyMigration) {
-          // Legacy hash was detected — switch to setup form
-          location.reload();
+        // Button loading state
+        if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+        e.style.display = 'none';
+        try {
+          var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
+          var d2 = await r2.json();
+          if (d2.ok) {
+            sessionStorage.setItem("doc77-auth","1");
+            if (d2.recovery_codes) { showRecoveryCodesModal(d2.recovery_codes); }
+
+            // ── Glow Ripple: 3-phase login transition ──
+            var gate = document.getElementById("loginGate");
+
+            // Phase 1: Create glow ripple at card center (expands 0→full screen)
+            var card = document.querySelector('.login-gate-card');
+            if (card) {
+              var rect = card.getBoundingClientRect();
+              var cx = rect.left + rect.width / 2;
+              var cy = rect.top + rect.height / 2;
+              var ripple = document.createElement('div');
+              ripple.className = 'login-gate-ripple';
+              ripple.style.cssText = 'left:' + cx + 'px;top:' + cy + 'px;transform:translate(-50%,-50%)';
+              document.body.appendChild(ripple);
+              setTimeout(function(){ if (ripple) ripple.remove(); }, 600);
+            }
+
+            // Phase 2: Dissolve gate + reveal content (staggered after ripple)
+            setTimeout(function() {
+              if (gate) gate.classList.add('login-gate-dissolve');
+              var cw = document.querySelector('.content-wrapper');
+              if (cw) cw.classList.add('content-reveal');
+            }, 120);
+
+            // Phase 3: Staggered element entries
+            setTimeout(function() {
+              var staggers = [
+                document.querySelector('.app-header'),
+                document.querySelector('.hero-banner'),
+                document.querySelector('.register-cta'),
+                document.querySelector('.recent-strip'),
+                document.querySelector('.projects-section')
+              ];
+              for (var si = 0; si < staggers.length; si++) {
+                if (staggers[si]) {
+                  staggers[si].classList.add('stagger-in', 'stagger-delay-' + si);
+                }
+              }
+            }, 220);
+
+            // Remove gate from DOM after all transitions finish
+            setTimeout(function() {
+              if (o) o.remove();
+            }, 700);
+          } else if (d2.legacyMigration) {
+            // Legacy hash was detected — switch to setup form
+            location.reload();
+          }
+          else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
+        } catch(ex) {
+          e.textContent = '网络错误: ' + ex.message; e.style.display = 'block';
+        } finally {
+          if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
         }
-        else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
       };
     }
     document.body.appendChild(o);
@@ -446,16 +742,20 @@ async function showForgotPassword(){
 async function verifyRC(){
   var rc = document.getElementById("rcInput").value.trim();
   var e = document.getElementById("rcError");
+  var btn = document.querySelector('.login-gate-btn');
   if(!rc){ e.style.display="block"; e.textContent="请输入恢复码"; return; }
-  var r = await fetch("/api/auth/forgot-password/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recovery_code:rc})});
-  var d = await r.json();
-  if(d.ok){
-    forgotState = 'reset';
-    sessionStorage.setItem("doc77-reset-token", d.reset_token);
-    showResetPassword();
-  } else {
-    e.style.display="block"; e.textContent = d.error || "验证失败";
-  }
+  e.style.display = 'none';
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    var r = await fetch("/api/auth/forgot-password/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recovery_code:rc})});
+    var d = await r.json();
+    if(d.ok){
+      forgotState = 'reset';
+      sessionStorage.setItem("doc77-reset-token", d.reset_token);
+      showResetPassword();
+    } else { e.style.display="block"; e.textContent = d.error || "验证失败"; }
+  } catch(ex) { e.style.display="block"; e.textContent = '网络错误: ' + ex.message; }
+  if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
 }
 
 function showResetPassword(){
@@ -472,17 +772,22 @@ async function doReset(){
   var p = document.getElementById("newPw").value;
   var c = document.getElementById("newPwConfirm").value;
   var e = document.getElementById("resetError");
+  var btn = document.querySelector('.login-gate-btn');
   if(p.length < 6){ e.style.display="block"; e.textContent="密码至少6位"; return; }
   if(p !== c){ e.style.display="block"; e.textContent="两次密码不一致"; return; }
-  var token = sessionStorage.getItem("doc77-reset-token");
-  var r = await fetch("/api/auth/forgot-password/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reset_token:token,new_password:p})});
-  var d = await r.json();
-  if(d.ok){
-    sessionStorage.removeItem("doc77-reset-token");
-    location.reload();
-  } else {
-    e.style.display="block"; e.textContent = d.error || "重置失败";
-  }
+  e.style.display = 'none';
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    var token = sessionStorage.getItem("doc77-reset-token");
+    var r = await fetch("/api/auth/forgot-password/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reset_token:token,new_password:p})});
+    var d = await r.json();
+    if(d.ok){
+      sessionStorage.removeItem("doc77-reset-token");
+      // Show loading overlay before reload
+      showLoading('密码已重置，正在重新登录...');
+      setTimeout(function() { location.reload(); }, 600);
+    } else { e.style.display="block"; e.textContent = d.error || "重置失败"; if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
+  } catch(ex) { e.style.display="block"; e.textContent = '网络错误: ' + ex.message; if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
 }
 
 //══════════ Recovery Codes Modal ══════════
