@@ -53,6 +53,16 @@ var directPath = new URLSearchParams(location.search).get('path') || '';
 if (!pid) location.href = '/';
 var proj = null, projects = [], currentFile = null, activeTab = 'outline';
 
+//══════════ Edit mode state ══════════
+var editMode = false;
+var editDirty = false;
+var editModifiedTime = null;
+var editSplitRatio = parseInt(localStorage.getItem('doc77_edit_ratio') || '50', 10);
+var editAutoSave = true;
+var editAutoSaveTimer = null;
+var editAutoSaveMs = 2000;
+var editOutlineWasManualCollapsed = false;
+
 //══════════ 多 tab 状态 ══════════
 // tabStore: 纯逻辑（顺序/活动/容量淘汰/渲染 LRU），来自 tabs.js
 var tabStore = TabStore.createTabStore({ maxTabs: 8, maxRendered: 3 });
@@ -108,6 +118,8 @@ function applyCapabilities() {
     CAPABILITIES = c; applyCapabilities();
     if (CAPABILITIES.mcp) initTaskEvents();
   }).catch(function(){});
+  // Preload editor module in background
+  if (window.EditorCore) window.EditorCore.load();
   try {
     var r = await fetch('/api/projects');
     projects = await r.json();
@@ -548,6 +560,22 @@ function mountPane(pane, path) {
 function afterActivate(path, d) {
   var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'];
   btns.forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = false; });
+  // Show edit button only for editable file types
+  var editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
+    '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
+    '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
+    '.env.example','.gitignore','.dockerignore','.editorconfig',
+    '.conf','.cfg','.ini','.csv','.log'];
+  var isEditable = editableExts.some(function(ext) {
+    return (currentFile || '').toLowerCase().endsWith(ext);
+  });
+  var editBtnEl = document.getElementById('editBtn');
+  if (editBtnEl) {
+    editBtnEl.style.display = isEditable ? '' : 'none';
+    editBtnEl.classList.toggle('editing-active', editMode);
+    editBtnEl.title = editMode ? '退出编辑模式' : '编辑此文件（分屏）';
+    editBtnEl.onclick = toggleEditMode;
+  }
   // Run 按钮：仅 js/py 显示
   var runBtn = document.getElementById('runBtn');
   if (runBtn) {
@@ -1154,6 +1182,229 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
 function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结「' + currentFile + '」的内容', currentFile); } }
+
+//══════════ Edit Mode ══════════
+function toggleEditMode() {
+  if (!currentFile) return;
+  if (editMode) { exitEditMode(); }
+  else { enterEditMode(); }
+}
+
+function enterEditMode() {
+  if (editMode) return;
+  var cached = tabDataCache[currentFile];
+  var initialContent = cached && cached.content ? cached.content : '';
+  editModifiedTime = cached && cached.modified ? cached.modified : null;
+
+  var docContent = document.getElementById('docContent');
+  if (!docContent) return;
+  var previewHTML = docContent.innerHTML;
+  var lang = getEditLanguage(currentFile);
+
+  docContent.innerHTML =
+    '<div id="editSplitContainer" class="edit-split">' +
+      '<div class="edit-pane-editor" id="editEditorPane"></div>' +
+      '<div class="edit-divider" id="editDivider"></div>' +
+      '<div class="edit-pane-preview" id="editPreviewPane">' + previewHTML + '</div>' +
+    '</div>' +
+    '<div class="edit-statusbar" id="editStatusbar">' +
+      '<span id="statusCursor">行:1 列:1</span>' +
+      '<span class="status-sep"></span><span>' + lang.toUpperCase() + '</span>' +
+      '<span class="status-sep"></span>' +
+      '<span class="status-dirty" id="statusDirty" style="display:none">● 已修改</span>' +
+      '<span class="status-saved fade" id="statusSaved">✓ 已保存</span>' +
+    '</div>';
+
+  var editorPane = document.getElementById('editEditorPane');
+  var container = document.getElementById('editSplitContainer');
+  if (container && editorPane) {
+    var tw = container.clientWidth;
+    editorPane.style.flex = '0 0 ' + editSplitRatio + '%';
+  }
+
+  initEditDivider();
+
+  // Auto-collapse outline
+  var op = document.getElementById('outlinePanel');
+  editOutlineWasManualCollapsed = op && op.classList.contains('hidden') &&
+    sessionStorage.getItem('doc77_outline_manual_collapsed') === '1';
+  if (op && !op.classList.contains('hidden')) op.classList.add('hidden');
+
+  var editBtnEl = document.getElementById('editBtn');
+  if (editBtnEl) { editBtnEl.classList.add('editing-active'); editBtnEl.title = '退出编辑模式'; }
+  editMode = true; editDirty = false;
+
+  // Load editor
+  if (!initialContent) {
+    fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile))
+      .then(function(r) { return r.text(); })
+      .then(function(t) { if (editMode) initEditorInstance(t); })
+      .catch(function() { if (editMode) initEditorInstance(''); });
+  } else {
+    initEditorInstance(initialContent);
+  }
+}
+
+function initEditorInstance(initialText) {
+  var pane = document.getElementById('editEditorPane');
+  if (!pane) return;
+
+  var useCM = window.EditorCore && window.EditorCore.isAvailable();
+  if (!useCM) {
+    var b = document.createElement('div'); b.className = 'editor-banner';
+    b.textContent = '编辑器增强加载失败，使用基础文本模式';
+    pane.parentNode.insertBefore(b, pane);
+  }
+
+  window._editEditor = window.EditorCore.createEditor(pane, {
+    initialValue: initialText,
+    language: getEditLanguage(currentFile),
+    onSave: function() { doSave(); }
+  });
+
+  var el = pane.querySelector('.cm-editor, .editor-textarea-fallback');
+  if (el) {
+    el.addEventListener('input', function() {
+      if (!editDirty) { editDirty = true; document.getElementById('statusDirty').style.display = ''; }
+      scheduleAutoSave();
+    });
+  }
+  if (editAutoSave) scheduleAutoSave();
+}
+
+function getEditLanguage(fp) {
+  var ext = (fp||'').split('.').pop().toLowerCase();
+  var m = {md:'markdown',mdx:'markdown',markdown:'markdown',json:'json',
+    js:'javascript',jsx:'javascript',ts:'typescript',tsx:'typescript',
+    py:'python',rb:'ruby',go:'go',rs:'rust',java:'java',c:'c',cpp:'cpp',h:'c',
+    css:'css',scss:'css',less:'css',html:'html',xml:'xml',svg:'xml',
+    sh:'shell',bash:'shell',zsh:'shell',yaml:'yaml',yml:'yaml',toml:'toml',
+    sql:'sql',txt:'text'};
+  return m[ext] || 'text';
+}
+
+function scheduleAutoSave() {
+  clearTimeout(editAutoSaveTimer);
+  if (!editAutoSave) return;
+  editAutoSaveTimer = setTimeout(function() { if (editDirty) doSave(); }, editAutoSaveMs);
+}
+
+function doSave(cb) {
+  if (!editMode || !currentFile || !window._editEditor) return;
+  var content = window._editEditor.getValue();
+  var headers = { 'Content-Type': 'application/json' };
+  if (editModifiedTime) headers['X-Expected-Modified'] = editModifiedTime;
+
+  fetch('/api/content/' + proj.id + '?path=' + encodeURIComponent(currentFile), {
+    method: 'PUT', headers: headers, body: JSON.stringify({ content: content })
+  })
+  .then(function(r) {
+    if (r.status === 409) {
+      r.json().then(function(d) {
+        showEditConfirm('文件已被外部修改', (d.error||'文件已被外部程序修改，继续保存会覆盖外部变更。'), [
+          {text:'覆盖保存',cls:'btn-danger',action:function(){
+            var fh = {'Content-Type':'application/json','X-Force-Overwrite':'true'};
+            fetch('/api/content/'+proj.id+'?path='+encodeURIComponent(currentFile),{method:'PUT',headers:fh,body:JSON.stringify({content:content})})
+            .then(function(r2){return r2.json().then(function(d2){if(!r2.ok)throw new Error(d2.error);return d2;});})
+            .then(function(d2){editModifiedTime=d2.modified;markSaved();updateEditPreview(content);if(cb)cb();})
+            .catch(function(e){alert('保存失败: '+e.message);});
+          }},
+          {text:'取消',cls:''}
+        ]);
+      });
+      return;
+    }
+    return r.json().then(function(d) { if (!r.ok) throw new Error(d.error||'保存失败'); return d; });
+  })
+  .then(function(d) {
+    if (!d) return;
+    editModifiedTime = d.modified; markSaved(); updateEditPreview(content);
+    tabDataCache[currentFile] = { content: content, path: currentFile, size: d.size, modified: d.modified };
+    if (cb) cb();
+  })
+  .catch(function(e) { alert('保存失败: ' + e.message); });
+}
+
+function markSaved() {
+  editDirty = false;
+  var d = document.getElementById('statusDirty'); if (d) d.style.display = 'none';
+  var s = document.getElementById('statusSaved');
+  if (s) { s.textContent = '✓ 已保存'; s.classList.remove('fade'); }
+}
+
+function updateEditPreview(content) {
+  var pp = document.getElementById('editPreviewPane'); if (!pp) return;
+  fetch('/api/content/'+proj.id+'?path='+encodeURIComponent(currentFile)+'&t='+Date.now())
+    .then(function(r){return r.json();})
+    .then(function(d){if(d&&d.html)pp.innerHTML=d.html;})
+    .catch(function(){pp.innerHTML='<pre style="white-space:pre-wrap;font-size:14px">'+escapeHtml(content)+'</pre>';});
+}
+
+function exitEditMode(skipConfirm) {
+  if (!editMode) return;
+  if (editDirty && !skipConfirm) {
+    showEditConfirm('有未保存的修改', '退出前是否保存修改？', [
+      {text:'保存并退出',cls:'btn-primary',action:function(){doSave(function(){doExitEdit();});}},
+      {text:'放弃修改',cls:'btn-danger',action:function(){doExitEdit();}},
+      {text:'取消',cls:''}
+    ]);
+    return;
+  }
+  doExitEdit();
+}
+
+function doExitEdit() {
+  var pp = document.getElementById('editPreviewPane');
+  var html = pp ? pp.innerHTML : '';
+  var dc = document.getElementById('docContent'); if (dc) dc.innerHTML = html;
+  if (!editOutlineWasManualCollapsed) {
+    var op = document.getElementById('outlinePanel'); if (op) op.classList.remove('hidden');
+  }
+  editMode = false; editDirty = false; editModifiedTime = null;
+  clearTimeout(editAutoSaveTimer); editAutoSaveTimer = null;
+  var eb = document.getElementById('editBtn');
+  if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
+  if (currentFile) { delete tabDataCache[currentFile]; fetchContent(currentFile).then(function(d){showContent(d,currentFile);}); }
+}
+
+function initEditDivider() {
+  var div = document.getElementById('editDivider');
+  var sc = document.getElementById('editSplitContainer');
+  var ep = document.getElementById('editEditorPane');
+  if (!div || !sc || !ep) return;
+  var dragging = false;
+  div.addEventListener('mousedown', function(e) { e.preventDefault(); dragging = true; div.classList.add('dragging'); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    var r = sc.getBoundingClientRect();
+    var pct = sc.classList.contains('vertical') ? ((e.clientY-r.top)/r.height)*100 : ((e.clientX-r.left)/r.width)*100;
+    pct = Math.max(20, Math.min(80, pct));
+    editSplitRatio = Math.round(pct); ep.style.flex = '0 0 ' + editSplitRatio + '%';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false; div.classList.remove('dragging');
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
+    localStorage.setItem('doc77_edit_ratio', String(editSplitRatio));
+  });
+}
+
+function showEditConfirm(title, message, buttons) {
+  var ov = document.createElement('div'); ov.className = 'confirm-overlay';
+  ov.innerHTML = '<div class="confirm-dialog"><h3>'+escapeHtml(title)+'</h3><p>'+escapeHtml(message)+'</p><div class="confirm-actions">'+
+    buttons.map(function(b,i){return '<button class="'+b.cls+'" data-idx="'+i+'">'+escapeHtml(b.text)+'</button>';}).join('')+
+    '</div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e) { if (e.target === ov) ov.remove(); });
+  ov.querySelectorAll('button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx = parseInt(btn.getAttribute('data-idx'),10); ov.remove();
+      if (buttons[idx]&&buttons[idx].action) buttons[idx].action();
+    });
+  });
+}
+
+function escapeHtml(str) { var d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
 // Outline
 var outlineHeadings = [], outlineBuilt = false;
