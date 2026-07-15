@@ -95,14 +95,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const useMobile = isMobileRequest(_req);
     const target = path.join(webDir, useMobile ? 'mobile/index.html' : 'index.html');
     if (fs.existsSync(target)) {
-      res.sendFile(target);
+      res.sendFile(target, { dotfiles: 'allow' });
       return;
     }
     // Graceful degradation: fall back to desktop if mobile HTML missing
     if (useMobile) {
       const desktopFallback = path.join(webDir, 'index.html');
       if (fs.existsSync(desktopFallback)) {
-        res.sendFile(desktopFallback);
+        res.sendFile(desktopFallback, { dotfiles: 'allow' });
         return;
       }
     }
@@ -116,7 +116,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
     const target = path.join(webDir, 'guide.html');
     if (fs.existsSync(target)) {
-      res.sendFile(target);
+      res.sendFile(target, { dotfiles: 'allow' });
       return;
     }
     res.status(404).type('html').send('<h1>Not Found</h1>');
@@ -130,13 +130,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const useMobile = isMobileRequest(_req);
     const target = path.join(webDir, useMobile ? 'mobile/preview.html' : 'preview.html');
     if (fs.existsSync(target)) {
-      res.sendFile(target);
+      res.sendFile(target, { dotfiles: 'allow' });
       return;
     }
     if (useMobile) {
       const desktopFallback = path.join(webDir, 'preview.html');
       if (fs.existsSync(desktopFallback)) {
-        res.sendFile(desktopFallback);
+        res.sendFile(desktopFallback, { dotfiles: 'allow' });
         return;
       }
     }
