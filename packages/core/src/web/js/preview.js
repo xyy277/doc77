@@ -1153,7 +1153,7 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
-function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容', currentFile); } }
+function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结「' + currentFile + '」的内容', currentFile); } }
 
 // Outline
 var outlineHeadings = [], outlineBuilt = false;
