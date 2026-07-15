@@ -48,5 +48,13 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@doc77/mcp": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@doc77/mcp": {
+      "optional": true
+    }
   }
 }
