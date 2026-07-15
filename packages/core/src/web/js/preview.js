@@ -1364,7 +1364,7 @@ function doExitEdit() {
   clearTimeout(editAutoSaveTimer); editAutoSaveTimer = null;
   var eb = document.getElementById('editBtn');
   if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
-  if (currentFile) { delete tabDataCache[currentFile]; fetchContent(currentFile).then(function(d){showContent(d,currentFile);}); }
+  if (currentFile) { delete tabDataCache[currentFile]; }
 }
 
 function initEditDivider() {
