@@ -2153,7 +2153,10 @@ export function createAIChatHandler(deps: {
         return;
       }
 
-      if (project_id && !(agent as any).hasContext) {
+      // Skip project-level context when user has a specific file open
+      // (context_file injects the file content instead; the project listing
+      // would bias the answer toward the whole system, not that document).
+      if (project_id && !(agent as any).hasContext && !context_file) {
         try {
           const root = scanDirectory(project_id, '');
           const fileList = root.entries
