@@ -153,6 +153,36 @@ git gc --prune=now --aggressive
 
 > GitHub 会将 force-push 前的旧 commits 在 `https://github.com/<org>/<repo>/security/secret-alerts` 中保留。推送清理后，联系 GitHub Support 请求清除缓存。
 
+## Git 操作规范 — 未提交代码保护（强制执行）
+
+**未提交的修改（staged + unstaged + untracked）是用户的真实工作成果，严禁丢弃。**
+
+### 禁止操作
+
+以下命令**永远不得主动执行**，除非用户在当前对话回合中**逐字明确要求**：
+
+| 禁止命令 | 破坏性 |
+|---|---|
+| `git checkout -- .` / `git restore .` | 丢弃所有 unstaged 修改 |
+| `git clean -fd` | 删除所有 untracked 文件 |
+| `git reset --hard` | 丢弃所有 staged + unstaged 修改 |
+| `git stash drop` / `git stash clear` | 删除已保存的 stash |
+
+### 分支切换前强制检查
+
+在 `git checkout <other-branch>` 或 `git switch` 之前，**必须先处理未提交代码**：
+
+1. `git status --short` 检查当前状态
+2. 如果有未提交修改：
+   - **当前分支任务代码** → `git add -A && git commit -m "..."` 提交到当前分支
+   - **跨分支临时修改** → `git stash push -m "<描述>"` 暂存
+   - **不确定归属** → **停止操作，询问用户**
+3. 处理完毕后再次 `git status --short` 确认干净，方可切换
+
+### 原则
+
+> **存疑即问，宁停勿丢。** 当你不能 100% 确定某段未提交代码是垃圾时，它就是有价值的，必须先提交再操作。
+
 ## CI / CD 规范
 
 - **不熟悉的工具链必须先搜索** — 搭 CI、配构建工具、跨平台打包等场景，先 `WebSearch` 查最佳实践和已知 issue，再动手写。禁止边试边修。
