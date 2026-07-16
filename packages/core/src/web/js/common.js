@@ -370,6 +370,8 @@ function switchSettingsTab(tab) {
       '<div id="translateModelStatus" style="font-size:11px;color:var(--text-muted);margin-bottom:8px">检查中...</div>' +
       '<button onclick="downloadTranslateModels()" id="btnDownloadModels" class="btn" style="width:100%;margin-top:4px;font-size:12px">📥 下载翻译模型 (~160MB)</button>';
     checkTranslateStatus();
+  } else if (tab === 'share') {
+    loadActiveShares(c);
   }
   loadSettingsValues();
   // 回填语言下拉选值 + 翻译设置面板内的 data-i18n
@@ -929,4 +931,70 @@ async function copyRC(){
   } catch(e) {
     toast('复制失败，请手动记录','error');
   }
+}
+
+//══════════ Share: Active Shares Tab ══════════
+
+/** Load and render the active shares list in settings. */
+function loadActiveShares(container) {
+  if (!container) container = document.getElementById('settingsContent');
+  container.innerHTML =
+    '<div class="section-title">活跃分享</div>' +
+    '<div id="shareList" style="font-size:12px;color:var(--text-muted)">加载中...</div>';
+
+  fetch('/api/shares').then(function(r){ return r.json(); }).then(function(shares){
+    var list = document.getElementById('shareList');
+    if (!list) return;
+    if (!shares || shares.length === 0) {
+      list.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--text-muted)">暂无活跃分享</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < shares.length; i++) {
+      var s = shares[i];
+      var expiresAt = new Date(s.expiresAt);
+      var expiresStr = expiresAt.toLocaleString('zh-CN');
+      // Reconstruct host URL (use the current page origin)
+      var shareUrl = window.location.origin + '/s/' + s.token;
+      html +=
+        '<div style="padding:10px;border:1px solid var(--border-light);border-radius:8px;margin-bottom:8px;font-size:12px">' +
+        '<div style="font-weight:600;margin-bottom:4px">📄 ' + escHtml(s.documentTitle) + '</div>' +
+        '<div style="font-family:monospace;font-size:11px;color:var(--text-secondary);word-break:break-all;margin-bottom:6px">' + escHtml(shareUrl) + '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="color:var(--text-muted);font-size:11px">有效期至 ' + expiresStr + '</span>' +
+        '<button onclick="revokeShare(\'' + s.token + '\', this)" style="padding:3px 10px;font-size:11px;color:#ef4444;border:1px solid #ef4444;background:transparent;border-radius:4px;cursor:pointer">撤销</button>' +
+        '</div></div>';
+    }
+    list.innerHTML = html;
+  }).catch(function(){
+    var list = document.getElementById('shareList');
+    if (list) list.innerHTML = '<div style="padding:16px 0;text-align:center;color:#ef4444">加载失败</div>';
+  });
+}
+
+/** Revoke a share token. */
+function revokeShare(token, btn) {
+  if (!confirm('确定要撤销此分享链接？撤销后已打开的页面将无法访问。')) return;
+  btn.disabled = true;
+  btn.textContent = '撤销中...';
+  fetch('/api/share/' + token, { method: 'DELETE' }).then(function(r){
+    if (r.ok) {
+      toast('✅ 分享链接已撤销', 'success');
+      // Reload the share list
+      loadActiveShares();
+    } else {
+      toast('撤销失败', 'error');
+      btn.disabled = false;
+      btn.textContent = '撤销';
+    }
+  }).catch(function(){
+    toast('撤销失败', 'error');
+    btn.disabled = false;
+    btn.textContent = '撤销';
+  });
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
