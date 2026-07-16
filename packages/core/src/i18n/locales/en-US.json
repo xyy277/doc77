@@ -7,5 +7,6 @@
   "common.settings.globalLang": "Global language (server / AI / CLI)",
   "common.settings.followGlobal": "Follow global",
   "common.settings.autoDetect": "Auto-detect",
-  "common.settings.globalLangSaved": "Saved. Restart the service for MCP tool descriptions to take effect"
+  "common.settings.globalLangSaved": "Saved. Restart the service for MCP tool descriptions to take effect",
+  "common.settings.globalLangSaveFailed": "Save failed, please try again"
 }

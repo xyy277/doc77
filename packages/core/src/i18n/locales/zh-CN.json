@@ -6,5 +6,6 @@
   "common.settings.globalLang": "全局语言（服务器/AI/CLI）",
   "common.settings.followGlobal": "跟随全局",
   "common.settings.autoDetect": "自动检测",
-  "common.settings.globalLangSaved": "已保存，MCP 工具描述需重启服务生效"
+  "common.settings.globalLangSaved": "已保存，MCP 工具描述需重启服务生效",
+  "common.settings.globalLangSaveFailed": "保存失败，请重试"
 }

@@ -220,6 +220,9 @@ window.showProgressOverlay = function(title, steps) {
 function esc(s) { var d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 function escAttr(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 function fmtSize(b) { return b<1024?b+' B':b<1024*1024?(b/1024).toFixed(1)+' KB':(b/(1024*1024)).toFixed(1)+' MB'; }
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 async function installElectronModule(mod) {
   var btn = document.getElementById('btnInstallAi');
@@ -286,9 +289,9 @@ function switchSettingsTab(tab) {
     c.innerHTML =
       '<div class="section-title">语言</div>' +
       '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.uiLang">界面语言（本浏览器）</span>' +
-        langSelect('uiLangSelect') + '</div>' +
+        langSelect('uiLangSelect', 'common.settings.followGlobal') + '</div>' +
       '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.globalLang">全局语言（服务器/AI/CLI）</span>' +
-        langSelect('globalLangSelect') + '</div>' +
+        langSelect('globalLangSelect', 'common.settings.autoDetect') + '</div>' +
       '<div class="section-title">编辑器</div>' +
       settingRow('默认编辑器','editor.default','text','vscode') +
       '<div class="section-title" style="margin-top:16px">事务</div>' +
@@ -427,10 +430,10 @@ function toggleSwitch(btn) {
 }
 function togglePasswordView(btn) { var i = btn.previousElementSibling; i.type = i.type === 'password' ? 'text' : 'password'; }
 
-function langSelect(id) {
-  var opts = '<option value="">' + t('common.settings.followGlobal') + '</option>';
+function langSelect(id, defaultLabelKey) {
+  var opts = '<option value="">' + t(defaultLabelKey) + '</option>';
   (window.__doc77_locales || []).forEach(function (l) {
-    opts += '<option value="' + l.code + '">' + l.name + '</option>';
+    opts += '<option value="' + escapeHtml(l.code) + '">' + escapeHtml(l.name) + '</option>';
   });
   return '<select id="' + id + '" onchange="onLangChange(this)" class="settings-select">' + opts + '</select>';
 }
@@ -445,7 +448,8 @@ function onLangChange(sel) {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'locale.language', value: sel.value }),
-    }).then(function () { showToast(t('common.settings.globalLangSaved')); });
+    }).then(function () { showToast(t('common.settings.globalLangSaved')); })
+      .catch(function(){ showToast(t('common.settings.globalLangSaveFailed')); });
   }
 }
 
