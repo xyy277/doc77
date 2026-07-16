@@ -34,6 +34,11 @@ const DEFAULTS: Record<string, string> = {
   'transport.mcp_stdio_enabled': 'true',
   'transport.mcp_http_enabled': 'true',
   'transport.mcp_http_port': '8899',
+  'translate.enabled': 'true',
+  'translate.mirror': 'false',
+  'translate.default_source': 'auto',
+  'translate.default_target': 'zh',
+  'translate.max_segment_length': '500',
 };
 
 /**

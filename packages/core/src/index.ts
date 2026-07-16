@@ -91,8 +91,23 @@ export {
 } from './server/auth.js';
 
 // Vendor
-export { fetchVendorAssets, isVendorReady, VENDOR_ASSETS } from './server/vendor.js';
+export {
+  fetchVendorAssets,
+  isVendorReady,
+  VENDOR_ASSETS,
+  translateModelsDir,
+} from './server/vendor.js';
 export type { VendorAsset } from './server/vendor.js';
+
+// Translate
+export {
+  isEngineAvailable,
+  isModelReady,
+  translate,
+  segmentText,
+  MODEL_PAIRS,
+} from './translate/index.js';
+export type { TranslationResult, Segment } from './translate/index.js';
 
 // Renderers
 export {

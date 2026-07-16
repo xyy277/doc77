@@ -53,8 +53,8 @@ async function auditLog(entry: Record<string, unknown>) {
 }
 
 // Module capabilities — set by CLI layer at startup
-let _capabilities = { ai: false, mcp: false };
-export function setCapabilities(caps: { ai: boolean; mcp: boolean }) {
+let _capabilities = { ai: false, mcp: false, translate: false };
+export function setCapabilities(caps: { ai: boolean; mcp: boolean; translate: boolean }) {
   _capabilities = caps;
 }
 
@@ -231,7 +231,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   if (process.env.DOC77_ELECTRON) {
     app.post('/api/electron/install', async (req: Request, res: Response) => {
       const mod = (req.body.module as string) || '';
-      if (!['ai', 'mcp'].includes(mod)) {
+      if (!['ai', 'mcp', 'translate'].includes(mod)) {
         res.status(400).json({ error: 'invalid module' });
         return;
       }
@@ -1545,6 +1545,83 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Unknown error';
       res.json({ ok: false, error: `网络错误: ${message}` });
+    }
+  });
+
+  // === Translation (Offline) ===
+
+  app.get('/api/translate/status', async (_req: Request, res: Response) => {
+    try {
+      const { isEngineAvailable, isModelReady } = await import('../translate/index.js');
+      const engine = await isEngineAvailable();
+      const enzh = engine ? await isModelReady('en-zh') : false;
+      const zhen = engine ? await isModelReady('zh-en') : false;
+      res.json({ engineAvailable: engine, models: { 'en-zh': enzh, 'zh-en': zhen } });
+    } catch {
+      res.json({ engineAvailable: false, models: {} });
+    }
+  });
+
+  app.post('/api/translate', async (req: Request, res: Response) => {
+    const { text, source_lang, target_lang, mode } = req.body || {};
+    if (!text || !target_lang) {
+      res.status(400).json({ error: 'text and target_lang are required' });
+      return;
+    }
+    try {
+      const { isEngineAvailable, translate, segmentText } = await import('../translate/index.js');
+      if (!(await isEngineAvailable())) {
+        res.status(503).json({
+          error: 'ENGINE_UNAVAILABLE',
+          message: '翻译引擎未安装。安装: doc77 i translate',
+        });
+        return;
+      }
+      const src = source_lang || 'auto';
+      const tgt = target_lang;
+      if (mode === 'document' && text.length > 300) {
+        const segments = segmentText(text);
+        const translations = [];
+        const startTime = Date.now();
+        for (const seg of segments) {
+          translations.push((await translate(seg.text, src, tgt)).translated_text);
+        }
+        return res.json({
+          translated_text: translations.join('\n\n'),
+          source_lang: src,
+          target_lang: tgt,
+          segment_count: segments.length,
+          duration_ms: Date.now() - startTime,
+          model: 'Opus-MT (ONNX)',
+        });
+      }
+      const result = await translate(text, src, tgt);
+      res.json({
+        translated_text: result.translated_text,
+        source_lang: result.source_lang,
+        target_lang: result.target_lang,
+        duration_ms: result.duration_ms,
+        model: 'Opus-MT (ONNX)',
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      if (msg === 'ENGINE_UNAVAILABLE') {
+        res.status(503).json({ error: 'ENGINE_UNAVAILABLE', message: '翻译引擎未安装' });
+      } else if (
+        msg === 'MODEL_NOT_READY' ||
+        msg.includes('fetch failed') ||
+        msg.includes('Network Error') ||
+        msg.includes('ENOENT') ||
+        msg.includes('Could not locate file')
+      ) {
+        res.status(503).json({
+          error: 'MODEL_NOT_READY',
+          message:
+            '翻译模型未下载或下载失败。请运行 doc77 vendor-install --translate en-zh 或在设置面板点击下载按钮。如网络不通可开启国内镜像。',
+        });
+      } else {
+        res.status(500).json({ error: msg });
+      }
     }
   });
 

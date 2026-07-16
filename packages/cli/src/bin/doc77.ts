@@ -29,6 +29,7 @@ const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
 // Module availability — checked at startup, cached for session
 let mcpAvailable = false;
 let aiAvailable = false;
+let translateAvailable = false;
 async function detectModules() {
   try {
     await import('@doc77/mcp');
@@ -37,6 +38,10 @@ async function detectModules() {
   try {
     await import('@doc77/ai');
     aiAvailable = true;
+  } catch {}
+  try {
+    const { isEngineAvailable } = await import('@doc77/core');
+    translateAvailable = await isEngineAvailable();
   } catch {}
 }
 async function tryGetMcp(names: string[]): Promise<Record<string, any> | null> {
@@ -171,8 +176,9 @@ Doc77 v${VERSION} — 默认安全、对话驱动的智能本地文档管理 Age
   --help                              显示帮助
 
 模块管理:
-  i <ai|mcp|all>                      安装可选模块
+  i <ai|mcp|translate|all>            安装可选模块
   rm <ai|mcp>                         卸载模块
+  vendor-install [--translate <pair>] [--mirror] [--no-pyodide]  下载离线资源
 
 配置管理:
   config set <key> <value>            设置配置项
@@ -337,7 +343,7 @@ async function main() {
       // Inject capabilities into app
       try {
         const { setCapabilities } = await import('@doc77/core');
-        setCapabilities({ ai: aiAvailable, mcp: mcpAvailable });
+        setCapabilities({ ai: aiAvailable, mcp: mcpAvailable, translate: translateAvailable });
       } catch {}
 
       const server = http.createServer(app);
@@ -676,6 +682,44 @@ async function main() {
     }
 
     case 'vendor-install': {
+      if (args.includes('--translate')) {
+        const pairIdx = args.indexOf('--translate');
+        const pairArg =
+          pairIdx + 1 < args.length && !args[pairIdx + 1].startsWith('--')
+            ? args[pairIdx + 1]
+            : 'all';
+        const pairs =
+          pairArg === 'all'
+            ? ['en-zh', 'zh-en']
+            : pairArg.split(',').filter((p: string) => p === 'en-zh' || p === 'zh-en');
+        if (!pairs.length) {
+          console.error('用法: doc77 vendor-install --translate <en-zh|zh-en|all>');
+          break;
+        }
+        const { isEngineAvailable, translate, MODEL_PAIRS } = await import('@doc77/core');
+        if (!(await isEngineAvailable())) {
+          console.error('❌ 翻译引擎未安装。请先运行：doc77 i translate');
+          break;
+        }
+        if (args.includes('--mirror')) {
+          setConfig('translate.mirror', 'true');
+          console.log('🌐 使用国内镜像 (hf-mirror.com)');
+        }
+        for (const pair of pairs) {
+          const mi = MODEL_PAIRS[pair];
+          console.log(`📥 下载模型 ${mi.displayName} (${mi.size})...`);
+          try {
+            await translate('Hello', mi.sourceLang, mi.targetLang);
+            console.log(`  ✅ ${mi.displayName} 就绪`);
+          } catch (e: unknown) {
+            console.error(
+              `  ❌ ${mi.displayName} 下载失败: ${e instanceof Error ? e.message : 'Unknown'}`,
+            );
+          }
+        }
+        console.log('✅ 翻译模型下载完成！');
+        break;
+      }
       const vendorDir = path.join(os.homedir(), '.doc77', 'vendor');
       const skipPyodide = args.includes('--no-pyodide');
       const { fetchVendorAssets, VENDOR_ASSETS } = await import('@doc77/core');
@@ -696,17 +740,25 @@ async function main() {
       break;
 
     case 'i': {
-      let modules = args.slice(1).filter((m: string) => ['ai', 'mcp', 'all'].includes(m));
-      if (modules.includes('all')) modules = ['ai', 'mcp'];
+      let modules = args
+        .slice(1)
+        .filter((m: string) => ['ai', 'mcp', 'translate', 'all'].includes(m));
+      if (modules.includes('all')) modules = ['ai', 'mcp', 'translate'];
       if (!modules.length) {
-        console.log('用法: doc77 i <ai|mcp|all>');
+        console.log('用法: doc77 i <ai|mcp|translate|all>');
         break;
       }
       const { execSync } = await import('node:child_process');
       for (const m of modules) {
-        console.log(`安装 @doc77/${m}...`);
-        execSync(`npm install @doc77/${m}@latest`, { stdio: 'inherit' });
-        console.log(`✅ @doc77/${m} 安装完成`);
+        if (m === 'translate') {
+          console.log('安装 @huggingface/transformers（翻译引擎）...');
+          execSync('npm install @huggingface/transformers@latest', { stdio: 'inherit' });
+          console.log('✅ 翻译引擎安装完成');
+        } else {
+          console.log(`安装 @doc77/${m}...`);
+          execSync(`npm install @doc77/${m}@latest`, { stdio: 'inherit' });
+          console.log(`✅ @doc77/${m} 安装完成`);
+        }
       }
       console.log('重启 Doc77 服务生效');
       break;

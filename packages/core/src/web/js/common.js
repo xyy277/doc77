@@ -6,9 +6,11 @@
 // Module capabilities
 window.__doc77_caps_ai = false;
 window.__doc77_caps_mcp = false;
+window.__doc77_caps_translate = false;
 fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c){
   window.__doc77_caps_ai = c.ai;
   window.__doc77_caps_mcp = c.mcp;
+  window.__doc77_caps_translate = c.translate;
 }).catch(function(){});
 
 // Version badge
@@ -192,6 +194,35 @@ async function installElectronModule(mod) {
   if (btn) { btn.disabled = false; btn.textContent = '📦 一键安装 AI 模块'; }
 }
 
+async function checkTranslateStatus() {
+  try {
+    var r = await fetch('/api/translate/status'); var d = await r.json();
+    var el = document.getElementById('translateModelStatus'); if (!el) return;
+    if (!d.engineAvailable) { el.innerHTML = '<span style="color:var(--danger)">❌ 引擎未安装</span>'; }
+    else {
+      var parts = [];
+      parts.push(d.models && d.models['en-zh'] ? '✅ English → 中文' : '⬜ English → 中文（未下载）');
+      parts.push(d.models && d.models['zh-en'] ? '✅ 中文 → English' : '⬜ 中文 → English（未下载）');
+      el.innerHTML = parts.join('<br>');
+    }
+  } catch(e) { var el2 = document.getElementById('translateModelStatus'); if (el2) el2.innerHTML = '<span style="color:var(--text-muted)">无法检查状态</span>'; }
+}
+
+async function downloadTranslateModels() {
+  var btn = document.getElementById('btnDownloadModels');
+  if (btn) { btn.disabled = true; btn.textContent = '下载中...（首次约需 1-2 分钟）'; }
+  try {
+    var mirrorCB = document.querySelector('[data-key="translate.mirror"]');
+    if (mirrorCB && mirrorCB.checked) { await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'translate.mirror', value: 'true' }) }); }
+    var r = await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Hello', source_lang: 'en', target_lang: 'zh', mode: 'sentence' }) });
+    if (r.ok) { toast('✅ en-zh 模型下载完成', 'success'); }
+    else { var d = await r.json(); toast('下载失败，请终端运行: doc77 vendor-install --translate en-zh --mirror', 'error'); if (btn) { btn.disabled = false; btn.textContent = '📥 下载翻译模型 (~160MB)'; } checkTranslateStatus(); return; }
+    try { await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: '你好', source_lang: 'zh', target_lang: 'en', mode: 'sentence' }) }); } catch(e) {}
+    checkTranslateStatus();
+  } catch(e) { toast('下载失败，请终端运行: doc77 vendor-install --translate en-zh --mirror', 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = '📥 下载翻译模型 (~160MB)'; }
+}
+
 //══════════ Settings ══════════
 function toggleSettings() {
   var ov = document.getElementById('settingsOverlay');
@@ -279,6 +310,22 @@ function switchSettingsTab(tab) {
       '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)"><button onclick="restartServer()" style="width:100%;padding:8px 0;font-size:13px;font-weight:500;color:var(--danger);border:1px solid var(--danger);border-radius:6px;background:transparent;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🔄 重启服务</button></div>';
     renderAccountSection();
     loadServerInfo();
+  } else if (tab === 'translate') {
+    if (!window.__doc77_caps_translate) {
+      var electronInstall = (window.doc77) ? '<button onclick="installElectronModule(\'translate\')" id="btnInstallTranslate" class="btn btn-primary" style="display:inline-flex;margin-top:12px;font-size:13px">📦 一键安装翻译模块</button>' : '<code style="font-size:11px;background:var(--bg-code);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:8px;color:var(--text-primary)">doc77 i translate</code>';
+      c.innerHTML = '<div style="text-align:center;padding:32px 0;font-size:13px;color:var(--text-muted)">翻译模块未安装<br>' + electronInstall + '</div>';
+      return;
+    }
+    c.innerHTML =
+      '<div class="section-title">离线翻译</div>' +
+      settingToggle('启用离线翻译','translate.enabled') + settingToggle('使用国内镜像 (hf-mirror.com)','translate.mirror') +
+      settingRow('默认源语言','translate.default_source','text','auto') + settingRow('默认目标语言','translate.default_target','text','zh') +
+      settingRow('最大分段长度','translate.max_segment_length','number','500') +
+      '<div class="settings-tip" style="margin-left:4px">翻译基于开源 Opus-MT ONNX 模型，完全离线运行，内容不出本机。</div>' +
+      '<div class="section-title" style="margin-top:16px">模型状态</div>' +
+      '<div id="translateModelStatus" style="font-size:11px;color:var(--text-muted);margin-bottom:8px">检查中...</div>' +
+      '<button onclick="downloadTranslateModels()" id="btnDownloadModels" class="btn" style="width:100%;margin-top:4px;font-size:12px">📥 下载翻译模型 (~160MB)</button>';
+    checkTranslateStatus();
   }
   loadSettingsValues();
 }

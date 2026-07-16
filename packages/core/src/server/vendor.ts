@@ -139,3 +139,7 @@ export function vendorAssetPath(vendorDir: string, name: string): string | null 
   const p = path.join(vendorDir, name);
   return fs.existsSync(p) ? p : null;
 }
+
+export function translateModelsDir(): string {
+  return path.join(process.env.HOME || '/home', '.doc77', 'translate-models');
+}
