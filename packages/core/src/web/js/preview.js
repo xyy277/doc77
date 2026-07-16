@@ -1334,10 +1334,10 @@ function getEditLanguage(fp) {
 function scheduleAutoSave() {
   clearTimeout(editAutoSaveTimer);
   if (!editAutoSave) return;
-  editAutoSaveTimer = setTimeout(function() { if (editDirty) doSave(); }, editAutoSaveMs);
+  editAutoSaveTimer = setTimeout(function() { if (editDirty) doSave(null, true); }, editAutoSaveMs);
 }
 
-function doSave(cb) {
+function doSave(cb, skipPreview) {
   if (!editMode || !currentFile || !window._editEditor || !proj || !proj.id) return;
   var content = window._editEditor.getValue();
   var headers = { 'Content-Type': 'application/json' };
@@ -1354,7 +1354,7 @@ function doSave(cb) {
             var fh = {'Content-Type':'application/json','X-Force-Overwrite':'true'};
             fetch('/api/content/'+proj.id+'?path='+encodeURIComponent(currentFile),{method:'PUT',headers:fh,body:JSON.stringify({content:content})})
             .then(function(r2){return r2.json().then(function(d2){if(!r2.ok)throw new Error(d2.error);return d2;});})
-            .then(function(d2){editModifiedTime=d2.modified;markSaved();updateEditPreview(content);if(cb)cb();})
+            .then(function(d2){editModifiedTime=d2.modified;markSaved();if(!skipPreview)updateEditPreview(content);if(cb)cb();})
             .catch(function(e){alert('保存失败: '+e.message);});
           }},
           {text:'取消',cls:''}
@@ -1366,7 +1366,9 @@ function doSave(cb) {
   })
   .then(function(d) {
     if (!d) return;
-    editModifiedTime = d.modified; markSaved(); updateEditPreview(content);
+    editModifiedTime = d.modified; markSaved();
+    // Only refresh server-rendered preview on manual save (Ctrl+S), not auto-save
+    if (!skipPreview) updateEditPreview(content);
     tabDataCache[currentFile] = { content: content, path: currentFile, size: d.size, modified: d.modified };
     if (cb) cb();
   })
