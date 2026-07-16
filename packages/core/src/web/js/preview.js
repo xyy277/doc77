@@ -1113,10 +1113,12 @@ function exitTranslateMode() {
 // Selection translate popup
 (function initSelectionTranslate() {
   document.addEventListener('mouseup', function(e) {
+    // Don't interfere if user is interacting with the translate popup itself
+    var popupEl = document.getElementById('translatePopup');
+    if (popupEl && popupEl.contains(e.target)) return;
     var sel = window.getSelection();
     var text = (sel && sel.toString() || '').trim();
-    var existing = document.getElementById('translatePopup');
-    if (existing) existing.remove();
+    if (popupEl) popupEl.remove();
     if (text.length < 2 || text.length > 2000) return;
     if (!CAPABILITIES || !CAPABILITIES.translate) return;
     var popup = document.createElement('div');
