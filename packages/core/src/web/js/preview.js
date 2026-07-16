@@ -1255,8 +1255,8 @@ function enterEditMode() {
   if (editBtnEl) { editBtnEl.classList.add('editing-active'); editBtnEl.title = '退出编辑模式'; }
   editMode = true; editDirty = false;
 
-  // Load editor with raw file content always (cached content is rendered HTML)
-  fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile))
+  // Load editor with raw file content (cache-bust to avoid stale browser cache)
+  fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile) + '&t=' + Date.now())
     .then(function(r) { return r.text(); })
     .then(function(t) { if (editMode) initEditorInstance(t); })
     .catch(function() { if (editMode) initEditorInstance(''); });
