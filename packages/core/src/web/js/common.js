@@ -1,7 +1,46 @@
 /**
  * Doc77 Common JS — 被 index.html 和 preview.html 共享
- * 包含: Theme, Toast/Confirm, Settings, Login Gate, Helpers
+ * 包含: Theme, Toast/Confirm, Settings, Login Gate, Helpers, i18n Runtime
  */
+
+//══════════ i18n ══════════
+window.__doc77_dict = {};
+window.t = function (key, params) {
+  var v = window.__doc77_dict[key] || key;
+  return v.replace(/\{(\w+)\}/g, function (m, name) {
+    return params && name in params ? String(params[name]) : m;
+  });
+};
+window.applyI18n = function (root) {
+  root = root || document;
+  root.querySelectorAll('[data-i18n]').forEach(function (el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  root.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  root.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+};
+window.__doc77_i18n_ready = fetch('/api/i18n?' + (function () {
+  var o = localStorage.getItem('doc77_lang');
+  return o ? 'lang=' + encodeURIComponent(o)
+           : 'hint=' + encodeURIComponent(navigator.language || '');
+})()).then(function (r) { return r.json(); }).then(function (d) {
+  window.__doc77_dict = d.dict;
+  window.__doc77_lang = d.lang;
+  window.__doc77_locales = d.available;
+  window.__doc77_lang_global = d.global;
+  document.documentElement.lang = d.lang;
+}).catch(function () {}).then(function () {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { applyI18n(); });
+  } else {
+    applyI18n();
+  }
+  document.documentElement.classList.remove('i18n-loading');
+});
 
 // Module capabilities
 window.__doc77_caps_ai = false;
@@ -245,6 +284,11 @@ function switchSettingsTab(tab) {
   if (!c) return;
   if (tab === 'system') {
     c.innerHTML =
+      '<div class="section-title">语言</div>' +
+      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.uiLang">界面语言（本浏览器）</span>' +
+        langSelect('uiLangSelect') + '</div>' +
+      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.globalLang">全局语言（服务器/AI/CLI）</span>' +
+        langSelect('globalLangSelect') + '</div>' +
       '<div class="section-title">编辑器</div>' +
       settingRow('默认编辑器','editor.default','text','vscode') +
       '<div class="section-title" style="margin-top:16px">事务</div>' +
@@ -328,6 +372,12 @@ function switchSettingsTab(tab) {
     checkTranslateStatus();
   }
   loadSettingsValues();
+  // 回填语言下拉选值 + 翻译设置面板内的 data-i18n
+  var uiSel = document.getElementById('uiLangSelect');
+  if (uiSel) uiSel.value = window.__doc77_lang || '';
+  var gSel = document.getElementById('globalLangSelect');
+  if (gSel) gSel.value = window.__doc77_lang_global || '';
+  applyI18n(c);
 }
 
 async function loadServerInfo() {
@@ -376,6 +426,28 @@ function toggleSwitch(btn) {
   btn.querySelector('span').classList.toggle('on', btn.dataset.value === 'true');
 }
 function togglePasswordView(btn) { var i = btn.previousElementSibling; i.type = i.type === 'password' ? 'text' : 'password'; }
+
+function langSelect(id) {
+  var opts = '<option value="">' + t('common.settings.followGlobal') + '</option>';
+  (window.__doc77_locales || []).forEach(function (l) {
+    opts += '<option value="' + l.code + '">' + l.name + '</option>';
+  });
+  return '<select id="' + id + '" onchange="onLangChange(this)" class="settings-select">' + opts + '</select>';
+}
+function onLangChange(sel) {
+  if (sel.id === 'uiLangSelect') {
+    if (sel.value) localStorage.setItem('doc77_lang', sel.value);
+    else localStorage.removeItem('doc77_lang');
+    location.reload();
+  } else {
+    // 全局语言写 config
+    fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'locale.language', value: sel.value }),
+    }).then(function () { showToast(t('common.settings.globalLangSaved')); });
+  }
+}
 
 // AI Providers
 var AI_PROVIDERS = {deepseek:{url:'https://api.deepseek.com',models:['deepseek-v4-pro','deepseek-v4-flash']},openai:{url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-5']},qwen:{url:'https://dashscope.aliyuncs.com/compatible-mode/v1',models:['qwen3-max','qwen-plus','qwen-turbo']},kimi:{url:'https://api.moonshot.cn/v1',models:['kimi-k2.7-code']},doubao:{url:'https://ark.cn-beijing.volces.com/api/v3',models:['doubao-seed-2-1-pro']},glm:{url:'https://open.bigmodel.cn/api/paas/v4',models:['glm-5.2']},custom:{url:'',models:[]}};

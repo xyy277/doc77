@@ -41,6 +41,9 @@ import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 
 import { VERSION } from '../version.gen.js';
+import { getConfig } from '../db/config.js';
+import { initI18n } from '../i18n/index.js';
+import { buildI18nResponse } from './i18n-route.js';
 
 /** Lazy import from @doc77/mcp — optional peer dep, may not be installed */
 async function auditLog(entry: Record<string, unknown>) {
@@ -66,6 +69,9 @@ export function setCapabilities(caps: { ai: boolean; mcp: boolean; translate: bo
  */
 export function createApp(restartCallback?: () => void, bindAddr?: string, port?: number) {
   const app = express();
+
+  // i18n：按全局配置初始化（config 为空 = 自动检测系统语言）
+  initI18n(getConfig('locale.language') || '');
 
   // --- Middleware ---
 
@@ -190,6 +196,21 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // --- API Routes ---
+
+  // i18n 词条表下发（带 ETag 缓存）
+  app.get('/api/i18n', (req: Request, res: Response) => {
+    const r = buildI18nResponse({
+      lang: String(req.query.lang || ''),
+      hint: String(req.query.hint || ''),
+      global: getConfig('locale.language') || '',
+    });
+    res.setHeader('ETag', r.etag);
+    if (req.headers['if-none-match'] === r.etag) {
+      res.status(304).end();
+      return;
+    }
+    res.json(r);
+  });
 
   // Server info — runtime state (actual bind address, not config)
   app.get('/api/server-info', (_req: Request, res: Response) => {
