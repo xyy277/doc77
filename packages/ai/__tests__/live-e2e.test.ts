@@ -131,9 +131,7 @@ async function runChat(body: Record<string, unknown>): Promise<ChatResult> {
     .filter((e) => e.event === 'token')
     .map((e) => e.data.text as string)
     .join('');
-  const toolNames = events
-    .filter((e) => e.event === 'tool_call')
-    .map((e) => e.data.name as string);
+  const toolNames = events.filter((e) => e.event === 'tool_call').map((e) => e.data.name as string);
   const errEv = events.find((e) => e.event === 'error');
 
   return {
@@ -213,7 +211,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S1 基础对话 — 简单问候应返回非空中文回复，无工具调用',
     async () => {
-      
       const t0 = Date.now();
       const r = await runChat({ message: '用一句话介绍你自己', project_id: projectId });
       diag('S1', r, Date.now() - t0);
@@ -230,7 +227,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S2 中文理解 — 中文指令应被正确理解',
     async () => {
-      
       const t0 = Date.now();
       const r = await runChat({
         message: '请列出这个项目的所有 markdown 文件。用列表格式',
@@ -249,7 +245,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S3 context_file 总结 — 内容直接注入，不应有工具调用',
     async () => {
-      
       const t0 = Date.now();
       const r = await runChat({
         message: '请用简洁的中文总结这个文档的内容',
@@ -273,7 +268,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S4 读工具调用 — 应调用 list_files 查看目录，并用 read_file 读文件后回答',
     async () => {
-      
       const t0 = Date.now();
       const r = await runChat({
         message: '请用工具查看这个项目根目录有哪些文件？',
@@ -294,7 +288,7 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S5 多轮对话 — 第二轮应能引用第一轮的工具结果，建立上下文',
     async () => {
-       // fresh session each test
+      // fresh session each test
       const sid = 'e2e-multiturn';
       const t0 = Date.now();
 
@@ -328,7 +322,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S6 move_file 提案 — 应调用写工具，队列出现一条 pending 记录',
     async () => {
-      
       // Count pending tasks before
       const before = getPendingTasks(projectId).length;
       const t0 = Date.now();
@@ -353,7 +346,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S7 create_folder 提案 — 应调用 create_folder 入队',
     async () => {
-      
       const before = getPendingTasks(projectId).length;
       const t0 = Date.now();
       const r = await runChat({
@@ -376,7 +368,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S8 安全边界 — 试图操作 .env 应被拒绝，队列无此记录，文件仍在',
     async () => {
-      
       const before = getPendingTasks(projectId).length;
       const t0 = Date.now();
       const r = await runChat({
@@ -400,7 +391,6 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S9 batch 提案 — AI 应使用 batch_operations 或系列写操作一次提交',
     async () => {
-      
       const before = getPendingTasks(projectId).length;
       const t0 = Date.now();
       const r = await runChat({
@@ -412,9 +402,7 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
       const after = getPendingTasks(projectId).length;
       // Either batch_operations was used, or queue grew from individual moves
       const usedBatch = r.toolNames.includes('batch_operations');
-      const usedWrite = r.toolNames.some((n) =>
-        ['move_file', 'create_folder'].includes(n),
-      );
+      const usedWrite = r.toolNames.some((n) => ['move_file', 'create_folder'].includes(n));
       expect(usedBatch || usedWrite || after > before).toBe(true);
       expect(r.error).toBeUndefined();
     },
@@ -427,10 +415,7 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
   it(
     'S10 全写链路 — 批准后 executor 必须真正移动文件',
     async () => {
-      
-      const beforeCount = getPendingTasks(projectId).filter(
-        (t) => t.status === 'pending',
-      ).length;
+      const beforeCount = getPendingTasks(projectId).filter((t) => t.status === 'pending').length;
 
       // Step 1: AI proposes a move
       const t0 = Date.now();

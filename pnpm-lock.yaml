@@ -62,6 +62,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@doc77/mcp':
+        specifier: workspace:^
+        version: link:../mcp
       express:
         specifier: ^5.1.0
         version: 5.2.1

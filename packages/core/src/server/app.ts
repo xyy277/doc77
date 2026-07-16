@@ -1109,53 +1109,16 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       // 1. Path validation
       const absPath = validatePath(project.path, filePath);
 
-      // 2. Check editable file type
+      // 2. Check editable file type (extension or dotfile basename)
       const ext = path.extname(filePath).toLowerCase();
-      const editableExts = [
-        '.md',
-        '.mdx',
-        '.txt',
-        '.markdown',
-        '.json',
-        '.yaml',
-        '.yml',
-        '.toml',
-        '.ts',
-        '.tsx',
-        '.js',
-        '.jsx',
-        '.py',
-        '.rb',
-        '.go',
-        '.rs',
-        '.java',
-        '.c',
-        '.cpp',
-        '.h',
-        '.css',
-        '.scss',
-        '.less',
-        '.html',
-        '.htm',
-        '.xml',
-        '.svg',
-        '.sh',
-        '.bash',
-        '.zsh',
-        '.env.example',
-        '.gitignore',
-        '.dockerignore',
-        '.editorconfig',
-        '.conf',
-        '.cfg',
-        '.ini',
-        '.csv',
-        '.log',
-      ];
-      if (!editableExts.includes(ext)) {
-        res.status(403).json({ error: '此文件类型不可编辑' });
-        return;
-      }
+      var baseName = path.basename(filePath);
+      const editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
+        '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
+        '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
+        '.conf','.cfg','.ini','.csv','.log'];
+      const editableDotfiles = ['.gitignore','.dockerignore','.editorconfig','.env.example','.env'];
+      var isEditable = editableExts.includes(ext) || editableDotfiles.includes(baseName);
+      if (!isEditable) { res.status(403).json({ error: '此文件类型不可编辑' }); return; }
 
       // 3. Sensitive file check
       if (isSensitiveFile(path.basename(filePath))) {
@@ -1163,8 +1126,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         return;
       }
 
-      // 4. File size check
-      const maxSizeMB = 2;
+      // 4. File size check (read from config)
+      const maxSizeMB = (() => {
+        try {
+          const row = db.prepare("SELECT value FROM config WHERE key = 'editor.maxFileSizeMB'").get() as { value: string } | undefined;
+          return row ? parseInt(row.value, 10) : 2;
+        } catch { return 2; }
+      })();
       const maxSizeBytes = maxSizeMB * 1024 * 1024;
       if (Buffer.byteLength(content, 'utf-8') > maxSizeBytes) {
         res.status(413).json({ error: `文件超过 ${maxSizeMB}MB 上限` });
@@ -1209,8 +1177,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
         // 9. Clear shadow
         if (shadowCreated) {
-          fs.rmSync(shadowDir, { recursive: true, force: true });
           shadowCreated = false;
+          fs.rmSync(shadowDir, { recursive: true, force: true });
         }
 
         // 10. Audit log

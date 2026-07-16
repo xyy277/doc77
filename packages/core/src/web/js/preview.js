@@ -1191,7 +1191,7 @@ function toggleEditMode() {
 }
 
 function enterEditMode() {
-  if (editMode) return;
+  if (editMode || !proj || !proj.id) return;
   var cached = tabDataCache[currentFile];
   var initialContent = cached && cached.content ? cached.content : '';
   editModifiedTime = cached && cached.modified ? cached.modified : null;
@@ -1291,7 +1291,7 @@ function scheduleAutoSave() {
 }
 
 function doSave(cb) {
-  if (!editMode || !currentFile || !window._editEditor) return;
+  if (!editMode || !currentFile || !window._editEditor || !proj || !proj.id) return;
   var content = window._editEditor.getValue();
   var headers = { 'Content-Type': 'application/json' };
   if (editModifiedTime) headers['X-Expected-Modified'] = editModifiedTime;
@@ -1355,6 +1355,11 @@ function exitEditMode(skipConfirm) {
 }
 
 function doExitEdit() {
+  // Destroy editor instance
+  if (window._editEditor) { try { window._editEditor.destroy(); } catch(e) {}; window._editEditor = null; }
+  // Cleanup divider event listeners
+  cleanupEditDivider();
+
   var pp = document.getElementById('editPreviewPane');
   var html = pp ? pp.innerHTML : '';
   var dc = document.getElementById('docContent'); if (dc) dc.innerHTML = html;
@@ -1375,25 +1380,36 @@ function initEditDivider() {
   var ep = document.getElementById('editEditorPane');
   if (!div || !sc || !ep) return;
   var dragging = false;
-  div.addEventListener('mousedown', function(e) { e.preventDefault(); dragging = true; div.classList.add('dragging'); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
-  document.addEventListener('mousemove', function(e) {
+  var onMove = function(e) {
     if (!dragging) return;
     var r = sc.getBoundingClientRect();
     var pct = sc.classList.contains('vertical') ? ((e.clientY-r.top)/r.height)*100 : ((e.clientX-r.left)/r.width)*100;
     pct = Math.max(20, Math.min(80, pct));
     editSplitRatio = Math.round(pct); ep.style.flex = '0 0 ' + editSplitRatio + '%';
-  });
-  document.addEventListener('mouseup', function() {
+  };
+  var onUp = function() {
     if (!dragging) return;
     dragging = false; div.classList.remove('dragging');
     document.body.style.cursor = ''; document.body.style.userSelect = '';
     localStorage.setItem('doc77_edit_ratio', String(editSplitRatio));
-  });
+  };
+  div.addEventListener('mousedown', function(e) { e.preventDefault(); dragging = true; div.classList.add('dragging'); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+  // Store for cleanup
+  window._editDividerCleanup = function() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+}
+
+function cleanupEditDivider() {
+  if (window._editDividerCleanup) { window._editDividerCleanup(); window._editDividerCleanup = null; }
 }
 
 function showEditConfirm(title, message, buttons) {
-  var ov = document.createElement('div'); ov.className = 'confirm-overlay';
-  ov.innerHTML = '<div class="confirm-dialog"><h3>'+escapeHtml(title)+'</h3><p>'+escapeHtml(message)+'</p><div class="confirm-actions">'+
+  var ov = document.createElement('div'); ov.className = 'edit-confirm-overlay';
+  ov.innerHTML = '<div class="edit-confirm-dialog"><h3>'+escapeHtml(title)+'</h3><p>'+escapeHtml(message)+'</p><div class="confirm-actions">'+
     buttons.map(function(b,i){return '<button class="'+b.cls+'" data-idx="'+i+'">'+escapeHtml(b.text)+'</button>';}).join('')+
     '</div></div>';
   document.body.appendChild(ov);
