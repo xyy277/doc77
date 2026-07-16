@@ -46,7 +46,7 @@ window.__doc77_i18n_ready = fetch('/api/i18n?' + (function () {
 var _loadingOverlay = null;
 window.showLoading = function(msg) {
   hideLoading();
-  msg = msg || '请稍候...';
+  msg = msg || t('common.loading.pleaseWait');
   var o = document.createElement('div');
   o.className = 'loading-overlay';
   o.innerHTML = '<div class="loading-spinner"></div><div class="loading-text">' + msg + '</div>';
@@ -61,16 +61,18 @@ window.hideLoading = function() {
 (function () {
   if (sessionStorage.getItem('doc77-auth')) return;
 
-  fetch('/api/auth/status')
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      if (!data.hasPassword) {
-        showSecurityPrompt();
-        return;
-      }
-      showLoginGate();
-    })
-    .catch(function () {});
+  // Wait for both auth status AND i18n dict before rendering (timing safety)
+  Promise.all([
+    fetch('/api/auth/status').then(function (r) { return r.json(); }),
+    window.__doc77_i18n_ready
+  ]).then(function (results) {
+    var data = results[0];
+    if (!data.hasPassword) {
+      showSecurityPrompt();
+      return;
+    }
+    showLoginGate();
+  }).catch(function () {});
 
   function showLoginGate() {
     var isDark = document.documentElement.classList.contains('dark');
@@ -89,11 +91,11 @@ window.hideLoading = function() {
         '<div style="width:100%;max-width:360px;text-align:center">' +
           '<div style="font-size:64px;margin-bottom:16px">📁</div>' +
           '<h1 style="font-size:24px;font-weight:700;color:'+text+';margin:0 0 8px">Doc77</h1>' +
-          '<p style="font-size:14px;color:'+subtext+';margin:0 0 28px">请输入密码解锁</p>' +
-          '<input id="loginPass" type="password" placeholder="密码" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:14px 16px;border:1px solid '+inputBd+';border-radius:12px;font-size:16px;background:'+inputBg+';color:'+text+';outline:none;margin-bottom:16px;-webkit-appearance:none" onkeydown="if(event.key===\'Enter\')unlock()">' +
-          '<button onclick="unlock()" id="loginBtn" style="width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation">解锁</button>' +
+          '<p style="font-size:14px;color:'+subtext+';margin:0 0 28px">' + t('common.login.enterPassword') + '</p>' +
+          '<input id="loginPass" type="password" placeholder="' + t('common.login.password') + '" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:14px 16px;border:1px solid '+inputBd+';border-radius:12px;font-size:16px;background:'+inputBg+';color:'+text+';outline:none;margin-bottom:16px;-webkit-appearance:none" onkeydown="if(event.key===\'Enter\')unlock()">' +
+          '<button onclick="unlock()" id="loginBtn" style="width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation">' + t('common.login.unlock') + '</button>' +
           '<div id="loginError" style="color:#dc2626;font-size:13px;margin-top:12px;display:none"></div>' +
-          '<p style="font-size:12px;color:'+muted+';margin-top:40px">Doc77 — 本地文档管理</p>' +
+          '<p style="font-size:12px;color:'+muted+';margin-top:40px">Doc77 — ' + t('common.login.localDocManagement') + '</p>' +
         '</div>' +
       '</div>';
     o.style.cssText = 'position:fixed;inset:0;z-index:200;background:'+bg;
@@ -103,7 +105,7 @@ window.hideLoading = function() {
       var p = document.getElementById('loginPass').value;
       var e = document.getElementById('loginError');
       var btn = document.getElementById('loginBtn');
-      if (!p) { e.textContent = '请输入密码'; e.style.display = 'block'; return; }
+      if (!p) { e.textContent = t('common.auth.enterPassword'); e.style.display = 'block'; return; }
       e.style.display = 'none';
       // Button loading state
       if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
@@ -134,11 +136,11 @@ window.hideLoading = function() {
           }, 120);
           setTimeout(function() { o.remove(); }, 600);
         } else {
-          e.textContent = d.error || '密码错误';
+          e.textContent = d.error || t('common.auth.wrongPassword');
           e.style.display = 'block';
         }
       } catch(ex) {
-        e.textContent = '网络错误: ' + ex.message;
+        e.textContent = t('common.login.networkError', {message: ex.message});
         e.style.display = 'block';
       } finally {
         if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
@@ -163,8 +165,8 @@ window.hideLoading = function() {
           'display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;' +
           'font-family:-apple-system,BlinkMacSystemFont,sans-serif';
         sb.innerHTML =
-          '<span>⚠️ 已配置 AI 但未设置密码</span>' +
-          '<button onclick="this.parentElement.remove();if(typeof openSettings===\'function\')openSettings(\'account\')" style="padding:6px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">设置密码</button>';
+          '<span>⚠️ ' + t('common.login.securityBannerSimple') + '</span>' +
+          '<button onclick="this.parentElement.remove();if(typeof openSettings===\'function\')openSettings(\'account\')" style="padding:6px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">' + t('common.login.setPassword') + '</button>';
         document.body.insertBefore(sb, document.body.firstChild);
       }
     } catch (e) {}

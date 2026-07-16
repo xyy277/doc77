@@ -62,7 +62,7 @@ fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c
     badge.classList.add('loaded');
   }).catch(function(){
     badge.textContent = '--';
-    badge.title = '无法获取版本号';
+    window.__doc77_i18n_ready.then(function(){ badge.title = t('common.versionBadge.failed'); });
   });
 })();
 
@@ -84,7 +84,7 @@ function toggleTheme() {
 var _loadingOverlay = null;
 window.showLoading = function(msg) {
   hideLoading();
-  msg = msg || '请稍候...';
+  msg = msg || t('common.loading.pleaseWait');
   var o = document.createElement('div');
   o.className = 'loading-overlay';
   o.innerHTML = '<div class="loading-spinner"></div><div class="loading-text">' + msg + '</div>';
@@ -154,9 +154,9 @@ window.showProgressOverlay = function(title, steps) {
     error: function(msg) {
       overlay.innerHTML = '<div class="progress-card" style="text-align:center">' +
         '<div style="font-size:40px;margin-bottom:12px;color:var(--danger)">✕</div>' +
-        '<div class="progress-title" style="color:var(--danger)">操作失败</div>' +
+        '<div class="progress-title" style="color:var(--danger)">' + t('common.progress.failed') + '</div>' +
         '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px 0">' + msg + '</p>' +
-        '<button onclick="this.closest(\'.progress-overlay\').remove()" class="btn" style="width:100%">关闭</button></div>';
+        '<button onclick="this.closest(\'.progress-overlay\').remove()" class="btn" style="width:100%">' + t('common.progress.close') + '</button></div>';
     }
   };
 };
@@ -175,8 +175,8 @@ window.showProgressOverlay = function(title, steps) {
       var o = document.createElement('div'); o.className = 'confirm-overlay';
       o.innerHTML = '<div class="confirm-box"><p style="font-size:13px;margin-bottom:16px;color:var(--text-primary)">' + msg + '</p>' +
         '<div style="display:flex;gap:8px;justify-content:flex-end">' +
-        '<button class="btn cancel-btn" style="font-size:12px">取消</button>' +
-        '<button class="btn btn-primary ok-btn" style="font-size:12px">确定</button></div></div>';
+        '<button class="btn cancel-btn" style="font-size:12px">' + t('common.confirm.cancel') + '</button>' +
+        '<button class="btn btn-primary ok-btn" style="font-size:12px">' + t('common.confirm.ok') + '</button></div></div>';
       document.body.appendChild(o);
       o.querySelector('.ok-btn').onclick = function(){ o.remove(); resolve(true); };
       o.querySelector('.cancel-btn').onclick = function(){ o.remove(); resolve(false); };
@@ -190,8 +190,8 @@ window.showProgressOverlay = function(title, steps) {
     var msg = opts.message || '';
     var type = opts.type || 'text';
     var placeholder = opts.placeholder || '';
-    var okText = opts.okText || '确定';
-    var cancelText = opts.cancelText || '取消';
+    var okText = opts.okText || t('common.confirm.ok');
+    var cancelText = opts.cancelText || t('common.confirm.cancel');
     return new Promise(function(resolve) {
       var o = document.createElement('div'); o.className = 'confirm-overlay';
       o.innerHTML = '<div class="confirm-box">' +
@@ -226,43 +226,43 @@ function escapeHtml(s) {
 
 async function installElectronModule(mod) {
   var btn = document.getElementById('btnInstallAi');
-  if (btn) { btn.disabled = true; btn.textContent = '安装中...'; }
+  if (btn) { btn.disabled = true; btn.textContent = t('common.install.installing'); }
   try {
     var r = await fetch('/api/electron/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: mod }) });
     var d = await r.json();
     if (d.ok) { toast(d.message, 'success'); setTimeout(function(){ location.reload(); }, 2000); }
-    else { toast('安装失败: ' + (d.error || '未知错误'), 'error'); }
-  } catch(e) { toast('安装失败: ' + e.message, 'error'); }
-  if (btn) { btn.disabled = false; btn.textContent = '📦 一键安装 AI 模块'; }
+    else { toast(t('common.auth.opFailed2') + ': ' + (d.error || t('common.auth.unknownError')), 'error'); }
+  } catch(e) { toast(t('common.auth.opFailed2') + ': ' + e.message, 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = t('common.settings.oneClickInstall'); }
 }
 
 async function checkTranslateStatus() {
   try {
     var r = await fetch('/api/translate/status'); var d = await r.json();
     var el = document.getElementById('translateModelStatus'); if (!el) return;
-    if (!d.engineAvailable) { el.innerHTML = '<span style="color:var(--danger)">❌ 引擎未安装</span>'; }
+    if (!d.engineAvailable) { el.innerHTML = '<span style="color:var(--danger)">❌ ' + t('common.translate.engineNotInstalled') + '</span>'; }
     else {
       var parts = [];
-      parts.push(d.models && d.models['en-zh'] ? '✅ English → 中文' : '⬜ English → 中文（未下载）');
-      parts.push(d.models && d.models['zh-en'] ? '✅ 中文 → English' : '⬜ 中文 → English（未下载）');
+      parts.push(d.models && d.models['en-zh'] ? '✅ ' + t('common.translate.statusEnZh') : '⬜ ' + t('common.translate.statusEnZhNotDownloaded'));
+      parts.push(d.models && d.models['zh-en'] ? '✅ ' + t('common.translate.statusZhEn') : '⬜ ' + t('common.translate.statusZhEnNotDownloaded'));
       el.innerHTML = parts.join('<br>');
     }
-  } catch(e) { var el2 = document.getElementById('translateModelStatus'); if (el2) el2.innerHTML = '<span style="color:var(--text-muted)">无法检查状态</span>'; }
+  } catch(e) { var el2 = document.getElementById('translateModelStatus'); if (el2) el2.innerHTML = '<span style="color:var(--text-muted)">' + t('common.translate.checkFailed') + '</span>'; }
 }
 
 async function downloadTranslateModels() {
   var btn = document.getElementById('btnDownloadModels');
-  if (btn) { btn.disabled = true; btn.textContent = '下载中...（首次约需 1-2 分钟）'; }
+  if (btn) { btn.disabled = true; btn.textContent = t('common.install.downloading'); }
   try {
     var mirrorCB = document.querySelector('[data-key="translate.mirror"]');
     if (mirrorCB && mirrorCB.checked) { await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'translate.mirror', value: 'true' }) }); }
     var r = await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Hello', source_lang: 'en', target_lang: 'zh', mode: 'sentence' }) });
-    if (r.ok) { toast('✅ en-zh 模型下载完成', 'success'); }
-    else { var d = await r.json(); toast('下载失败，请终端运行: doc77 vendor-install --translate en-zh --mirror', 'error'); if (btn) { btn.disabled = false; btn.textContent = '📥 下载翻译模型 (~160MB)'; } checkTranslateStatus(); return; }
-    try { await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: '你好', source_lang: 'zh', target_lang: 'en', mode: 'sentence' }) }); } catch(e) {}
+    if (r.ok) { toast(t('common.translate.enZhDownloaded'), 'success'); }
+    else { var d = await r.json(); toast(t('common.translate.downloadFailed'), 'error'); if (btn) { btn.disabled = false; btn.textContent = t('common.settings.downloadTranslateModels'); } checkTranslateStatus(); return; }
+    try { await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'hello', source_lang: 'zh', target_lang: 'en', mode: 'sentence' }) }); } catch(e) {}
     checkTranslateStatus();
-  } catch(e) { toast('下载失败，请终端运行: doc77 vendor-install --translate en-zh --mirror', 'error'); }
-  if (btn) { btn.disabled = false; btn.textContent = '📥 下载翻译模型 (~160MB)'; }
+  } catch(e) { toast(t('common.translate.downloadFailed'), 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = t('common.settings.downloadTranslateModels'); }
 }
 
 //══════════ Settings ══════════
@@ -287,91 +287,91 @@ function switchSettingsTab(tab) {
   if (!c) return;
   if (tab === 'system') {
     c.innerHTML =
-      '<div class="section-title">语言</div>' +
-      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.uiLang">界面语言（本浏览器）</span>' +
+      '<div class="section-title">' + t('common.settings.language') + '</div>' +
+      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.uiLang"></span>' +
         langSelect('uiLangSelect', 'common.settings.followGlobal') + '</div>' +
-      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.globalLang">全局语言（服务器/AI/CLI）</span>' +
+      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.globalLang"></span>' +
         langSelect('globalLangSelect', 'common.settings.autoDetect') + '</div>' +
-      '<div class="section-title">编辑器</div>' +
-      settingRow('默认编辑器','editor.default','text','vscode') +
-      '<div class="section-title" style="margin-top:16px">事务</div>' +
-      settingRow('文件大小阈值(MB)','transaction.file_size_threshold_mb','number','50') +
-      settingToggle('启用回滚','transaction.rollback_enabled') +
+      '<div class="section-title">' + t('common.settings.editor') + '</div>' +
+      settingRow(t('common.settings.defaultEditor'),'editor.default','text','vscode') +
+      '<div class="section-title" style="margin-top:16px">' + t('common.settings.transaction') + '</div>' +
+      settingRow(t('common.settings.fileSizeThreshold'),'transaction.file_size_threshold_mb','number','50') +
+      settingToggle(t('common.settings.enableRollback'),'transaction.rollback_enabled') +
       settingToggle('Shadow GC','transaction.shadow_gc_enabled') +
-      settingRow('孤儿Shadow超时(h)','transaction.shadow_orphan_age_hours','number','24') +
-      '<div class="section-title" style="margin-top:16px">并发</div>' +
-      settingToggle('项目锁','concurrency.enable_project_lock') +
-      settingRow('锁超时(分钟)','concurrency.lock_timeout_minutes','number','10') +
-      settingRow('心跳间隔(秒)','concurrency.lock_heartbeat_seconds','number','30') +
-      '<div class="section-title" style="margin-top:16px">会话 & 传输</div>' +
-      settingRow('会话超时(分钟)','session.idle_timeout_minutes','number','120') +
-      settingRow('清理间隔(分钟)','session.cleanup_interval_minutes','number','60') +
-      settingRow('写入限制/会话','rate.write_limit_per_session','number','50') +
-      settingRow('限制窗口(分钟)','rate.write_window_minutes','number','5') +
+      settingRow(t('common.settings.orphanShadowTimeout'),'transaction.shadow_orphan_age_hours','number','24') +
+      '<div class="section-title" style="margin-top:16px">' + t('common.settings.concurrency') + '</div>' +
+      settingToggle(t('common.settings.enableProjectLock'),'concurrency.enable_project_lock') +
+      settingRow(t('common.settings.lockTimeout'),'concurrency.lock_timeout_minutes','number','10') +
+      settingRow(t('common.settings.heartbeatInterval'),'concurrency.lock_heartbeat_seconds','number','30') +
+      '<div class="section-title" style="margin-top:16px">' + t('common.settings.sessionAndTransport') + '</div>' +
+      settingRow(t('common.settings.sessionTimeout'),'session.idle_timeout_minutes','number','120') +
+      settingRow(t('common.settings.cleanupInterval'),'session.cleanup_interval_minutes','number','60') +
+      settingRow(t('common.settings.writeLimitPerSession'),'rate.write_limit_per_session','number','50') +
+      settingRow(t('common.settings.limitWindow'),'rate.write_window_minutes','number','5') +
       (window.__doc77_caps_mcp ? (
       settingToggle('MCP stdio','transport.mcp_stdio_enabled') +
       settingToggle('MCP HTTP','transport.mcp_http_enabled') +
-      settingRow('MCP 端口','transport.mcp_http_port','number','8899')) : '');
+      settingRow(t('common.settings.mcpPort'),'transport.mcp_http_port','number','8899')) : '');
   } else if (tab === 'ai') {
     if (!window.__doc77_caps_ai) {
       var electronInstall = (window.doc77) ?
-        '<button onclick="installElectronModule(\'ai\')" id="btnInstallAi" class="btn btn-primary" style="display:inline-flex;margin-top:12px;font-size:13px">📦 一键安装 AI 模块</button>' :
-        '<code style="font-size:11px;background:var(--bg-code);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:8px;color:var(--text-primary)">doc77 i ai</code>';
-      c.innerHTML = '<div style="text-align:center;padding:32px 0;font-size:13px;color:var(--text-muted)">AI 模块未安装<br>' + electronInstall + '</div>';
+        '<button onclick="installElectronModule(\'ai\')" id="btnInstallAi" class="btn btn-primary" style="display:inline-flex;margin-top:12px;font-size:13px">' + t('common.settings.oneClickInstall') + '</button>' :
+        '<code style="font-size:11px;background:var(--bg-code);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:8px;color:var(--text-primary)">' + t('common.settings.installAiModuleCmd') + '</code>';
+      c.innerHTML = '<div style="text-align:center;padding:32px 0;font-size:13px;color:var(--text-muted)">' + t('common.settings.aiModuleNotInstalled') + '<br>' + electronInstall + '</div>';
       return;
     }
-    c.innerHTML = '<div class="section-title">AI 提供商</div>' +
-      '<div class="settings-row"><span class="settings-label">提供商</span>' +
+    c.innerHTML = '<div class="section-title">' + t('common.settings.aiProvider') + '</div>' +
+      '<div class="settings-row"><span class="settings-label">' + t('common.settings.provider') + '</span>' +
       '<select id="aiProvider" data-key="ai.provider" onchange="onProviderChange()" class="settings-select">' +
-      '<option value="custom">自定义</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>' +
-      '<option value="qwen">Qwen (阿里)</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">GLM (智谱)</option></select></div>' +
+      '<option value="custom">' + t('common.settings.custom') + '</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>' +
+      '<option value="qwen">' + t('common.settings.qwenAlibaba') + '</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">' + t('common.settings.glmZhipu') + '</option></select></div>' +
       settingRow('Base URL','ai.base_url','text','https://api.deepseek.com') +
-      '<div class="settings-row"><span class="settings-label">模型</span>' +
+      '<div class="settings-row"><span class="settings-label">' + t('common.settings.model') + '</span>' +
       '<select id="aiModelSelect" onchange="onModelSelect(this.value)" class="settings-select">' +
       '<option value="deepseek-v4-pro">deepseek-v4-pro</option><option value="deepseek-v4-flash">deepseek-v4-flash</option></select></div>' +
       '<input data-key="ai.model" type="hidden" value="deepseek-v4-pro">' +
-      settingRow('API Token','ai.token','password','sk-...') +
-      '<div class="settings-tip" style="margin-left:4px">🔒 Token 仅保存在本地 SQLite 数据库</div>' +
-      '<button onclick="testConnection()" style="width:100%;padding:6px 0;font-size:13px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;background:transparent;cursor:pointer;margin-top:8px" onmouseover="this.style.background=\'var(--accent-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🔗 测试连接</button>' +
+      settingRow(t('common.settings.apiToken'),'ai.token','password','sk-...') +
+      '<div class="settings-tip" style="margin-left:4px">' + t('common.settings.tokenSavedLocally') + '</div>' +
+      '<button onclick="testConnection()" style="width:100%;padding:6px 0;font-size:13px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;background:transparent;cursor:pointer;margin-top:8px" onmouseover="this.style.background=\'var(--accent-light-bg)\'" onmouseout="this.style.background=\'transparent\'">' + t('common.settings.testConnection') + '</button>' +
       '<div id="testResult" style="font-size:11px;margin-top:4px"></div>' +
-      '<div class="section-title" style="margin-top:16px">AI 行为</div>' +
-      settingToggle('启用 AI','ai.enabled') + settingToggle('自动模式','ai.auto_mode') +
-      settingRow('风险等级','ai.risk_level','select','medium','low,medium,high') +
-      settingToggle('确认删除','ai.confirm_delete') + settingRow('批量大小','ai.batch_size','number','5') +
-      settingRow('最大深度','ai.max_depth','number','5') +
-      settingRow('每会话读取限制','ai.read_limit_per_session','number','200');
+      '<div class="section-title" style="margin-top:16px">' + t('common.settings.aiBehavior') + '</div>' +
+      settingToggle(t('common.settings.enableAi'),'ai.enabled') + settingToggle(t('common.settings.autoMode'),'ai.auto_mode') +
+      settingRow(t('common.settings.riskLevel'),'ai.risk_level','select','medium','low,medium,high') +
+      settingToggle(t('common.settings.confirmDelete'),'ai.confirm_delete') + settingRow(t('common.settings.batchSize'),'ai.batch_size','number','5') +
+      settingRow(t('common.settings.maxDepth'),'ai.max_depth','number','5') +
+      settingRow(t('common.settings.readLimitPerSession'),'ai.read_limit_per_session','number','200');
   } else if (tab === 'account') {
-    c.innerHTML = '<div class="section-title">登录密码</div>' +
-      '<div id="authSection"><div style="font-size:11px;color:var(--text-muted)">检查中...</div></div>' +
-      '<div class="section-title" style="margin-top:16px">网络绑定 <span id="bindStatus" style="font-weight:400;font-size:10px"></span></div>' +
-      '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6">控制 Doc77 监听哪些网络接口。<b>127.0.0.1</b> = 仅本机访问（安全）；<b>0.0.0.0</b> = 局域网可访问（需设密码）。</div>' +
-      '<div class="settings-row"><span class="settings-label">当前实际绑定</span><span style="font-size:13px;font-family:monospace;font-weight:600;color:var(--accent)" id="runtimeBind">-</span></div>' +
-      '<div class="settings-row"><span class="settings-label">配置值（重启后生效）</span><span style="font-size:13px;font-family:monospace" id="configBind">-</span></div>' +
+    c.innerHTML = '<div class="section-title">' + t('common.settings.loginPassword') + '</div>' +
+      '<div id="authSection"><div style="font-size:11px;color:var(--text-muted)">' + t('common.auth.checking') + '</div></div>' +
+      '<div class="section-title" style="margin-top:16px">' + t('common.settings.networkBind') + ' <span id="bindStatus" style="font-weight:400;font-size:10px"></span></div>' +
+      '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6">' + t('common.settings.networkBindDesc') + '</div>' +
+      '<div class="settings-row"><span class="settings-label">' + t('common.settings.currentBind') + '</span><span style="font-size:13px;font-family:monospace;font-weight:600;color:var(--accent)" id="runtimeBind">-</span></div>' +
+      '<div class="settings-row"><span class="settings-label">' + t('common.settings.configBind') + '</span><span style="font-size:13px;font-family:monospace" id="configBind">-</span></div>' +
       settingRow('','security.bind_address','text','127.0.0.1') +
       '<input type="hidden" id="bindAddrInput" value="">' +
-      '<div style="font-size:10px;color:var(--danger);margin-top:4px;display:none" id="bindMismatch">⚠️ 配置值与当前实际绑定不一致，重启后生效</div>' +
-      '<div class="settings-tip">修改后需点击下方「重启服务」生效</div>' +
-      '<div class="section-title" style="margin-top:16px">其他安全设置</div>' +
-      settingRow('共享密钥','security.shared_secret','password','') +
-      settingToggle('跟踪符号链接','security.follow_symlinks') +
-      '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)"><button onclick="restartServer()" style="width:100%;padding:8px 0;font-size:13px;font-weight:500;color:var(--danger);border:1px solid var(--danger);border-radius:6px;background:transparent;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🔄 重启服务</button></div>';
+      '<div style="font-size:10px;color:var(--danger);margin-top:4px;display:none" id="bindMismatch">' + t('common.settings.bindMismatch') + '</div>' +
+      '<div class="settings-tip">' + t('common.settings.tipRestart') + '</div>' +
+      '<div class="section-title" style="margin-top:16px">' + t('common.settings.otherSecurity') + '</div>' +
+      settingRow(t('common.settings.sharedSecret'),'security.shared_secret','password','') +
+      settingToggle(t('common.settings.followSymlinks'),'security.follow_symlinks') +
+      '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)"><button onclick="restartServer()" style="width:100%;padding:8px 0;font-size:13px;font-weight:500;color:var(--danger);border:1px solid var(--danger);border-radius:6px;background:transparent;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">' + t('common.settings.restartService') + '</button></div>';
     renderAccountSection();
     loadServerInfo();
   } else if (tab === 'translate') {
     if (!window.__doc77_caps_translate) {
-      var electronInstall = (window.doc77) ? '<button onclick="installElectronModule(\'translate\')" id="btnInstallTranslate" class="btn btn-primary" style="display:inline-flex;margin-top:12px;font-size:13px">📦 一键安装翻译模块</button>' : '<code style="font-size:11px;background:var(--bg-code);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:8px;color:var(--text-primary)">doc77 i translate</code>';
-      c.innerHTML = '<div style="text-align:center;padding:32px 0;font-size:13px;color:var(--text-muted)">翻译模块未安装<br>' + electronInstall + '</div>';
+      var electronInstall = (window.doc77) ? '<button onclick="installElectronModule(\'translate\')" id="btnInstallTranslate" class="btn btn-primary" style="display:inline-flex;margin-top:12px;font-size:13px">' + t('common.settings.oneClickInstallTranslate') + '</button>' : '<code style="font-size:11px;background:var(--bg-code);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:8px;color:var(--text-primary)">' + t('common.settings.installTranslateCmd') + '</code>';
+      c.innerHTML = '<div style="text-align:center;padding:32px 0;font-size:13px;color:var(--text-muted)">' + t('common.settings.translateModuleNotInstalled') + '<br>' + electronInstall + '</div>';
       return;
     }
     c.innerHTML =
-      '<div class="section-title">离线翻译</div>' +
-      settingToggle('启用离线翻译','translate.enabled') + settingToggle('使用国内镜像 (hf-mirror.com)','translate.mirror') +
-      settingRow('默认源语言','translate.default_source','text','auto') + settingRow('默认目标语言','translate.default_target','text','zh') +
-      settingRow('最大分段长度','translate.max_segment_length','number','500') +
-      '<div class="settings-tip" style="margin-left:4px">翻译基于开源 Opus-MT ONNX 模型，完全离线运行，内容不出本机。</div>' +
-      '<div class="section-title" style="margin-top:16px">模型状态</div>' +
-      '<div id="translateModelStatus" style="font-size:11px;color:var(--text-muted);margin-bottom:8px">检查中...</div>' +
-      '<button onclick="downloadTranslateModels()" id="btnDownloadModels" class="btn" style="width:100%;margin-top:4px;font-size:12px">📥 下载翻译模型 (~160MB)</button>';
+      '<div class="section-title">' + t('common.settings.offlineTranslate') + '</div>' +
+      settingToggle(t('common.settings.enableOfflineTranslate'),'translate.enabled') + settingToggle(t('common.settings.useMirror'),'translate.mirror') +
+      settingRow(t('common.settings.defaultSourceLang'),'translate.default_source','text','auto') + settingRow(t('common.settings.defaultTargetLang'),'translate.default_target','text','zh') +
+      settingRow(t('common.settings.maxSegmentLength'),'translate.max_segment_length','number','500') +
+      '<div class="settings-tip" style="margin-left:4px">' + t('common.settings.translatePrivacy') + '</div>' +
+      '<div class="section-title" style="margin-top:16px">' + t('common.settings.modelStatus') + '</div>' +
+      '<div id="translateModelStatus" style="font-size:11px;color:var(--text-muted);margin-bottom:8px">' + t('common.auth.checking') + '</div>' +
+      '<button onclick="downloadTranslateModels()" id="btnDownloadModels" class="btn" style="width:100%;margin-top:4px;font-size:12px">' + t('common.settings.downloadTranslateModels') + '</button>';
     checkTranslateStatus();
   }
   loadSettingsValues();
@@ -398,7 +398,7 @@ async function loadServerInfo() {
     setTimeout(function() {
       var inp = document.querySelector('[data-key="security.bind_address"]');
       var configVal = inp ? inp.value : '';
-      if (configEl) configEl.textContent = configVal || '127.0.0.1 (默认)';
+      if (configEl) configEl.textContent = configVal || t('common.defaultValue');
       if (mismatchEl && configVal && configVal !== d.bindAddress) {
         mismatchEl.style.display = 'block';
       }
@@ -459,7 +459,7 @@ function onModelSelect(v) {
   var modelEl = document.querySelector('[data-key="ai.model"]');
   if (!modelEl) return;
   if (v === '_custom') {
-    var m = prompt('输入模型名称:');
+    var m = prompt(t('common.settings.manualInput').replace(/[()]/g, '').trim());
     if (m) {
       var sel = document.getElementById('aiModelSelect');
       var o = document.createElement('option');
@@ -478,18 +478,18 @@ function onProviderChange() {
   var sel = document.getElementById('aiModelSelect');
   var modelEl = document.querySelector('[data-key="ai.model"]');
   if (info.url) urlEl.value = info.url;
-  sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">(手动输入)</option>') +
-    (p !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
+  sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">' + t('common.settings.manualInput') + '</option>') +
+    (p !== 'custom' ? '<option value="_custom">' + t('common.settings.other') + '</option>' : '');
   if (info.models.length) { modelEl.value = info.models[0]; sel.value = info.models[0]; }
   sel.onchange = function() { onModelSelect(this.value); };
 }
 async function testConnection() {
   var r = document.getElementById('testResult');
-  r.textContent = '测试中...'; r.style.cssText = 'font-size:11px;color:var(--text-muted)';
+  r.textContent = t('common.ai.testing'); r.style.cssText = 'font-size:11px;color:var(--text-muted)';
   try { var res = await fetch('/api/ai/test',{method:'POST'}); var d = await res.json();
-    if (d.ok) { r.textContent = '✅ 连接成功 ('+d.status+')'; r.style.cssText = 'font-size:11px;color:#059669'; }
+    if (d.ok) { r.textContent = t('common.ai.connected', {status: d.status}); r.style.cssText = 'font-size:11px;color:#059669'; }
     else { r.textContent = '❌ '+d.error; r.style.cssText = 'font-size:11px;color:var(--danger)'; }
-  } catch(ex) { r.textContent = '❌ 网络错误: '+ex.message; r.style.cssText = 'font-size:11px;color:var(--danger)'; }
+  } catch(ex) { r.textContent = t('common.ai.networkError', {message: ex.message}); r.style.cssText = 'font-size:11px;color:var(--danger)'; }
 }
 async function loadSettingsValues() {
   try { var r = await fetch('/api/config'); var d = await r.json();
@@ -515,8 +515,8 @@ async function loadSettingsValues() {
       var sel = document.getElementById('aiModelSelect');
       var modelEl = document.querySelector('[data-key="ai.model"]');
       var savedModel = modelEl ? modelEl.value : '';
-      sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">(手动输入)</option>') +
-        (pv !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
+      sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">' + t('common.settings.manualInput') + '</option>') +
+        (pv !== 'custom' ? '<option value="_custom">' + t('common.settings.other') + '</option>' : '');
       if (info.models.length) {
         var opt = sel.querySelector('option[value="'+savedModel+'"]');
         if (opt) opt.selected = true;
@@ -541,21 +541,21 @@ async function saveSettings() {
     }
     await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
   }
-  toast('设置已保存','success');
+  toast(t('common.toast.saved'),'success');
 }
 async function restartServer() {
-  if (!await confirmDialog('确定重启服务？正在进行的操作会中断，浏览器需要刷新页面重新连接。')) return;
+  if (!await confirmDialog(t('common.confirm.restartService'))) return;
   try {
     await saveSettings();
     await fetch('/api/restart', { method: 'POST' });
-    toast('服务正在重启，3 秒后自动刷新...', 'info');
+    toast(t('common.toast.restarting'), 'info');
     setTimeout(function() { location.reload(); }, 3000);
-  } catch(e) { toast('重启失败', 'error'); }
+  } catch(e) { toast(t('common.toast.restartFailed'), 'error'); }
 }
 
 async function resetDefaults() {
-  if (!await confirmDialog('确定恢复所有默认设置？')) return;
-  try { await fetch('/api/config/reset',{method:'POST'}); switchSettingsTab('system'); toast('已恢复默认值','success'); } catch(e) { toast('恢复失败','error'); }
+  if (!await confirmDialog(t('common.confirm.resetDefaults'))) return;
+  try { await fetch('/api/config/reset',{method:'POST'}); switchSettingsTab('system'); toast(t('common.toast.defaultsRestored'),'success'); } catch(e) { toast(t('common.toast.restoreFailed'),'error'); }
 }
 
 // Auth — Account Section
@@ -570,34 +570,34 @@ async function renderAccountSection(){
       var rr = await fetch('/api/auth/recovery-status');
       var rd = await rr.json();
       if(rd.hasRecovery){
-        rsHtml = '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">剩余恢复码：' + rd.remaining + ' / ' + rd.total + '</div>' +
-          '<button onclick="regenerateRC()" class="btn" style="width:100%;font-size:13px;margin-top:8px">重新生成恢复码</button>';
+        rsHtml = '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">' + t('common.auth.remainingCodes', {remaining: rd.remaining, total: rd.total}) + '</div>' +
+          '<button onclick="regenerateRC()" class="btn" style="width:100%;font-size:13px;margin-top:8px">' + t('common.auth.regenerateCodes') + '</button>';
       }
     } catch(e){}
   }
 
   if(d.hasPassword){
-    s.innerHTML = '<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">密码已设置</div>' + rsHtml +
+    s.innerHTML = '<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">' + t('common.auth.passwordSet') + '</div>' + rsHtml +
       '<div style="margin-top:16px">' +
-      '<input id="curPass" type="password" placeholder="当前密码" class="input" style="width:100%;padding:6px 12px">' +
-      '<input id="newPass" type="password" placeholder="新密码（留空不修改）" class="input" style="width:100%;padding:6px 12px" oninput="updateStrength()">' +
+      '<input id="curPass" type="password" placeholder="' + t('common.auth.currentPassword') + '" class="input" style="width:100%;padding:6px 12px">' +
+      '<input id="newPass" type="password" placeholder="' + t('common.auth.newPassword') + '" class="input" style="width:100%;padding:6px 12px" oninput="updateStrength()">' +
       '<div id="pwStrength" style="font-size:11px;margin:4px 0"></div>' +
-      '<button onclick="changePw()" class="btn btn-primary" style="width:100%;font-size:13px">修改密码</button>' +
+      '<button onclick="changePw()" class="btn btn-primary" style="width:100%;font-size:13px">' + t('common.auth.changePassword') + '</button>' +
       '</div>' +
-      '<button onclick="doLogout()" class="btn" style="color:var(--danger);width:100%;margin-top:16px;font-size:13px">退出登录</button>' +
+      '<button onclick="doLogout()" class="btn" style="color:var(--danger);width:100%;margin-top:16px;font-size:13px">' + t('common.auth.logout') + '</button>' +
       '<hr style="margin:16px 0;border-color:var(--border)">' +
-      '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">危险操作 — 清除所有安全设置（包括AI Token等加密配置）</div>' +
-      '<button onclick="forceResetPw()" class="btn" style="color:var(--danger);width:100%;font-size:11px;border-color:var(--danger)">强制重置密码</button>';
+      '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">' + t('common.auth.dangerZone') + '</div>' +
+      '<button onclick="forceResetPw()" class="btn" style="color:var(--danger);width:100%;font-size:11px;border-color:var(--danger)">' + t('common.auth.forceResetPassword') + '</button>';
   } else {
-    s.innerHTML = '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">尚未设置密码</div>' +
-      '<input id="setupPass" type="password" placeholder="设置密码（至少6位）" class="input" style="width:100%;padding:6px 12px">' +
-      '<button onclick="setupPw()" class="btn btn-primary" style="width:100%;font-size:13px">设置密码</button>';
+    s.innerHTML = '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">' + t('common.auth.noPassword') + '</div>' +
+      '<input id="setupPass" type="password" placeholder="' + t('common.auth.setupPasswordHint') + '" class="input" style="width:100%;padding:6px 12px">' +
+      '<button onclick="setupPw()" class="btn btn-primary" style="width:100%;font-size:13px">' + t('common.auth.setupPassword') + '</button>';
   }
 }
 function doLogout() { sessionStorage.removeItem("doc77-auth"); location.reload(); }
 async function forceResetPw() {
-  if (!confirm('⚠️ 此操作将清除所有安全设置（密码、恢复码）和加密配置（AI Token 等），且不可撤销。\n\n确定要继续吗？')) return;
-  var pw = prompt('请输入当前密码以验证身份：');
+  if (!confirm(t('common.confirm.forceResetTitle'))) return;
+  var pw = prompt(t('common.auth.enterCurrentPassword'));
   if (!pw) return;
   try {
     var r = await fetch('/api/auth/force-reset', {
@@ -606,62 +606,62 @@ async function forceResetPw() {
       body: JSON.stringify({password: pw, confirm: 'yes-i-know'})
     });
     var d = await r.json();
-    if (d.ok) { alert('✅ 安全设置已清除。页面将刷新。'); sessionStorage.removeItem('doc77-auth'); location.reload(); }
-    else { alert('❌ ' + (d.error || '操作失败')); }
-  } catch(e) { alert('❌ 请求失败: ' + e.message); }
+    if (d.ok) { alert('✅ ' + t('common.auth.securityCleared')); sessionStorage.removeItem('doc77-auth'); location.reload(); }
+    else { alert('❌ ' + (d.error || t('common.auth.opFailed2'))); }
+  } catch(e) { alert('❌ ' + t('common.auth.requestFailed', {message: e.message})); }
 }
 function updateStrength() {
   var p = (document.getElementById('newPass') && document.getElementById('newPass').value) || '';
   var s = 0; if (p.length >= 8) s++; if (p.length >= 12) s++; if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++; if (/[0-9]/.test(p)) s++; if (/[^a-zA-Z0-9]/.test(p)) s++;
-  var l = ['非常弱','弱','一般','强','非常强'], c = ['#ef4444','#f97316','#eab308','#84cc16','#22c55e'];
-  var el = document.getElementById('pwStrength'); el.textContent = '强度: ' + l[Math.min(s,4)]; el.style.cssText = 'font-size:11px;color:' + c[Math.min(s,4)];
+  var l = [t('common.strength.veryWeak'),t('common.strength.weak'),t('common.strength.fair'),t('common.strength.strong'),t('common.strength.veryStrong')], c = ['#ef4444','#f97316','#eab308','#84cc16','#22c55e'];
+  var el = document.getElementById('pwStrength'); el.textContent = t('common.strength.prefix', {level: l[Math.min(s,4)]}); el.style.cssText = 'font-size:11px;color:' + c[Math.min(s,4)];
 }
 async function setupPw() {
   var p = document.getElementById('setupPass').value;
-  if (p.length < 6) { toast('密码至少6位','error'); return; }
-  showLoading('正在设置密码...');
+  if (p.length < 6) { toast(t('common.auth.passwordAtLeast6'),'error'); return; }
+  showLoading(t('common.loading.settingPassword'));
   try {
     var r = await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
     var d = await r.json();
     if(d.ok){
       if(d.recovery_codes){ showRecoveryCodesModal(d.recovery_codes); }
       switchSettingsTab('account');
-      toast('密码设置成功','success');
+      toast(t('common.auth.setupSuccess'),'success');
     } else { toast(d.error,'error'); }
-  } catch(e) { toast('设置失败: ' + e.message,'error'); }
+  } catch(e) { toast(t('common.auth.setupFailed', {message: e.message}),'error'); }
   hideLoading();
 }
 async function changePw() {
   var c = document.getElementById('curPass').value;
   var n = document.getElementById('newPass').value;
-  if(!c || !n){ toast('请输入当前密码和新密码','error'); return; }
-  if(n.length < 6){ toast('新密码至少6位','error'); return; }
-  showLoading('正在修改密码...');
+  if(!c || !n){ toast(t('common.auth.currentAndNewRequired'),'error'); return; }
+  if(n.length < 6){ toast(t('common.auth.newPasswordAtLeast6'),'error'); return; }
+  showLoading(t('common.loading.changingPassword'));
   try {
     var r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password:c,new_password:n})});
     var d = await r.json();
     if(d.ok){
       if(d.recovery_codes){ showRecoveryCodesModal(d.recovery_codes); }
       switchSettingsTab('account');
-      toast('密码已修改','success');
+      toast(t('common.auth.changed'),'success');
     } else { toast(d.error,'error'); }
-  } catch(e) { toast('修改失败: ' + e.message,'error'); }
+  } catch(e) { toast(t('common.auth.changeFailed', {message: e.message}),'error'); }
   hideLoading();
 }
 
 async function regenerateRC(){
-  var pw = await promptDialog({ title: '重新生成恢复码', message: '请输入当前密码以确认身份：', type: 'password', placeholder: '当前密码', okText: '确认' });
+  var pw = await promptDialog({ title: t('common.auth.regenerateCodes'), message: t('common.auth.enterCurrentPassword'), type: 'password', placeholder: t('common.auth.currentPassword'), okText: t('common.confirm.ok') });
   if(!pw) return;
-  showLoading('正在重新生成恢复码...');
+  showLoading(t('common.loading.regeneratingCodes'));
   try {
     var r = await fetch('/api/auth/recovery-codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
     var d = await r.json();
     if(d.ok && d.recovery_codes){
       showRecoveryCodesModal(d.recovery_codes);
       switchSettingsTab('account');
-      toast('恢复码已重新生成，旧码已作废','success');
+      toast(t('common.auth.codesRegenerated'),'success');
     } else { toast(d.error,'error'); }
-  } catch(e) { toast('操作失败: ' + e.message,'error'); }
+  } catch(e) { toast(t('common.auth.opFailed', {message: e.message}),'error'); }
   hideLoading();
 }
 
@@ -669,26 +669,30 @@ async function regenerateRC(){
 (function(){
   if (sessionStorage.getItem("doc77-auth")) return;
   var d;
-  fetch("/api/auth/status").then(function(r){ return r.json(); }).then(function(data){ d = data;
+  // Wait for both auth status AND i18n dict before rendering (timing safety)
+  Promise.all([
+    fetch("/api/auth/status").then(function(r){ return r.json(); }),
+    window.__doc77_i18n_ready
+  ]).then(function(results){ d = results[0];
     if (!d.hasPassword && !d.isLegacy) { showSecurityPrompt(); return; }
     var o = document.createElement("div"); o.id = "loginGate";
     o.className = 'login-gate-bg';
     if (d.isLegacy) {
       // Legacy password — system upgraded, must re-set password with migration progress
-      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-badge">系统已升级，请重新设置密码</div></div><input id="setupPass" type="password" placeholder="新密码（至少6位）" class="login-gate-input"><button onclick="setupPwLegacy()" class="login-gate-btn">设置密码</button><div id="loginError" class="login-gate-error"></div></div>';
+      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-badge">' + t('common.login.legacyUpgrade') + '</div></div><input id="setupPass" type="password" placeholder="' + t('common.login.newPasswordHint') + '" class="login-gate-input"><button onclick="setupPwLegacy()" class="login-gate-btn">' + t('common.login.setPassword') + '</button><div id="loginError" class="login-gate-error"></div></div>';
       window.setupPwLegacy = async function() {
         var p = document.getElementById("setupPass").value;
         var e = document.getElementById("loginError");
         var btn = document.querySelector('.login-gate-btn');
-        if (p.length < 6) { e.textContent = "密码至少6位"; e.style.display = 'block'; return; }
+        if (p.length < 6) { e.textContent = t('common.login.passwordAtLeast6'); e.style.display = 'block'; return; }
         e.style.display = 'none';
 
         // Show migration progress overlay
-        var prog = showProgressOverlay('正在更新系统安全配置', [
-          { icon: '🔐', label: '正在初始化加密系统...' },
-          { icon: '🔄', label: '正在迁移加密数据...' },
-          { icon: '🔑', label: '正在生成恢复码...' },
-          { icon: '✅', label: '配置完成！' }
+        var prog = showProgressOverlay(t('common.login.updatingSecurity'), [
+          { icon: '🔐', label: t('common.login.initCrypto') },
+          { icon: '🔄', label: t('common.login.migratingData') },
+          { icon: '🔑', label: t('common.login.generatingCodes') },
+          { icon: '✅', label: t('common.login.configComplete') }
         ]);
 
         // Simulate step 1 → 2 (init → migrate)
@@ -753,20 +757,20 @@ async function regenerateRC(){
               }, 700);
             });
           } else {
-            prog.error(rd.error || "设置失败");
+            prog.error(rd.error || t('common.login.setupFailed'));
           }
         } catch(ex) {
-          prog.error('网络错误: ' + ex.message);
+          prog.error(t('common.login.networkError', {message: ex.message}));
         }
       };
     } else {
       // Normal login
-      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">默认安全 &middot; 对话驱动</div></div><input id="loginPass" type="password" placeholder="请输入密码解锁" class="login-gate-input" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="login-gate-btn">解锁</button><div id="loginError" class="login-gate-error"></div><a href="javascript:showForgotPassword()" class="login-gate-link">忘记密码？</a></div>';
+      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">' + t('common.login.tagline') + '</div></div><input id="loginPass" type="password" placeholder="' + t('common.login.enterPassword') + '" class="login-gate-input" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="login-gate-btn">' + t('common.login.unlock') + '</button><div id="loginError" class="login-gate-error"></div><a href="javascript:showForgotPassword()" class="login-gate-link">' + t('common.login.forgotPassword') + '</a></div>';
       window.unlock = async function() {
         var p = document.getElementById("loginPass").value;
         var e = document.getElementById("loginError");
         var btn = document.querySelector('.login-gate-btn');
-        if (!p) { e.textContent = "请输入密码"; e.style.display = 'block'; return; }
+        if (!p) { e.textContent = t('common.auth.enterPassword'); e.style.display = 'block'; return; }
         // Button loading state
         if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
         e.style.display = 'none';
@@ -824,9 +828,9 @@ async function regenerateRC(){
             // Legacy hash was detected — switch to setup form
             location.reload();
           }
-          else { e.textContent = d2.error || "密码错误"; e.style.display = 'block'; }
+          else { e.textContent = d2.error || t('common.login.incorrectPassword'); e.style.display = 'block'; }
         } catch(ex) {
-          e.textContent = '网络错误: ' + ex.message; e.style.display = 'block';
+          e.textContent = t('common.login.networkError', {message: ex.message}); e.style.display = 'block';
         } finally {
           if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
         }
@@ -839,8 +843,8 @@ async function regenerateRC(){
         if ((sd["ai.token"] || sd["ai.enabled"] === "true") && !d.hasPassword) {
           var sb = document.createElement("div"); sb.id = "securityBanner";
           sb.className = 'login-gate-security-banner';
-          sb.innerHTML = '<span style="color:var(--accent)">⚠️ 已配置 AI 模型但未设置访问密码，建议设置密码保护数据安全</span>' +
-            '<button onclick="this.parentElement.remove();toggleSettings();switchSettingsTab(&quot;account&quot;)" style="padding:4px 12px;background:var(--accent);color:#fff;font-size:11px;border:none;border-radius:6px;cursor:pointer;margin-left:16px;flex-shrink:0">设置密码</button>';
+          sb.innerHTML = '<span style="color:var(--accent)">⚠️ ' + t('common.login.securityBanner') + '</span>' +
+            '<button onclick="this.parentElement.remove();toggleSettings();switchSettingsTab(&quot;account&quot;)" style="padding:4px 12px;background:var(--accent);color:#fff;font-size:11px;border:none;border-radius:6px;cursor:pointer;margin-left:16px;flex-shrink:0">' + t('common.login.setPassword') + '</button>';
           document.body.insertBefore(sb, document.body.firstChild);
         }
       } catch(e) {}
@@ -855,18 +859,18 @@ async function showForgotPassword(){
   forgotState = 'verify';
   var h = document.getElementById("loginGate");
   if(!h) return;
-  h.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">找回密码 &middot; 输入恢复码</div></div>' +
-    '<input id="rcInput" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" class="login-gate-input login-gate-mono-input" autocomplete="off">' +
-    '<button onclick="verifyRC()" class="login-gate-btn">验证恢复码</button>' +
+  h.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">' + t('common.login.forgotTitle') + '</div></div>' +
+    '<input id="rcInput" type="text" placeholder="' + t('common.login.recoveryCodeInput') + '" class="login-gate-input login-gate-mono-input" autocomplete="off">' +
+    '<button onclick="verifyRC()" class="login-gate-btn">' + t('common.login.verifyCode') + '</button>' +
     '<div id="rcError" class="login-gate-error"></div>' +
-    '<a href="javascript:location.reload()" class="login-gate-link">返回登录</a></div>';
+    '<a href="javascript:location.reload()" class="login-gate-link">' + t('common.login.backToLogin') + '</a></div>';
 }
 
 async function verifyRC(){
   var rc = document.getElementById("rcInput").value.trim();
   var e = document.getElementById("rcError");
   var btn = document.querySelector('.login-gate-btn');
-  if(!rc){ e.style.display="block"; e.textContent="请输入恢复码"; return; }
+  if(!rc){ e.style.display="block"; e.textContent=t('common.auth.enterRecoveryCode'); return; }
   e.style.display = 'none';
   if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
@@ -876,18 +880,18 @@ async function verifyRC(){
       forgotState = 'reset';
       sessionStorage.setItem("doc77-reset-token", d.reset_token);
       showResetPassword();
-    } else { e.style.display="block"; e.textContent = d.error || "验证失败"; }
-  } catch(ex) { e.style.display="block"; e.textContent = '网络错误: ' + ex.message; }
+    } else { e.style.display="block"; e.textContent = d.error || t('common.auth.verifyFailed'); }
+  } catch(ex) { e.style.display="block"; e.textContent = t('common.auth.networkError', {message: ex.message}); }
   if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
 }
 
 function showResetPassword(){
   var h = document.getElementById("loginGate");
   if(!h) return;
-  h.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">设置新密码 &middot; 恢复码验证通过</div></div>' +
-    '<input id="newPw" type="password" placeholder="新密码（至少6位）" class="login-gate-input">' +
-    '<input id="newPwConfirm" type="password" placeholder="确认新密码" class="login-gate-input">' +
-    '<button onclick="doReset()" class="login-gate-btn">重置密码</button>' +
+  h.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">' + t('common.login.setNewPassword') + '</div></div>' +
+    '<input id="newPw" type="password" placeholder="' + t('common.login.newPasswordHint') + '" class="login-gate-input">' +
+    '<input id="newPwConfirm" type="password" placeholder="' + t('common.login.confirmNewPassword') + '" class="login-gate-input">' +
+    '<button onclick="doReset()" class="login-gate-btn">' + t('common.login.resetPassword') + '</button>' +
     '<div id="resetError" class="login-gate-error"></div></div>';
 }
 
@@ -896,8 +900,8 @@ async function doReset(){
   var c = document.getElementById("newPwConfirm").value;
   var e = document.getElementById("resetError");
   var btn = document.querySelector('.login-gate-btn');
-  if(p.length < 6){ e.style.display="block"; e.textContent="密码至少6位"; return; }
-  if(p !== c){ e.style.display="block"; e.textContent="两次密码不一致"; return; }
+  if(p.length < 6){ e.style.display="block"; e.textContent=t('common.login.passwordAtLeast6'); return; }
+  if(p !== c){ e.style.display="block"; e.textContent=t('common.login.passwordsNotMatch'); return; }
   e.style.display = 'none';
   if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
@@ -907,10 +911,10 @@ async function doReset(){
     if(d.ok){
       sessionStorage.removeItem("doc77-reset-token");
       // Show loading overlay before reload
-      showLoading('密码已重置，正在重新登录...');
+      showLoading(t('common.loading.passwordReset'));
       setTimeout(function() { location.reload(); }, 600);
-    } else { e.style.display="block"; e.textContent = d.error || "重置失败"; if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
-  } catch(ex) { e.style.display="block"; e.textContent = '网络错误: ' + ex.message; if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
+    } else { e.style.display="block"; e.textContent = d.error || t('common.auth.resetFailed'); if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
+  } catch(ex) { e.style.display="block"; e.textContent = t('common.login.networkError', {message: ex.message}); if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
 }
 
 //══════════ Recovery Codes Modal ══════════
@@ -929,8 +933,8 @@ async function copyRC(){
   var text = Array.from(spans).map(function(s){ return s.textContent; }).join('\n');
   try {
     await navigator.clipboard.writeText(text);
-    toast('已复制到剪贴板','success');
+    toast(t('common.toast.copied'),'success');
   } catch(e) {
-    toast('复制失败，请手动记录','error');
+    toast(t('common.toast.copyFailed'),'error');
   }
 }
