@@ -642,6 +642,7 @@ function activateTab(path, opts) {
   host.innerHTML = '<div class="p-4 sm:p-10"><div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div></div>';
   fetchDoc(path).then(function(d) {
     if (activeTabPath !== path) return; // 用户已切走
+    if (translateActive) { exitTranslateMode(); return; } // 翻译模式激活时跳过渲染
     var pane = renderDocNode(path, d);
     if (!isHeavyDoc(path, d)) {
       paneCache[path] = pane;
@@ -659,6 +660,8 @@ function activateTab(path, opts) {
 /** 打开文件为 tab：已打开则切过去，否则新建。 */
 function openTab(path, opts) {
   opts = opts || {};
+  if (translateActive) exitTranslateMode();
+  if (editMode) doExitEdit(true);
   if (!tabStore.has(path)) {
     var r = tabStore.open(path, basename(path));
     r.evicted.forEach(function(p) { releaseTab(p); });
@@ -668,6 +671,9 @@ function openTab(path, opts) {
 
 /** 关闭 tab：清资源，激活相邻 tab，或回到空状态。 */
 function closeTab(path) {
+  var isCurrent = path === activeTabPath;
+  if (translateActive) exitTranslateMode();
+  if (editMode && isCurrent) doExitEdit(true);
   var r = tabStore.close(path);
   releaseTab(path);
   renderTabBar(); saveTabsState();
@@ -1038,8 +1044,11 @@ async function toggleTranslate() {
   var text = contentEl.textContent;
   if (!text || text.trim().length < 2) { toast('文档内容太短', 'info'); return; }
 
-  // Save original content for exit
-  _savedOriginalContent = contentEl.cloneNode(true);
+  // Save entire contentArea state for clean restoration on exit
+  _savedOriginalContent = {
+    html: container.innerHTML,
+    contentArea: container,
+  };
 
   translateActive = true;
   var btn = document.getElementById('translateBtn');
@@ -1092,17 +1101,9 @@ function exitTranslateMode() {
   translateActive = false;
   var btn = document.getElementById('translateBtn');
   if (btn) { btn.textContent = '🌐'; btn.classList.remove('ring-2', 'ring-emerald-400'); }
-  // Ensure docPaneHost exists for tab switching / mountPane
-  var container = document.getElementById('contentArea');
-  if (container && !document.getElementById('docPaneHost')) {
-    var host = document.createElement('div');
-    host.id = 'docPaneHost';
-    container.appendChild(host);
-  }
-  // Restore saved original content immediately (faster + no network)
-  if (_savedOriginalContent) {
-    var dc = document.getElementById('docContent');
-    if (dc) dc.innerHTML = _savedOriginalContent.innerHTML;
+  // Restore entire contentArea from saved snapshot (guarantees clean DOM)
+  if (_savedOriginalContent && _savedOriginalContent.html) {
+    _savedOriginalContent.contentArea.innerHTML = _savedOriginalContent.html;
     _savedOriginalContent = null;
   }
 }
@@ -1499,6 +1500,7 @@ function doSave(cb, skipPreview) {
     // Only refresh server-rendered preview on manual save (Ctrl+S), not auto-save
     if (!skipPreview) updateEditPreview(content);
     tabDataCache[currentFile] = { content: content, path: currentFile, size: d.size, modified: d.modified };
+    delete paneCache[currentFile]; // 重新渲染时从服务端加载最新内容
     if (cb) cb();
   })
   .catch(function(e) { alert('保存失败: ' + e.message); });
@@ -1599,6 +1601,7 @@ function doExitEdit(skipRefresh) {
   if (currentFile && !skipRefresh) {
     tabDataCache[currentFile] = null;
     fetchDoc(currentFile).then(function(d) {
+      if (translateActive) return; // 翻译模式激活时跳过渲染
       var pane = renderDocNode(currentFile, d);
       mountPane(pane, currentFile);
       afterActivate(currentFile, d);
