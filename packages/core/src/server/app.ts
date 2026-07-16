@@ -61,7 +61,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   // --- Middleware ---
 
   // Parse JSON bodies
-  app.use(express.json());
+  app.use(express.json({ limit: '5mb' }));
 
   // === Resolve web directory (unchanged logic) ===
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -1084,56 +1084,115 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const forceOverwrite = req.headers['x-force-overwrite'] === 'true';
     const expectedModified = req.headers['x-expected-modified'] as string | undefined;
 
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!filePath) { res.status(400).json({ error: 'path query parameter is required' }); return; }
-    if (typeof content !== 'string') { res.status(400).json({ error: 'content body field is required' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!filePath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    if (typeof content !== 'string') {
+      res.status(400).json({ error: 'content body field is required' });
+      return;
+    }
 
     try {
       const db = getConnection();
       const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
         { path: string } | undefined;
-      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
 
       // 1. Path validation
       const absPath = validatePath(project.path, filePath);
 
       // 2. Check editable file type
       const ext = path.extname(filePath).toLowerCase();
-      const editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
-        '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
-        '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
-        '.env.example','.gitignore','.dockerignore','.editorconfig',
-        '.conf','.cfg','.ini','.csv','.log'];
-      if (!editableExts.includes(ext)) { res.status(403).json({ error: '此文件类型不可编辑' }); return; }
+      const editableExts = [
+        '.md',
+        '.mdx',
+        '.txt',
+        '.markdown',
+        '.json',
+        '.yaml',
+        '.yml',
+        '.toml',
+        '.ts',
+        '.tsx',
+        '.js',
+        '.jsx',
+        '.py',
+        '.rb',
+        '.go',
+        '.rs',
+        '.java',
+        '.c',
+        '.cpp',
+        '.h',
+        '.css',
+        '.scss',
+        '.less',
+        '.html',
+        '.htm',
+        '.xml',
+        '.svg',
+        '.sh',
+        '.bash',
+        '.zsh',
+        '.env.example',
+        '.gitignore',
+        '.dockerignore',
+        '.editorconfig',
+        '.conf',
+        '.cfg',
+        '.ini',
+        '.csv',
+        '.log',
+      ];
+      if (!editableExts.includes(ext)) {
+        res.status(403).json({ error: '此文件类型不可编辑' });
+        return;
+      }
 
       // 3. Sensitive file check
       if (isSensitiveFile(path.basename(filePath))) {
-        res.status(403).json({ error: '此文件不可编辑（敏感文件）' }); return;
+        res.status(403).json({ error: '此文件不可编辑（敏感文件）' });
+        return;
       }
 
       // 4. File size check
       const maxSizeMB = 2;
       const maxSizeBytes = maxSizeMB * 1024 * 1024;
       if (Buffer.byteLength(content, 'utf-8') > maxSizeBytes) {
-        res.status(413).json({ error: `文件超过 ${maxSizeMB}MB 上限` }); return;
+        res.status(413).json({ error: `文件超过 ${maxSizeMB}MB 上限` });
+        return;
       }
 
       // 5. Check existing file
       let existingStats: fs.Stats | null = null;
       let fileExists = false;
-      try { existingStats = fs.statSync(absPath); fileExists = true; } catch {}
+      try {
+        existingStats = fs.statSync(absPath);
+        fileExists = true;
+      } catch {}
 
       // 6. External change detection
       if (fileExists && expectedModified && !forceOverwrite) {
         if (Math.abs(existingStats!.mtimeMs - new Date(expectedModified).getTime()) > 1000) {
-          res.status(409).json({ error: '文件已被外部修改，刷新后重试' }); return;
+          res.status(409).json({ error: '文件已被外部修改，刷新后重试' });
+          return;
         }
       }
 
       // 7. Shadow backup
       const shadowDir = path.join(
         process.env.HOME || process.env.USERPROFILE || '/tmp',
-        '.doc77', 'shadow', `edit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        '.doc77',
+        'shadow',
+        `edit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       );
       let shadowCreated = false;
       try {
@@ -1149,22 +1208,28 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         fs.writeFileSync(absPath, content, 'utf-8');
 
         // 9. Clear shadow
-        if (shadowCreated) { fs.rmSync(shadowDir, { recursive: true, force: true }); shadowCreated = false; }
+        if (shadowCreated) {
+          fs.rmSync(shadowDir, { recursive: true, force: true });
+          shadowCreated = false;
+        }
 
         // 10. Audit log
         try {
           writeAuditLog({
-            project_id: projectId, operation_type: 'edit_file',
+            project_id: projectId,
+            operation_type: 'edit_file',
             operation_data: { file_path: filePath, size: Buffer.byteLength(content, 'utf-8') },
-            source: 'user', status: 'executed',
+            source: 'user',
+            status: 'executed',
           });
         } catch {}
 
         // 11. Update cache
         const newStats = fs.statSync(absPath);
         try {
-          db.prepare(`UPDATE filetree_cache SET scanned_at = datetime('now') WHERE project_id = ? AND node_path = ?`)
-            .run(projectId, path.dirname(filePath));
+          db.prepare(
+            `UPDATE filetree_cache SET scanned_at = datetime('now') WHERE project_id = ? AND node_path = ?`,
+          ).run(projectId, path.dirname(filePath));
         } catch {}
 
         res.json({ ok: true, size: newStats.size, modified: newStats.mtime.toISOString() });
@@ -1178,13 +1243,23 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
             fs.rmSync(shadowDir, { recursive: true, force: true });
           } catch {}
         }
-        try { writeAuditLog({ project_id: projectId, operation_type: 'edit_file', operation_data: { file_path: filePath }, source: 'user', status: 'failed', error_message: message }); } catch {}
+        try {
+          writeAuditLog({
+            project_id: projectId,
+            operation_type: 'edit_file',
+            operation_data: { file_path: filePath },
+            source: 'user',
+            status: 'failed',
+            error_message: message,
+          });
+        } catch {}
         res.status(500).json({ error: `保存失败：${message}` });
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       if (message.includes('Path traversal') || message.includes('outside project root')) {
-        res.status(403).json({ error: message }); return;
+        res.status(403).json({ error: message });
+        return;
       }
       res.status(500).json({ error: message });
     }

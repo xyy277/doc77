@@ -1224,11 +1224,12 @@ function enterEditMode() {
 
   initEditDivider();
 
-  // Auto-collapse outline
-  var op = document.getElementById('outlinePanel');
-  editOutlineWasManualCollapsed = op && op.classList.contains('hidden') &&
-    sessionStorage.getItem('doc77_outline_manual_collapsed') === '1';
-  if (op && !op.classList.contains('hidden')) op.classList.add('hidden');
+  // Auto-collapse right panel
+  var rp = document.getElementById('rightPanel');
+  editOutlineWasManualCollapsed = rp && rp.classList.contains('hidden');
+  if (rp && !rp.classList.contains('hidden')) {
+    togglePanel('right');
+  }
 
   var editBtnEl = document.getElementById('editBtn');
   if (editBtnEl) { editBtnEl.classList.add('editing-active'); editBtnEl.title = '退出编辑模式'; }
@@ -1358,7 +1359,8 @@ function doExitEdit() {
   var html = pp ? pp.innerHTML : '';
   var dc = document.getElementById('docContent'); if (dc) dc.innerHTML = html;
   if (!editOutlineWasManualCollapsed) {
-    var op = document.getElementById('outlinePanel'); if (op) op.classList.remove('hidden');
+    var rp = document.getElementById('rightPanel');
+    if (rp && rp.classList.contains('hidden')) togglePanel('right');
   }
   editMode = false; editDirty = false; editModifiedTime = null;
   clearTimeout(editAutoSaveTimer); editAutoSaveTimer = null;

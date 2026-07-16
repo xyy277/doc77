@@ -1,53 +1,58 @@
 /**
  * editor-core.js — CodeMirror 6 lazy loader with textarea fallback.
+ * Loads CodeMirror via dynamic import() for reliable ESM loading.
  */
 (function () {
   'use strict';
   var EDITOR_AVAILABLE = false;
   var loadPromise = null;
+  var cmModules = null;
 
   function loadCodeMirror() {
     if (loadPromise) return loadPromise;
-    loadPromise = new Promise(function (resolve) {
-      if (EDITOR_AVAILABLE) { resolve(true); return; }
-      var script = document.createElement('script');
-      script.type = 'module';
-      script.textContent =
-        'import { EditorView, basicSetup } from "https://esm.sh/codemirror@6.0.1";\n' +
-        'import { markdown } from "https://esm.sh/@codemirror/lang-markdown@6.3.2";\n' +
-        'import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark@6.1.2";\n' +
-        'window.__cm6 = { EditorView: EditorView, basicSetup: basicSetup, markdown: markdown, oneDark: oneDark };\n';
-      script.onload = function () {
-        setTimeout(function () {
-          if (window.__cm6 && window.__cm6.EditorView) { EDITOR_AVAILABLE = true; resolve(true); }
-          else { resolve(false); }
-        }, 200);
-      };
-      script.onerror = function () { resolve(false); };
-      document.head.appendChild(script);
-      setTimeout(function () { if (!EDITOR_AVAILABLE) resolve(false); }, 10000);
-    });
+    loadPromise = (async function () {
+      if (EDITOR_AVAILABLE) return true;
+      try {
+        var [cm, langMarkdown, themeOneDark] = await Promise.all([
+          import('https://esm.sh/codemirror@6.0.1'),
+          import('https://esm.sh/@codemirror/lang-markdown@6.3.2'),
+          import('https://esm.sh/@codemirror/theme-one-dark@6.1.2')
+        ]);
+        cmModules = {
+          EditorView: cm.EditorView,
+          basicSetup: cm.basicSetup,
+          markdown: langMarkdown.markdown,
+          oneDark: themeOneDark.oneDark
+        };
+        EDITOR_AVAILABLE = true;
+        return true;
+      } catch (e) {
+        console.warn('CodeMirror 6 failed to load, using textarea fallback:', e.message);
+        return false;
+      }
+    })();
     return loadPromise;
   }
 
   function createEditor(parentEl, opts) {
-    if (!EDITOR_AVAILABLE) return createTextareaEditor(parentEl, opts);
-    var cm = window.__cm6;
-    var extensions = [cm.basicSetup];
-    if (opts.language === 'markdown' || opts.language === 'md') extensions.push(cm.markdown());
+    if (!EDITOR_AVAILABLE || !cmModules) return createTextareaEditor(parentEl, opts);
+
+    var extensions = [cmModules.basicSetup];
+    if (opts.language === 'markdown' || opts.language === 'md') {
+      extensions.push(cmModules.markdown());
+    }
     try {
       var isDark = document.documentElement.classList.contains('dark') ||
         (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      if (isDark) extensions.push(cm.oneDark);
+      if (isDark) extensions.push(cmModules.oneDark);
     } catch (e) {}
 
-    var view = new cm.EditorView({
+    var view = new cmModules.EditorView({
       doc: opts.initialValue || '',
       extensions: extensions,
       parent: parentEl,
     });
 
-    // Ctrl+S handler
     parentEl.addEventListener('keydown', function (e) {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
