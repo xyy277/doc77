@@ -1156,6 +1156,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
           try {
             // Validate the image path against the project root
             const validatedPath = validatePath(projectRoot, img.path);
+            const stats = fs.statSync(validatedPath);
+            if (stats.size > 10 * 1024 * 1024) continue; // skip images over 10MB
             const data = fs.readFileSync(validatedPath);
             const ext = path.extname(validatedPath).toLowerCase();
             const mimeMap: Record<string, string> = {
@@ -1188,7 +1190,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
       const safeFilename = (title || 'untitled').replace(/[^a-zA-Z0-9一-鿿_-]/g, '_') + '.html';
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`);
       res.send(html);
     } catch (err: any) {
       res.status(500).json({ error: err.message || '导出失败' });
@@ -1200,6 +1202,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   /** POST /api/share — Create a share link */
   app.post('/api/share', (req: Request, res: Response) => {
     try {
+      // Kill switch: check export.share.enabled
+      if (getConfig('export.share.enabled') === 'false') {
+        res.status(403).json({ error: '分享功能已禁用' });
+        return;
+      }
+
       const { projectId, filePath, title, theme } = req.body;
       if (!projectId || !filePath) {
         res.status(400).json({ error: 'projectId and filePath are required' });
@@ -1242,7 +1250,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       });
 
       // Get the runtime bind address and port from server info
-      const serverInfo = getServerInfo ? getServerInfo() : { bind: '0.0.0.0', port: 2777 };
+      const serverInfo = getServerInfo();
       const shareUrl = `http://${getLocalIP()}:${serverInfo.port}/s/${token.token}`;
 
       // Audit log
@@ -1339,7 +1347,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
 
     // Reconstruct the share URL (we don't store it, but we know the token)
-    const serverInfo = getServerInfo ? getServerInfo() : { bind: '0.0.0.0', port: 2777 };
+    const serverInfo = getServerInfo();
     const shareUrl = `http://${getLocalIP()}:${serverInfo.port}/s/${token.token}`;
 
     try {
@@ -2552,7 +2560,7 @@ function getProjectById(id: number | string) {
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
   if (isNaN(numericId)) return undefined;
   const projects = listProjects();
-  return projects.find((p: any) => p.id === numericId);
+  return projects.find((p: { id: number }) => p.id === numericId);
 }
 
 /**
