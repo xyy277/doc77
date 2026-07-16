@@ -1315,8 +1315,6 @@ async function initEditorInstance(initialText) {
       }, 150);
     });
   }
-  // Initial preview
-  updateEditPreviewLive(initialText);
   if (editAutoSave) scheduleAutoSave();
 }
 
@@ -1444,9 +1442,6 @@ function doExitEdit() {
   // Cleanup divider event listeners
   cleanupEditDivider();
 
-  var pp = document.getElementById('editPreviewPane');
-  var html = pp ? pp.innerHTML : '';
-  var dc = document.getElementById('docContent'); if (dc) dc.innerHTML = html;
   // Always reopen right panel on exit
   var rp = document.getElementById('rightPanel');
   if (rp && rp.classList.contains('hidden')) togglePanel('right');
@@ -1455,7 +1450,17 @@ function doExitEdit() {
   clearTimeout(window._editPreviewTimer); window._editPreviewTimer = null;
   var eb = document.getElementById('editBtn');
   if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
-  if (currentFile) { delete tabDataCache[currentFile]; }
+
+  // Re-fetch server-rendered content to restore proper styling (live preview may
+  // have overwritten editPreviewPane with simplified client-side rendering)
+  if (currentFile) {
+    delete tabDataCache[currentFile];
+    fetchDoc(currentFile).then(function(d) {
+      var pane = renderDocNode(currentFile, d);
+      mountPane(pane, currentFile);
+      afterActivate(currentFile, d);
+    });
+  }
 }
 
 function initEditDivider() {
