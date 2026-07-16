@@ -714,7 +714,20 @@ function renderTabBar() {
 }
 
 /** tab 左键点击切换。 */
-function onTabClick(e, path) { if (path !== activeTabPath) activateTab(path); }
+function onTabClick(e, path) {
+  if (path === activeTabPath) return;
+  // If editing, prompt to save before switching
+  if (editMode && editDirty) {
+    showEditConfirm('有未保存的修改', '切换文件前是否保存当前修改？', [
+      {text:'保存并切换',cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(); activateTab(path); }); }},
+      {text:'放弃修改',cls:'btn-danger',action:function(){ doExitEdit(); activateTab(path); }},
+      {text:'取消',cls:''}
+    ]);
+    return;
+  }
+  if (editMode) { doExitEdit(); }
+  activateTab(path);
+}
 /** 中键关闭 tab。 */
 function onTabMouseDown(e, path) { if (e.button === 1) { e.preventDefault(); closeTab(path); } }
 
