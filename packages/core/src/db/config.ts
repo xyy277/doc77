@@ -14,6 +14,8 @@ const DEFAULTS: Record<string, string> = {
   'ai.max_depth': '5',
   'ai.read_limit_per_session': '200',
   'editor.default': 'vscode',
+  'editor.maxFileSizeMB': '2',
+  'editor.autoSave': 'true',
   'security.follow_symlinks': 'false',
   'transaction.shadow_dir': '~/.doc77/shadow',
   'transaction.file_size_threshold_mb': '50',

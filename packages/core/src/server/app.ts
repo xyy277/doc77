@@ -41,6 +41,7 @@ import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 
 import { VERSION } from '../version.gen.js';
+import { writeAuditLog } from '@doc77/mcp';
 
 // Module capabilities — set by CLI layer at startup
 let _capabilities = { ai: false, mcp: false };
@@ -60,7 +61,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   // --- Middleware ---
 
   // Parse JSON bodies
-  app.use(express.json());
+  app.use(express.json({ limit: '5mb' }));
 
   // === Resolve web directory (unchanged logic) ===
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -99,14 +100,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const useMobile = isMobileRequest(_req);
     const target = path.join(webDir, useMobile ? 'mobile/index.html' : 'index.html');
     if (fs.existsSync(target)) {
-      res.sendFile(target);
+      res.sendFile(target, { dotfiles: 'allow' });
       return;
     }
     // Graceful degradation: fall back to desktop if mobile HTML missing
     if (useMobile) {
       const desktopFallback = path.join(webDir, 'index.html');
       if (fs.existsSync(desktopFallback)) {
-        res.sendFile(desktopFallback);
+        res.sendFile(desktopFallback, { dotfiles: 'allow' });
         return;
       }
     }
@@ -120,7 +121,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
     const target = path.join(webDir, 'guide.html');
     if (fs.existsSync(target)) {
-      res.sendFile(target);
+      res.sendFile(target, { dotfiles: 'allow' });
       return;
     }
     res.status(404).type('html').send('<h1>Not Found</h1>');
@@ -134,13 +135,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const useMobile = isMobileRequest(_req);
     const target = path.join(webDir, useMobile ? 'mobile/preview.html' : 'preview.html');
     if (fs.existsSync(target)) {
-      res.sendFile(target);
+      res.sendFile(target, { dotfiles: 'allow' });
       return;
     }
     if (useMobile) {
       const desktopFallback = path.join(webDir, 'preview.html');
       if (fs.existsSync(desktopFallback)) {
-        res.sendFile(desktopFallback);
+        res.sendFile(desktopFallback, { dotfiles: 'allow' });
         return;
       }
     }
@@ -1069,6 +1070,209 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         message.includes('traversal')
       ) {
         res.status(404).json({ error: 'File not found' });
+        return;
+      }
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Save edited file content (lightweight editing)
+  app.put('/api/content/:id', async (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    const filePath = req.query.path as string;
+    const { content } = req.body as { content?: string };
+    const forceOverwrite = req.headers['x-force-overwrite'] === 'true';
+    const expectedModified = req.headers['x-expected-modified'] as string | undefined;
+
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!filePath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    if (typeof content !== 'string') {
+      res.status(400).json({ error: 'content body field is required' });
+      return;
+    }
+
+    try {
+      const db = getConnection();
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+
+      // 1. Path validation
+      const absPath = validatePath(project.path, filePath);
+
+      // 2. Check editable file type (extension or dotfile basename)
+      const ext = path.extname(filePath).toLowerCase();
+      var baseName = path.basename(filePath);
+      const editableExts = [
+        '.md',
+        '.mdx',
+        '.txt',
+        '.markdown',
+        '.json',
+        '.yaml',
+        '.yml',
+        '.toml',
+        '.ts',
+        '.tsx',
+        '.js',
+        '.jsx',
+        '.py',
+        '.rb',
+        '.go',
+        '.rs',
+        '.java',
+        '.c',
+        '.cpp',
+        '.h',
+        '.css',
+        '.scss',
+        '.less',
+        '.html',
+        '.htm',
+        '.xml',
+        '.svg',
+        '.sh',
+        '.bash',
+        '.zsh',
+        '.conf',
+        '.cfg',
+        '.ini',
+        '.csv',
+        '.log',
+      ];
+      const editableDotfiles = [
+        '.gitignore',
+        '.dockerignore',
+        '.editorconfig',
+        '.env.example',
+        '.env',
+      ];
+      var isEditable = editableExts.includes(ext) || editableDotfiles.includes(baseName);
+      if (!isEditable) {
+        res.status(403).json({ error: '此文件类型不可编辑' });
+        return;
+      }
+
+      // 3. Sensitive file check
+      if (isSensitiveFile(path.basename(filePath))) {
+        res.status(403).json({ error: '此文件不可编辑（敏感文件）' });
+        return;
+      }
+
+      // 4. File size check (read from config)
+      const maxSizeMB = (() => {
+        try {
+          const row = db
+            .prepare("SELECT value FROM config WHERE key = 'editor.maxFileSizeMB'")
+            .get() as { value: string } | undefined;
+          return row ? parseInt(row.value, 10) : 2;
+        } catch {
+          return 2;
+        }
+      })();
+      const maxSizeBytes = maxSizeMB * 1024 * 1024;
+      if (Buffer.byteLength(content, 'utf-8') > maxSizeBytes) {
+        res.status(413).json({ error: `文件超过 ${maxSizeMB}MB 上限` });
+        return;
+      }
+
+      // 5. Check existing file
+      let existingStats: fs.Stats | null = null;
+      let fileExists = false;
+      try {
+        existingStats = fs.statSync(absPath);
+        fileExists = true;
+      } catch {}
+
+      // 6. External change detection
+      if (fileExists && expectedModified && !forceOverwrite) {
+        if (Math.abs(existingStats!.mtimeMs - new Date(expectedModified).getTime()) > 1000) {
+          res.status(409).json({ error: '文件已被外部修改，刷新后重试' });
+          return;
+        }
+      }
+
+      // 7. Shadow backup
+      const shadowDir = path.join(
+        process.env.HOME || process.env.USERPROFILE || '/tmp',
+        '.doc77',
+        'shadow',
+        `edit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      );
+      let shadowCreated = false;
+      try {
+        if (fileExists) {
+          fs.mkdirSync(shadowDir, { recursive: true });
+          fs.copyFileSync(absPath, path.join(shadowDir, path.basename(filePath)));
+          shadowCreated = true;
+        }
+
+        // 8. Write
+        const dir = path.dirname(absPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(absPath, content, 'utf-8');
+
+        // 9. Clear shadow
+        if (shadowCreated) {
+          shadowCreated = false;
+          fs.rmSync(shadowDir, { recursive: true, force: true });
+        }
+
+        // 10. Audit log
+        try {
+          writeAuditLog({
+            project_id: projectId,
+            operation_type: 'edit_file',
+            operation_data: { file_path: filePath, size: Buffer.byteLength(content, 'utf-8') },
+            source: 'user',
+            status: 'executed',
+          });
+        } catch {}
+
+        // 11. Update cache
+        const newStats = fs.statSync(absPath);
+        try {
+          db.prepare(
+            `UPDATE filetree_cache SET scanned_at = datetime('now') WHERE project_id = ? AND node_path = ?`,
+          ).run(projectId, path.dirname(filePath));
+        } catch {}
+
+        res.json({ ok: true, size: newStats.size, modified: newStats.mtime.toISOString() });
+      } catch (writeErr: unknown) {
+        // Rollback
+        const message = writeErr instanceof Error ? writeErr.message : 'Unknown error';
+        if (shadowCreated) {
+          try {
+            const sf = path.join(shadowDir, path.basename(filePath));
+            if (fs.existsSync(sf)) fs.copyFileSync(sf, absPath);
+            fs.rmSync(shadowDir, { recursive: true, force: true });
+          } catch {}
+        }
+        try {
+          writeAuditLog({
+            project_id: projectId,
+            operation_type: 'edit_file',
+            operation_data: { file_path: filePath },
+            source: 'user',
+            status: 'failed',
+            error_message: message,
+          });
+        } catch {}
+        res.status(500).json({ error: `保存失败：${message}` });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      if (message.includes('Path traversal') || message.includes('outside project root')) {
+        res.status(403).json({ error: message });
         return;
       }
       res.status(500).json({ error: message });
@@ -2124,7 +2328,6 @@ export function createAIChatHandler(deps: {
         project_id,
       );
       toolSessionId = sid;
-
       // Rehydrate a persisted conversation when the client reconnects to a
       // session that isn't in the in-memory cache (e.g. after a server restart).
       if (isNew && session_id) {
@@ -2153,7 +2356,10 @@ export function createAIChatHandler(deps: {
         return;
       }
 
-      if (project_id && !(agent as any).hasContext) {
+      // Skip project-level context when user has a specific file open
+      // (context_file injects the file content instead; the project listing
+      // would bias the answer toward the whole system, not that document).
+      if (project_id && !(agent as any).hasContext && !context_file) {
         try {
           const root = scanDirectory(project_id, '');
           const fileList = root.entries

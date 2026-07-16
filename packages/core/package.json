@@ -1,6 +1,6 @@
 {
   "name": "@doc77/core",
-  "version": "0.7.1",
+  "version": "0.7.3",
   "description": "Doc77 核心引擎 — 数据库、文件系统抽象层、预览引擎、Express Server",
   "license": "MIT",
   "repository": {
@@ -48,5 +48,13 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@doc77/mcp": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@doc77/mcp": {
+      "optional": true
+    }
   }
 }

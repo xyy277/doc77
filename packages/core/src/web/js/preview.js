@@ -53,6 +53,16 @@ var directPath = new URLSearchParams(location.search).get('path') || '';
 if (!pid) location.href = '/';
 var proj = null, projects = [], currentFile = null, activeTab = 'outline';
 
+//══════════ Edit mode state ══════════
+var editMode = false;
+var editDirty = false;
+var editModifiedTime = null;
+var editSplitRatio = parseInt(localStorage.getItem('doc77_edit_ratio') || '50', 10);
+var editAutoSave = true;
+var editAutoSaveTimer = null;
+var editAutoSaveMs = 2000;
+var editOutlineWasManualCollapsed = false;
+
 //══════════ 多 tab 状态 ══════════
 // tabStore: 纯逻辑（顺序/活动/容量淘汰/渲染 LRU），来自 tabs.js
 var tabStore = TabStore.createTabStore({ maxTabs: 8, maxRendered: 3 });
@@ -108,6 +118,8 @@ function applyCapabilities() {
     CAPABILITIES = c; applyCapabilities();
     if (CAPABILITIES.mcp) initTaskEvents();
   }).catch(function(){});
+  // Preload editor module in background
+  if (window.EditorCore) window.EditorCore.load();
   try {
     var r = await fetch('/api/projects');
     projects = await r.json();
@@ -548,6 +560,22 @@ function mountPane(pane, path) {
 function afterActivate(path, d) {
   var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'];
   btns.forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = false; });
+  // Show edit button only for editable file types
+  var editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
+    '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
+    '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
+    '.env.example','.gitignore','.dockerignore','.editorconfig',
+    '.conf','.cfg','.ini','.csv','.log'];
+  var isEditable = editableExts.some(function(ext) {
+    return (currentFile || '').toLowerCase().endsWith(ext);
+  });
+  var editBtnEl = document.getElementById('editBtn');
+  if (editBtnEl) {
+    editBtnEl.style.display = isEditable ? '' : 'none';
+    editBtnEl.classList.toggle('editing-active', editMode);
+    editBtnEl.title = editMode ? '退出编辑模式' : '编辑此文件（分屏）';
+    editBtnEl.onclick = toggleEditMode;
+  }
   // Run 按钮：仅 js/py 显示
   var runBtn = document.getElementById('runBtn');
   if (runBtn) {
@@ -686,15 +714,43 @@ function renderTabBar() {
 }
 
 /** tab 左键点击切换。 */
-function onTabClick(e, path) { if (path !== activeTabPath) activateTab(path); }
+function onTabClick(e, path) {
+  if (path === activeTabPath) return;
+  // If editing, prompt to save before switching
+  if (editMode && editDirty) {
+    showEditConfirm('有未保存的修改', '切换文件前是否保存当前修改？', [
+      {text:'保存并切换',cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(); activateTab(path); }); }},
+      {text:'放弃修改',cls:'btn-danger',action:function(){ doExitEdit(); activateTab(path); }},
+      {text:'取消',cls:''}
+    ]);
+    return;
+  }
+  if (editMode) { doExitEdit(); }
+  activateTab(path);
+}
 /** 中键关闭 tab。 */
 function onTabMouseDown(e, path) { if (e.button === 1) { e.preventDefault(); closeTab(path); } }
 
-/** 同步左侧文件树的 active-node 高亮到当前 tab。 */
+/** 同步左侧文件树的 active-node 高亮到当前 tab。若父目录未展开则逐层展开。 */
 function syncTreeActive(path) {
   document.querySelectorAll('#tree .active-node').forEach(function(el) { el.classList.remove('active-node','bg-blue-600','text-white'); });
   if (!path) return;
-  var row = document.querySelector('#tree [data-path="' + CSS.escape(path) + '"]');
+  var tree = document.getElementById('tree');
+  var row = tree.querySelector('[data-path="' + CSS.escape(path) + '"]');
+  // If node not visible, expand parent directories
+  if (!row) {
+    var parts = path.split('/');
+    for (var i = 0; i < parts.length - 1; i++) {
+      var dirPath = parts.slice(0, i + 1).join('/');
+      var dirRow = tree.querySelector('[data-path="' + CSS.escape(dirPath) + '"]');
+      if (dirRow) {
+        var wrapper = dirRow.nextElementSibling;
+        if (wrapper && wrapper.classList.contains('hidden')) dirRow.click();
+      }
+    }
+    // Re-query after expanding
+    row = tree.querySelector('[data-path="' + CSS.escape(path) + '"]');
+  }
   if (row) {
     row.classList.add('active-node','bg-blue-600','text-white');
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1153,8 +1209,309 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
-function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结当前文档的内容', currentFile); } }
+function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结「' + currentFile + '」的内容', currentFile); } }
 
+//══════════ Edit Mode ══════════
+function toggleEditMode() {
+  if (!currentFile) return;
+  if (editMode) { exitEditMode(); }
+  else { enterEditMode(); }
+}
+
+function enterEditMode() {
+  if (editMode || !proj || !proj.id) return;
+  var cached = tabDataCache[currentFile];
+  editModifiedTime = cached && cached.modified ? cached.modified : null;
+
+  var docContent = document.getElementById('docContent');
+  if (!docContent) return;
+  var previewHTML = docContent.innerHTML;
+  var lang = getEditLanguage(currentFile);
+
+  docContent.innerHTML =
+    '<div id="editSplitContainer" class="edit-split">' +
+      '<div class="edit-pane-editor" id="editEditorPane"></div>' +
+      '<div class="edit-divider" id="editDivider"></div>' +
+      '<div class="edit-pane-preview" id="editPreviewPane">' + previewHTML + '</div>' +
+    '</div>' +
+    '<div class="edit-statusbar" id="editStatusbar">' +
+      '<span id="statusCursor">行:1 列:1</span>' +
+      '<span class="status-sep"></span><span>' + lang.toUpperCase() + '</span>' +
+      '<span class="status-sep"></span>' +
+      '<span class="status-dirty" id="statusDirty" style="display:none">● 已修改</span>' +
+      '<span class="status-saved fade" id="statusSaved">✓ 已保存</span>' +
+    '</div>';
+
+  var editorPane = document.getElementById('editEditorPane');
+  var container = document.getElementById('editSplitContainer');
+  if (container && editorPane) {
+    var tw = container.clientWidth;
+    editorPane.style.flex = '0 0 ' + editSplitRatio + '%';
+  }
+
+  initEditDivider();
+
+  // Override parent max-width constraint for full-width editor
+  var editContainer = document.getElementById('editSplitContainer');
+  var p = editContainer ? editContainer.parentElement : null;
+  while (p && !p.classList.contains('max-w-4xl')) { p = p.parentElement; }
+  if (p) { p.style.maxWidth = 'none'; window._editMaxWidthParent = p; }
+
+  // Auto-collapse right panel
+  var rp = document.getElementById('rightPanel');
+  editOutlineWasManualCollapsed = rp && rp.classList.contains('hidden');
+  if (rp && !rp.classList.contains('hidden')) {
+    togglePanel('right');
+  }
+
+  var editBtnEl = document.getElementById('editBtn');
+  if (editBtnEl) { editBtnEl.classList.add('editing-active'); editBtnEl.title = '退出编辑模式'; }
+  editMode = true; editDirty = false;
+
+  // Load editor with raw file content (cache-bust to avoid stale browser cache)
+  fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile) + '&t=' + Date.now())
+    .then(function(r) { return r.text(); })
+    .then(function(t) { if (editMode) initEditorInstance(t); })
+    .catch(function() { if (editMode) initEditorInstance(''); });
+}
+
+async function initEditorInstance(initialText) {
+  var pane = document.getElementById('editEditorPane');
+  if (!pane) return;
+
+  // Show loading while CodeMirror loads
+  pane.innerHTML = '<div class="flex items-center justify-center h-full"><span class="text-sm text-slate-400">加载编辑器中...</span></div>';
+
+  // Wait for CodeMirror to load (may be in-flight from preload or freshly started)
+  var cmLoaded = false;
+  if (window.EditorCore && window.EditorCore.load) {
+    cmLoaded = await window.EditorCore.load();
+  }
+
+  // Clear loading indicator
+  pane.innerHTML = '';
+
+  if (!cmLoaded) {
+    var b = document.createElement('div'); b.className = 'editor-banner';
+    b.textContent = '编辑器增强加载失败，使用基础文本模式';
+    pane.parentNode.insertBefore(b, pane);
+  }
+
+  window._editEditor = window.EditorCore.createEditor(pane, {
+    initialValue: initialText,
+    language: getEditLanguage(currentFile),
+    onSave: function() { doSave(); }
+  });
+
+  var el = pane.querySelector('.cm-editor, .editor-textarea-fallback');
+  if (el) {
+    el.addEventListener('input', function() {
+      if (!editDirty) { editDirty = true; document.getElementById('statusDirty').style.display = ''; }
+      scheduleAutoSave();
+      // Real-time preview (debounced 150ms)
+      clearTimeout(window._editPreviewTimer);
+      window._editPreviewTimer = setTimeout(function() {
+        if (editMode && window._editEditor) updateEditPreviewLive(window._editEditor.getValue());
+      }, 150);
+    });
+  }
+  if (editAutoSave) scheduleAutoSave();
+}
+
+function getEditLanguage(fp) {
+  var ext = (fp||'').split('.').pop().toLowerCase();
+  var m = {md:'markdown',mdx:'markdown',markdown:'markdown',json:'json',
+    js:'javascript',jsx:'javascript',ts:'typescript',tsx:'typescript',
+    py:'python',rb:'ruby',go:'go',rs:'rust',java:'java',c:'c',cpp:'cpp',h:'c',
+    css:'css',scss:'css',less:'css',html:'html',xml:'xml',svg:'xml',
+    sh:'shell',bash:'shell',zsh:'shell',yaml:'yaml',yml:'yaml',toml:'toml',
+    sql:'sql',txt:'text'};
+  return m[ext] || 'text';
+}
+
+function scheduleAutoSave() {
+  clearTimeout(editAutoSaveTimer);
+  if (!editAutoSave) return;
+  editAutoSaveTimer = setTimeout(function() { if (editDirty) doSave(null, true); }, editAutoSaveMs);
+}
+
+function doSave(cb, skipPreview) {
+  if (!editMode || !currentFile || !window._editEditor || !proj || !proj.id) return;
+  var content = window._editEditor.getValue();
+  var headers = { 'Content-Type': 'application/json' };
+  if (editModifiedTime) headers['X-Expected-Modified'] = editModifiedTime;
+
+  fetch('/api/content/' + proj.id + '?path=' + encodeURIComponent(currentFile), {
+    method: 'PUT', headers: headers, body: JSON.stringify({ content: content })
+  })
+  .then(function(r) {
+    if (r.status === 409) {
+      r.json().then(function(d) {
+        showEditConfirm('文件已被外部修改', (d.error||'文件已被外部程序修改，继续保存会覆盖外部变更。'), [
+          {text:'覆盖保存',cls:'btn-danger',action:function(){
+            var fh = {'Content-Type':'application/json','X-Force-Overwrite':'true'};
+            fetch('/api/content/'+proj.id+'?path='+encodeURIComponent(currentFile),{method:'PUT',headers:fh,body:JSON.stringify({content:content})})
+            .then(function(r2){return r2.json().then(function(d2){if(!r2.ok)throw new Error(d2.error);return d2;});})
+            .then(function(d2){editModifiedTime=d2.modified;markSaved();if(!skipPreview)updateEditPreview(content);if(cb)cb();})
+            .catch(function(e){alert('保存失败: '+e.message);});
+          }},
+          {text:'取消',cls:''}
+        ]);
+      });
+      return;
+    }
+    return r.json().then(function(d) { if (!r.ok) throw new Error(d.error||'保存失败'); return d; });
+  })
+  .then(function(d) {
+    if (!d) return;
+    editModifiedTime = d.modified; markSaved();
+    // Only refresh server-rendered preview on manual save (Ctrl+S), not auto-save
+    if (!skipPreview) updateEditPreview(content);
+    tabDataCache[currentFile] = { content: content, path: currentFile, size: d.size, modified: d.modified };
+    if (cb) cb();
+  })
+  .catch(function(e) { alert('保存失败: ' + e.message); });
+}
+
+function markSaved() {
+  editDirty = false;
+  var d = document.getElementById('statusDirty'); if (d) d.style.display = 'none';
+  var s = document.getElementById('statusSaved');
+  if (s) { s.textContent = '✓ 已保存'; s.classList.remove('fade'); }
+}
+
+function updateEditPreviewLive(content) {
+  var pp = document.getElementById('editPreviewPane');
+  if (!pp) return;
+  try {
+    // Inline-render raw markdown as HTML preview (synchronous, instant)
+    var ext = (currentFile || '').split('.').pop().toLowerCase();
+    if (ext === 'md' || ext === 'markdown' || ext === 'mdx') {
+      // Basic markdown-like rendering: headings, bold, italic, code blocks, lists
+      var html = content
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/^### (.+)$/gm,'<h4 style="margin:1em 0 .3em;font-size:15px">$1</h4>')
+        .replace(/^## (.+)$/gm,'<h3 style="margin:1.2em 0 .4em;font-size:17px">$1</h3>')
+        .replace(/^# (.+)$/gm,'<h2 style="margin:1.4em 0 .5em;font-size:20px">$1</h2>')
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g,'<em>$1</em>')
+        .replace(/`([^`]+)`/g,'<code style="background:var(--bg-code,#f1f5f9);padding:1px 4px;border-radius:3px;font-size:13px">$1</code>')
+        .replace(/^\- (.+)$/gm,'<li style="margin-left:1.5em">$1</li>')
+        .replace(/\n\n/g,'<br><br>')
+        .replace(/\n/g,'<br>');
+      pp.innerHTML = '<div style="padding:16px 20px;font-size:14px;line-height:1.7;color:var(--text-primary,#1e293b)">' + html + '</div>';
+    } else {
+      pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px">' + escapeHtml(content) + '</pre>';
+    }
+  } catch(e) {
+    pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px">' + escapeHtml(content) + '</pre>';
+  }
+}
+
+function updateEditPreview(content) {
+  var pp = document.getElementById('editPreviewPane');
+  if (!pp || !currentFile || !proj || !proj.id) return;
+  fetch('/api/content/' + proj.id + '?path=' + encodeURIComponent(currentFile) + '&t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.content) pp.innerHTML = d.content;
+    })
+    .catch(function() {
+      pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px">' + escapeHtml(content) + '</pre>';
+    });
+}
+
+function exitEditMode(skipConfirm) {
+  if (!editMode) return;
+  if (editDirty && !skipConfirm) {
+    showEditConfirm('有未保存的修改', '退出前是否保存修改？', [
+      {text:'保存并退出',cls:'btn-primary',action:function(){doSave(function(){doExitEdit();});}},
+      {text:'放弃修改',cls:'btn-danger',action:function(){doExitEdit();}},
+      {text:'取消',cls:''}
+    ]);
+    return;
+  }
+  doExitEdit();
+}
+
+function doExitEdit() {
+  // Restore max-width on parent that was overridden for full-width editing
+  if (window._editMaxWidthParent) { window._editMaxWidthParent.style.maxWidth = ''; window._editMaxWidthParent = null; }
+  // Destroy editor instance
+  if (window._editEditor) { try { window._editEditor.destroy(); } catch(e) {}; window._editEditor = null; }
+  // Cleanup divider event listeners
+  cleanupEditDivider();
+
+  // Always reopen right panel on exit
+  var rp = document.getElementById('rightPanel');
+  if (rp && rp.classList.contains('hidden')) togglePanel('right');
+  editMode = false; editDirty = false; editModifiedTime = null;
+  clearTimeout(editAutoSaveTimer); editAutoSaveTimer = null;
+  clearTimeout(window._editPreviewTimer); window._editPreviewTimer = null;
+  var eb = document.getElementById('editBtn');
+  if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
+
+  // Re-fetch server-rendered content to restore proper styling (live preview may
+  // have overwritten editPreviewPane with simplified client-side rendering)
+  if (currentFile) {
+    delete tabDataCache[currentFile];
+    fetchDoc(currentFile).then(function(d) {
+      var pane = renderDocNode(currentFile, d);
+      mountPane(pane, currentFile);
+      afterActivate(currentFile, d);
+    });
+  }
+}
+
+function initEditDivider() {
+  var div = document.getElementById('editDivider');
+  var sc = document.getElementById('editSplitContainer');
+  var ep = document.getElementById('editEditorPane');
+  if (!div || !sc || !ep) return;
+  var dragging = false;
+  var onMove = function(e) {
+    if (!dragging) return;
+    var r = sc.getBoundingClientRect();
+    var pct = sc.classList.contains('vertical') ? ((e.clientY-r.top)/r.height)*100 : ((e.clientX-r.left)/r.width)*100;
+    pct = Math.max(20, Math.min(80, pct));
+    editSplitRatio = Math.round(pct); ep.style.flex = '0 0 ' + editSplitRatio + '%';
+  };
+  var onUp = function() {
+    if (!dragging) return;
+    dragging = false; div.classList.remove('dragging');
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
+    localStorage.setItem('doc77_edit_ratio', String(editSplitRatio));
+  };
+  div.addEventListener('mousedown', function(e) { e.preventDefault(); dragging = true; div.classList.add('dragging'); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+  // Store for cleanup
+  window._editDividerCleanup = function() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+}
+
+function cleanupEditDivider() {
+  if (window._editDividerCleanup) { window._editDividerCleanup(); window._editDividerCleanup = null; }
+}
+
+function showEditConfirm(title, message, buttons) {
+  var ov = document.createElement('div'); ov.className = 'edit-confirm-overlay';
+  ov.innerHTML = '<div class="edit-confirm-dialog"><h3>'+escapeHtml(title)+'</h3><p>'+escapeHtml(message)+'</p><div class="confirm-actions">'+
+    buttons.map(function(b,i){return '<button class="'+b.cls+'" data-idx="'+i+'">'+escapeHtml(b.text)+'</button>';}).join('')+
+    '</div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e) { if (e.target === ov) ov.remove(); });
+  ov.querySelectorAll('button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx = parseInt(btn.getAttribute('data-idx'),10); ov.remove();
+      if (buttons[idx]&&buttons[idx].action) buttons[idx].action();
+    });
+  });
+}
+
+function escapeHtml(str) { var d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 // Outline
 var outlineHeadings = [], outlineBuilt = false;
 function ensureOutlineBuilt() { if (!outlineBuilt) { var doc = document.getElementById('docContent'); if (doc) buildOutline(); } }
