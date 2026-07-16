@@ -1308,8 +1308,15 @@ async function initEditorInstance(initialText) {
     el.addEventListener('input', function() {
       if (!editDirty) { editDirty = true; document.getElementById('statusDirty').style.display = ''; }
       scheduleAutoSave();
+      // Real-time preview (debounced 150ms)
+      clearTimeout(window._editPreviewTimer);
+      window._editPreviewTimer = setTimeout(function() {
+        if (editMode && window._editEditor) updateEditPreviewLive(window._editEditor.getValue());
+      }, 150);
     });
   }
+  // Initial preview
+  updateEditPreviewLive(initialText);
   if (editAutoSave) scheduleAutoSave();
 }
 
@@ -1373,6 +1380,34 @@ function markSaved() {
   if (s) { s.textContent = '✓ 已保存'; s.classList.remove('fade'); }
 }
 
+function updateEditPreviewLive(content) {
+  var pp = document.getElementById('editPreviewPane');
+  if (!pp) return;
+  try {
+    // Inline-render raw markdown as HTML preview (synchronous, instant)
+    var ext = (currentFile || '').split('.').pop().toLowerCase();
+    if (ext === 'md' || ext === 'markdown' || ext === 'mdx') {
+      // Basic markdown-like rendering: headings, bold, italic, code blocks, lists
+      var html = content
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/^### (.+)$/gm,'<h4 style="margin:1em 0 .3em;font-size:15px">$1</h4>')
+        .replace(/^## (.+)$/gm,'<h3 style="margin:1.2em 0 .4em;font-size:17px">$1</h3>')
+        .replace(/^# (.+)$/gm,'<h2 style="margin:1.4em 0 .5em;font-size:20px">$1</h2>')
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g,'<em>$1</em>')
+        .replace(/`([^`]+)`/g,'<code style="background:var(--bg-code,#f1f5f9);padding:1px 4px;border-radius:3px;font-size:13px">$1</code>')
+        .replace(/^\- (.+)$/gm,'<li style="margin-left:1.5em">$1</li>')
+        .replace(/\n\n/g,'<br><br>')
+        .replace(/\n/g,'<br>');
+      pp.innerHTML = '<div style="padding:16px 20px;font-size:14px;line-height:1.7;color:var(--text-primary,#1e293b)">' + html + '</div>';
+    } else {
+      pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px">' + escapeHtml(content) + '</pre>';
+    }
+  } catch(e) {
+    pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px">' + escapeHtml(content) + '</pre>';
+  }
+}
+
 function updateEditPreview(content) {
   var pp = document.getElementById('editPreviewPane');
   if (!pp || !currentFile || !proj || !proj.id) return;
@@ -1415,6 +1450,7 @@ function doExitEdit() {
   if (rp && rp.classList.contains('hidden')) togglePanel('right');
   editMode = false; editDirty = false; editModifiedTime = null;
   clearTimeout(editAutoSaveTimer); editAutoSaveTimer = null;
+  clearTimeout(window._editPreviewTimer); window._editPreviewTimer = null;
   var eb = document.getElementById('editBtn');
   if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
   if (currentFile) { delete tabDataCache[currentFile]; }
