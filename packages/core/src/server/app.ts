@@ -41,7 +41,16 @@ import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 
 import { VERSION } from '../version.gen.js';
-import { writeAuditLog } from '@doc77/mcp';
+
+/** Lazy import from @doc77/mcp — optional peer dep, may not be installed */
+async function auditLog(entry: Record<string, unknown>) {
+  try {
+    const { writeAuditLog } = await import('@doc77/mcp');
+    writeAuditLog(entry as any);
+  } catch {
+    /* mcp not installed - skip audit log */
+  }
+}
 
 // Module capabilities — set by CLI layer at startup
 let _capabilities = { ai: false, mcp: false };
@@ -1228,15 +1237,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         }
 
         // 10. Audit log
-        try {
-          writeAuditLog({
-            project_id: projectId,
-            operation_type: 'edit_file',
-            operation_data: { file_path: filePath, size: Buffer.byteLength(content, 'utf-8') },
-            source: 'user',
-            status: 'executed',
-          });
-        } catch {}
+        await auditLog({
+          project_id: projectId,
+          operation_type: 'edit_file',
+          operation_data: { file_path: filePath, size: Buffer.byteLength(content, 'utf-8') },
+          source: 'user',
+          status: 'executed',
+        });
 
         // 11. Update cache
         const newStats = fs.statSync(absPath);
@@ -1257,16 +1264,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
             fs.rmSync(shadowDir, { recursive: true, force: true });
           } catch {}
         }
-        try {
-          writeAuditLog({
-            project_id: projectId,
-            operation_type: 'edit_file',
-            operation_data: { file_path: filePath },
-            source: 'user',
-            status: 'failed',
-            error_message: message,
-          });
-        } catch {}
+        await auditLog({
+          project_id: projectId,
+          operation_type: 'edit_file',
+          operation_data: { file_path: filePath },
+          source: 'user',
+          status: 'failed',
+          error_message: message,
+        });
         res.status(500).json({ error: `保存失败：${message}` });
       }
     } catch (err: unknown) {
