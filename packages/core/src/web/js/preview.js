@@ -1334,11 +1334,13 @@ function markSaved() {
 }
 
 function updateEditPreview(content) {
-  var pp = document.getElementById('editPreviewPane'); if (!pp) return;
-  fetch('/api/content/'+proj.id+'?path='+encodeURIComponent(currentFile)+'&t='+Date.now())
-    .then(function(r){return r.json();})
-    .then(function(d){if(d&&d.html)pp.innerHTML=d.html;})
-    .catch(function(){pp.innerHTML='<pre style="white-space:pre-wrap;font-size:14px">'+escapeHtml(content)+'</pre>';});
+  var pp = document.getElementById('editPreviewPane'); if (!pp || !currentFile) return;
+  try {
+    var fakeData = { type: 'markdown', content: content, path: currentFile };
+    pp.innerHTML = buildDocHTML(currentFile, fakeData);
+  } catch(e) {
+    pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px">'+escapeHtml(content)+'</pre>';
+  }
 }
 
 function exitEditMode(skipConfirm) {
@@ -1363,10 +1365,9 @@ function doExitEdit() {
   var pp = document.getElementById('editPreviewPane');
   var html = pp ? pp.innerHTML : '';
   var dc = document.getElementById('docContent'); if (dc) dc.innerHTML = html;
-  if (!editOutlineWasManualCollapsed) {
-    var rp = document.getElementById('rightPanel');
-    if (rp && rp.classList.contains('hidden')) togglePanel('right');
-  }
+  // Always reopen right panel on exit
+  var rp = document.getElementById('rightPanel');
+  if (rp && rp.classList.contains('hidden')) togglePanel('right');
   editMode = false; editDirty = false; editModifiedTime = null;
   clearTimeout(editAutoSaveTimer); editAutoSaveTimer = null;
   var eb = document.getElementById('editBtn');
