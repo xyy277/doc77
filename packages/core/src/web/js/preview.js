@@ -718,11 +718,26 @@ function onTabClick(e, path) { if (path !== activeTabPath) activateTab(path); }
 /** 中键关闭 tab。 */
 function onTabMouseDown(e, path) { if (e.button === 1) { e.preventDefault(); closeTab(path); } }
 
-/** 同步左侧文件树的 active-node 高亮到当前 tab。 */
+/** 同步左侧文件树的 active-node 高亮到当前 tab。若父目录未展开则逐层展开。 */
 function syncTreeActive(path) {
   document.querySelectorAll('#tree .active-node').forEach(function(el) { el.classList.remove('active-node','bg-blue-600','text-white'); });
   if (!path) return;
-  var row = document.querySelector('#tree [data-path="' + CSS.escape(path) + '"]');
+  var tree = document.getElementById('tree');
+  var row = tree.querySelector('[data-path="' + CSS.escape(path) + '"]');
+  // If node not visible, expand parent directories
+  if (!row) {
+    var parts = path.split('/');
+    for (var i = 0; i < parts.length - 1; i++) {
+      var dirPath = parts.slice(0, i + 1).join('/');
+      var dirRow = tree.querySelector('[data-path="' + CSS.escape(dirPath) + '"]');
+      if (dirRow) {
+        var wrapper = dirRow.nextElementSibling;
+        if (wrapper && wrapper.classList.contains('hidden')) dirRow.click();
+      }
+    }
+    // Re-query after expanding
+    row = tree.querySelector('[data-path="' + CSS.escape(path) + '"]');
+  }
   if (row) {
     row.classList.add('active-node','bg-blue-600','text-white');
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
