@@ -49,5 +49,19 @@
   "ai.context.emptyDir": "(empty directory)",
   "ai.context.projectInfo": "Current project: {name} (path: {path})\nRoot directory contents:\n{fileList}",
   "ai.context.fileDirective": "Below is the full content of document \"{file}\". Please answer directly based on it without calling any tools:",
-  "ai.context.serviceError": "AI service error: {msg}"
+  "ai.context.serviceError": "AI service error: {msg}",
+  "ai.runtime.riskLevelDenied": "Error: Current risk level \"{riskLevel}\" does not allow {opType} operation. Please increase ai.risk_level in settings and try again.",
+  "ai.runtime.sensitiveRejected": "Error: Path \"{filePath}\" points to a sensitive file, rejected.",
+  "ai.runtime.descMove": "Move {source} → {target}",
+  "ai.runtime.descCreateFolder": "Create directory {folderPath}",
+  "ai.runtime.descDelete": "Delete {filePath}",
+  "ai.runtime.descBatch": "Batch {count} items",
+  "ai.runtime.queuedForApproval": "[Pending approval] Queued for approval, task ID: {taskId} ({desc}). Go to the Approvals tab to approve or reject; will not execute until approved.",
+  "cli.vendor.assetExists": "  ✓ {name} (already exists)",
+  "web.preview.pdfPrev": "◀ Prev Page",
+  "web.preview.pdfPageInfo": "Page <span class=\"pdf-current-page\">1</span> / <span class=\"pdf-total-pages\">?</span>",
+  "web.preview.pdfNext": "Next Page ▶",
+  "web.preview.pdfLoading": "Loading PDF...",
+  "web.preview.copyCode": "Copy",
+  "api.dialog.selectProjectDir": "Select project directory"
 }

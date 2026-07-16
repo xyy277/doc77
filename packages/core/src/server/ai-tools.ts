@@ -12,6 +12,8 @@
  * is unit-testable without a live database.
  */
 
+import { t } from '../i18n/index.js';
+
 /** MCP write functions (each enqueues a pending task and returns its id). */
 export interface AiWriteFns {
   moveFile: (
@@ -94,9 +96,9 @@ export async function executeAiWriteTool(
     name === 'batch_operations'
       ? ((args.operations as Array<{ type: string }>) || []).map((o) => o.type)
       : [name];
-  for (const t of opTypes) {
-    if (!allowed.has(t)) {
-      return `Error: 当前风险等级 "${deps.getRiskLevel()}" 不允许 ${t} 操作。请在设置中调高 ai.risk_level 后重试。`;
+  for (const opType of opTypes) {
+    if (!allowed.has(opType)) {
+      return t('ai.runtime.riskLevelDenied', { riskLevel: deps.getRiskLevel(), opType });
     }
   }
 
@@ -109,7 +111,7 @@ export async function executeAiWriteTool(
       : pathsForOp(name, args);
   for (const p of allPaths) {
     if (deps.isSensitiveFile(basename(p))) {
-      return `Error: 路径 "${p}" 指向敏感文件（sensitive file），已拒绝。`;
+      return t('ai.runtime.sensitiveRejected', { filePath: p });
     }
   }
 
@@ -119,25 +121,25 @@ export async function executeAiWriteTool(
   switch (name) {
     case 'move_file':
       task = await deps.writeFns.moveFile(pid, sid, args.source as string, args.target as string);
-      desc = `移动 ${args.source} → ${args.target}`;
+      desc = t('ai.runtime.descMove', { source: args.source as string, target: args.target as string });
       break;
     case 'create_folder':
       task = await deps.writeFns.createFolder(pid, sid, args.folder_path as string);
-      desc = `创建目录 ${args.folder_path}`;
+      desc = t('ai.runtime.descCreateFolder', { folderPath: args.folder_path as string });
       break;
     case 'delete_file':
       task = await deps.writeFns.deleteFile(pid, sid, args.file_path as string);
-      desc = `删除 ${args.file_path}`;
+      desc = t('ai.runtime.descDelete', { filePath: args.file_path as string });
       break;
     case 'batch_operations': {
       const ops = (args.operations as Array<Record<string, unknown>>) || [];
       task = await deps.writeFns.batchOperations(pid, sid, ops);
-      desc = `批量操作 ${ops.length} 项`;
+      desc = t('ai.runtime.descBatch', { count: ops.length });
       break;
     }
     default:
       return `Error: Unknown write tool "${name}"`;
   }
 
-  return `[待审批] 已加入审批队列，任务ID: ${task.task_id}（${desc}）。请前往「审批」标签页查看并批准；批准前不会执行。`;
+  return t('ai.runtime.queuedForApproval', { taskId: task.task_id, desc });
 }

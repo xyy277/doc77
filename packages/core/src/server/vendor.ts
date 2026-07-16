@@ -3,6 +3,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { t } from '../i18n/index.js';
 
 export interface VendorAsset {
   name: string; // local filename under vendor/
@@ -102,7 +103,7 @@ export async function fetchVendorAssets(vendorDir: string, assets: VendorAsset[]
   for (const asset of assets) {
     const dest = path.join(vendorDir, asset.name);
     if (fs.existsSync(dest)) {
-      console.log(`  ✓ ${asset.name} (已存在)`);
+      console.log(t('cli.vendor.assetExists', { name: asset.name }));
       continue;
     }
     try {

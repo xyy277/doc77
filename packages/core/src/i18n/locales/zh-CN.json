@@ -48,5 +48,19 @@
   "ai.context.emptyDir": "(空目录)",
   "ai.context.projectInfo": "当前项目: {name} (路径: {path})\n根目录内容:\n{fileList}",
   "ai.context.fileDirective": "以下是文档「{file}」的完整内容，请直接基于它作答，无需调用任何工具：",
-  "ai.context.serviceError": "AI 服务异常: {msg}"
+  "ai.context.serviceError": "AI 服务异常: {msg}",
+  "ai.runtime.riskLevelDenied": "Error: 当前风险等级 \"{riskLevel}\" 不允许 {opType} 操作。请在设置中调高 ai.risk_level 后重试。",
+  "ai.runtime.sensitiveRejected": "Error: 路径 \"{filePath}\" 指向敏感文件（sensitive file），已拒绝。",
+  "ai.runtime.descMove": "移动 {source} → {target}",
+  "ai.runtime.descCreateFolder": "创建目录 {folderPath}",
+  "ai.runtime.descDelete": "删除 {filePath}",
+  "ai.runtime.descBatch": "批量操作 {count} 项",
+  "ai.runtime.queuedForApproval": "[待审批] 已加入审批队列，任务ID: {taskId}（{desc}）。请前往「审批」标签页查看并批准；批准前不会执行。",
+  "cli.vendor.assetExists": "  ✓ {name} (已存在)",
+  "web.preview.pdfPrev": "◀ 上一页",
+  "web.preview.pdfPageInfo": "第 <span class=\"pdf-current-page\">1</span> / <span class=\"pdf-total-pages\">?</span> 页",
+  "web.preview.pdfNext": "下一页 ▶",
+  "web.preview.pdfLoading": "加载 PDF 中...",
+  "web.preview.copyCode": "复制",
+  "api.dialog.selectProjectDir": "选择项目目录"
 }

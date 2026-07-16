@@ -9,7 +9,10 @@ import {
   runMigrations,
   isSensitiveFile,
   executeAiWriteTool,
+  initI18n,
 } from '@doc77/core';
+
+beforeAll(() => initI18n('zh-CN'));
 import { createSession } from '../src/session.js';
 import { getPendingTasks, updateTaskStatus } from '../src/queue/index.js';
 import { moveFile, createFolder, deleteFile, batchOperations } from '../src/tools/write.js';

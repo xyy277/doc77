@@ -1,6 +1,7 @@
 import { marked } from 'marked';
 import * as path from 'node:path';
 import { deflateSync } from 'node:zlib';
+import { t } from '../i18n/index.js';
 
 /** Encode PlantUML source for kroki.io GET API (deflate + base64url). */
 function encodePlantUML(text: string): string {
@@ -308,7 +309,7 @@ export function renderMarkdown(
     const langClass = lang ? ` class="language-${lang}"` : '';
     return (
       `<div class="doc77-code-block">` +
-      `<button class="code-copy-btn" title="复制" onclick="copyCode(this)"></button>` +
+      `<button class="code-copy-btn" title="${t('web.preview.copyCode')}" onclick="copyCode(this)"></button>` +
       `<pre><code${langClass}>${text}</code></pre>` +
       `</div>`
     );

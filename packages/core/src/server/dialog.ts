@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { t } from '../i18n/index.js';
 
 /**
  * Detect WSL by checking /proc/version.
@@ -133,7 +134,7 @@ function linuxDialog(): Promise<string | null> {
     // Try zenity first
     execFile(
       'zenity',
-      ['--file-selection', '--directory', '--title=选择项目目录'],
+      ['--file-selection', '--directory', `--title=${t('api.dialog.selectProjectDir')}`],
       { timeout: 120000 },
       (err, stdout) => {
         if (!err && stdout) {
@@ -153,7 +154,7 @@ function linuxDialog(): Promise<string | null> {
             // Fallback to yad
             execFile(
               'yad',
-              ['--file-selection', '--directory', '--title=选择项目目录'],
+              ['--file-selection', '--directory', `--title=${t('api.dialog.selectProjectDir')}`],
               { timeout: 120000 },
               (err3, stdout3) => {
                 if (!err3 && stdout3) {
@@ -174,7 +175,7 @@ function linuxDialog(): Promise<string | null> {
 function tryTkDialog(): Promise<string | null> {
   return new Promise((resolve) => {
     const pyScript =
-      'import tkinter.filedialog as fd, tkinter as tk; root=tk.Tk(); root.withdraw(); print(fd.askdirectory(title="选择项目目录") or "")';
+      `import tkinter.filedialog as fd, tkinter as tk; root=tk.Tk(); root.withdraw(); print(fd.askdirectory(title="${t('api.dialog.selectProjectDir')}") or "")`;
     execFile('python3', ['-c', pyScript], { timeout: 120000 }, (err, stdout) => {
       if (err || !stdout) {
         resolve(null);
@@ -192,7 +193,7 @@ function macDialog(): Promise<string | null> {
   return new Promise((resolve) => {
     execFile(
       'osascript',
-      ['-e', 'POSIX path of (choose folder with prompt "选择项目目录")'],
+      ['-e', `POSIX path of (choose folder with prompt "${t('api.dialog.selectProjectDir')}")`],
       { timeout: 120000 },
       (err, stdout) => {
         if (err || !stdout) {
@@ -209,7 +210,7 @@ function macDialog(): Promise<string | null> {
 
 function winDialog(): Promise<string | null> {
   return new Promise((resolve) => {
-    const psScript = `Add-Type -AssemblyName System.Windows.Forms;$d=New-Object System.Windows.Forms.FolderBrowserDialog;$d.Description='选择项目目录';$d.ShowNewFolderButton=1;if($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){Write-Output $d.SelectedPath}`;
+    const psScript = `Add-Type -AssemblyName System.Windows.Forms;$d=New-Object System.Windows.Forms.FolderBrowserDialog;$d.Description='${t('api.dialog.selectProjectDir')}';$d.ShowNewFolderButton=1;if($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){Write-Output $d.SelectedPath}`;
     execFile(
       'powershell',
       ['-NoProfile', '-Command', psScript],
