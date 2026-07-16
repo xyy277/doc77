@@ -10,5 +10,5 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/main.ts", "src/server.ts", "src/tray.ts"]
+  "include": ["src/main.ts", "src/server.ts", "src/tray.ts", "src/shims.d.ts"]
 }

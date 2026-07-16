@@ -4,6 +4,7 @@
  */
 import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
+import { t } from '@doc77/core';
 import { findAvailablePort, startServer, ServerProcess } from './server';
 import { createTray } from './tray';
 
@@ -66,7 +67,7 @@ ipcMain.handle('dialog:openDirectory', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
-    title: '选择项目目录',
+    title: t('electron.dialog.selectDir'),
   });
   return result.canceled ? null : result.filePaths[0];
 });

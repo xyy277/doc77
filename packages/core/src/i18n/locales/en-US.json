@@ -166,5 +166,8 @@
   "cli.discover.pathLabel": "     Path: {path}",
   "cli.discover.markdownLabel": "     Markdown: {count}",
   "cli.discover.hasReadme": " (includes README)",
-  "cli.discover.registerUsage": "Register with: doc77 register <path> --name \"<name>\""
+  "cli.discover.registerUsage": "Register with: doc77 register <path> --name \"<name>\"",
+  "electron.tray.open": "📁 Open Doc77",
+  "electron.tray.quit": "❌ Quit Doc77",
+  "electron.dialog.selectDir": "Select project directory"
 }

@@ -2,6 +2,7 @@
  * Doc77 Electron — System tray
  */
 import { Tray, Menu, app, nativeImage } from 'electron';
+import { t } from '@doc77/core';
 
 export function createTray(iconPath: string, onClick: () => void): Tray {
   const icon = nativeImage.createFromPath(iconPath);
@@ -10,12 +11,12 @@ export function createTray(iconPath: string, onClick: () => void): Tray {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '📁 打开 Doc77',
+      label: t('electron.tray.open'),
       click: () => onClick(),
     },
     { type: 'separator' },
     {
-      label: '❌ 退出 Doc77',
+      label: t('electron.tray.quit'),
       click: () => {
         app.quit();
       },

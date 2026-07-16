@@ -165,5 +165,8 @@
   "cli.discover.pathLabel": "     路径: {path}",
   "cli.discover.markdownLabel": "     Markdown: {count} 个",
   "cli.discover.hasReadme": " (含 README)",
-  "cli.discover.registerUsage": "使用 doc77 register <路径> --name \"<名称>\" 注册项目"
+  "cli.discover.registerUsage": "使用 doc77 register <路径> --name \"<名称>\" 注册项目",
+  "electron.tray.open": "📁 打开 Doc77",
+  "electron.tray.quit": "❌ 退出 Doc77",
+  "electron.dialog.selectDir": "选择项目目录"
 }
