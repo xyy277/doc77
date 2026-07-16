@@ -37,7 +37,7 @@ export function renderSharePage(token: { documentTitle: string; theme: string })
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(token.documentTitle)} — Doc77</title>
 <style>
-:root{--bg-body:#f8fafc;--text-primary:#1e293b;--text-secondary:#64748b;--border-light:#e2e8f0;--accent:#6366f1}.dark{--bg-body:#0f172a;--text-primary:#e2e8f0;--text-secondary:#94a3b8;--border-light:#334155;--accent:#818cf8}
+:root{--bg-body:#f8fafc;--bg-code:#f1f5f9;--text-primary:#1e293b;--text-secondary:#64748b;--border-light:#e2e8f0;--accent:#6366f1}.dark{--bg-body:#0f172a;--bg-code:#1e293b;--text-primary:#e2e8f0;--text-secondary:#94a3b8;--border-light:#334155;--accent:#818cf8}
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;background:var(--bg-body);color:var(--text-primary);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.6}
 .doc77-share-page{min-height:100vh;display:flex;flex-direction:column}
@@ -69,7 +69,6 @@ body{margin:0;background:var(--bg-body);color:var(--text-primary);font-family:-a
   </footer>
 </div>
 <script>
-const token = '${token.documentTitle.replace(/['\\]/g, '\\$&')}'; // not used as security — just for context
 fetch('/api/share/' + window.location.pathname.split('/').pop() + '/data')
   .then(function(r){ if(!r.ok) throw new Error('not found'); return r.json(); })
   .then(function(d){

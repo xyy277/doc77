@@ -1125,22 +1125,39 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
   app.post('/api/export/html', async (req: Request, res: Response) => {
     try {
-      const { title, content, styles, images, theme } = req.body;
+      const { title, content, styles, images, theme, projectId } = req.body;
 
       if (!content || typeof content !== 'string') {
         res.status(400).json({ error: 'content is required' });
         return;
       }
 
-      // Resolve local images to base64
+      // Require projectId for path validation
+      if (!projectId) {
+        res.status(400).json({ error: 'projectId is required' });
+        return;
+      }
+
+      // Look up the project from the DB and resolve project root
+      const db = getConnection();
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+      const projectRoot = resolveProjectPath(project.path);
+
+      // Resolve local images to base64 with path validation
       const resolvedImages: Array<{ url: string; base64: string }> = [];
       if (Array.isArray(images)) {
         for (const img of images) {
           if (!img.url || !img.path) continue;
           try {
-            // img.path is the physical file path (resolved by frontend from project root)
-            const data = fs.readFileSync(img.path);
-            const ext = path.extname(img.path).toLowerCase();
+            // Validate the image path against the project root
+            const validatedPath = validatePath(projectRoot, img.path);
+            const data = fs.readFileSync(validatedPath);
+            const ext = path.extname(validatedPath).toLowerCase();
             const mimeMap: Record<string, string> = {
               '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
               '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
@@ -1155,7 +1172,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       }
 
       const maxSize = parseInt(getConfig('export.html.maxFileSizeMB') || '10', 10);
-      const htmlSizeKB = Math.round((content.length + JSON.stringify(styles).length) / 1024);
+      const htmlSizeKB = Math.round((content.length + JSON.stringify(styles).length + JSON.stringify(images || []).length) / 1024);
       if (htmlSizeKB > maxSize * 1024) {
         res.status(413).json({ error: `文件过大 (${Math.round(htmlSizeKB/1024)}MB)，导出上限 ${maxSize}MB` });
         return;
@@ -1213,7 +1230,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         return;
       }
 
-      const ttlHours = parseInt(getConfig('export.share.ttl_hours') || '24', 10);
+      const ttlHours = parseInt(getConfig('export.share.ttl_hours') || '24', 10) || 24;
       const ttlMs = Math.min(Math.max(ttlHours, 1), 168) * 60 * 60 * 1000; // 1h min, 168h max
 
       const token = shareManager.create({
@@ -2531,9 +2548,11 @@ function getFileCategory(filePath: string): string {
 /**
  * Look up a project by its numeric ID.
  */
-function getProjectById(id: number) {
+function getProjectById(id: number | string) {
+  const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+  if (isNaN(numericId)) return undefined;
   const projects = listProjects();
-  return projects.find((p: any) => p.id === id);
+  return projects.find((p: any) => p.id === numericId);
 }
 
 /**
