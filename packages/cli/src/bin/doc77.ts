@@ -21,10 +21,15 @@ import {
   removeProject,
   updateProject,
   discoverProjects,
+  t,
+  initI18n,
 } from '@doc77/core';
 
 import { VERSION } from '../version.gen.js';
 const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
+
+// Phase 1 i18n init: detect system locale before DB is available
+initI18n('');
 
 // Module availability — checked at startup, cached for session
 let mcpAvailable = false;
@@ -60,10 +65,12 @@ async function init() {
   await initDatabase(DB_PATH);
   runMigrations();
   loadDefaults();
+  // Phase 2 i18n init: use DB-persisted locale config
+  initI18n(getConfig('locale.language') || '');
 }
 
 /** Read a password from stdin without echoing. */
-function askPassword(prompt: string = '请输入密码（至少6位）'): Promise<string> {
+function askPassword(prompt: string = t('cli.password.prompt')): Promise<string> {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     // Use stdin raw mode to hide echo (not perfect but works)
@@ -101,33 +108,33 @@ function askPassword(prompt: string = '请输入密码（至少6位）'): Promis
 
 /** Set password via CLI command. */
 async function setPasswordInteractive(): Promise<void> {
-  const pwd = await askPassword('请输入新密码（至少6位）');
+  const pwd = await askPassword(t('cli.password.promptNew'));
   if (pwd.length < 6) {
-    console.error('❌ 密码至少6位');
+    console.error(t('cli.password.tooShort'));
     process.exit(1);
   }
-  const confirm = await askPassword('请再次输入密码');
+  const confirm = await askPassword(t('cli.password.promptConfirm'));
   if (pwd !== confirm) {
-    console.error('❌ 两次密码不一致');
+    console.error(t('cli.password.mismatch'));
     process.exit(1);
   }
   const { setupPasswordWithDEK } = await import('@doc77/core');
   const codes = setupPasswordWithDEK(pwd);
   if (!codes) {
-    console.error('❌ 密码已设置，如需修改请使用 change-password 命令');
+    console.error(t('cli.password.alreadySet'));
     process.exit(1);
   }
-  console.log('✅ 密码已设置');
+  console.log(t('cli.password.setOk'));
   console.log('');
-  console.log('📋 以下是您的恢复码，请妥善保管：');
+  console.log(t('cli.recovery.codesHeader'));
   codes.formatted.forEach((c: string) => console.log(`   ${c}`));
-  console.log('⚠️  这些恢复码仅在本次显示，关闭后将无法再次查看。');
+  console.log(t('cli.recovery.codesWarning'));
 }
 
 function printBanner() {
   const padEnd = (s: string, w: number) => {
     let d = 0;
-    for (const c of s) d += /[一-鿿　-〿＀-￯]/.test(c) ? 2 : 1;
+    for (const c of s) d += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(c) ? 2 : 1;
     return s + ' '.repeat(w - d);
   };
   // Inner width = 36 display columns
@@ -139,10 +146,10 @@ function printBanner() {
       padEnd('Doc77', 34) +
       '║' +
       '\n  ║  ' +
-      padEnd('默认安全 · 对话驱动', 34) +
+      padEnd(t('cli.banner.tagline'), 34) +
       '║' +
       '\n  ║  ' +
-      padEnd('智能本地文档管理 Agent', 34) +
+      padEnd(t('cli.banner.subtitle'), 34) +
       '║' +
       '\n  ║  ' +
       padEnd('v' + VERSION, 34) +
@@ -154,62 +161,7 @@ function printBanner() {
 }
 
 function printHelp() {
-  console.log(`
-Doc77 v${VERSION} — 默认安全、对话驱动的智能本地文档管理 Agent
-
-用法:
-  doc77 <command> [options]
-
-📦 桌面版下载: https://github.com/xyy277/doc77/releases
-
-核心命令:
-  start [--port <n>] [--bind <addr>] [--no-browser]  启动 Web Dashboard
-  discover [path]                     扫描发现候选项目
-  discover --path ~/work              指定扫描目录
-  discover --depth 3                  指定扫描深度（默认2）
-  register <path> [--name <n>]        注册项目
-  list [--json]                       列出所有项目
-  remove <id>                         按 ID 移除项目
-  update <id> [--name <n>] [--path <p>] 更新项目
-  status                              查看服务状态
-  --version                           显示版本号
-  --help                              显示帮助
-
-模块管理:
-  i <ai|mcp|translate|all>            安装可选模块
-  rm <ai|mcp>                         卸载模块
-  vendor-install [--translate <pair>] [--mirror] [--no-pyodide]  下载离线资源
-
-配置管理:
-  config set <key> <value>            设置配置项
-  config get <key>                    获取配置项
-  config list                         列出所有配置
-  config set-password                 设置密码
-  config change-password              修改密码
-  config reset-password               重置密码（需要恢复码）
-  config reset-password --force       强制重置密码（清空加密数据）
-  config recovery-codes               重新生成恢复码
-
-MCP 服务:
-  mcp serve [--http] [--port <n>]    启动 MCP 服务
-
-任务审批:
-  approve --list                      列出待审批任务
-  approve --accept <task_id>          批准指定任务
-  approve --reject <task_id>          拒绝指定任务
-  approve --accept --all              批量批准
-  approve --reject --all              批量拒绝
-
-锁管理:
-  lock status                         查看活跃锁
-  lock release <project_id>           手动释放锁
-
-AI 能力:
-  ai summarize <file>                 总结文档
-  ai classify <dir>                   分析项目结构
-  ai summary <dir>                    生成项目摘要
-  ai chat                             进入对话模式
-`);
+  console.log(t('cli.help.content', { version: VERSION }));
 }
 
 async function main() {
@@ -351,11 +303,9 @@ async function main() {
       // Handle server errors gracefully
       server.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
-          console.error(`\n❌ 端口 ${port} 已被占用。`);
-          console.error(`   请先关闭占用该端口的程序，或使用其他端口：`);
-          console.error(`   doc77 start --port ${port + 1}`);
+          console.error(t('cli.start.portInUse', { port, suggestedPort: port + 1 }));
         } else {
-          console.error(`\n❌ 启动失败: ${err.message}`);
+          console.error(t('cli.start.failed', { message: err.message }));
         }
         closeConnection();
         process.exit(1);
@@ -367,7 +317,7 @@ async function main() {
           .prepare('SELECT password_hash FROM user_auth WHERE id = 1')
           .get() as { password_hash: string } | undefined;
         if (!authRow?.password_hash) {
-          console.log(`\n⚠️  绑定 ${bindAddr} 会将 Doc77 暴露到网络，需要设置访问密码。`);
+          console.log(t('cli.start.noPasswordBind', { addr: bindAddr }));
           // Try interactive password setup
           if (process.stdin.isTTY) {
             const pwd = await askPassword();
@@ -381,28 +331,25 @@ async function main() {
                   'INSERT OR REPLACE INTO user_auth (id, password_hash, pbkdf2_salt, encryption_salt) VALUES (1, ?, ?, ?)',
                 )
                 .run(hash, pbkdf2Salt, encSalt);
-              console.log('✅ 密码已设置\n');
+              console.log(t('cli.start.passwordSetOk'));
             } else {
-              console.error('❌ 密码设置失败，启动取消。\n');
+              console.error(t('cli.start.passwordSetFailed'));
               process.exit(1);
             }
           } else {
-            console.error('❌ 无法交互设置密码（非终端环境）。请先运行:');
-            console.error('   doc77 config set-password');
-            console.error('   或: doc77 start (绑定 127.0.0.1)，通过 Web 设置密码\n');
+            console.error(t('cli.start.noTty'));
             process.exit(1);
           }
         }
-        console.log(`🔒 密码保护已启用 — 绑定 ${bindAddr}`);
+        console.log(t('cli.start.passwordEnabled', { addr: bindAddr }));
       }
       if (!isLocalAddr(bindAddr)) {
-        console.log(`⚠️  绑定 ${bindAddr} — 确保防火墙已配置。`);
+        console.log(t('cli.start.bindWarning', { addr: bindAddr }));
       }
       server.listen(port, bindAddr, () => {
-        console.log(
-          `Doc77 Dashboard: http://${bindAddr === '127.0.0.1' || bindAddr === '::1' || bindAddr === 'localhost' ? 'localhost' : bindAddr}:${port}`,
-        );
-        console.log('💡 桌面版: https://github.com/xyy277/doc77/releases');
+        const displayAddr = bindAddr === '127.0.0.1' || bindAddr === '::1' || bindAddr === 'localhost' ? 'localhost' : bindAddr;
+        console.log(t('cli.start.dashboardUrl', { addr: displayAddr, port }));
+        console.log(t('cli.start.desktopLink'));
       });
 
       // Graceful shutdown
@@ -499,21 +446,21 @@ async function main() {
       } else if (sub === 'set-password') {
         await setPasswordInteractive();
       } else if (sub === 'change-password') {
-        const oldPw = await askPassword('请输入当前密码');
-        const newPw = await askPassword('请输入新密码（至少6位）');
+        const oldPw = await askPassword(t('cli.password.promptCurrent'));
+        const newPw = await askPassword(t('cli.password.promptNew'));
         if (newPw.length < 6) {
-          console.error('❌ 密码至少6位');
+          console.error(t('cli.password.tooShort'));
           process.exit(1);
         }
-        const confirm = await askPassword('请再次输入新密码');
+        const confirm = await askPassword(t('cli.password.promptConfirmNew'));
         if (newPw !== confirm) {
-          console.error('❌ 两次密码不一致');
+          console.error(t('cli.password.mismatch'));
           process.exit(1);
         }
         const { changePassword } = await import('@doc77/core');
         const result = changePassword(oldPw, newPw);
         if (result.ok) {
-          console.log('✅ 密码已修改');
+          console.log(t('cli.config.changePwd.ok'));
         } else {
           console.error(`❌ ${result.error}`);
           process.exit(1);
@@ -524,16 +471,16 @@ async function main() {
           const readline = await import('node:readline');
           const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
           rl.question(
-            '⚠️  此操作将清空所有加密配置（AI Token 等），且不可撤销。\n⚠️  输入 "yes-i-know" 确认: ',
+            t('cli.config.resetPwd.forceConfirm'),
             async (answer: string) => {
               rl.close();
               if (answer.trim() !== 'yes-i-know') {
-                console.error('❌ 操作已取消');
+                console.error(t('cli.config.resetPwd.cancelled'));
                 process.exit(1);
               }
               const { forceResetPassword } = await import('@doc77/core');
               forceResetPassword();
-              console.log('✅ 密码已重置，加密配置已清空');
+              console.log(t('cli.config.resetPwd.ok'));
               process.exit(0);
             },
           );
@@ -541,7 +488,7 @@ async function main() {
         }
         const readline = await import('node:readline');
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        rl.question('请输入恢复码: ', async (rc: string) => {
+        rl.question(t('cli.recovery.prompt'), async (rc: string) => {
           rl.close();
           const { verifyRecoveryCode, resetPasswordWithToken } = await import('@doc77/core');
           const result = verifyRecoveryCode(rc.trim());
@@ -549,42 +496,40 @@ async function main() {
             console.error(`❌ ${result.error}`);
             process.exit(1);
           }
-          console.log('✅ 恢复码验证通过');
-          const newPw = await askPassword('请输入新密码（至少6位）');
+          console.log(t('cli.recovery.verified'));
+          const newPw = await askPassword(t('cli.password.promptNew'));
           if (newPw.length < 6) {
-            console.error('❌ 密码至少6位');
+            console.error(t('cli.password.tooShort'));
             process.exit(1);
           }
-          const confirm = await askPassword('请再次输入新密码');
+          const confirm = await askPassword(t('cli.password.promptConfirmNew'));
           if (newPw !== confirm) {
-            console.error('❌ 两次密码不一致');
+            console.error(t('cli.password.mismatch'));
             process.exit(1);
           }
           const resetResult = resetPasswordWithToken(result.resetToken!, newPw);
           if (resetResult.ok) {
-            console.log(`✅ 密码已重置，该恢复码已失效（剩余 ${result.remaining} 个）`);
+            console.log(t('cli.config.resetPwd.okWithRemaining', { remaining: result.remaining }));
           } else {
             console.error(`❌ ${resetResult.error}`);
             process.exit(1);
           }
         });
       } else if (sub === 'recovery-codes') {
-        const password = await askPassword('请输入当前密码');
+        const password = await askPassword(t('cli.password.promptCurrent'));
         const { regenerateRecoveryCodes } = await import('@doc77/core');
         const rcResult = regenerateRecoveryCodes(password);
         if (rcResult.ok && rcResult.codes) {
-          console.log('📋 以下是您的新恢复码，请妥善保管：');
+          console.log(t('cli.recovery.newCodesHeader'));
           rcResult.codes.formatted.forEach((c: string) => console.log(`   ${c}`));
-          console.log('⚠️  旧恢复码已全部作废。');
-          console.log('⚠️  这些恢复码仅在本次显示，关闭后将无法再次查看。');
+          console.log(t('cli.recovery.oldCodesInvalidated'));
+          console.log(t('cli.recovery.codesWarning'));
         } else {
           console.error(`❌ ${rcResult.error}`);
           process.exit(1);
         }
       } else {
-        console.error(
-          'Usage: doc77 config set|get|list|set-password|change-password|reset-password|recovery-codes [key] [value]',
-        );
+        console.error(t('cli.config.usage'));
         process.exit(1);
       }
       break;
@@ -598,7 +543,7 @@ async function main() {
         'executeApprovedTasks',
       ]);
       if (!mcp) {
-        console.error('MCP 模块未安装。安装: doc77 i mcp');
+        console.error(t('cli.mcp.notInstalled'));
         break;
       }
       if (args.includes('--list')) {
@@ -661,7 +606,7 @@ async function main() {
     case 'lock': {
       const mcp = await tryGetMcp(['getActiveLock', 'releaseProjectLock']);
       if (!mcp) {
-        console.error('MCP 模块未安装。安装: doc77 i mcp');
+        console.error(t('cli.mcp.notInstalled'));
         break;
       }
       if (args[1] === 'status') {
@@ -693,31 +638,31 @@ async function main() {
             ? ['en-zh', 'zh-en']
             : pairArg.split(',').filter((p: string) => p === 'en-zh' || p === 'zh-en');
         if (!pairs.length) {
-          console.error('用法: doc77 vendor-install --translate <en-zh|zh-en|all>');
+          console.error(t('cli.translate.usage'));
           break;
         }
         const { isEngineAvailable, translate, MODEL_PAIRS } = await import('@doc77/core');
         if (!(await isEngineAvailable())) {
-          console.error('❌ 翻译引擎未安装。请先运行：doc77 i translate');
+          console.error(t('cli.translate.engineNotAvailable'));
           break;
         }
         if (args.includes('--mirror')) {
           setConfig('translate.mirror', 'true');
-          console.log('🌐 使用国内镜像 (hf-mirror.com)');
+          console.log(t('cli.translate.mirrorEnabled'));
         }
         for (const pair of pairs) {
           const mi = MODEL_PAIRS[pair];
-          console.log(`📥 下载模型 ${mi.displayName} (${mi.size})...`);
+          console.log(t('cli.translate.downloading', { displayName: mi.displayName, size: mi.size }));
           try {
             await translate('Hello', mi.sourceLang, mi.targetLang);
-            console.log(`  ✅ ${mi.displayName} 就绪`);
+            console.log(t('cli.translate.modelReady', { displayName: mi.displayName }));
           } catch (e: unknown) {
             console.error(
-              `  ❌ ${mi.displayName} 下载失败: ${e instanceof Error ? e.message : 'Unknown'}`,
+              t('cli.translate.downloadFailed', { displayName: mi.displayName, error: e instanceof Error ? e.message : 'Unknown' }),
             );
           }
         }
-        console.log('✅ 翻译模型下载完成！');
+        console.log(t('cli.translate.downloadComplete'));
         break;
       }
       const vendorDir = path.join(os.homedir(), '.doc77', 'vendor');
@@ -726,9 +671,9 @@ async function main() {
       const assets = skipPyodide
         ? VENDOR_ASSETS.filter((a) => !a.name.includes('pyodide'))
         : VENDOR_ASSETS;
-      console.log(`下载 ${assets.length} 个资源到 ${vendorDir}...`);
+      console.log(t('cli.vendor.downloadingAssets', { count: assets.length, dir: vendorDir }));
       await fetchVendorAssets(vendorDir, assets);
-      console.log('✅ Vendor 资源下载完成！离线模式已就绪。');
+      console.log(t('cli.vendor.complete'));
       break;
     }
 
@@ -745,37 +690,37 @@ async function main() {
         .filter((m: string) => ['ai', 'mcp', 'translate', 'all'].includes(m));
       if (modules.includes('all')) modules = ['ai', 'mcp', 'translate'];
       if (!modules.length) {
-        console.log('用法: doc77 i <ai|mcp|translate|all>');
+        console.log(t('cli.install.usage'));
         break;
       }
       const { execSync } = await import('node:child_process');
       for (const m of modules) {
         if (m === 'translate') {
-          console.log('安装 @huggingface/transformers（翻译引擎）...');
+          console.log(t('cli.install.installingTransformers'));
           execSync('npm install @huggingface/transformers@latest', { stdio: 'inherit' });
-          console.log('✅ 翻译引擎安装完成');
+          console.log(t('cli.install.transformersOk'));
         } else {
-          console.log(`安装 @doc77/${m}...`);
+          console.log(t('cli.install.installingModule', { mod: m }));
           execSync(`npm install @doc77/${m}@latest`, { stdio: 'inherit' });
-          console.log(`✅ @doc77/${m} 安装完成`);
+          console.log(t('cli.install.moduleOk', { mod: m }));
         }
       }
-      console.log('重启 Doc77 服务生效');
+      console.log(t('cli.install.restart'));
       break;
     }
     case 'rm': {
       const modules = args.slice(1).filter((m: string) => ['ai', 'mcp'].includes(m));
       if (!modules.length) {
-        console.log('用法: doc77 rm <ai|mcp>');
+        console.log(t('cli.install.rmUsage'));
         break;
       }
       const { execSync } = await import('node:child_process');
       for (const m of modules) {
-        console.log(`卸载 @doc77/${m}...`);
+        console.log(t('cli.install.uninstalling', { mod: m }));
         execSync(`npm uninstall @doc77/${m}`, { stdio: 'inherit' });
-        console.log(`✅ @doc77/${m} 已卸载`);
+        console.log(t('cli.install.uninstalled', { mod: m }));
       }
-      console.log('重启 Doc77 服务生效');
+      console.log(t('cli.install.restart'));
       break;
     }
 
@@ -783,7 +728,7 @@ async function main() {
       if (args[1] === 'serve') {
         const mcp = await tryGetMcp(['createMcpServer']);
         if (!mcp) {
-          console.error('MCP 模块未安装。安装: doc77 i mcp');
+          console.error(t('cli.mcp.notInstalled'));
           break;
         }
         const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
@@ -828,20 +773,20 @@ async function main() {
         }
       }
 
-      console.log(`🔍 扫描目录: ${discoverPath} (深度: ${depth})`);
+      console.log(t('cli.discover.scanning', { path: discoverPath, depth }));
       const results = discoverProjects(discoverPath, depth, new Set());
 
       if (results.length === 0) {
-        console.log('未发现候选项目（需要 .git + 至少 1 个 .md 文件）');
+        console.log(t('cli.discover.noCandidates'));
       } else {
-        console.log(`\n发现 ${results.length} 个候选项目:\n`);
+        console.log(t('cli.discover.foundCandidates', { count: results.length }));
         for (const r of results) {
           console.log(`  📂 ${r.name}`);
-          console.log(`     路径: ${r.path}`);
-          console.log(`     Markdown: ${r.mdCount} 个${r.hasReadme ? ' (含 README)' : ''}`);
+          console.log(t('cli.discover.pathLabel', { path: r.path }));
+          console.log(t('cli.discover.markdownLabel', { count: r.mdCount }) + (r.hasReadme ? t('cli.discover.hasReadme') : ''));
           console.log('');
         }
-        console.log('使用 doc77 register <路径> --name "<名称>" 注册项目');
+        console.log(t('cli.discover.registerUsage'));
       }
       break;
     }
