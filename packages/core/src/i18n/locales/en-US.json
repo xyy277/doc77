@@ -1,0 +1,6 @@
+{
+  "_meta": { "code": "en-US", "name": "English" },
+  "test.hello": "Hello",
+  "test.enOnly": "English only",
+  "test.sized": "Limit {maxSizeMB}MB"
+}

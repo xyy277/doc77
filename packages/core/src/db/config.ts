@@ -39,6 +39,7 @@ const DEFAULTS: Record<string, string> = {
   'translate.default_source': 'auto',
   'translate.default_target': 'zh',
   'translate.max_segment_length': '500',
+  'locale.language': '', // 空值 = 自动检测（系统 LANG / 浏览器 hint）
 };
 
 /**

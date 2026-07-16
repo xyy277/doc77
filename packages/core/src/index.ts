@@ -26,6 +26,18 @@ export {
 } from './crypto.js';
 export type { EncryptedData } from './crypto.js';
 
+// i18n
+export {
+  initI18n,
+  t,
+  setLocale,
+  getLocale,
+  listLocales,
+  resolveLocale,
+  getDict,
+} from './i18n/index.js';
+export type { LocaleInfo } from './i18n/index.js';
+
 // Database
 export {
   initDatabase,
