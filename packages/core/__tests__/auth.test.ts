@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
+import { initI18n } from '../src/i18n/index.js';
 import {
   setupPasswordWithDEK,
   verifyLogin,
@@ -21,6 +22,7 @@ let testDir: string;
 let dbPath: string;
 
 beforeAll(async () => {
+  initI18n('zh-CN');
   testDir = path.join(
     os.tmpdir(),
     `doc77-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -76,7 +78,7 @@ describe('Login', () => {
     const result = verifyLogin('wrong-password');
     expect(result.ok).toBe(false);
     expect(result.status).toBe(401);
-    expect(result.error).toMatch(/密码错误/);
+    expect(result.code).toBe('WRONG_PASSWORD');
   });
 });
 

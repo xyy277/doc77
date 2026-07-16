@@ -1,6 +1,7 @@
 import { getConnection } from '../db/connection.js';
 import * as crypto from '../crypto.js';
 import { createHmac } from 'node:crypto';
+import { t } from '../i18n/index.js';
 
 // ---------------------------------------------------------------------------
 // Audit logging
@@ -335,17 +336,18 @@ export function verifyLogin(password: string): {
   token?: string;
   legacyMigration?: boolean;
   error?: string;
+  code?: string;
   status: number;
 } {
   const db = getConnection();
   const row = getAuthRow();
 
   if (!row?.password_hash) {
-    return { ok: false, error: '未设置密码', status: 404 };
+    return { ok: false, error: t('api.auth.noPassword'), code: 'NO_PASSWORD', status: 404 };
   }
 
   if (row.locked_until && new Date(row.locked_until as string) > new Date()) {
-    return { ok: false, error: '账户已锁定，请稍后再试', status: 423 };
+    return { ok: false, error: t('api.auth.accountLocked'), code: 'ACCOUNT_LOCKED', status: 423 };
   }
 
   if (!crypto.verifyPassword(password, row.password_hash as string)) {
@@ -354,7 +356,8 @@ export function verifyLogin(password: string): {
       // Legacy hash detected — user must re-set password with new scrypt params
       return {
         ok: false,
-        error: '系统已升级，请重新设置密码',
+        error: t('api.auth.passwordResetRequired'),
+        code: 'PASSWORD_RESET_REQUIRED',
         status: 410,
         legacyMigration: true,
       };
@@ -365,10 +368,10 @@ export function verifyLogin(password: string): {
       db.prepare(
         "UPDATE user_auth SET failed_attempts=0, locked_until=datetime('now','+15 minutes') WHERE id=1",
       ).run();
-      return { ok: false, error: '密码错误次数过多，已锁定15分钟', status: 423 };
+      return { ok: false, error: t('api.auth.tooManyAttempts'), code: 'TOO_MANY_ATTEMPTS', status: 423 };
     }
     db.prepare('UPDATE user_auth SET failed_attempts=? WHERE id=1').run(fails);
-    return { ok: false, error: `密码错误（${fails}/5）`, status: 401 };
+    return { ok: false, error: t('api.auth.wrongPassword', { fails, max: 5 }), code: 'WRONG_PASSWORD', status: 401 };
   }
 
   db.prepare('UPDATE user_auth SET failed_attempts=0, locked_until=NULL WHERE id=1').run();
@@ -384,20 +387,21 @@ export function verifyRecoveryCode(rcInput: string): {
   resetToken?: string;
   remaining?: number;
   error?: string;
+  code?: string;
   status: number;
 } {
   const db = getConnection();
   const row = getAuthRow();
 
   if (!row?.recovery_code_hashes) {
-    return { ok: false, error: '未设置恢复码', status: 404 };
+    return { ok: false, error: t('api.auth.noRecoveryCode'), code: 'NO_RECOVERY_CODE', status: 404 };
   }
 
   if (row.recovery_locked_until && new Date(row.recovery_locked_until as string) > new Date()) {
     const mins = Math.ceil(
       (new Date(row.recovery_locked_until as string).getTime() - Date.now()) / 60000,
     );
-    return { ok: false, error: `recovery_locked (${mins} min)`, status: 423 };
+    return { ok: false, error: `recovery_locked (${mins} min)`, code: 'RECOVERY_LOCKED', status: 423 };
   }
 
   // Normalize: remove dashes
@@ -418,12 +422,13 @@ export function verifyRecoveryCode(rcInput: string): {
       db.prepare(
         "UPDATE user_auth SET recovery_attempts=0, recovery_locked_until=datetime('now','+15 minutes') WHERE id=1",
       ).run();
-      return { ok: false, error: 'recovery_locked (15 min)', status: 423 };
+      return { ok: false, error: 'recovery_locked (15 min)', code: 'RECOVERY_LOCKED', status: 423 };
     }
     db.prepare('UPDATE user_auth SET recovery_attempts=? WHERE id=1').run(fails);
     return {
       ok: false,
       error: `invalid_recovery_code (${fails}/5)`,
+      code: 'INVALID_RECOVERY_CODE',
       status: 401,
     };
   }
@@ -435,18 +440,19 @@ export function verifyRecoveryCode(rcInput: string): {
       db.prepare(
         "UPDATE user_auth SET recovery_attempts=0, recovery_locked_until=datetime('now','+15 minutes') WHERE id=1",
       ).run();
-      return { ok: false, error: 'recovery_locked (15 min)', status: 423 };
+      return { ok: false, error: 'recovery_locked (15 min)', code: 'RECOVERY_LOCKED', status: 423 };
     }
     db.prepare('UPDATE user_auth SET recovery_attempts=? WHERE id=1').run(fails);
     return {
       ok: false,
       error: `invalid_recovery_code (${fails}/5)`,
+      code: 'INVALID_RECOVERY_CODE',
       status: 401,
     };
   }
 
   if (used[matchIdx]) {
-    return { ok: false, error: 'recovery_code_already_used', status: 401 };
+    return { ok: false, error: 'recovery_code_already_used', code: 'RECOVERY_CODE_USED', status: 401 };
   }
 
   // Unwrap DEK with recovery code
@@ -455,7 +461,7 @@ export function verifyRecoveryCode(rcInput: string): {
   try {
     dek = crypto.unwrapDEK(wrappedByRc[matchIdx], rcWrapKey);
   } catch {
-    return { ok: false, error: 'dek_unwrap_failed', status: 500 };
+    return { ok: false, error: 'dek_unwrap_failed', code: 'DEK_UNWRAP_FAILED', status: 500 };
   }
 
   // Sign reset token — store DEK in in-memory state
@@ -483,13 +489,13 @@ export function resetPasswordWithToken(
   resetToken: string,
   newPassword: string,
   source = 'web',
-): { ok: boolean; error?: string; status: number } {
+): { ok: boolean; error?: string; code?: string; status: number } {
   const { valid, codeIndex } = verifyStoredResetToken(resetToken);
   if (!valid || codeIndex === undefined) {
     if (resetState.has(resetToken)) {
-      return { ok: false, error: 'reset_token_expired', status: 401 };
+      return { ok: false, error: 'reset_token_expired', code: 'RESET_TOKEN_EXPIRED', status: 401 };
     }
-    return { ok: false, error: 'reset_token_invalid', status: 401 };
+    return { ok: false, error: 'reset_token_invalid', code: 'RESET_TOKEN_INVALID', status: 401 };
   }
 
   const state = resetState.get(resetToken)!;
@@ -546,12 +552,12 @@ export function changePassword(
   oldPassword: string,
   newPassword: string,
   source = 'web',
-): { ok: boolean; codes?: crypto.RecoveryCodeSet; error?: string; status: number } {
+): { ok: boolean; codes?: crypto.RecoveryCodeSet; error?: string; code?: string; status: number } {
   const db = getConnection();
   const row = getAuthRow();
 
   if (!row?.password_hash) {
-    return { ok: false, error: '未设置密码', status: 404 };
+    return { ok: false, error: t('api.auth.noPassword'), code: 'NO_PASSWORD', status: 404 };
   }
 
   // Try new params first (N=131072), then legacy (N=16384)
@@ -559,7 +565,7 @@ export function changePassword(
     !crypto.verifyPassword(oldPassword, row.password_hash as string) &&
     !crypto.verifyPasswordLegacy(oldPassword, row.password_hash as string)
   ) {
-    return { ok: false, error: 'current_password_wrong', status: 401 };
+    return { ok: false, error: 'current_password_wrong', code: 'CURRENT_PASSWORD_WRONG', status: 401 };
   }
 
   // Check if legacy mode — migrate to envelope encryption
@@ -637,7 +643,7 @@ export function changePassword(
     const wrapped: crypto.EncryptedData = JSON.parse(row.wrapped_dek_by_password as string);
     dek = crypto.unwrapDEK(wrapped, oldPwWrapKey);
   } catch {
-    return { ok: false, error: 'dek_unwrap_failed', status: 500 };
+    return { ok: false, error: 'dek_unwrap_failed', code: 'DEK_UNWRAP_FAILED', status: 500 };
   }
 
   const newPwSalt = crypto.generateSalt();
@@ -694,13 +700,14 @@ export function regenerateRecoveryCodes(
   ok: boolean;
   codes?: crypto.RecoveryCodeSet;
   error?: string;
+  code?: string;
   status: number;
 } {
   const db = getConnection();
   const row = getAuthRow();
 
   if (!row?.password_hash) {
-    return { ok: false, error: '未设置密码', status: 404 };
+    return { ok: false, error: t('api.auth.noPassword'), code: 'NO_PASSWORD', status: 404 };
   }
 
   // Verify password (try new params first, then legacy)
@@ -708,7 +715,7 @@ export function regenerateRecoveryCodes(
     !crypto.verifyPassword(password, row.password_hash as string) &&
     !crypto.verifyPasswordLegacy(password, row.password_hash as string)
   ) {
-    return { ok: false, error: 'current_password_wrong', status: 401 };
+    return { ok: false, error: 'current_password_wrong', code: 'CURRENT_PASSWORD_WRONG', status: 401 };
   }
 
   // Unwrap DEK with password using helper

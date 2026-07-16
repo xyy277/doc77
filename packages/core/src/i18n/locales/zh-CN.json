@@ -7,5 +7,15 @@
   "common.settings.followGlobal": "跟随全局",
   "common.settings.autoDetect": "自动检测",
   "common.settings.globalLangSaved": "已保存，MCP 工具描述需重启服务生效",
-  "common.settings.globalLangSaveFailed": "保存失败，请重试"
+  "common.settings.globalLangSaveFailed": "保存失败，请重试",
+  "api.password.tooShort": "密码至少需要 8 个字符",
+  "api.password.mixedCase": "建议同时包含大小写字母",
+  "api.password.requireDigit": "建议包含数字",
+  "api.password.specialChar": "建议包含特殊字符",
+  "api.auth.noPassword": "未设置密码",
+  "api.auth.accountLocked": "账户已锁定，请稍后再试",
+  "api.auth.passwordResetRequired": "系统已升级，请重新设置密码",
+  "api.auth.tooManyAttempts": "密码错误次数过多，已锁定15分钟",
+  "api.auth.wrongPassword": "密码错误（{fails}/{max}）",
+  "api.auth.noRecoveryCode": "未设置恢复码"
 }

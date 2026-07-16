@@ -8,5 +8,15 @@
   "common.settings.followGlobal": "Follow global",
   "common.settings.autoDetect": "Auto-detect",
   "common.settings.globalLangSaved": "Saved. Restart the service for MCP tool descriptions to take effect",
-  "common.settings.globalLangSaveFailed": "Save failed, please try again"
+  "common.settings.globalLangSaveFailed": "Save failed, please try again",
+  "api.password.tooShort": "Password must be at least 8 characters",
+  "api.password.mixedCase": "Use a mix of uppercase and lowercase letters",
+  "api.password.requireDigit": "Include at least one digit",
+  "api.password.specialChar": "Include at least one special character",
+  "api.auth.noPassword": "No password is set",
+  "api.auth.accountLocked": "Account is locked, please try again later",
+  "api.auth.passwordResetRequired": "System has been upgraded, please reset your password",
+  "api.auth.tooManyAttempts": "Too many incorrect attempts, account locked for 15 minutes",
+  "api.auth.wrongPassword": "Incorrect password ({fails}/{max})",
+  "api.auth.noRecoveryCode": "No recovery codes are set"
 }

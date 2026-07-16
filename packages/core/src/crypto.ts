@@ -10,6 +10,8 @@ import {
 import { scryptSync } from 'node:crypto';
 export { scryptSync };
 
+import { t } from './i18n/index.js';
+
 export interface EncryptedData {
   iv: string;
   tag: string;
@@ -109,16 +111,16 @@ export function checkPasswordStrength(password: string): {
   let score = 0;
 
   if (password.length >= 8) score += 1;
-  else feedback.push('密码至少需要 8 个字符');
+  else feedback.push(t('api.password.tooShort'));
 
   if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
-  else feedback.push('建议同时包含大小写字母');
+  else feedback.push(t('api.password.mixedCase'));
 
   if (/\d/.test(password)) score += 1;
-  else feedback.push('建议包含数字');
+  else feedback.push(t('api.password.requireDigit'));
 
   if (/[^A-Za-z0-9]/.test(password)) score += 1;
-  else feedback.push('建议包含特殊字符');
+  else feedback.push(t('api.password.specialChar'));
 
   return { score, feedback };
 }
