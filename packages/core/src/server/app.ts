@@ -42,7 +42,7 @@ import * as auth from './auth.js';
 
 import { VERSION } from '../version.gen.js';
 import { getConfig } from '../db/config.js';
-import { initI18n } from '../i18n/index.js';
+import { initI18n, t } from '../i18n/index.js';
 import { buildI18nResponse } from './i18n-route.js';
 
 /** Lazy import from @doc77/mcp — optional peer dep, may not be installed */
@@ -70,7 +70,7 @@ export function setCapabilities(caps: { ai: boolean; mcp: boolean; translate: bo
 export function createApp(restartCallback?: () => void, bindAddr?: string, port?: number) {
   const app = express();
 
-  // i18n：按全局配置初始化（config 为空 = 自动检测系统语言）
+  // Initialize i18n from global config (empty config = auto-detect system language)
   initI18n(getConfig('locale.language') || '');
 
   // --- Middleware ---
@@ -197,7 +197,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
   // --- API Routes ---
 
-  // i18n 词条表下发（带 ETag 缓存）
+  // i18n dictionary delivery (with ETag caching)
   app.get('/api/i18n', (req: Request, res: Response) => {
     const r = buildI18nResponse({
       lang: String(req.query.lang || ''),
@@ -271,7 +271,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         fs.rmSync(target, { recursive: true, force: true });
         fs.renameSync(src, target);
         fs.unlinkSync(path.join(dest, `${mod}.tgz`));
-        res.json({ ok: true, message: `@doc77/${mod}@${info.version} 安装完成，重启生效` });
+        res.json({ ok: true, message: t('api.electron.installDone', { mod: `@doc77/${mod}`, version: info.version }) });
       } catch (e: unknown) {
         res.status(500).json({ error: (e as Error).message });
       }
@@ -445,7 +445,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     for (const b of blocked) {
       const bn = b.replace(/\\/g, '/');
       if (resolved === bn || resolved.startsWith(bn + '/')) {
-        res.status(400).json({ error: '此目录不允许扫描' });
+        res.status(400).json({ error: t('api.scan.dirNotAllowed'), code: 'SCAN_DIR_NOT_ALLOWED' });
         return;
       }
     }
@@ -718,7 +718,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         parent: null,
         roots: ['/home', '/tmp'],
         entries: [],
-        error: '远程访问模式下不允许浏览 /mnt（Windows 驱动器）',
+        error: t('api.fs.mntNotAllowed'), code: 'FS_MNT_NOT_ALLOWED',
       });
       return;
     }
@@ -761,7 +761,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       return blocked.some((r) => p === r || p.startsWith(r + path.sep));
     }
     if (isPathBlocked(dirPath)) {
-      res.json({ path: dirPath, parent: null, roots: [], entries: [], error: '此目录不允许访问' });
+      res.json({ path: dirPath, parent: null, roots: [], entries: [], error: t('api.fs.dirNotAllowed'), code: 'FS_DIR_NOT_ALLOWED' });
       return;
     }
 
@@ -1003,7 +1003,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
             path: filePath,
             type: rendererType === 'text' ? 'text' : rendererType,
             content: truncated
-              ? `⚠️ 文件过大（${(totalBytes / 1024 / 1024).toFixed(1)} MB），仅显示前 10,000 行。建议在本地编辑器中打开。\n\n---\n\n${content}`
+              ? `${t('api.file.truncatedWarning', { size: (totalBytes / 1024 / 1024).toFixed(1) })}${content}`
               : content,
             truncated,
           });
@@ -1176,7 +1176,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
 
     const warn = truncated
-      ? `⚠️ 文件过大（${(content.length / 1024 / 1024).toFixed(1)} MB），仅显示前 10,000 行。建议在本地编辑器中打开。\n\n---\n\n`
+      ? t('api.file.truncatedWarning', { size: (content.length / 1024 / 1024).toFixed(1) })
       : '';
 
     let result: Record<string, unknown>;
@@ -1296,13 +1296,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       ];
       var isEditable = editableExts.includes(ext) || editableDotfiles.includes(baseName);
       if (!isEditable) {
-        res.status(403).json({ error: '此文件类型不可编辑' });
+        res.status(403).json({ error: t('api.file.typeNotEditable'), code: 'EDIT_TYPE_NOT_ALLOWED' });
         return;
       }
 
       // 3. Sensitive file check
       if (isSensitiveFile(path.basename(filePath))) {
-        res.status(403).json({ error: '此文件不可编辑（敏感文件）' });
+        res.status(403).json({ error: t('api.file.sensitiveNotEditable'), code: 'EDIT_SENSITIVE_NOT_ALLOWED' });
         return;
       }
 
@@ -1319,7 +1319,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       })();
       const maxSizeBytes = maxSizeMB * 1024 * 1024;
       if (Buffer.byteLength(content, 'utf-8') > maxSizeBytes) {
-        res.status(413).json({ error: `文件超过 ${maxSizeMB}MB 上限` });
+        res.status(413).json({ error: t('api.file.tooLarge', { maxSizeMB }), code: 'FILE_TOO_LARGE' });
         return;
       }
 
@@ -1334,7 +1334,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       // 6. External change detection
       if (fileExists && expectedModified && !forceOverwrite) {
         if (Math.abs(existingStats!.mtimeMs - new Date(expectedModified).getTime()) > 1000) {
-          res.status(409).json({ error: '文件已被外部修改，刷新后重试' });
+          res.status(409).json({ error: t('api.file.externalModified'), code: 'FILE_EXTERNAL_MODIFIED' });
           return;
         }
       }
@@ -1401,7 +1401,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
           status: 'failed',
           error_message: message,
         });
-        res.status(500).json({ error: `保存失败：${message}` });
+        res.status(500).json({ error: t('api.file.saveFailed', { message }), code: 'SAVE_FAILED' });
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -1641,12 +1641,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     try {
       const cfg = getDecryptedAiConfig();
       if (!cfg) {
-        res.json({ ok: false, error: '请先配置 Base URL 和 API Token' });
+        res.json({ ok: false, error: t('api.ai.notConfigured'), code: 'AI_NOT_CONFIGURED' });
         return;
       }
       // Guard: reject non-latin-1 tokens that would crash the HTTP header build
       if (cfg.token && [...cfg.token].some((c) => c.charCodeAt(0) > 255)) {
-        res.json({ ok: false, error: 'Token 包含无效字符，请重新输入并保存' });
+        res.json({ ok: false, error: t('api.ai.tokenInvalid'), code: 'AI_TOKEN_INVALID' });
         return;
       }
       const url = cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions';
@@ -1673,7 +1673,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Unknown error';
-      res.json({ ok: false, error: `网络错误: ${message}` });
+      res.json({ ok: false, error: t('api.ai.networkError', { message }), code: 'AI_NETWORK_ERROR' });
     }
   });
 
@@ -1700,10 +1700,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     try {
       const { isEngineAvailable, translate, segmentText } = await import('../translate/index.js');
       if (!(await isEngineAvailable())) {
-        res.status(503).json({
-          error: 'ENGINE_UNAVAILABLE',
-          message: '翻译引擎未安装。安装: doc77 i translate',
-        });
+        res.status(503).json({ error: t('api.translate.notInstalled'), code: 'ENGINE_UNAVAILABLE' });
         return;
       }
       const src = source_lang || 'auto';
@@ -1735,7 +1732,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
       if (msg === 'ENGINE_UNAVAILABLE') {
-        res.status(503).json({ error: 'ENGINE_UNAVAILABLE', message: '翻译引擎未安装' });
+        res.status(503).json({ error: t('api.translate.engineUnavailable'), code: 'ENGINE_UNAVAILABLE' });
       } else if (
         msg === 'MODEL_NOT_READY' ||
         msg.includes('fetch failed') ||
@@ -1743,11 +1740,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         msg.includes('ENOENT') ||
         msg.includes('Could not locate file')
       ) {
-        res.status(503).json({
-          error: 'MODEL_NOT_READY',
-          message:
-            '翻译模型未下载或下载失败。请运行 doc77 vendor-install --translate en-zh 或在设置面板点击下载按钮。如网络不通可开启国内镜像。',
-        });
+        res.status(503).json({ error: t('api.translate.modelNotReady'), code: 'MODEL_NOT_READY' });
       } else {
         res.status(500).json({ error: msg });
       }
@@ -1948,7 +1941,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.post('/api/auth/setup', (req: Request, res: Response) => {
     const { password } = req.body;
     if (!password || password.length < 6) {
-      res.status(400).json({ error: '密码至少6位' });
+      res.status(400).json({ error: t('api.auth.passwordTooShort'), code: 'PASSWORD_TOO_SHORT' });
       return;
     }
     try {
@@ -1957,7 +1950,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         ? auth.setupPasswordLegacy(password)
         : auth.setupPasswordWithDEK(password);
       if (!codes) {
-        res.status(409).json({ error: '密码已设置，请使用修改密码功能' });
+        res.status(409).json({ error: t('api.auth.passwordAlreadySet'), code: 'PASSWORD_ALREADY_SET' });
         return;
       }
       res.json({ ok: true, recovery_codes: codes.formatted });
@@ -1970,7 +1963,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.post('/api/auth/login', (req: Request, res: Response) => {
     const { password } = req.body;
     if (!password) {
-      res.status(400).json({ error: '密码不能为空' });
+      res.status(400).json({ error: t('api.auth.passwordRequired'), code: 'PASSWORD_REQUIRED' });
       return;
     }
     try {
@@ -2020,7 +2013,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       return;
     }
     if (new_password.length < 6) {
-      res.status(400).json({ error: '密码至少6位' });
+      res.status(400).json({ error: t('api.auth.passwordTooShort'), code: 'PASSWORD_TOO_SHORT' });
       return;
     }
     try {
@@ -2043,7 +2036,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       return;
     }
     if (new_password.length < 6) {
-      res.status(400).json({ error: '密码至少6位' });
+      res.status(400).json({ error: t('api.auth.passwordTooShort'), code: 'PASSWORD_TOO_SHORT' });
       return;
     }
     try {
@@ -2098,7 +2091,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.post('/api/auth/force-reset', (req: Request, res: Response) => {
     const { password, confirm } = req.body;
     if (confirm !== 'yes-i-know') {
-      res.status(400).json({ error: '请在请求体中提供 confirm: "yes-i-know" 以确认操作' });
+      res.status(400).json({ error: t('api.auth.confirmRequired'), code: 'CONFIRM_REQUIRED' });
       return;
     }
     try {
@@ -2108,19 +2101,19 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         { password_hash: string } | undefined;
       if (authRow?.password_hash) {
         if (!password) {
-          res.status(400).json({ error: '当前已设置密码，请提供 password 字段' });
+          res.status(400).json({ error: t('api.auth.passwordRequiredForReset'), code: 'PASSWORD_REQUIRED_FOR_RESET' });
           return;
         }
         if (!crypto.verifyPassword(password, authRow.password_hash)) {
           // Also try legacy params before rejecting
           if (!crypto.verifyPasswordLegacy(password, authRow.password_hash)) {
-            res.status(401).json({ error: '密码错误' });
+            res.status(401).json({ error: t('api.auth.incorrectPassword'), code: 'INCORRECT_PASSWORD' });
             return;
           }
         }
       }
       auth.forceResetPassword();
-      res.json({ ok: true, message: '所有安全设置已清除，加密配置（AI Token 等）已失效' });
+      res.json({ ok: true, message: t('api.auth.securityCleared') });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }
@@ -2411,7 +2404,7 @@ export function createAIChatHandler(deps: {
     if (!cfg) {
       res
         .status(400)
-        .json({ error: 'AI_NOT_CONFIGURED', message: '请先在设置中配置 AI 模型和 API Token' });
+        .json({ error: t('api.ai.notConfiguredMessage'), code: 'AI_NOT_CONFIGURED' });
       return;
     }
 
@@ -2471,7 +2464,7 @@ export function createAIChatHandler(deps: {
         if (!pid) return 'Error: project_id is required';
         // Write tools enqueue into the approval queue; they never execute here.
         if (isAiWriteTool(name)) {
-          if (!deps.writeFns) return 'Error: 写操作不可用（需安装 @doc77/mcp 模块）';
+          if (!deps.writeFns) return t('ai.context.writeToolsUnavailable');
           return executeAiWriteTool(
             name,
             args,
@@ -2484,7 +2477,7 @@ export function createAIChatHandler(deps: {
             const dirPath = (args.dir_path as string) || '';
             const result = scanDirectory(pid, dirPath);
             const entries = result.entries.slice(0, 50);
-            if (entries.length === 0) return `目录 "${dirPath || '/'}" 为空或不存在`;
+            if (entries.length === 0) return t('ai.context.dirEmpty', { dirPath: dirPath || '/' });
             return entries
               .map(
                 (e) =>
@@ -2562,7 +2555,7 @@ export function createAIChatHandler(deps: {
         }
       })();
       if (!aiRateLimiter.check(sid, rlLimit, 5 * 60 * 1000, Date.now()).allowed) {
-        send('error', { message: '请求过于频繁，请稍后再试' });
+        send('error', { message: t('ai.context.rateLimited') });
         res.end();
         return;
       }
@@ -2582,8 +2575,9 @@ export function createAIChatHandler(deps: {
             return db.prepare('SELECT name, path FROM projects WHERE id = ?').get(project_id) as
               { name: string; path: string } | undefined;
           })();
+          const fileListDisplay = fileList || t('ai.context.emptyDir');
           (agent as any).addContext(
-            `当前项目: ${proj?.name || 'Unknown'} (路径: ${proj?.path || 'N/A'})\n根目录内容:\n${fileList || '(空目录)'}`,
+            t('ai.context.projectInfo', { name: proj?.name || 'Unknown', path: proj?.path || 'N/A', fileList: fileListDisplay }),
           );
         } catch {
           /* non-fatal */
@@ -2602,7 +2596,7 @@ export function createAIChatHandler(deps: {
       if (context_file && project_id) {
         const content = readProjectFileContent(project_id, context_file as string);
         if (!content.startsWith('Error:')) {
-          outgoing = `${message}\n\n以下是文档「${context_file}」的完整内容，请直接基于它作答，无需调用任何工具：\n\n${content}`;
+          outgoing = `${message}\n\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
           noTools = true;
         }
       }
@@ -2640,7 +2634,7 @@ export function createAIChatHandler(deps: {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      send('error', { message: `AI 服务异常: ${msg}` });
+      send('error', { message: t('ai.context.serviceError', { msg }) });
     }
 
     res.end();
