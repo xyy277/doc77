@@ -149,7 +149,7 @@ function renderCompactCard(p, inFavorites) {
       '</div>' +
       '<div style="display:flex;gap:8px">' +
         '<button onclick="doUpdate(' + p.id + ')" class="btn btn-primary" style="font-size:12px">💾 ' + t('web.dashboard.save') + '</button>' +
-        '<button onclick="cancelEdit(' + p.id + ')" class="btn" style="font-size:12px">✕ ' + t('web.dashboard.cancel') + '</button>' +
+        '<button onclick="cancelEdit(' + p.id + ')" class="btn" style="font-size:12px">✕ ' + t('common.confirm.cancel') + '</button>' +
       '</div>' +
       '<div id="editError-' + p.id + '" style="color:var(--danger);font-size:12px;display:none;margin-top:6px"></div>' +
     '</div>' +
