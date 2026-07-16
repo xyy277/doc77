@@ -265,9 +265,13 @@ html:not(.tw-loading) .boot-overlay{display:none}
 <!-- Right-click context menu -->
 <div id="ctxMenu" class="ctx-menu hidden"></div>
 
+<!-- Drop zone overlay -->
+<div id="dropOverlay" class="hidden"><div id="dropOverlayContent"><span class="text-6xl mb-4 block">📎</span><span class="text-lg font-medium">拖拽文件以临时预览</span><span class="text-sm opacity-70">支持 Markdown / 代码 / 图片 / PDF 等格式</span></div></div>
+
 <script src="js/editor-core.js"></script>
 <script src="js/common.js"></script>
 <script src="js/tabs.js"></script>
+<script src="js/temp-preview.js"></script>
 <script src="js/preview.js"></script>
 </body>
 </html>

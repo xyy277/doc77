@@ -4,6 +4,18 @@
 
 ---
 
+## [2026-07-16]
+
+### @doc77/core `0.9.0`
+
+**Added**
+- 临时文件拖拽预览：`POST /api/render-temp` 无状态渲染接口，支持 Markdown / 代码 / Mermaid 等文本格式的纯内存渲染
+- 浏览器端拖拽交互（`initDropZone` + `openTempTab`）：preview 页面拖入文件 → 以带 📎 标识的临时 tab 打开，刷新即消失
+- 二进制预览类型（图片 / PDF / docx / xlsx）通过 `URL.createObjectURL` 直接渲染，无需后端参与
+- 临时文件类型分类 + 文本前 8KB null 字节嗅探，镜像服务端 `isBinaryFile` 语义
+- 临时 tab 生命周期管理：不持久化到 localStorage、禁用 edit/AI/reveal 按钮、`releaseTab` 时自动 `revokeObjectURL`
+- 前端 UMD 模块 `temp-preview.js`：`makeTempPath` / `isTempPath` / `classifyTempFile` / `sniffBinary`
+
 ## [2026-07-12]
 
 ### @doc77/core `0.6.0`

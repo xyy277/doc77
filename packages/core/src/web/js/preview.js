@@ -509,7 +509,7 @@ function buildDocHTML(path, d) {
       (d.modified ? '<span class="text-slate-500">修改时间</span><span class="text-slate-700 dark:text-slate-300">' + new Date(d.modified).toLocaleString('zh-CN') + '</span>' : '') +
       '</div>' +
       '<p class="text-xs text-amber-600 dark:text-amber-400 mb-4">⚠️ 不支持预览此文件格式</p>' +
-      '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 文件夹中显示</button>' +
+      (d.temp ? '' : '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 文件夹中显示</button>') +
       '</div>';
   } else if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
     html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
@@ -562,15 +562,20 @@ function mountPane(pane, path) {
 
 /** 激活后统一刷新工具栏/大纲/阅读时长/高亮/面包屑。 */
 function afterActivate(path, d) {
+  var isTemp = TempPreview.isTempPath(path);
   var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'];
   btns.forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = false; });
-  // Show edit button only for editable file types
+  // Disable specific buttons for temp (disk-less) files
+  if (isTemp) {
+    ['aiBtn','editBtn','revealBtn'].forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = true; });
+  }
+  // Show edit button only for editable file types (not temp)
   var editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
     '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
     '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
     '.env.example','.gitignore','.dockerignore','.editorconfig',
     '.conf','.cfg','.ini','.csv','.log'];
-  var isEditable = editableExts.some(function(ext) {
+  var isEditable = !isTemp && editableExts.some(function(ext) {
     return (currentFile || '').toLowerCase().endsWith(ext);
   });
   var editBtnEl = document.getElementById('editBtn');
@@ -627,7 +632,7 @@ function activateTab(path, opts) {
   tabStore.activate(path);
   activeTabPath = path; currentFile = path;
   renderTabBar(); syncTreeActive(path); saveTabsState();
-  if (!opts.silent) addRecentFile(path);
+  if (!opts.silent && !TempPreview.isTempPath(path)) addRecentFile(path);
 
   var cached = paneCache[path];
   if (cached) {
@@ -683,6 +688,9 @@ function closeTab(path) {
 
 /** 释放某 path 的所有缓存资源。 */
 function releaseTab(path) {
+  // Revoke objectURL for binary temp previews
+  var entry = tabDataCache[path];
+  if (entry && entry.objectUrl) { try { URL.revokeObjectURL(entry.objectUrl); } catch(e) {} }
   delete tabDataCache[path];
   delete paneCache[path];
   delete tabScroll[path];
@@ -712,11 +720,15 @@ function renderTabBar() {
   bar.classList.remove('hidden'); bar.classList.add('flex');
   bar.innerHTML = tabs.map(function(t) {
     var active = t.path === activeTabPath;
+    var isTemp = TempPreview.isTempPath(t.path);
     var cls = 'group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 my-1 rounded-md cursor-pointer text-xs whitespace-nowrap border transition-colors ' +
       (active ? 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 font-medium shadow-sm'
               : 'bg-transparent border-transparent text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60');
-    return '<div class="' + cls + '" title="' + escAttr(t.path) + '" onclick="onTabClick(event, \'' + escAttr(t.path) + '\')" onmousedown="onTabMouseDown(event, \'' + escAttr(t.path) + '\')">' +
+    var badge = isTemp ? '<span class="temp-badge">📎</span>' : '';
+    var tooltip = isTemp ? '临时预览 — 刷新后关闭' : escAttr(t.path);
+    return '<div class="' + cls + '" title="' + tooltip + '" onclick="onTabClick(event, \'' + escAttr(t.path) + '\')" onmousedown="onTabMouseDown(event, \'' + escAttr(t.path) + '\')">' +
       '<span class="shrink-0">' + iconFor(t.title) + '</span>' +
+      badge +
       '<span class="truncate max-w-[160px]">' + esc(t.title) + '</span>' +
       '<button class="shrink-0 w-4 h-4 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-red-500" onclick="event.stopPropagation();closeTab(\'' + escAttr(t.path) + '\')" title="关闭">✕</button>' +
       '</div>';
@@ -743,10 +755,10 @@ function onTabClick(e, path) {
 /** 中键关闭 tab。 */
 function onTabMouseDown(e, path) { if (e.button === 1) { e.preventDefault(); closeTab(path); } }
 
-/** 同步左侧文件树的 active-node 高亮到当前 tab。若父目录未展开则逐层展开。 */
+/** 同步左侧文件树的 active-node 高亮到当前 tab。若父目录未展开则逐层展开。临时文件不参与。 */
 function syncTreeActive(path) {
   document.querySelectorAll('#tree .active-node').forEach(function(el) { el.classList.remove('active-node','bg-blue-600','text-white'); });
-  if (!path) return;
+  if (!path || TempPreview.isTempPath(path)) return;
   var tree = document.getElementById('tree');
   var row = tree.querySelector('[data-path="' + CSS.escape(path) + '"]');
   // If node not visible, expand parent directories
@@ -769,10 +781,13 @@ function syncTreeActive(path) {
   }
 }
 
-/** localStorage 持久化 tab 列表 + 活动 tab。 */
+/** localStorage 持久化 tab 列表 + 活动 tab（排除临时 tab）。 */
 function saveTabsState() {
   try {
-    localStorage.setItem(tabsStorageKey(), JSON.stringify({ tabs: tabStore.list().map(function(t){ return t.path; }), active: activeTabPath }));
+    var allTabs = tabStore.list().map(function(t){ return t.path; });
+    var diskTabs = allTabs.filter(function(p){ return !TempPreview.isTempPath(p); });
+    var diskActive = TempPreview.isTempPath(activeTabPath) ? null : activeTabPath;
+    localStorage.setItem(tabsStorageKey(), JSON.stringify({ tabs: diskTabs, active: diskActive }));
   } catch (e) {}
 }
 function loadTabsState() {
@@ -792,11 +807,17 @@ function restoreTabs(preferActivePath) {
 }
 
 //══════════ 面包屑（可点击跳转到上一级目录）══════════
-/** 渲染面包屑：项目根 + 各目录段可点击，末段（文件名）不可点击。 */
+/** 渲染面包屑：项目根 + 各目录段可点击，末段（文件名）不可点击。临时文件特殊显示。 */
 function renderBreadcrumb(filePath) {
   var bc = document.getElementById('breadcrumb');
   if (!bc) return;
   if (!filePath) { bc.innerHTML = '<span id="breadcrumbPath" class="text-slate-400 text-sm">未选择文件</span>'; return; }
+  // Temp file breadcrumb
+  if (TempPreview.isTempPath(filePath)) {
+    var tName = basename(filePath);
+    bc.innerHTML = '<span class="text-slate-400 text-sm">📎 临时文件</span><span class="text-slate-300 dark:text-slate-600 shrink-0">›</span><strong class="text-slate-700 dark:text-slate-200 truncate">' + esc(tName) + '</strong>';
+    return;
+  }
   var parts = filePath.split('/');
   var html = '<a href="javascript:void(0)" onclick="revealDirInTree(\'\')" class="hover:text-blue-500 dark:hover:text-blue-400 truncate shrink-0" title="项目根目录">' + esc(proj ? proj.name : '根') + '</a>';
   var acc = '';
@@ -2096,4 +2117,125 @@ function initPyodide(cb) {
     };
     document.head.appendChild(s);
   }
+}
+
+//══════════ Temp file drag & drop (stateless preview) ══════════
+
+/** Open a dropped File as a temp tab (no disk write). */
+async function openTempTab(file) {
+  var filename = file.name;
+  var classification = TempPreview.classifyTempFile(filename);
+  var tempPath = TempPreview.makeTempPath(filename);
+
+  if (classification === 'unsupported') {
+    tabDataCache[tempPath] = { path: filename, type: 'unsupported', category: 'unknown', size: file.size, temp: true };
+    openTab(tempPath);
+    return;
+  }
+
+  if (classification === 'binary-preview') {
+    var objectUrl = URL.createObjectURL(file);
+    var ext = '.' + filename.split('.').pop().toLowerCase();
+    if (ext === '.pdf') {
+      tabDataCache[tempPath] = { path: filename, type: 'pdf', rawUrl: objectUrl, objectUrl: objectUrl, size: file.size, temp: true };
+    } else if (ext === '.docx' || ext === '.xlsx') {
+      tabDataCache[tempPath] = { path: filename, type: ext.slice(1), rawUrl: objectUrl, objectUrl: objectUrl, size: file.size, temp: true };
+    } else {
+      // Image
+      tabDataCache[tempPath] = { path: filename, type: 'image', rawUrl: objectUrl, objectUrl: objectUrl, size: file.size, temp: true };
+    }
+    openTab(tempPath);
+    return;
+  }
+
+  // classification === 'text-render'
+  // Size gate: skip POST for files > 4 MB
+  if (file.size > TempPreview.TEMP_TEXT_LIMIT) {
+    tabDataCache[tempPath] = { path: filename, type: 'unsupported', category: 'too_large', size: file.size, temp: true };
+    openTab(tempPath);
+    return;
+  }
+
+  try {
+    var content = await file.text();
+  } catch (e) {
+    // Binary sniff failed: show unsupported
+    tabDataCache[tempPath] = { path: filename, type: 'unsupported', category: 'binary', size: file.size, temp: true };
+    openTab(tempPath);
+    return;
+  }
+
+  // POST to stateless render endpoint
+  try {
+    var res = await fetch('/api/render-temp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: filename, content: content }),
+    });
+    if (!res.ok) {
+      // Fallback: show raw text
+      tabDataCache[tempPath] = { path: filename, type: 'text', content: content, size: file.size, temp: true };
+      openTab(tempPath);
+      return;
+    }
+    var data = await res.json();
+    data.temp = true;
+    if (!data.path) data.path = filename;
+    tabDataCache[tempPath] = data;
+  } catch (e) {
+    tabDataCache[tempPath] = { path: filename, type: 'text', content: content, size: file.size, temp: true };
+  }
+  openTab(tempPath);
+}
+
+/** Initialize drag-and-drop zone: document-level events + overlay. */
+function initDropZone() {
+  var overlay = document.getElementById('dropOverlay');
+  if (!overlay) return;
+  var dragDepth = 0;
+
+  document.addEventListener('dragenter', function(e) {
+    if (!e.dataTransfer || !e.dataTransfer.types || !e.dataTransfer.types.indexOf('Files') >= 0) return;
+    dragDepth++;
+    if (dragDepth === 1) overlay.classList.remove('hidden');
+  });
+
+  document.addEventListener('dragover', function(e) {
+    if (!e.dataTransfer || !e.dataTransfer.types || e.dataTransfer.types.indexOf('Files') < 0) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.addEventListener('dragleave', function(e) {
+    if (!e.dataTransfer || !e.dataTransfer.types || e.dataTransfer.types.indexOf('Files') < 0) return;
+    dragDepth--;
+    if (dragDepth <= 0) { dragDepth = 0; overlay.classList.add('hidden'); }
+  });
+
+  document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dragDepth = 0;
+    overlay.classList.add('hidden');
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+
+    var count = files.length;
+    var fileArray = [];
+    for (var i = 0; i < files.length; i++) { fileArray.push(files[i]); }
+
+    // Serial open to respect maxTabs=8
+    (async function() {
+      for (var j = 0; j < fileArray.length; j++) {
+        try { await openTempTab(fileArray[j]); } catch (err) { console.error('[drop]', err); }
+      }
+      if (count > 1) {
+        showToast('已拖入 ' + count + ' 个临时文件', 'info');
+      }
+    })();
+  });
+}
+
+// Boot drop zone
+if (typeof TempPreview !== 'undefined') {
+  initDropZone();
 }

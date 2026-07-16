@@ -1085,6 +1085,114 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
   });
 
+  // --- Stateless render for temp drag-and-drop preview ---
+  const BINARY_PREVIEW_EXTS = new Set([
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.svg',
+    '.webp',
+    '.bmp',
+    '.ico',
+    '.avif',
+    '.pdf',
+    '.docx',
+    '.xlsx',
+  ]);
+
+  app.post('/api/render-temp', async (req: Request, res: Response) => {
+    const { filename, content } = req.body as { filename?: string; content?: string };
+
+    if (!filename) {
+      res.status(400).json({ error: 'filename is required' });
+      return;
+    }
+    if (typeof content !== 'string') {
+      res.status(400).json({ error: 'content must be a string' });
+      return;
+    }
+
+    // Basename only — no path traversal risk
+    const baseName = path.basename(filename);
+    const ext = path.extname(baseName).toLowerCase();
+
+    // Binary preview types must be rendered client-side via URL.createObjectURL
+    if (BINARY_PREVIEW_EXTS.has(ext)) {
+      res.status(400).json({ error: `binary preview type ${ext} — render client-side` });
+      return;
+    }
+
+    // Null-byte detection (mirrors isBinaryFile in fs/index.ts)
+    if (content.indexOf('\x00') !== -1) {
+      res.json({ path: baseName, type: 'unsupported', category: 'binary', size: content.length });
+      return;
+    }
+
+    // Unsupported format
+    if (isUnsupportedFormat(baseName)) {
+      res.json({
+        path: baseName,
+        type: 'unsupported',
+        category: getFileCategory(baseName) || 'binary',
+        size: content.length,
+      });
+      return;
+    }
+
+    const rendererType = getRendererForFile(baseName);
+
+    // Size truncation — defensive, frontend gates before sending
+    const sizeLimit = FORMAT_SIZE_LIMITS[rendererType] ?? FORMAT_SIZE_LIMITS.text;
+    let renderContent = content;
+    let truncated = false;
+    if (sizeLimit > 0 && content.length > sizeLimit) {
+      const lines = content.split('\n');
+      if (lines.length > 10000) {
+        renderContent = lines.slice(0, 10000).join('\n');
+        truncated = true;
+      }
+    }
+
+    const warn = truncated
+      ? `⚠️ 文件过大（${(content.length / 1024 / 1024).toFixed(1)} MB），仅显示前 10,000 行。建议在本地编辑器中打开。\n\n---\n\n`
+      : '';
+
+    let result: Record<string, unknown>;
+
+    switch (rendererType) {
+      case 'markdown':
+        result = {
+          path: baseName,
+          type: 'markdown',
+          content: warn + renderMarkdown(renderContent),
+          size: content.length,
+        };
+        break;
+      case 'mermaid':
+        result = {
+          path: baseName,
+          type: 'mermaid',
+          content: warn + renderMermaid(renderContent),
+          size: content.length,
+        };
+        break;
+      case 'code':
+        result = {
+          path: baseName,
+          type: 'code',
+          content: renderCode(renderContent, ext.slice(1) || 'txt'),
+          size: content.length,
+        };
+        break;
+      default:
+        result = { path: baseName, type: 'text', content: renderContent, size: content.length };
+    }
+
+    if (truncated) result.truncated = true;
+    res.json(result);
+  });
+
   // Save edited file content (lightweight editing)
   app.put('/api/content/:id', async (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);

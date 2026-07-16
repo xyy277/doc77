@@ -638,6 +638,32 @@ body {
 @keyframes slideDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
+/* ═══ Drop overlay (temp file drag & drop) ═══ */
+#dropOverlay {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: opacity 0.2s ease;
+}
+#dropOverlay.hidden { display: none; }
+#dropOverlay #dropOverlayContent {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 48px 64px;
+  border: 2px dashed rgba(255,255,255,0.35);
+  border-radius: 20px;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ═══ Temp tab indication ═══ */
+.tab-temp .temp-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; line-height: 1; margin-right: 2px;
+}
+
 /* ═══ System Intro Hero ═══ */
 .intro-section {
   display: flex; align-items: flex-start; gap: 32px;
