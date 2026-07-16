@@ -1275,12 +1275,23 @@ function enterEditMode() {
     .catch(function() { if (editMode) initEditorInstance(''); });
 }
 
-function initEditorInstance(initialText) {
+async function initEditorInstance(initialText) {
   var pane = document.getElementById('editEditorPane');
   if (!pane) return;
 
-  var useCM = window.EditorCore && window.EditorCore.isAvailable();
-  if (!useCM) {
+  // Show loading while CodeMirror loads
+  pane.innerHTML = '<div class="flex items-center justify-center h-full"><span class="text-sm text-slate-400">加载编辑器中...</span></div>';
+
+  // Wait for CodeMirror to load (may be in-flight from preload or freshly started)
+  var cmLoaded = false;
+  if (window.EditorCore && window.EditorCore.load) {
+    cmLoaded = await window.EditorCore.load();
+  }
+
+  // Clear loading indicator
+  pane.innerHTML = '';
+
+  if (!cmLoaded) {
     var b = document.createElement('div'); b.className = 'editor-banner';
     b.textContent = '编辑器增强加载失败，使用基础文本模式';
     pane.parentNode.insertBefore(b, pane);
