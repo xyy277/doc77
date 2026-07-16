@@ -110,6 +110,10 @@ function applyCapabilities() {
     // 智能归类 relies on write tools (batch_operations) — hide when MCP absent.
     var btnClassify = document.getElementById('btnClassify'); if (btnClassify) btnClassify.style.display = 'none';
   }
+  if (CAPABILITIES.translate) {
+    var tBtn = document.getElementById('translateBtn');
+    if (tBtn) { tBtn.classList.remove('hidden'); tBtn.disabled = false; }
+  }
 }
 
 (async function boot() {
@@ -719,13 +723,13 @@ function onTabClick(e, path) {
   // If editing, prompt to save before switching
   if (editMode && editDirty) {
     showEditConfirm('有未保存的修改', '切换文件前是否保存当前修改？', [
-      {text:'保存并切换',cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(); activateTab(path); }); }},
-      {text:'放弃修改',cls:'btn-danger',action:function(){ doExitEdit(); activateTab(path); }},
+      {text:'保存并切换',cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(true); activateTab(path); }); }},
+      {text:'放弃修改',cls:'btn-danger',action:function(){ doExitEdit(true); activateTab(path); }},
       {text:'取消',cls:''}
     ]);
     return;
   }
-  if (editMode) { doExitEdit(); }
+  if (editMode) { doExitEdit(true); }
   activateTab(path);
 }
 /** 中键关闭 tab。 */
@@ -1434,7 +1438,8 @@ function exitEditMode(skipConfirm) {
   doExitEdit();
 }
 
-function doExitEdit() {
+/** @param {boolean} [skipRefresh] — true when switching tabs (activateTab handles rendering) */
+function doExitEdit(skipRefresh) {
   // Restore max-width on parent that was overridden for full-width editing
   if (window._editMaxWidthParent) { window._editMaxWidthParent.style.maxWidth = ''; window._editMaxWidthParent = null; }
   // Destroy editor instance
@@ -1451,9 +1456,8 @@ function doExitEdit() {
   var eb = document.getElementById('editBtn');
   if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
 
-  // Re-fetch server-rendered content to restore proper styling (live preview may
-  // have overwritten editPreviewPane with simplified client-side rendering)
-  if (currentFile) {
+  // Re-fetch server-rendered content (skip when switching tabs — activateTab handles it)
+  if (currentFile && !skipRefresh) {
     delete tabDataCache[currentFile];
     fetchDoc(currentFile).then(function(d) {
       var pane = renderDocNode(currentFile, d);
