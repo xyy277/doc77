@@ -36,6 +36,8 @@
 | 19 | CI test job 全绿失败 | vitest `packageEntryFailure` 解析 `@doc77/core` | test job 只 `pnpm install` 未 build，`packages/mcp/__tests__` import 了 `@doc77/core`（解析到 `dist/`），CI 无 dist | `.github/workflows/ci.yml` test job 在 `pnpm test` 前加 `pnpm build` |
 | 20 | 发布后 build 回退版本 | `pnpm build` 把子包版本从 0.7.0 改回 0.6.1 | `publish.sh` 用 `npm version` 逐个 bump 子包，但未改 root `package.json`（`sync-version.cjs` 的版本源）；build 时 sync-version 以 root 版本覆盖子包 | 发布时先 bump root `package.json` 再 `sync-version` 传播；本次已手动把 root 改到 0.7.0 |
 | 21 | Electron CI `vendor-install` 崩溃 | `ERR_MODULE_NOT_FOUND: @doc77/mcp` | `@doc77/core` 静态 import `writeAuditLog` from `@doc77/mcp`，但 `@doc77/mcp` 是 optional peer dep，CI 仅 build core+cli 时未安装 | 静态 import 改为 `async import()` 懒加载，调用点已包 try/catch |
+| 22 | CI `pnpm install` 失败（锁文件污染） | `pnpm install --frozen-lockfile` exit 1，无明确错误信息 | release 分支从 origin/main 创建时，feature 分支的本地修改（`@huggingface/transformers` 等依赖）泄露到 `package.json` 和 `pnpm-lock.yaml`，锁文件引用不存在的包导致安装失败 | 创建 release 分支前 `git stash --all` 确保干净；生成锁文件后 `grep` 验证无意外依赖 |
+| 23 | CI `pnpm install` 失败（ERR_PNPM_IGNORED_BUILDS） | `[ERR_PNPM_IGNORED_BUILDS]` → exit 1 | pnpm 11.13+ `allowBuilds` 值需为 boolean；`pnpm-workspace.yaml` 中 `onnxruntime-node` / `protobufjs` / `sharp` 的值是占位字符串 `"set this to true or false"`，pnpm 无法识别为 true | 改为 boolean `true` |
 
 > **发布脚本待改进**：`scripts/publish.sh` 应改为「bump root package.json → sync-version → 逐包 publish」，而非逐包 `npm version`，以免与 `sync-version.cjs` 的单一版本源冲突。
 

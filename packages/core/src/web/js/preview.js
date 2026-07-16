@@ -110,6 +110,10 @@ function applyCapabilities() {
     // 智能归类 relies on write tools (batch_operations) — hide when MCP absent.
     var btnClassify = document.getElementById('btnClassify'); if (btnClassify) btnClassify.style.display = 'none';
   }
+  if (CAPABILITIES.translate) {
+    var tBtn = document.getElementById('translateBtn');
+    if (tBtn) { tBtn.classList.remove('hidden'); tBtn.disabled = false; }
+  }
 }
 
 (async function boot() {
@@ -629,7 +633,7 @@ function activateTab(path, opts) {
   if (cached) {
     tabStore.noteRendered(path); // 刷新 LRU
     mountPane(cached, path);
-    afterActivate(path, tabDataCache[path]);
+    afterActivate(path, tabDataCache[path] || { type: 'text', content: '' });
     return;
   }
   // 需要渲染：先显示骨架
@@ -638,6 +642,7 @@ function activateTab(path, opts) {
   host.innerHTML = '<div class="p-4 sm:p-10"><div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div></div>';
   fetchDoc(path).then(function(d) {
     if (activeTabPath !== path) return; // 用户已切走
+    if (translateActive) { exitTranslateMode(); return; } // 翻译模式激活时跳过渲染
     var pane = renderDocNode(path, d);
     if (!isHeavyDoc(path, d)) {
       paneCache[path] = pane;
@@ -655,6 +660,8 @@ function activateTab(path, opts) {
 /** 打开文件为 tab：已打开则切过去，否则新建。 */
 function openTab(path, opts) {
   opts = opts || {};
+  if (translateActive) exitTranslateMode();
+  if (editMode) doExitEdit(true);
   if (!tabStore.has(path)) {
     var r = tabStore.open(path, basename(path));
     r.evicted.forEach(function(p) { releaseTab(p); });
@@ -664,6 +671,9 @@ function openTab(path, opts) {
 
 /** 关闭 tab：清资源，激活相邻 tab，或回到空状态。 */
 function closeTab(path) {
+  var isCurrent = path === activeTabPath;
+  if (translateActive) exitTranslateMode();
+  if (editMode && isCurrent) doExitEdit(true);
   var r = tabStore.close(path);
   releaseTab(path);
   renderTabBar(); saveTabsState();
@@ -716,16 +726,18 @@ function renderTabBar() {
 /** tab 左键点击切换。 */
 function onTabClick(e, path) {
   if (path === activeTabPath) return;
+  // Exit any active mode before switching
+  if (translateActive) exitTranslateMode();
   // If editing, prompt to save before switching
   if (editMode && editDirty) {
     showEditConfirm('有未保存的修改', '切换文件前是否保存当前修改？', [
-      {text:'保存并切换',cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(); activateTab(path); }); }},
-      {text:'放弃修改',cls:'btn-danger',action:function(){ doExitEdit(); activateTab(path); }},
+      {text:'保存并切换',cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(true); activateTab(path); }); }},
+      {text:'放弃修改',cls:'btn-danger',action:function(){ doExitEdit(true); activateTab(path); }},
       {text:'取消',cls:''}
     ]);
     return;
   }
-  if (editMode) { doExitEdit(); }
+  if (editMode) { doExitEdit(true); }
   activateTab(path);
 }
 /** 中键关闭 tab。 */
@@ -940,7 +952,8 @@ function renderMath() {
 
 // Feature 2: Reading Time
 function updateReadingTime(d) {
-  var el = document.getElementById('readTime');
+  var el = document.getElementById('readTime'); if (!el) return;
+  if (!d || !d.type) { el.classList.add('hidden'); return; }
   if (d.type === 'image' || d.type === 'pdf') { el.classList.add('hidden'); return; }
   var text = d.content || '';
   var chars = text.replace(/<[^>]*>/g,'').length;
@@ -1015,6 +1028,129 @@ function toggleTTS() {
   window.speechSynthesis.speak(u);
 }
 function updateTTSRate() { if (ttsActive) { window.speechSynthesis.cancel(); ttsActive = false; toggleTTS(); } }
+
+// Translation cache
+var translateCache = {};
+var translateActive = false;
+var _savedOriginalContent = null;
+
+async function toggleTranslate() {
+  if (translateActive) {
+    exitTranslateMode();
+    return;
+  }
+  var contentEl = document.getElementById('docContent') || document.querySelector('.doc-content');
+  if (!contentEl) { toast('请先打开文档', 'error'); return; }
+  var text = contentEl.textContent;
+  if (!text || text.trim().length < 2) { toast('文档内容太短', 'info'); return; }
+
+  var container = document.getElementById('contentArea');
+  if (!container) { toast('未找到内容区域', 'error'); return; }
+
+  // Save entire contentArea state for clean restoration on exit
+  _savedOriginalContent = {
+    html: container.innerHTML,
+    contentArea: container,
+  };
+
+  translateActive = true;
+  var btn = document.getElementById('translateBtn');
+  if (btn) { btn.textContent = '⏹'; btn.classList.add('ring-2', 'ring-emerald-400'); }
+
+  var splitPane = document.createElement('div');
+  splitPane.id = 'translateSplit';
+  splitPane.style.cssText = 'display:flex;gap:12px;height:100%';
+  var left = document.createElement('div');
+  left.id = 'translateLeft';
+  left.style.cssText = 'flex:1;overflow-y:auto;padding:8px 12px;border-right:1px solid var(--border-light)';
+  left.appendChild(contentEl.cloneNode(true));
+  var right = document.createElement('div');
+  right.id = 'translateRight';
+  right.style.cssText = 'flex:1;overflow-y:auto;padding:8px 12px';
+  right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">🌐 正在翻译...</div>';
+  splitPane.appendChild(left); splitPane.appendChild(right);
+  while (container.firstChild) container.removeChild(container.firstChild);
+  container.appendChild(splitPane);
+
+  try {
+    var cacheKey = 'doc_' + currentFile;
+    if (translateCache[cacheKey]) {
+      right.innerHTML = '<div class="translated-content">' + translateCache[cacheKey] + '</div>';
+      return;
+    }
+    var r = await fetch('/api/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, source_lang: 'auto', target_lang: 'zh', mode: 'document' })
+    });
+    if (!r.ok) {
+      var err = await r.json();
+      right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger)">❌ ' + (err.message || err.error || '翻译失败') + '</div>';
+      return;
+    }
+    var result = await r.json();
+    var translatedHtml = '<div class="translated-content" style="white-space:pre-wrap">' + escapeHtml(result.translated_text) + '</div>';
+    if (result.segment_count) {
+      translatedHtml += '<div style="margin-top:8px;font-size:10px;color:var(--text-muted);text-align:center">分' + result.segment_count + '段 · ' + (result.duration_ms / 1000).toFixed(1) + 's · Opus-MT</div>';
+    }
+    right.innerHTML = translatedHtml;
+    translateCache[cacheKey] = translatedHtml;
+  } catch(e) {
+    right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger)">❌ 翻译失败: ' + e.message + '</div>';
+  }
+}
+
+function exitTranslateMode() {
+  translateActive = false;
+  var btn = document.getElementById('translateBtn');
+  if (btn) { btn.textContent = '🌐'; btn.classList.remove('ring-2', 'ring-emerald-400'); }
+  // Restore entire contentArea from saved snapshot (guarantees clean DOM)
+  if (_savedOriginalContent && _savedOriginalContent.html) {
+    _savedOriginalContent.contentArea.innerHTML = _savedOriginalContent.html;
+    _savedOriginalContent = null;
+  }
+}
+
+// Selection translate popup
+(function initSelectionTranslate() {
+  document.addEventListener('mouseup', function(e) {
+    // Don't interfere if user is interacting with the translate popup itself
+    var popupEl = document.getElementById('translatePopup');
+    if (popupEl && popupEl.contains(e.target)) return;
+    var sel = window.getSelection();
+    var text = (sel && sel.toString() || '').trim();
+    if (popupEl) popupEl.remove();
+    if (text.length < 2 || text.length > 2000) return;
+    if (!CAPABILITIES || !CAPABILITIES.translate) return;
+    var popup = document.createElement('div');
+    popup.id = 'translatePopup';
+    popup.style.cssText = 'position:fixed;z-index:9999;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:4px;display:flex;gap:4px;font-size:12px';
+    popup.style.left = (e.clientX + 10) + 'px';
+    popup.style.top = (e.clientY - 40) + 'px';
+    var btn = document.createElement('button');
+    btn.textContent = '🌐 翻译选中';
+    btn.style.cssText = 'padding:4px 10px;border:none;border-radius:6px;cursor:pointer;background:var(--accent);color:#fff;font-size:12px;white-space:nowrap';
+    btn.onclick = async function() {
+      btn.textContent = '翻译中...'; btn.disabled = true;
+      try {
+        var r = await fetch('/api/translate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text, source_lang: 'auto', target_lang: 'zh', mode: 'sentence' })
+        });
+        if (r.ok) {
+          var result = await r.json();
+          popup.innerHTML = '<div style="padding:8px 12px;max-width:360px;line-height:1.5;font-size:13px;color:var(--text-primary)">' + escapeHtml(result.translated_text) + '<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">' + (result.duration_ms/1000).toFixed(1) + 's</div></div>';
+        } else {
+          popup.innerHTML = '<div style="padding:8px 12px;color:var(--danger)">翻译失败</div>';
+        }
+      } catch(err) { popup.remove(); }
+    };
+    popup.appendChild(btn);
+    document.body.appendChild(popup);
+    setTimeout(function() { if (document.getElementById('translatePopup')) popup.remove(); }, 8000);
+    var dismiss = function(ev) { if (popup && !popup.contains(ev.target)) { popup.remove(); document.removeEventListener('click', dismiss); } };
+    setTimeout(function() { document.addEventListener('click', dismiss); }, 100);
+  });
+})();
 
 // Feature 6: Auto-Scroll
 var autoScrollRAF = null, autoScrollActive = false;
@@ -1368,6 +1504,7 @@ function doSave(cb, skipPreview) {
     // Only refresh server-rendered preview on manual save (Ctrl+S), not auto-save
     if (!skipPreview) updateEditPreview(content);
     tabDataCache[currentFile] = { content: content, path: currentFile, size: d.size, modified: d.modified };
+    delete paneCache[currentFile]; // 重新渲染时从服务端加载最新内容
     if (cb) cb();
   })
   .catch(function(e) { alert('保存失败: ' + e.message); });
@@ -1434,13 +1571,26 @@ function exitEditMode(skipConfirm) {
   doExitEdit();
 }
 
-function doExitEdit() {
+/** @param {boolean} [skipRefresh] — true when switching tabs (activateTab handles rendering) */
+function doExitEdit(skipRefresh) {
   // Restore max-width on parent that was overridden for full-width editing
   if (window._editMaxWidthParent) { window._editMaxWidthParent.style.maxWidth = ''; window._editMaxWidthParent = null; }
+
+  // Capture preview HTML before destroying editor, then restore docContent
+  var previewHTML = null;
+  var pp = document.getElementById('editPreviewPane');
+  if (pp) previewHTML = pp.innerHTML;
+
   // Destroy editor instance
   if (window._editEditor) { try { window._editEditor.destroy(); } catch(e) {}; window._editEditor = null; }
   // Cleanup divider event listeners
   cleanupEditDivider();
+
+  // Restore docContent from preview pane (always — even skipRefresh, so DOM is clean)
+  if (previewHTML) {
+    var dc = document.getElementById('docContent');
+    if (dc) dc.innerHTML = previewHTML;
+  }
 
   // Always reopen right panel on exit
   var rp = document.getElementById('rightPanel');
@@ -1451,11 +1601,11 @@ function doExitEdit() {
   var eb = document.getElementById('editBtn');
   if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
 
-  // Re-fetch server-rendered content to restore proper styling (live preview may
-  // have overwritten editPreviewPane with simplified client-side rendering)
-  if (currentFile) {
-    delete tabDataCache[currentFile];
+  // Re-fetch server-rendered content (invalidate cache first to force fresh data)
+  if (currentFile && !skipRefresh) {
+    tabDataCache[currentFile] = null;
     fetchDoc(currentFile).then(function(d) {
+      if (translateActive) return; // 翻译模式激活时跳过渲染
       var pane = renderDocNode(currentFile, d);
       mountPane(pane, currentFile);
       afterActivate(currentFile, d);
