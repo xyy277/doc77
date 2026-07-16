@@ -1044,6 +1044,9 @@ async function toggleTranslate() {
   var text = contentEl.textContent;
   if (!text || text.trim().length < 2) { toast('文档内容太短', 'info'); return; }
 
+  var container = document.getElementById('contentArea');
+  if (!container) { toast('未找到内容区域', 'error'); return; }
+
   // Save entire contentArea state for clean restoration on exit
   _savedOriginalContent = {
     html: container.innerHTML,
@@ -1054,7 +1057,6 @@ async function toggleTranslate() {
   var btn = document.getElementById('translateBtn');
   if (btn) { btn.textContent = '⏹'; btn.classList.add('ring-2', 'ring-emerald-400'); }
 
-  var container = document.getElementById('contentArea');
   var splitPane = document.createElement('div');
   splitPane.id = 'translateSplit';
   splitPane.style.cssText = 'display:flex;gap:12px;height:100%';
