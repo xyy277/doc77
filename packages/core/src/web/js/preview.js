@@ -720,6 +720,8 @@ function renderTabBar() {
 /** tab 左键点击切换。 */
 function onTabClick(e, path) {
   if (path === activeTabPath) return;
+  // Exit any active mode before switching
+  if (translateActive) exitTranslateMode();
   // If editing, prompt to save before switching
   if (editMode && editDirty) {
     showEditConfirm('有未保存的修改', '切换文件前是否保存当前修改？', [
@@ -1024,6 +1026,7 @@ function updateTTSRate() { if (ttsActive) { window.speechSynthesis.cancel(); tts
 // Translation cache
 var translateCache = {};
 var translateActive = false;
+var _savedOriginalContent = null;
 
 async function toggleTranslate() {
   if (translateActive) {
@@ -1034,6 +1037,10 @@ async function toggleTranslate() {
   if (!contentEl) { toast('请先打开文档', 'error'); return; }
   var text = contentEl.textContent;
   if (!text || text.trim().length < 2) { toast('文档内容太短', 'info'); return; }
+
+  // Save original content for exit
+  _savedOriginalContent = contentEl.cloneNode(true);
+
   translateActive = true;
   var btn = document.getElementById('translateBtn');
   if (btn) { btn.textContent = '⏹'; btn.classList.add('ring-2', 'ring-emerald-400'); }
@@ -1044,11 +1051,11 @@ async function toggleTranslate() {
   splitPane.style.cssText = 'display:flex;gap:12px;height:100%';
   var left = document.createElement('div');
   left.id = 'translateLeft';
-  left.style.cssText = 'flex:1;overflow-y:auto;padding-right:6px;border-right:1px solid var(--border-light)';
+  left.style.cssText = 'flex:1;overflow-y:auto;padding:8px 12px;border-right:1px solid var(--border-light)';
   left.appendChild(contentEl.cloneNode(true));
   var right = document.createElement('div');
   right.id = 'translateRight';
-  right.style.cssText = 'flex:1;overflow-y:auto;padding-left:6px';
+  right.style.cssText = 'flex:1;overflow-y:auto;padding:8px 12px';
   right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">🌐 正在翻译...</div>';
   splitPane.appendChild(left); splitPane.appendChild(right);
   while (container.firstChild) container.removeChild(container.firstChild);
@@ -1085,7 +1092,19 @@ function exitTranslateMode() {
   translateActive = false;
   var btn = document.getElementById('translateBtn');
   if (btn) { btn.textContent = '🌐'; btn.classList.remove('ring-2', 'ring-emerald-400'); }
-  if (currentFile) fetchDoc(currentFile);
+  // Ensure docPaneHost exists for tab switching / mountPane
+  var container = document.getElementById('contentArea');
+  if (container && !document.getElementById('docPaneHost')) {
+    var host = document.createElement('div');
+    host.id = 'docPaneHost';
+    container.appendChild(host);
+  }
+  // Restore saved original content immediately (faster + no network)
+  if (_savedOriginalContent) {
+    var dc = document.getElementById('docContent');
+    if (dc) dc.innerHTML = _savedOriginalContent.innerHTML;
+    _savedOriginalContent = null;
+  }
 }
 
 // Selection translate popup
