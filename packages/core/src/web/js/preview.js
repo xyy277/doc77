@@ -1208,7 +1208,6 @@ function toggleEditMode() {
 function enterEditMode() {
   if (editMode || !proj || !proj.id) return;
   var cached = tabDataCache[currentFile];
-  var initialContent = cached && cached.content ? cached.content : '';
   editModifiedTime = cached && cached.modified ? cached.modified : null;
 
   var docContent = document.getElementById('docContent');
@@ -1256,15 +1255,11 @@ function enterEditMode() {
   if (editBtnEl) { editBtnEl.classList.add('editing-active'); editBtnEl.title = '退出编辑模式'; }
   editMode = true; editDirty = false;
 
-  // Load editor
-  if (!initialContent) {
-    fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile))
-      .then(function(r) { return r.text(); })
-      .then(function(t) { if (editMode) initEditorInstance(t); })
-      .catch(function() { if (editMode) initEditorInstance(''); });
-  } else {
-    initEditorInstance(initialContent);
-  }
+  // Load editor with raw file content always (cached content is rendered HTML)
+  fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile))
+    .then(function(r) { return r.text(); })
+    .then(function(t) { if (editMode) initEditorInstance(t); })
+    .catch(function() { if (editMode) initEditorInstance(''); });
 }
 
 function initEditorInstance(initialText) {
@@ -1360,7 +1355,7 @@ function updateEditPreview(content) {
   fetch('/api/content/' + proj.id + '?path=' + encodeURIComponent(currentFile) + '&t=' + Date.now())
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (d && d.content) pp.innerHTML = buildDocHTML(currentFile, d);
+      if (d && d.content) pp.innerHTML = d.content;
     })
     .catch(function() {
       pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px">' + escapeHtml(content) + '</pre>';
