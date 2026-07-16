@@ -171,7 +171,14 @@ export function validatePath(projectRoot: string, requestedPath: string): string
     throw new Error(`Path traversal denied: "${requestedPath}" is outside project root.`);
   }
 
-  // Resolve symlinks to get real path
+  // Resolve symlinks to get real path for both root and candidate
+  let realRoot: string;
+  try {
+    realRoot = fs.realpathSync(root);
+  } catch {
+    realRoot = root;
+  }
+
   let realPath: string;
   try {
     realPath = fs.realpathSync(candidate);
@@ -188,8 +195,8 @@ export function validatePath(projectRoot: string, requestedPath: string): string
     realPath = path.join(realParent, path.basename(candidate));
   }
 
-  // Recheck after symlink resolution
-  if (!realPath.startsWith(root + path.sep) && realPath !== root) {
+  // Recheck after symlink resolution (compare against resolved root)
+  if (!realPath.startsWith(realRoot + path.sep) && realPath !== realRoot) {
     throw new Error(`Symlink traversal denied: "${requestedPath}" resolves outside project root.`);
   }
 
