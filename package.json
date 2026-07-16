@@ -16,7 +16,8 @@
     "lint": "eslint packages --ext .ts",
     "format": "prettier --write \"packages/**/*.ts\"",
     "format:check": "prettier --check \"packages/**/*.ts\"",
-    "clean": "pnpm -r clean"
+    "clean": "pnpm -r clean",
+    "check:i18n": "bash scripts/check-i18n.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
