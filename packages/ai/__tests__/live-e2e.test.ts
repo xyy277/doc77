@@ -35,6 +35,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import {
   initDatabase,
+  initI18n,
   closeConnection,
   runMigrations,
   registerProject,
@@ -42,7 +43,7 @@ import {
   createAIChatHandler,
   getConfig,
 } from '@doc77/core';
-import { AiProvider, DocAgent, READ_TOOLS, WRITE_TOOLS } from '../src/index.js';
+import { AiProvider, DocAgent, getReadTools, getWriteTools } from '../src/index.js';
 import {
   writeFile,
   createFolder,
@@ -184,12 +185,13 @@ suite('LIVE E2E — LLM (Qwen3.5 优化版)', () => {
     setConfig('ai.model', LLM_MODEL);
     setConfig('ai.risk_level', 'high');
     setConfig('ai.read_limit_per_session', '999');
+    initI18n('zh-CN');
 
     deps = {
       AiProvider: AiProvider as never,
       DocAgent: DocAgent as never,
-      READ_TOOLS,
-      WRITE_TOOLS,
+      getReadTools,
+      getWriteTools,
       writeFns: { writeFile, createFolder, moveFile, deleteFile, batchOperations } as never,
     };
     deps.handler = createAIChatHandler(deps as never);

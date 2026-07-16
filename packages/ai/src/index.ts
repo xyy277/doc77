@@ -23,4 +23,4 @@ export { DocAgent, createClassifyPrompt } from './agent/index.js';
 export type { AgentConfig, AgentResponse } from './agent/index.js';
 
 // Tools
-export { READ_TOOLS, WRITE_TOOLS } from './tools.js';
+export { getReadTools, getWriteTools } from './tools.js';

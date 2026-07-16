@@ -2321,8 +2321,8 @@ export function createQueueApproveHandler(
  * between @doc77/core and @doc77/ai. Register from the CLI layer.
  *
  * Usage (in CLI start command):
- *   const { AiProvider, DocAgent, READ_TOOLS } = await import('@doc77/ai');
- *   app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, READ_TOOLS }));
+ *   const { AiProvider, DocAgent, getReadTools, getWriteTools } = await import('@doc77/ai');
+ *   app.post('/api/ai/chat', createAIChatHandler({ AiProvider, DocAgent, getReadTools, getWriteTools }));
  */
 export function createAIChatHandler(deps: {
   AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => SessionAgent;
@@ -2346,13 +2346,13 @@ export function createAIChatHandler(deps: {
       | { type: 'error'; message: string }
     >;
   };
-  READ_TOOLS: unknown[];
+  getReadTools: () => unknown[];
   // Optional write integration — injected by the CLI layer only when @doc77/mcp
   // is installed. When absent, the AI agent stays read-only.
-  WRITE_TOOLS?: unknown[];
+  getWriteTools?: () => unknown[];
   writeFns?: AiWriteFns;
 }) {
-  const { AiProvider, DocAgent, READ_TOOLS } = deps;
+  const { getReadTools } = deps;
   // One limiter for the lifetime of the handler (persists across requests).
   const aiRateLimiter = createRateLimiter();
 
@@ -2524,8 +2524,8 @@ export function createAIChatHandler(deps: {
             model: cfg.model,
             // Expose write tools only when MCP write functions were injected.
             tools: (deps.writeFns
-              ? [...(READ_TOOLS as any[]), ...((deps.WRITE_TOOLS as any[]) || [])]
-              : (READ_TOOLS as any[])) as any[],
+              ? [...(getReadTools()), ...((deps.getWriteTools?.() || []))]
+              : (getReadTools())) as any[],
             executeTool,
             maxSteps: 5,
           }) as any,

@@ -324,15 +324,15 @@ async function main() {
 
       // Register AI-dependent routes (optional)
       try {
-        const { AiProvider, DocAgent, READ_TOOLS, WRITE_TOOLS } = await import('@doc77/ai');
+        const { AiProvider, DocAgent, getReadTools, getWriteTools } = await import('@doc77/ai');
         const { createAIChatHandler } = await import('@doc77/core');
-        const aiDeps: Record<string, unknown> = { AiProvider, DocAgent, READ_TOOLS };
+        const aiDeps: Record<string, unknown> = { AiProvider, DocAgent, getReadTools };
         // When MCP is installed, let the AI propose writes through the approval
         // queue by injecting its write functions + tool schemas.
         if (mcpAvailable) {
           const { createFolder, moveFile, deleteFile, batchOperations } =
             await import('@doc77/mcp');
-          aiDeps.WRITE_TOOLS = WRITE_TOOLS;
+          aiDeps.getWriteTools = getWriteTools;
           aiDeps.writeFns = { createFolder, moveFile, deleteFile, batchOperations };
         }
         app.post('/api/ai/chat', createAIChatHandler(aiDeps as any));
