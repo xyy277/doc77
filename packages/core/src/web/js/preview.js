@@ -1224,6 +1224,12 @@ function enterEditMode() {
 
   initEditDivider();
 
+  // Override parent max-width constraint for full-width editor
+  var editContainer = document.getElementById('editSplitContainer');
+  var p = editContainer ? editContainer.parentElement : null;
+  while (p && !p.classList.contains('max-w-4xl')) { p = p.parentElement; }
+  if (p) { p.style.maxWidth = 'none'; window._editMaxWidthParent = p; }
+
   // Auto-collapse right panel
   var rp = document.getElementById('rightPanel');
   editOutlineWasManualCollapsed = rp && rp.classList.contains('hidden');
@@ -1334,13 +1340,16 @@ function markSaved() {
 }
 
 function updateEditPreview(content) {
-  var pp = document.getElementById('editPreviewPane'); if (!pp || !currentFile) return;
-  try {
-    var fakeData = { type: 'markdown', content: content, path: currentFile };
-    pp.innerHTML = buildDocHTML(currentFile, fakeData);
-  } catch(e) {
-    pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px">'+escapeHtml(content)+'</pre>';
-  }
+  var pp = document.getElementById('editPreviewPane');
+  if (!pp || !currentFile || !proj || !proj.id) return;
+  fetch('/api/content/' + proj.id + '?path=' + encodeURIComponent(currentFile) + '&t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.content) pp.innerHTML = buildDocHTML(currentFile, d);
+    })
+    .catch(function() {
+      pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px">' + escapeHtml(content) + '</pre>';
+    });
 }
 
 function exitEditMode(skipConfirm) {
@@ -1357,6 +1366,8 @@ function exitEditMode(skipConfirm) {
 }
 
 function doExitEdit() {
+  // Restore max-width on parent that was overridden for full-width editing
+  if (window._editMaxWidthParent) { window._editMaxWidthParent.style.maxWidth = ''; window._editMaxWidthParent = null; }
   // Destroy editor instance
   if (window._editEditor) { try { window._editEditor.destroy(); } catch(e) {}; window._editEditor = null; }
   // Cleanup divider event listeners
