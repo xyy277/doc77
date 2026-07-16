@@ -17,7 +17,7 @@ HITS=$(grep -rnP '[一-龥]' "${TARGETS[@]}" \
         --include='*.ts' --include='*.js' --include='*.html' 2>/dev/null \
       | grep -Ev "$WHITELIST" \
       | grep -Ev ':[0-9]+:[[:space:]]*(//|\*|/\*|#|--|<!--)' \
-      | grep -Ev 'replace\(.*一-鿿' || true)
+      | grep -Ev 'replace\([^)]*一-鿿' || true)
 if [ -n "$HITS" ]; then
   echo "❌ 发现未提取的硬编码中文（非注释）:"
   echo "$HITS"
