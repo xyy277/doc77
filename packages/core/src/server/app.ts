@@ -1112,13 +1112,55 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       // 2. Check editable file type (extension or dotfile basename)
       const ext = path.extname(filePath).toLowerCase();
       var baseName = path.basename(filePath);
-      const editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
-        '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
-        '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
-        '.conf','.cfg','.ini','.csv','.log'];
-      const editableDotfiles = ['.gitignore','.dockerignore','.editorconfig','.env.example','.env'];
+      const editableExts = [
+        '.md',
+        '.mdx',
+        '.txt',
+        '.markdown',
+        '.json',
+        '.yaml',
+        '.yml',
+        '.toml',
+        '.ts',
+        '.tsx',
+        '.js',
+        '.jsx',
+        '.py',
+        '.rb',
+        '.go',
+        '.rs',
+        '.java',
+        '.c',
+        '.cpp',
+        '.h',
+        '.css',
+        '.scss',
+        '.less',
+        '.html',
+        '.htm',
+        '.xml',
+        '.svg',
+        '.sh',
+        '.bash',
+        '.zsh',
+        '.conf',
+        '.cfg',
+        '.ini',
+        '.csv',
+        '.log',
+      ];
+      const editableDotfiles = [
+        '.gitignore',
+        '.dockerignore',
+        '.editorconfig',
+        '.env.example',
+        '.env',
+      ];
       var isEditable = editableExts.includes(ext) || editableDotfiles.includes(baseName);
-      if (!isEditable) { res.status(403).json({ error: '此文件类型不可编辑' }); return; }
+      if (!isEditable) {
+        res.status(403).json({ error: '此文件类型不可编辑' });
+        return;
+      }
 
       // 3. Sensitive file check
       if (isSensitiveFile(path.basename(filePath))) {
@@ -1129,9 +1171,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       // 4. File size check (read from config)
       const maxSizeMB = (() => {
         try {
-          const row = db.prepare("SELECT value FROM config WHERE key = 'editor.maxFileSizeMB'").get() as { value: string } | undefined;
+          const row = db
+            .prepare("SELECT value FROM config WHERE key = 'editor.maxFileSizeMB'")
+            .get() as { value: string } | undefined;
           return row ? parseInt(row.value, 10) : 2;
-        } catch { return 2; }
+        } catch {
+          return 2;
+        }
       })();
       const maxSizeBytes = maxSizeMB * 1024 * 1024;
       if (Buffer.byteLength(content, 'utf-8') > maxSizeBytes) {
