@@ -67,9 +67,9 @@ var editOutlineWasManualCollapsed = false;
 // tabStore: 纯逻辑（顺序/活动/容量淘汰/渲染 LRU），来自 tabs.js
 var tabStore = TabStore.createTabStore({ maxTabs: 8, maxRendered: 3 });
 var activeTabPath = null;
-var tabDataCache = {}; // path -> /api/content 响应（缓存，切 tab 不重复请求）
-var tabScroll = {}; // path -> contentArea.scrollTop（切 tab 保存/恢复阅读位置）
-var paneCache = {}; // path -> 已渲染的内容 DOM 节点（仅轻量类型进入 LRU）
+var tabDataCache = {}; // path -> /api/content response (cached, no re-fetch on tab switch)
+var tabScroll = {}; // path -> contentArea.scrollTop (save/restore reading position)
+var paneCache = {}; // path -> rendered content DOM nodes (lightweight types only)
 function basename(p) { return p.split('/').pop() || p; }
 function tabsStorageKey() { return 'doc77-tabs-' + pid; }
 
@@ -82,13 +82,13 @@ function initTaskEvents() {
     taskEventSrc = new EventSource('/api/events');
     taskEventSrc.addEventListener('task:executed', function(e){
       var d = {}; try { d = JSON.parse(e.data); } catch(_){}
-      toast('✅ 操作已执行（任务 #' + (d.task_id||'?') + '）', 'success');
-      loadTasks(); appendTaskReceipt('✅ 任务 #' + (d.task_id||'?') + ' 已执行完成');
+      toast(t('web.preview.task.toastExecuted', {id: d.task_id||'?'}), 'success');
+      loadTasks(); appendTaskReceipt(t('web.preview.task.taskExecuted', {id: d.task_id||'?'}));
     });
     taskEventSrc.addEventListener('task:failed', function(e){
       var d = {}; try { d = JSON.parse(e.data); } catch(_){}
-      toast('❌ 操作失败（任务 #' + (d.task_id||'?') + '）', 'error');
-      loadTasks(); appendTaskReceipt('❌ 任务 #' + (d.task_id||'?') + ' 执行失败' + (d.error_message ? ('：' + d.error_message) : ''));
+      toast(t('web.preview.task.toastFailed', {id: d.task_id||'?'}), 'error');
+      loadTasks(); appendTaskReceipt(t('web.preview.task.taskFailed', {id: d.task_id||'?'}) + (d.error_message ? '：' + d.error_message : ''));
     });
     taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
   } catch(_){}
@@ -128,7 +128,7 @@ function applyCapabilities() {
     var r = await fetch('/api/projects');
     projects = await r.json();
     proj = projects.find(function(p) { return p.id === parseInt(pid); });
-    if (!proj) { toast('项目未找到','error'); location.href='/'; return; }
+    if (!proj) { toast(t('web.preview.projectNotFound'),'error'); location.href='/'; return; }
     document.getElementById('projName').textContent = '💼 ' + proj.name;
     document.title = 'Doc77 — ' + proj.name;
     renderProjMenu(); loadTree(''); loadTasks(); setActiveTab('outline');
@@ -138,7 +138,7 @@ function applyCapabilities() {
     // Navigate to specific file if path param provided (from recent-files link) — 展开左侧树
     if (directPath) { setTimeout(function(){ navigateToFile(directPath); }, 400); }
     fetch('/api/projects/' + pid + '/touch', { method: 'POST' }).catch(function(){});
-  } catch(e) { document.getElementById('projName').textContent = '⚠ 加载失败'; }
+  } catch(e) { document.getElementById('projName').textContent = t('web.preview.loadFailed'); }
 })();
 
 //══════════ Project Switcher ══════════
@@ -161,17 +161,17 @@ function renderProjMenu(filter) {
     if (aLo && bLo) return bLo - aLo;
     if (aLo) return -1;
     if (bLo) return 1;
-    return a.name.localeCompare(b.name, 'zh-CN');
+    return a.name.localeCompare(b.name, window.__doc77_lang || 'zh-CN');
   });
   var filtered = filter ? sorted.filter(function(p) { return p.name.toLowerCase().indexOf(filter) >= 0 || p.path.toLowerCase().indexOf(filter) >= 0; }) : sorted;
   var items = filtered.map(function(p) {
     return '<button onclick="switchProject(' + p.id + ')" class="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 flex flex-col transition-colors"><span class="font-medium">' + (p.id===proj.id?'✓ ':'') + '💼 ' + esc(p.name) + '</span><span class="text-xs text-slate-500 truncate">' + esc(p.path) + '</span></button>';
   }).join('');
-  if (!items) items = '<div class="px-3 py-2 text-xs text-slate-500">没有匹配的项目</div>';
+  if (!items) items = '<div class="px-3 py-2 text-xs text-slate-500">' + t('web.preview.noMatchingProjects') + '</div>';
   document.getElementById('projMenu').innerHTML =
-    '<div class="px-2 pt-2 pb-1 sticky top-0 bg-slate-800 z-10"><div class="relative"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="projSearch" placeholder="搜索项目..." oninput="renderProjMenu(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-md pl-7 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-500"></div></div>' +
+    '<div class="px-2 pt-2 pb-1 sticky top-0 bg-slate-800 z-10"><div class="relative"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="projSearch" placeholder="' + t('web.preview.searchProject') + '" oninput="renderProjMenu(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-md pl-7 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-500"></div></div>' +
     '<div class="max-h-72 overflow-y-auto scrollbar-dark">' + items + '</div>' +
-    '<div class="h-px bg-slate-700 my-1"></div><a href="/" class="block w-full text-left px-3 py-2 text-sm text-blue-400 hover:bg-slate-700 transition-colors">＋ 注册新项目</a>';
+    '<div class="h-px bg-slate-700 my-1"></div><a href="/" class="block w-full text-left px-3 py-2 text-sm text-blue-400 hover:bg-slate-700 transition-colors">' + t('web.preview.registerNewProject') + '</a>';
 }
 function switchProject(id) { location.href = '/preview.html?id=' + id; }
 
@@ -217,8 +217,8 @@ function togglePanel(side) {
   } else {
     var capsule = document.getElementById('capsuleBtn');
     var icon = document.getElementById('capsuleIcon');
-    if (h) { capsule.style.right = '16px'; capsule.title = '展开面板'; }
-    else { capsule.style.right = (parseInt(panel.style.width) || 320) - 4 + 'px'; capsule.title = '收起面板'; }
+    if (h) { capsule.style.right = '16px'; capsule.title = t('web.preview.expandPanel'); }
+    else { capsule.style.right = (parseInt(panel.style.width) || 320) - 4 + 'px'; capsule.title = t('web.preview.collapsePanel'); }
     icon.textContent = h ? '◀' : '▶';
   }
 }
@@ -280,8 +280,8 @@ async function loadTree(dirPath) {
     var fld = d.entries.filter(function(e) { return e.type === 'directory'; });
     var fls = d.entries.filter(function(e) { return e.type === 'file'; });
     fld.concat(fls).forEach(function(e) { tree.appendChild(makeNode(e, dirPath||'')); });
-    if (!fld.length && !fls.length) tree.innerHTML = '<div class="text-center py-4 text-slate-500 text-xs">空目录</div>';
-  } catch(e) { tree.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">加载失败</div>'; }
+    if (!fld.length && !fls.length) tree.innerHTML = '' + t('web.preview.emptyDir') + '';
+  } catch(e) { tree.innerHTML = '' + t('web.preview.loadFailed') + ''; }
 }
 function refreshTree() { loadTree(''); }
 function applyFilter() {
@@ -310,20 +310,20 @@ function makeNode(entry, parentPath) {
       e.stopPropagation();
       if (wrapper.classList.contains('hidden')) {
         if (!loaded) {
-          wrapper.classList.remove('hidden'); wrapper.innerHTML = '<div class="text-slate-500 text-xs py-1 pl-2">加载中...</div>';
+          wrapper.classList.remove('hidden'); wrapper.innerHTML = '<div class="text-slate-500 text-xs py-1 pl-2">' + t('web.preview.loading') + '</div>';
           fetch('/api/tree/' + pid + '?path=' + encodeURIComponent(childPath)).then(function(r) { return r.json(); }).then(function(d) {
             wrapper.innerHTML = '';
             var f = d.entries.filter(function(e){ return e.type === 'directory'; });
             var l = d.entries.filter(function(e){ return e.type === 'file'; });
-            if (!f.length && !l.length) wrapper.innerHTML = '<div class="text-slate-600 text-xs py-1 pl-2">空目录</div>';
+            if (!f.length && !l.length) wrapper.innerHTML = '<div class="text-slate-600 text-xs py-1 pl-2">' + t('web.preview.emptyDir') + '</div>';
             else f.concat(l).forEach(function(e) { wrapper.appendChild(makeNode(e, childPath)); });
             var cb = document.createElement('div');
             cb.className = 'tree-collapse-btn text-[10px] text-slate-500 hover:text-slate-300 cursor-pointer py-1 pl-2 select-none';
-            cb.textContent = '🔼 收起此目录';
+            cb.textContent = t('web.preview.collapseDir');
             cb.onclick = function(ev) { ev.stopPropagation(); wrapper.classList.add('hidden'); row.querySelector('span').textContent = '▸'; };
             wrapper.appendChild(cb);
             loaded = true;
-          }).catch(function() { wrapper.innerHTML = '<div class="text-red-400 text-xs py-1 pl-2">加载失败</div>'; });
+          }).catch(function() { wrapper.innerHTML = '<div class="text-red-400 text-xs py-1 pl-2">' + t('web.preview.loadFailed') + '</div>'; });
         } else { wrapper.classList.remove('hidden'); }
         row.querySelector('span').textContent = '▾';
       } else { wrapper.classList.add('hidden'); row.querySelector('span').textContent = '▸'; }
@@ -494,10 +494,10 @@ function isHeavyDoc(path, d) {
 function buildDocHTML(path, d) {
   var html = '';
   if (d.type === 'unsupported') {
-    var labels = { video:'🎬 视频', audio:'🎵 音频', archive:'📦 压缩包', font:'🔤 字体',
-      database:'🗄 数据库', design:'🎨 设计文件', binary:'⚙ 二进制', gis:'🗺 GIS数据',
-      '3d':'🧊 3D模型', ebook:'📚 电子书', document:'📄 文档', spreadsheet:'📊 表格',
-      presentation:'📽 演示文稿', too_large:'📦 文件过大', unknown:'📁 未知格式' };
+    var labels = { video:t('web.preview.type.video'), audio:t('web.preview.type.audio'), archive:t('web.preview.type.archive'), font:t('web.preview.type.font'),
+      database:t('web.preview.type.database'), design:t('web.preview.type.design'), binary:t('web.preview.type.binary'), gis:t('web.preview.type.gis'),
+      '3d':t('web.preview.type.model3d'), ebook:t('web.preview.type.ebook'), document:t('web.preview.type.document'), spreadsheet:t('web.preview.type.spreadsheet'),
+      presentation:t('web.preview.type.presentation'), too_large:t('web.preview.type.tooLarge'), unknown:t('web.preview.type.unknown') };
     var label = labels[d.category] || labels.unknown;
     var sizeStr = d.size < 1024 ? d.size + ' B' : d.size < 1048576 ? (d.size/1024).toFixed(1) + ' KB' : (d.size/1048576).toFixed(1) + ' MB';
     html = '<div class="max-w-md mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 text-center">' +
@@ -505,11 +505,11 @@ function buildDocHTML(path, d) {
       '<h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">' + label + '</h3>' +
       '<p class="text-sm text-slate-500 dark:text-slate-400 mb-4">' + esc(path) + '</p>' +
       '<div class="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 mb-4 text-xs text-left">' +
-      '<span class="text-slate-500">大小</span><span class="text-slate-700 dark:text-slate-300">' + sizeStr + '</span>' +
-      (d.modified ? '<span class="text-slate-500">修改时间</span><span class="text-slate-700 dark:text-slate-300">' + new Date(d.modified).toLocaleString('zh-CN') + '</span>' : '') +
+      '<span class="text-slate-500">' + t('web.preview.size') + '</span><span class="text-slate-700 dark:text-slate-300">' + sizeStr + '</span>' +
+      (d.modified ? '<span class="text-slate-500">' + t('web.preview.modifiedTime') + '</span><span class="text-slate-700 dark:text-slate-300">' + new Date(d.modified).toLocaleString(window.__doc77_lang || 'zh-CN') + '</span>' : '') +
       '</div>' +
-      '<p class="text-xs text-amber-600 dark:text-amber-400 mb-4">⚠️ 不支持预览此文件格式</p>' +
-      (d.temp ? '' : '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 文件夹中显示</button>') +
+      '<p class="text-xs text-amber-600 dark:text-amber-400 mb-4">⚠️ ' + t('web.preview.unsupportedFormat') + '</p>' +
+      (d.temp ? '' : '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 ' + t('web.preview.showInFolder') + '</button>') +
       '</div>';
   } else if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
     html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
@@ -517,10 +517,10 @@ function buildDocHTML(path, d) {
       var ext = path.split('.').pop().toLowerCase();
       if (ext === 'html' || ext === 'htm') {
         html = '<div style="position:relative">' +
-          '<button id="htmlToggleBtn" onclick="toggleHtmlPreview()" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10;padding:6px 16px;border:1px solid #e2e8f0;border-radius:8px;background:rgba(255,255,255,0.9);color:#475569;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);backdrop-filter:blur(4px);white-space:nowrap">👁 预览</button>' +
+          '<button id="htmlToggleBtn" onclick="toggleHtmlPreview()" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10;padding:6px 16px;border:1px solid #e2e8f0;border-radius:8px;background:rgba(255,255,255,0.9);color:#475569;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);backdrop-filter:blur(4px);white-space:nowrap">' + t('web.preview.htmlToggle.preview') + '</button>' +
           '<div id="htmlCodeView">' + html + '</div>' +
           '<div id="htmlPreview" style="display:none"><div id="htmlPreviewContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
-          '<button onclick="toggleHtmlPreviewFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
+          '<button onclick="toggleHtmlPreviewFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="' + t('web.preview.htmlToggle.fullscreen') + '">⛶</button>' +
           '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div></div>' +
           '</div>';
       }
@@ -529,7 +529,7 @@ function buildDocHTML(path, d) {
     html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center" style="min-height:60vh"><img src="' + d.rawUrl + '" alt="' + esc(path) + '" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="openImageLightbox(\'' + escAttr(d.rawUrl) + '\', \'' + escAttr(path) + '\')" /></div>';
   } else if (d.type === 'pdf') {
     html = '<div class="pdf-wrapper" id="pdfContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
-      '<button onclick="togglePdfFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="全屏">⛶</button>' +
+      '<button onclick="togglePdfFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="' + t('web.preview.htmlToggle.fullscreen') + '">⛶</button>' +
       '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div>';
   } else {
     html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><pre class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono">' + esc(d.content) + '</pre></div>';
@@ -543,7 +543,7 @@ function renderDocNode(path, d) {
   pane.className = 'doc-pane';
   pane.dataset.path = path;
   if (d.type === 'docx' || d.type === 'xlsx') {
-    pane.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载中...</div></div>';
+    pane.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">' + t('web.preview.loading') + '</div></div>';
     renderOfficeDoc(d, pane, path);
   } else {
     pane.innerHTML = buildDocHTML(path, d);
@@ -582,7 +582,7 @@ function afterActivate(path, d) {
   if (editBtnEl) {
     editBtnEl.style.display = isEditable ? '' : 'none';
     editBtnEl.classList.toggle('editing-active', editMode);
-    editBtnEl.title = editMode ? '退出编辑模式' : '编辑此文件（分屏）';
+    editBtnEl.title = editMode ? t('web.preview.exitEditMode') : t('web.preview.editFile');
     editBtnEl.onclick = toggleEditMode;
   }
   // Run 按钮：仅 js/py 显示
@@ -610,7 +610,7 @@ function refreshOutline() {
   var doc = document.getElementById('docContent');
   if (doc) { buildOutline(); }
   else {
-    document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">当前文档不支持大纲</div>';
+    document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">' + t('web.preview.noOutline') + '</div>';
     outlineBuilt = true;
   }
 }
@@ -636,7 +636,7 @@ function activateTab(path, opts) {
 
   var cached = paneCache[path];
   if (cached) {
-    tabStore.noteRendered(path); // 刷新 LRU
+    tabStore.noteRendered(path); // touch LRU
     mountPane(cached, path);
     afterActivate(path, tabDataCache[path] || { type: 'text', content: '' });
     return;
@@ -646,8 +646,8 @@ function activateTab(path, opts) {
   var empty = document.getElementById('emptyState'); if (empty) empty.classList.add('hidden');
   host.innerHTML = '<div class="p-4 sm:p-10"><div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div></div>';
   fetchDoc(path).then(function(d) {
-    if (activeTabPath !== path) return; // 用户已切走
-    if (translateActive) { exitTranslateMode(); return; } // 翻译模式激活时跳过渲染
+    if (activeTabPath !== path) return; // user switched away
+    if (translateActive) { exitTranslateMode(); return; } // skip render when translate active
     var pane = renderDocNode(path, d);
     if (!isHeavyDoc(path, d)) {
       paneCache[path] = pane;
@@ -658,7 +658,7 @@ function activateTab(path, opts) {
     afterActivate(path, d);
   }).catch(function() {
     if (activeTabPath !== path) return;
-    host.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">文件加载失败</p></div>';
+    host.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">' + t('web.preview.fileLoadFailed') + '</p></div>';
   });
 }
 
@@ -725,12 +725,12 @@ function renderTabBar() {
       (active ? 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 font-medium shadow-sm'
               : 'bg-transparent border-transparent text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60');
     var badge = isTemp ? '<span class="temp-badge">📎</span>' : '';
-    var tooltip = isTemp ? '临时预览 — 刷新后关闭' : escAttr(t.path);
+    var tooltip = isTemp ? t('web.preview.tempPreviewTooltip') : escAttr(t.path);
     return '<div class="' + cls + '" title="' + tooltip + '" onclick="onTabClick(event, \'' + escAttr(t.path) + '\')" onmousedown="onTabMouseDown(event, \'' + escAttr(t.path) + '\')">' +
       '<span class="shrink-0">' + iconFor(t.title) + '</span>' +
       badge +
       '<span class="truncate max-w-[160px]">' + esc(t.title) + '</span>' +
-      '<button class="shrink-0 w-4 h-4 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-red-500" onclick="event.stopPropagation();closeTab(\'' + escAttr(t.path) + '\')" title="关闭">✕</button>' +
+      '<button class="shrink-0 w-4 h-4 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-red-500" onclick="event.stopPropagation();closeTab(\'' + escAttr(t.path) + '\')" title="' + t('web.preview.close') + '">✕</button>' +
       '</div>';
   }).join('');
 }
@@ -742,10 +742,10 @@ function onTabClick(e, path) {
   if (translateActive) exitTranslateMode();
   // If editing, prompt to save before switching
   if (editMode && editDirty) {
-    showEditConfirm('有未保存的修改', '切换文件前是否保存当前修改？', [
-      {text:'保存并切换',cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(true); activateTab(path); }); }},
-      {text:'放弃修改',cls:'btn-danger',action:function(){ doExitEdit(true); activateTab(path); }},
-      {text:'取消',cls:''}
+    showEditConfirm(t('web.preview.edit.unsavedTitle'), t('web.preview.edit.switchSavePrompt'), [
+      {text:t('web.preview.edit.saveAndSwitch'),cls:'btn-primary',action:function(){ doSave(function(){ doExitEdit(true); activateTab(path); }); }},
+      {text:t('web.preview.edit.discard'),cls:'btn-danger',action:function(){ doExitEdit(true); activateTab(path); }},
+      {text:t('web.preview.edit.cancel'),cls:''}
     ]);
     return;
   }
@@ -811,15 +811,15 @@ function restoreTabs(preferActivePath) {
 function renderBreadcrumb(filePath) {
   var bc = document.getElementById('breadcrumb');
   if (!bc) return;
-  if (!filePath) { bc.innerHTML = '<span id="breadcrumbPath" class="text-slate-400 text-sm">未选择文件</span>'; return; }
+  if (!filePath) { bc.innerHTML = '<span id="breadcrumbPath" class="text-slate-400 text-sm">' + t('web.preview.toolbar.noFileSelected') + '</span>'; return; }
   // Temp file breadcrumb
   if (TempPreview.isTempPath(filePath)) {
     var tName = basename(filePath);
-    bc.innerHTML = '<span class="text-slate-400 text-sm">📎 临时文件</span><span class="text-slate-300 dark:text-slate-600 shrink-0">›</span><strong class="text-slate-700 dark:text-slate-200 truncate">' + esc(tName) + '</strong>';
+    bc.innerHTML = '<span class="text-slate-400 text-sm">' + t('web.preview.tempFile') + '</span><span class="text-slate-300 dark:text-slate-600 shrink-0">›</span><strong class="text-slate-700 dark:text-slate-200 truncate">' + esc(tName) + '</strong>';
     return;
   }
   var parts = filePath.split('/');
-  var html = '<a href="javascript:void(0)" onclick="revealDirInTree(\'\')" class="hover:text-blue-500 dark:hover:text-blue-400 truncate shrink-0" title="项目根目录">' + esc(proj ? proj.name : '根') + '</a>';
+  var html = '<a href="javascript:void(0)" onclick="revealDirInTree(\'\')" class="hover:text-blue-500 dark:hover:text-blue-400 truncate shrink-0" title="' + t('web.preview.projectRoot') + '">' + esc(proj ? proj.name : t('web.preview.root')) + '</a>';
   var acc = '';
   parts.forEach(function(part, i) {
     html += '<span class="text-slate-300 dark:text-slate-600 shrink-0">›</span>';
@@ -898,7 +898,7 @@ function loadMermaid(cb) {
   };
   s.onerror = function() {
     _mermaidLoading = false;
-    _mermaidCbs.splice(0).forEach(function(fn){ fn(false); }); // 降级：保留 <pre class="mermaid"> 源码
+    _mermaidCbs.splice(0).forEach(function(fn){ fn(false); }); // degrade: keep <pre class="mermaid"> source
   };
   document.head.appendChild(s);
 }
@@ -979,7 +979,7 @@ function updateReadingTime(d) {
   var text = d.content || '';
   var chars = text.replace(/<[^>]*>/g,'').length;
   var mins = Math.max(1, Math.round(chars / 400));
-  el.textContent = '约 ' + mins + ' 分钟';
+  el.textContent = t('web.preview.readingTime', {n: mins});
   el.classList.remove('hidden');
 }
 
@@ -1006,7 +1006,7 @@ function addRecentFile(fp) {
 function renderRecentFiles() {
   var rf = getRecentFiles().filter(function(f) { return f.pid == pid; });
   var el = document.getElementById('recentList');
-  if (!rf.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">暂无</div>'; return; }
+  if (!rf.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">' + t('web.preview.recent.empty') + '</div>'; return; }
   el.innerHTML = rf.map(function(f) {
     return '<div onclick="navigateToFile(\'' + escAttr(f.path) + '\')" class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-slate-300 truncate text-xs"><span>📄</span><span class="truncate">' + esc(f.path) + '</span></div>';
   }).join('');
@@ -1038,7 +1038,7 @@ var ttsActive = false;
 function toggleTTS() {
   if (ttsActive) { window.speechSynthesis.cancel(); ttsActive = false; document.getElementById('ttsBtn').textContent = '🔊'; document.getElementById('ttsRate').classList.add('hidden'); return; }
   var text = (document.getElementById('docContent') || document.querySelector('.doc-content'))?.textContent;
-  if (!text) { toast('请先打开文档','error'); return; }
+  if (!text) { toast(t('web.preview.codeRun.openDoc'),'error'); return; }
   ttsActive = true;
   document.getElementById('ttsBtn').textContent = '⏹';
   document.getElementById('ttsRate').classList.remove('hidden');
@@ -1061,12 +1061,12 @@ async function toggleTranslate() {
     return;
   }
   var contentEl = document.getElementById('docContent') || document.querySelector('.doc-content');
-  if (!contentEl) { toast('请先打开文档', 'error'); return; }
+  if (!contentEl) { toast(t('web.preview.openDocFirst'), 'error'); return; }
   var text = contentEl.textContent;
-  if (!text || text.trim().length < 2) { toast('文档内容太短', 'info'); return; }
+  if (!text || text.trim().length < 2) { toast(t('web.preview.docTooShort'), 'info'); return; }
 
   var container = document.getElementById('contentArea');
-  if (!container) { toast('未找到内容区域', 'error'); return; }
+  if (!container) { toast(t('web.preview.noContentArea'), 'error'); return; }
 
   // Save entire contentArea state for clean restoration on exit
   _savedOriginalContent = {
@@ -1088,7 +1088,7 @@ async function toggleTranslate() {
   var right = document.createElement('div');
   right.id = 'translateRight';
   right.style.cssText = 'flex:1;overflow-y:auto;padding:8px 12px';
-  right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">🌐 正在翻译...</div>';
+  right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">🌐 ' + t('web.preview.translating') + '</div>';
   splitPane.appendChild(left); splitPane.appendChild(right);
   while (container.firstChild) container.removeChild(container.firstChild);
   container.appendChild(splitPane);
@@ -1105,18 +1105,18 @@ async function toggleTranslate() {
     });
     if (!r.ok) {
       var err = await r.json();
-      right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger)">❌ ' + (err.message || err.error || '翻译失败') + '</div>';
+      right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger)">❌ ' + (err.message || err.error || t('web.preview.translateFailed')) + '</div>';
       return;
     }
     var result = await r.json();
     var translatedHtml = '<div class="translated-content" style="white-space:pre-wrap">' + escapeHtml(result.translated_text) + '</div>';
     if (result.segment_count) {
-      translatedHtml += '<div style="margin-top:8px;font-size:10px;color:var(--text-muted);text-align:center">分' + result.segment_count + '段 · ' + (result.duration_ms / 1000).toFixed(1) + 's · Opus-MT</div>';
+      translatedHtml += '<div style="margin-top:8px;font-size:10px;color:var(--text-muted);text-align:center">' + t('web.preview.segments', {count: result.segment_count, duration: (result.duration_ms / 1000).toFixed(1)}) + '</div>';
     }
     right.innerHTML = translatedHtml;
     translateCache[cacheKey] = translatedHtml;
   } catch(e) {
-    right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger)">❌ 翻译失败: ' + e.message + '</div>';
+    right.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger)">❌ ' + t('web.preview.translateFailed') + ': ' + e.message + '</div>';
   }
 }
 
@@ -1148,10 +1148,10 @@ function exitTranslateMode() {
     popup.style.left = (e.clientX + 10) + 'px';
     popup.style.top = (e.clientY - 40) + 'px';
     var btn = document.createElement('button');
-    btn.textContent = '🌐 翻译选中';
+    btn.textContent = t('web.preview.translateSelected');
     btn.style.cssText = 'padding:4px 10px;border:none;border-radius:6px;cursor:pointer;background:var(--accent);color:#fff;font-size:12px;white-space:nowrap';
     btn.onclick = async function() {
-      btn.textContent = '翻译中...'; btn.disabled = true;
+      btn.textContent = t('web.preview.translating'); btn.disabled = true;
       try {
         var r = await fetch('/api/translate', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1161,7 +1161,7 @@ function exitTranslateMode() {
           var result = await r.json();
           popup.innerHTML = '<div style="padding:8px 12px;max-width:360px;line-height:1.5;font-size:13px;color:var(--text-primary)">' + escapeHtml(result.translated_text) + '<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">' + (result.duration_ms/1000).toFixed(1) + 's</div></div>';
         } else {
-          popup.innerHTML = '<div style="padding:8px 12px;color:var(--danger)">翻译失败</div>';
+          popup.innerHTML = '<div style="padding:8px 12px;color:var(--danger)">' + t('web.preview.translateFailed') + '</div>';
         }
       } catch(err) { popup.remove(); }
     };
@@ -1196,14 +1196,14 @@ function toggleAutoScroll() {
 
 // Feature 7: AI Summary
 async function doAISummary() {
-  if (!currentFile) { toast('请先打开文档','error'); return; }
+  if (!currentFile) { toast(t('web.preview.openDocFirst'),'error'); return; }
   var card = document.getElementById('summaryCard');
   var txt = document.getElementById('summaryText');
-  card.classList.remove('hidden'); txt.textContent = '生成中...';
+  card.classList.remove('hidden'); txt.textContent = t('web.preview.generating');
   try {
-    var body = JSON.stringify({ message: '请用100字以内简洁总结这个文档的核心内容', project_id: parseInt(pid), context_file: currentFile });
+    var body = JSON.stringify({ message: t('web.preview.summaryPrompt'), project_id: parseInt(pid), context_file: currentFile });
     var res = await fetch('/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: body });
-    if (!res.ok) { txt.textContent = 'AI 服务不可用，请检查设置'; return; }
+    if (!res.ok) { txt.textContent = t('web.preview.aiUnavailable'); return; }
     var reader = res.body.getReader(), decoder = new TextDecoder(), buf = '', summary = '';
     while (true) {
       var rr = await reader.read(); if (rr.done) break;
@@ -1216,12 +1216,12 @@ async function doAISummary() {
         }
       }
     }
-    if (!summary) txt.textContent = '未能生成摘要';
-  } catch(e) { txt.textContent = '生成失败: ' + e.message; }
+    if (!summary) txt.textContent = t('web.preview.summaryFailed');
+  } catch(e) { txt.textContent = t('web.preview.summaryFailed') + ': ' + e.message; }
 }
 function readSummary() {
   var txt = document.getElementById('summaryText').textContent;
-  if (!txt || txt === '生成中...') return;
+  if (!txt || txt === t('web.preview.generating')) return;
   var u = new SpeechSynthesisUtterance(txt);
   u.lang = 'zh-CN'; u.rate = 1;
   window.speechSynthesis.speak(u);
@@ -1241,11 +1241,11 @@ function doDocSearch() {
   searchMatches = []; searchIdx = -1;
   if (q.length < 2) { document.getElementById('searchCount').textContent = ''; return; }
   var doc = document.getElementById('docContent');
-  if (!doc) { document.getElementById('searchCount').textContent = '0 个匹配'; return; }
+  if (!doc) { document.getElementById('searchCount').textContent = t('web.preview.zeroMatches'); return; }
   // Use TreeWalker to find text nodes, then wrap matches
   highlightInNode(doc, q.toLowerCase());
   var count = document.querySelectorAll('.search-highlight').length;
-  document.getElementById('searchCount').textContent = count + ' 个匹配';
+  document.getElementById('searchCount').textContent = t('web.preview.matches', {count: count});
   if (count > 0) { searchIdx = 0; scrollToMatch(0); }
 }
 function highlightInNode(root, q) {
@@ -1302,15 +1302,15 @@ async function doGlobalSearch() {
   var rdiv = document.getElementById('searchResults');
   if (q.length < 2) { rdiv.classList.add('hidden'); return; }
   rdiv.classList.remove('hidden');
-  rdiv.innerHTML = '<div class="text-xs text-slate-500 px-2 py-1">搜索中...</div>';
+  rdiv.innerHTML = '<div class="text-xs text-slate-500 px-2 py-1">' + t('web.preview.searching') + '</div>';
   try {
     var res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&project_id=' + pid);
     var d = await res.json();
-    if (!d.matches.length) { rdiv.innerHTML = '<div class="text-xs text-slate-500 px-2 py-1">无结果</div>'; return; }
+    if (!d.matches.length) { rdiv.innerHTML = '<div class="text-xs text-slate-500 px-2 py-1">' + t('web.preview.noResults') + '</div>'; return; }
     rdiv.innerHTML = d.matches.slice(0,20).map(function(m) {
       return '<div onclick="navigateToFile(\'' + escAttr(m.file) + '\', ' + m.line + ')" class="flex flex-col px-2 py-1 rounded cursor-pointer hover:bg-slate-800 text-xs"><span class="text-blue-400 truncate">' + esc(m.file) + ':' + m.line + '</span><span class="text-slate-400 truncate">' + esc(m.content) + '</span></div>';
     }).join('');
-  } catch(e) { rdiv.innerHTML = '<div class="text-xs text-red-500 px-2 py-1">搜索失败</div>'; }
+  } catch(e) { rdiv.innerHTML = '<div class="text-xs text-red-500 px-2 py-1">' + t('web.preview.searchFailed') + '</div>'; }
 }
 
 function toggleBookmarkSection() {
@@ -1331,12 +1331,12 @@ function getBookmarks() { try { return JSON.parse(localStorage.getItem('doc77-bo
 function saveBookmarks(bm) { localStorage.setItem('doc77-bookmarks', JSON.stringify(bm)); }
 function addBookmark(filePath) {
   var bm = getBookmarks();
-  if (bm.find(function(b){ return b.pid == pid && b.path === filePath; })) { toast('已收藏过此文件','info'); return; }
+  if (bm.find(function(b){ return b.pid == pid && b.path === filePath; })) { toast(t('web.preview.alreadyBookmarked'),'info'); return; }
   bm.unshift({ pid: parseInt(pid), path: filePath, time: Date.now() });
   if (bm.length > 50) bm = bm.slice(0, 50);
   saveBookmarks(bm);
   renderBookmarks();
-  toast('已收藏 ⭐','success');
+  toast(t('web.preview.bookmarked'),'success');
 }
 function removeBookmark(filePath) {
   var bm = getBookmarks().filter(function(b){ return !(b.pid == pid && b.path === filePath); });
@@ -1347,7 +1347,7 @@ function renderBookmarks() {
   var el = document.getElementById('bookmarkList');
   var cnt = document.getElementById('bookmarkCount');
   if (cnt) cnt.textContent = bm.length;
-  if (!bm.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">暂无收藏</div>'; return; }
+  if (!bm.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">' + t('web.preview.bookmark.empty') + '</div>'; return; }
   el.innerHTML = bm.map(function(b) {
     return '<div class="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-800 group cursor-pointer">' +
       '<span class="truncate flex-1 text-slate-300" onclick="navigateToFile(\'' + escAttr(b.path) + '\')">⭐ ' + esc(b.path) + '</span>' +
@@ -1357,7 +1357,7 @@ function renderBookmarks() {
 // Right-click context menu
 function showCtxMenu(x, y, filePath) {
   var m = document.getElementById('ctxMenu');
-  m.innerHTML = '<button onclick="addBookmark(\'' + escAttr(filePath) + '\');hideCtxMenu()">⭐ 收藏文件</button>';
+  m.innerHTML = '<button onclick="addBookmark(\'' + escAttr(filePath) + '\');hideCtxMenu()">' + t('web.preview.bookmark.add') + '</button>';
   m.style.left = x + 'px'; m.style.top = y + 'px';
   m.classList.remove('hidden');
   setTimeout(function(){ document.addEventListener('click', hideCtxMenu, {once:true}); }, 0);
@@ -1366,7 +1366,7 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
-function openAIChat() { if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg('请总结「' + currentFile + '」的内容', currentFile); } }
+function openAIChat() { if (!CAPABILITIES.ai) { toast(t('web.preview.aiNotInstalled'), 'info'); return; } togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; sendQuickMsg(t('web.preview.chat.summarizePrompt', {file: currentFile}), currentFile); } }
 
 //══════════ Edit Mode ══════════
 function toggleEditMode() {
@@ -1392,11 +1392,11 @@ function enterEditMode() {
       '<div class="edit-pane-preview" id="editPreviewPane">' + previewHTML + '</div>' +
     '</div>' +
     '<div class="edit-statusbar" id="editStatusbar">' +
-      '<span id="statusCursor">行:1 列:1</span>' +
+      '<span id="statusCursor">' + t('web.preview.edit.lineCol') + '</span>' +
       '<span class="status-sep"></span><span>' + lang.toUpperCase() + '</span>' +
       '<span class="status-sep"></span>' +
-      '<span class="status-dirty" id="statusDirty" style="display:none">● 已修改</span>' +
-      '<span class="status-saved fade" id="statusSaved">✓ 已保存</span>' +
+      '<span class="status-dirty" id="statusDirty" style="display:none">' + t('web.preview.edit.dirty') + '</span>' +
+      '<span class="status-saved fade" id="statusSaved">' + t('web.preview.edit.saved') + '</span>' +
     '</div>';
 
   var editorPane = document.getElementById('editEditorPane');
@@ -1422,7 +1422,7 @@ function enterEditMode() {
   }
 
   var editBtnEl = document.getElementById('editBtn');
-  if (editBtnEl) { editBtnEl.classList.add('editing-active'); editBtnEl.title = '退出编辑模式'; }
+  if (editBtnEl) { editBtnEl.classList.add('editing-active'); editBtnEl.title = t('web.preview.edit.exitEditMode'); }
   editMode = true; editDirty = false;
 
   // Load editor with raw file content (cache-bust to avoid stale browser cache)
@@ -1437,7 +1437,7 @@ async function initEditorInstance(initialText) {
   if (!pane) return;
 
   // Show loading while CodeMirror loads
-  pane.innerHTML = '<div class="flex items-center justify-center h-full"><span class="text-sm text-slate-400">加载编辑器中...</span></div>';
+  pane.innerHTML = '<div class="flex items-center justify-center h-full"><span class="text-sm text-slate-400">' + t('web.preview.edit.loadingEditor') + '</span></div>';
 
   // Wait for CodeMirror to load (may be in-flight from preload or freshly started)
   var cmLoaded = false;
@@ -1450,7 +1450,7 @@ async function initEditorInstance(initialText) {
 
   if (!cmLoaded) {
     var b = document.createElement('div'); b.className = 'editor-banner';
-    b.textContent = '编辑器增强加载失败，使用基础文本模式';
+    b.textContent = t('web.preview.edit.editorFallback');
     pane.parentNode.insertBefore(b, pane);
   }
 
@@ -1504,20 +1504,20 @@ function doSave(cb, skipPreview) {
   .then(function(r) {
     if (r.status === 409) {
       r.json().then(function(d) {
-        showEditConfirm('文件已被外部修改', (d.error||'文件已被外部程序修改，继续保存会覆盖外部变更。'), [
-          {text:'覆盖保存',cls:'btn-danger',action:function(){
+        showEditConfirm(t('web.preview.edit.externalModified'), (d.error||t('web.preview.edit.overwriteWarning')), [
+          {text:t('web.preview.edit.overwriteSave'),cls:'btn-danger',action:function(){
             var fh = {'Content-Type':'application/json','X-Force-Overwrite':'true'};
             fetch('/api/content/'+proj.id+'?path='+encodeURIComponent(currentFile),{method:'PUT',headers:fh,body:JSON.stringify({content:content})})
             .then(function(r2){return r2.json().then(function(d2){if(!r2.ok)throw new Error(d2.error);return d2;});})
             .then(function(d2){editModifiedTime=d2.modified;markSaved();if(!skipPreview)updateEditPreview(content);if(cb)cb();})
-            .catch(function(e){alert('保存失败: '+e.message);});
+            .catch(function(e){alert(t('web.preview.edit.saveFailed', {message: e.message}));});
           }},
-          {text:'取消',cls:''}
+          {text:t('web.preview.edit.cancel'),cls:''}
         ]);
       });
       return;
     }
-    return r.json().then(function(d) { if (!r.ok) throw new Error(d.error||'保存失败'); return d; });
+    return r.json().then(function(d) { if (!r.ok) throw new Error(d.error||t('web.preview.edit.saveFailed')); return d; });
   })
   .then(function(d) {
     if (!d) return;
@@ -1525,17 +1525,17 @@ function doSave(cb, skipPreview) {
     // Only refresh server-rendered preview on manual save (Ctrl+S), not auto-save
     if (!skipPreview) updateEditPreview(content);
     tabDataCache[currentFile] = { content: content, path: currentFile, size: d.size, modified: d.modified };
-    delete paneCache[currentFile]; // 重新渲染时从服务端加载最新内容
+    delete paneCache[currentFile]; // force re-fetch from server on re-render
     if (cb) cb();
   })
-  .catch(function(e) { alert('保存失败: ' + e.message); });
+  .catch(function(e) { alert(t('web.preview.edit.saveFailed') + ': ' + e.message); });
 }
 
 function markSaved() {
   editDirty = false;
   var d = document.getElementById('statusDirty'); if (d) d.style.display = 'none';
   var s = document.getElementById('statusSaved');
-  if (s) { s.textContent = '✓ 已保存'; s.classList.remove('fade'); }
+  if (s) { s.textContent = t('web.preview.edit.saved'); s.classList.remove('fade'); }
 }
 
 function updateEditPreviewLive(content) {
@@ -1582,10 +1582,10 @@ function updateEditPreview(content) {
 function exitEditMode(skipConfirm) {
   if (!editMode) return;
   if (editDirty && !skipConfirm) {
-    showEditConfirm('有未保存的修改', '退出前是否保存修改？', [
-      {text:'保存并退出',cls:'btn-primary',action:function(){doSave(function(){doExitEdit();});}},
-      {text:'放弃修改',cls:'btn-danger',action:function(){doExitEdit();}},
-      {text:'取消',cls:''}
+    showEditConfirm(t('web.preview.edit.unsavedTitle'), t('web.preview.edit.exitSavePrompt'), [
+      {text:t('web.preview.edit.saveAndExit'),cls:'btn-primary',action:function(){doSave(function(){doExitEdit();});}},
+      {text:t('web.preview.edit.discard'),cls:'btn-danger',action:function(){doExitEdit();}},
+      {text:t('web.preview.edit.cancel'),cls:''}
     ]);
     return;
   }
@@ -1620,13 +1620,13 @@ function doExitEdit(skipRefresh) {
   clearTimeout(editAutoSaveTimer); editAutoSaveTimer = null;
   clearTimeout(window._editPreviewTimer); window._editPreviewTimer = null;
   var eb = document.getElementById('editBtn');
-  if (eb) { eb.classList.remove('editing-active'); eb.title = '编辑此文件（分屏）'; }
+  if (eb) { eb.classList.remove('editing-active'); eb.title = t('web.preview.edit.editFile'); }
 
   // Re-fetch server-rendered content (invalidate cache first to force fresh data)
   if (currentFile && !skipRefresh) {
     tabDataCache[currentFile] = null;
     fetchDoc(currentFile).then(function(d) {
-      if (translateActive) return; // 翻译模式激活时跳过渲染
+      if (translateActive) return; // skip render when translate active
       var pane = renderDocNode(currentFile, d);
       mountPane(pane, currentFile);
       afterActivate(currentFile, d);
@@ -1688,10 +1688,10 @@ var outlineHeadings = [], outlineBuilt = false;
 function ensureOutlineBuilt() { if (!outlineBuilt) { var doc = document.getElementById('docContent'); if (doc) buildOutline(); } }
 function buildOutline() {
   var doc = document.getElementById('docContent'), list = document.getElementById('outlineList');
-  if (!doc) { list.innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">请先打开一个 Markdown 文档</div>'; outlineBuilt = false; return; }
+  if (!doc) { list.innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">' + t('web.preview.outline.openMarkdown') + '</div>'; outlineBuilt = false; return; }
   var headings = doc.querySelectorAll('h1, h2, h3'); outlineHeadings = [];
   headings.forEach(function(h, i) { h.id = 'heading-' + i; outlineHeadings.push({ id: h.id, text: h.textContent||'', level: parseInt(h.tagName[1]) }); });
-  if (!outlineHeadings.length) { list.innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">此文档没有标题</div>'; outlineBuilt = true; return; }
+  if (!outlineHeadings.length) { list.innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">' + t('web.preview.outline.noHeadings') + '</div>'; outlineBuilt = true; return; }
   list.innerHTML = outlineHeadings.map(function(h) {
     return '<div onclick="scrollToHeading(\'' + h.id + '\')" class="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 text-sm" style="padding-left:' + ((h.level-1)*12+8) + 'px">' +
       '<span class="w-1 h-4 rounded-full ' + (h.level===1?'bg-blue-500':h.level===2?'bg-slate-400':'bg-slate-300') + ' shrink-0"></span>' +
@@ -1737,8 +1737,8 @@ async function sendMessage() {
     var response = await fetch('/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:body });
     if (!response.ok) {
       var errData = await response.json().catch(function(){ return {}; });
-      if (errData.error === 'AI_NOT_CONFIGURED') aiBody.innerHTML = '<span class="text-amber-600">⚠️ 请先配置 AI 模型</span> <button onclick="toggleSettings();switchSettingsTab(\'ai\')" class="text-blue-600 underline text-xs">前往设置</button>';
-      else aiBody.textContent = '❌ ' + (errData.message||errData.error||'AI 服务不可用');
+      if (errData.error === 'AI_NOT_CONFIGURED') aiBody.innerHTML = '<span class="text-amber-600">⚠️ ' + t('web.preview.chat.configureAi') + '</span> <button onclick="toggleSettings();switchSettingsTab(\'ai\')" class="text-blue-600 underline text-xs">' + t('web.preview.chat.goToSettings') + '</button>';
+      else aiBody.textContent = '❌ ' + (errData.message||errData.error||t('web.preview.chat.aiUnavailable'));
       document.getElementById('sendBtn').disabled = false; return;
     }
     var reader = response.body.getReader(), decoder = new TextDecoder(), buffer = '', currentEvent = '';
@@ -1752,7 +1752,7 @@ async function sendMessage() {
         else if (trimmed.startsWith('data:')) { try { var data = JSON.parse(trimmed.slice(5).trim()); handleSSE(currentEvent, data, aiBody); } catch(e){} }
       }
     }
-  } catch(e) { if (!aiBody.textContent) aiBody.textContent = '⚠️ 网络连接失败'; }
+  } catch(e) { if (!aiBody.textContent) aiBody.textContent = t('web.preview.chat.networkFailed'); }
   document.getElementById('sendBtn').disabled = false;
 }
 function handleSSE(event, data, aiBody) {
@@ -1767,16 +1767,16 @@ function handleSSE(event, data, aiBody) {
       if (isWriteOp) {
         ind.dataset.write = '1';
         ind.className = 'text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-2';
-        ind.innerHTML = '<span>📋 ' + esc(data.name) + '（待审批）</span><a onclick="setActiveTab(\'queue\');loadTasks();" class="text-blue-600 dark:text-blue-400 underline cursor-pointer">查看审批队列</a>';
+        ind.innerHTML = '<span>📋 ' + esc(data.name) + t('web.preview.chat.pendingApproval') + '</span><a onclick="setActiveTab(\'queue\');loadTasks();" class="text-blue-600 dark:text-blue-400 underline cursor-pointer">' + t('web.preview.chat.viewQueue') + '</a>';
       } else {
         ind.className = 'text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1';
         ind.innerHTML = '<span>🔍 ' + esc(data.name) + '...</span>';
       }
       aiBody.appendChild(ind); break;
     case 'done':
-      aiBody.querySelectorAll('[data-tool]:not([data-write])').forEach(function(el){ el.innerHTML = '<span>✅ 已完成 ' + esc(el.dataset.tool) + '</span>'; el.className = 'text-xs text-green-600 dark:text-green-400 mt-1'; }); break;
+      aiBody.querySelectorAll('[data-tool]:not([data-write])').forEach(function(el){ el.innerHTML = '<span>' + t('web.preview.chat.toolCompleted', {tool: esc(el.dataset.tool)}) + '</span>'; el.className = 'text-xs text-green-600 dark:text-green-400 mt-1'; }); break;
     case 'error':
-      var ed = document.createElement('div'); ed.className = 'text-xs text-red-500 mt-1'; ed.textContent = '❌ ' + (data.message||'未知错误'); aiBody.appendChild(ed); break;
+      var ed = document.createElement('div'); ed.className = 'text-xs text-red-500 mt-1'; ed.textContent = '❌ ' + (data.message||t('web.preview.chat.unknownError')); aiBody.appendChild(ed); break;
   }
 }
 function appendChatMsg(role, content) {
@@ -1789,11 +1789,9 @@ function appendChatMsg(role, content) {
 function sendQuickMsg(m, contextFile) { pendingContextFile = contextFile || null; document.getElementById('chatInput').value = m; sendMessage(); }
 // 智能归类：让 AI 分析文件组织并用 batch_operations 提交一个待审批的整理方案（依赖 Phase 2 写工具）。
 function doSmartClassify() {
-  if (!CAPABILITIES.ai) { toast('AI 模块未安装，运行: doc77 i ai', 'info'); return; }
-  if (!CAPABILITIES.mcp) { toast('智能归类需要 MCP 模块，运行: doc77 i mcp', 'info'); return; }
-  sendQuickMsg('请分析当前项目的文件组织，提出一个整理归类方案：把相关文件归入合适的分类目录。' +
-    '对需要新建的目录和移动的文件，请直接调用 batch_operations 工具一次性提交到审批队列，不要只给文字建议。' +
-    '提交后请告诉我任务ID以及你的归类思路，我会前往「审批」标签页确认。');
+  if (!CAPABILITIES.ai) { toast(t('web.preview.toolbar.aiNotInstalled'), 'info'); return; }
+  if (!CAPABILITIES.mcp) { toast(t('web.preview.toolbar.classifyNeedsMCP'), 'info'); return; }
+  sendQuickMsg(t('web.preview.toolbar.classifyPrompt'));
 }
 
 // Queue
@@ -1804,19 +1802,19 @@ async function loadTasks() {
     var pending = tasks.filter(function(t){ return t.status === 'pending'; });
     document.getElementById('pendingCount').textContent = pending.length;
     var b = document.getElementById('pendingBadge'); b.textContent = pending.length; b.classList.toggle('hidden', pending.length === 0);
-    if (!tasks.length) { list.innerHTML = '<div class="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-2">✅<br>队列已清空</div>'; return; }
-    var tl = {write_file:'写入覆盖',create_folder:'创建目录',move_file:'移动文件',delete_file:'安全删除',batch_operations:'批量操作'};
+    if (!tasks.length) { list.innerHTML = '<div class="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-2">✅<br>' + t('web.preview.queue.empty') + '</div>'; return; }
+    var tl = {write_file:t('web.preview.queue.type.writeFile'),create_folder:t('web.preview.queue.type.createFolder'),move_file:t('web.preview.queue.type.moveFile'),delete_file:t('web.preview.queue.type.deleteFile'),batch_operations:t('web.preview.queue.type.batchOperations')};
     var tc = {write_file:'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',create_folder:'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',move_file:'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',delete_file:'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',batch_operations:'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'};
     list.innerHTML = tasks.map(function(t){
       var label = tl[t.operation_type]||t.operation_type, tcl = tc[t.operation_type]||'bg-slate-100 text-slate-700';
       var isP = t.status==='pending', isX = t.status==='executing', isE = t.status==='executed', isR = t.status==='rejected';
       var borderCls = isE?'border-emerald-200 bg-emerald-50/50':isR?'border-slate-200 bg-slate-50 opacity-60':isX?'border-blue-300 ring-2 ring-blue-100':'border-slate-200 hover:border-blue-300';
-      var stHtml = isP?'<div class="flex gap-1"><button onclick="approveTask(\''+t.id+'\')" class="p-1 text-green-600 hover:bg-green-100 rounded">✅</button><button onclick="rejectTask(\''+t.id+'\')" class="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded">✕</button></div>':isX?'<span class="text-xs font-bold text-blue-600">⏳ 执行中</span>':isE?'<span class="text-xs font-bold text-emerald-600">✓ 已执行</span>':'<span class="text-xs font-bold text-slate-400">已拒绝</span>';
+      var stHtml = isP?'<div class="flex gap-1"><button onclick="approveTask(\''+t.id+'\')" class="p-1 text-green-600 hover:bg-green-100 rounded">✅</button><button onclick="rejectTask(\''+t.id+'\')" class="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded">✕</button></div>':isX?'<span class="text-xs font-bold text-blue-600">' + t('web.preview.task.executing') + '</span>':isE?'<span class="text-xs font-bold text-emerald-600">' + t('web.preview.task.executed') + '</span>':'<span class="text-xs font-bold text-slate-400">' + t('web.preview.task.rejected') + '</span>';
       var d = typeof t.operation_data==='string'?JSON.parse(t.operation_data):t.operation_data;
       var pi = ''; if (d.file_path) pi+='<div>📄 '+esc(d.file_path)+'</div>'; if (d.folder_path) pi+='<div>📁 '+esc(d.folder_path)+'</div>'; if (d.source) pi+='<div class="opacity-70 line-through">'+esc(d.source)+'</div>'; if (d.target) pi+='<div class="text-blue-700">→ '+esc(d.target)+'</div>';
       return '<div class="bg-white dark:bg-slate-800 border rounded-lg p-3 shadow-sm relative overflow-hidden '+borderCls+' '+(isX?'dark:border-blue-700':'dark:border-slate-700')+'">'+(isX?'<div class="absolute top-0 left-0 h-1 bg-blue-500 w-full" style="animation:pulse 1s infinite"></div>':'')+'<div class="flex items-start justify-between mb-2"><div class="flex items-center gap-1.5 text-xs font-semibold"><span class="'+tcl+' px-1.5 py-0.5 rounded text-[10px] font-bold">'+label+'</span></div>'+stHtml+'</div><div class="text-[11px] text-slate-600 dark:text-slate-400 space-y-1 font-mono bg-slate-50 dark:bg-slate-900 p-2 rounded border">'+ (pi||JSON.stringify(d)) +'</div></div>';
     }).join('');
-  } catch(e) { list.innerHTML = '<div class="text-center py-8 text-red-400 text-xs">加载失败</div>'; }
+  } catch(e) { list.innerHTML = '<div class="text-center py-8 text-red-400 text-xs">' + t('web.preview.loadFailed') + '</div>'; }
 }
 async function approveTask(id) { await fetch('/api/queue/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:id})}); loadTasks(); }
 async function rejectTask(id) { await fetch('/api/queue/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:id})}); loadTasks(); }
@@ -1857,11 +1855,11 @@ window.toggleHtmlPreview = function () {
   if (preview.style.display === 'none') {
     codeView.style.display = 'none';
     preview.style.display = 'block';
-    if (btn) btn.innerHTML = '💻 代码';
+    if (btn) btn.innerHTML = t('web.preview.htmlToggle.code');
   } else {
     codeView.style.display = 'block';
     preview.style.display = 'none';
-    if (btn) btn.innerHTML = '👁 预览';
+    if (btn) btn.innerHTML = t('web.preview.htmlToggle.preview');
   }
 };
 window.toggleHtmlPreviewFullscreen = function () {
@@ -1903,7 +1901,7 @@ function renderDocx(d, area, path) {
         area.innerHTML = '<div class="p-4 sm:p-10">' + html + '</div>';
         if (result.warnings.length) console.warn('DOCX warnings:', result.warnings);
         if (activeTabPath === path) { refreshOutline(); setTimeout(highlightCode, 60); }
-      }).catch(function() { area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">DOCX 解析失败</div>'; });
+      }).catch(function() { area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">' + t('web.preview.office.docxFailed') + '</div>'; });
     });
   });
 }
@@ -1914,7 +1912,7 @@ function renderXlsx(d, area, path) {
     s.src = vsrc('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.mini.min.js');
     s.onload = function(){ renderXlsx(d, area, path); };
     document.head.appendChild(s);
-    area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">加载 XLSX 查看器...</div></div>';
+    area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="text-sm text-slate-500">' + t('web.preview.office.loadingXlsx') + '</div></div>';
     return;
   }
   fetch(d.rawUrl).then(function(r){ return r.arrayBuffer(); }).then(function(buf) {
@@ -1930,7 +1928,7 @@ function renderXlsx(d, area, path) {
       sheetsHtml += '<div class="xlsx-sheet ' + (i===0?'':'hidden') + '" data-sheet="' + escAttr(name) + '"><div class="overflow-x-auto">' + html + '</div></div>';
     });
     area.innerHTML = '<div class="p-2 sm:p-4"><div class="max-w-full mx-auto bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">' + tabsHtml + sheetsHtml + '</div></div>';
-  }).catch(function(){ area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">XLSX 加载失败</div>'; });
+  }).catch(function(){ area.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400">' + t('web.preview.office.xlsxFailed') + '</div>'; });
 }
 
 function switchXlsxSheet(name) {
@@ -2024,7 +2022,7 @@ function getSiblingImages(filePath) {
     .then(function(r){ return r.json(); })
     .then(function(d) {
       var images = d.entries.filter(function(e){ return e.type==='file' && imgExts.some(function(ext){ return e.name.toLowerCase().endsWith(ext); }); });
-      images.sort(function(a,b){ return a.name.localeCompare(b.name,'zh-CN'); });
+      images.sort(function(a,b){ return a.name.localeCompare(b.name, window.__doc77_lang || 'zh-CN'); });
       return images.map(function(e){ return { name:e.name, path: (parentDir ? parentDir+'/' : '') + e.name }; });
     })
     .catch(function(){ return []; });
@@ -2035,7 +2033,7 @@ function runCode() {
   var runBtn = document.getElementById('runBtn');
   var lang = runBtn.dataset.lang;
   var code = (document.getElementById('docContent') || {}).textContent || runBtn.dataset.code || '';
-  if (!code.trim()) { toast('没有可执行的代码','error'); return; }
+  if (!code.trim()) { toast(t('web.preview.codeRun.noCode'),'error'); return; }
 
   var area = document.querySelector('#docPaneHost .doc-pane') || document.getElementById('contentArea');
   var existing = document.getElementById('codeOutput');
@@ -2045,9 +2043,9 @@ function runCode() {
   outputDiv.id = 'codeOutput';
   outputDiv.className = 'max-w-4xl mx-auto mt-4 bg-slate-900 dark:bg-black border border-slate-700 rounded-xl overflow-hidden';
   outputDiv.innerHTML = '<div class="flex items-center justify-between px-4 py-2 bg-slate-800 dark:bg-slate-950 border-b border-slate-700 text-xs text-slate-300">' +
-    '<span>▶ 输出</span><span class="text-slate-500" id="codeOutputLang">' + lang + '</span>' +
+    '<span>' + t('web.preview.codeRun.output') + '</span><span class="text-slate-500" id="codeOutputLang">' + lang + '</span>' +
     '<button onclick="document.getElementById(\'codeOutput\').remove()" class="text-slate-400 hover:text-white">✕</button></div>' +
-    '<div class="p-4 font-mono text-sm text-emerald-400 whitespace-pre-wrap max-h-80 overflow-y-auto" id="codeOutputText">运行中...</div>';
+    '<div class="p-4 font-mono text-sm text-emerald-400 whitespace-pre-wrap max-h-80 overflow-y-auto" id="codeOutputText">' + t('web.preview.codeRun.running') + '</div>';
   area.appendChild(outputDiv);
   outputDiv.scrollIntoView({ behavior: 'smooth' });
 
@@ -2068,7 +2066,7 @@ function runJS(code) {
     scriptEl.textContent = 'try {\n' + code + '\n} catch(e) { console.log("Error: " + e.message); }';
     iframe.contentDocument.body.appendChild(scriptEl);
     setTimeout(function() {
-      document.getElementById('codeOutputText').textContent = output.join('\n') || '(无输出)';
+      document.getElementById('codeOutputText').textContent = output.join('\n') || t('web.preview.codeRun.noOutput');
       document.body.removeChild(iframe);
     }, 500);
   } catch(e) {
@@ -2084,7 +2082,7 @@ function runPython(code) {
       pyodide.runPython('import sys\nfrom io import StringIO\nsys.stdout = StringIO()');
       pyodide.runPython(code);
       var stdout = pyodide.runPython('sys.stdout.getvalue()');
-      outEl.textContent = stdout || '(无输出)';
+      outEl.textContent = stdout || t('web.preview.codeRun.noOutput');
     } catch(e) {
       outEl.textContent = 'Python Error: ' + e.message;
     }
@@ -2095,7 +2093,7 @@ function runPython(code) {
 function initPyodide(cb) {
   if (window._pyodide) { cb(window._pyodide); return; }
   var outEl = document.getElementById('codeOutputText');
-  if (outEl) outEl.textContent = '正在加载 Python 运行时 (Pyodide ~12MB, 首次加载较慢)...';
+  if (outEl) outEl.textContent = t('web.preview.codeRun.loadingPyodide');
   var pyodideUrl = window.__VENDOR_READY ? '/vendor/' : 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/';
 
   // Check if the Pyodide CDN has already loaded its global init function
@@ -2113,7 +2111,7 @@ function initPyodide(cb) {
     };
     s.onerror = function() {
       var el = document.getElementById('codeOutputText');
-      if (el) el.textContent = 'Error: 无法加载 Pyodide CDN，请检查网络连接';
+      if (el) el.textContent = t('web.preview.codeRun.pyodideError');
     };
     document.head.appendChild(s);
   }
@@ -2229,7 +2227,7 @@ function initDropZone() {
         try { await openTempTab(fileArray[j]); } catch (err) { console.error('[drop]', err); }
       }
       if (count > 1) {
-        showToast('已拖入 ' + count + ' 个临时文件', 'info');
+        showToast(t('web.preview.drop.filesDropped', {count: count}), 'info');
       }
     })();
   });
