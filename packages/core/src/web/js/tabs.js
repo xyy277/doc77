@@ -1,10 +1,13 @@
 /**
- * tabs.js — Doc77 多 tab 预览的纯逻辑层（tab 列表管理 + 渲染 DOM 的 LRU 淘汰）。
+ * tabs.js — Doc77 multi-tab preview logic layer (tab list management + LRU eviction for rendered DOM).
  *
- * 这里只维护顺序、活动选择、容量淘汰与「已渲染节点」的 LRU 键，不触碰 DOM。
- * preview.js 负责把这些决策落到真实 DOM（挂载/销毁内容节点、缓存 data/scrollTop）。
+ * Only maintains ordering, active selection, capacity eviction, and an LRU key for
+ * "rendered nodes" without touching the DOM.
+ * preview.js is responsible for applying these decisions to real DOM (mounting/destroying
+ * content nodes, caching data/scrollTop).
  *
- * UMD 包装：浏览器里作为全局 `window.TabStore`；vitest 里作为 CommonJS 模块导入。
+ * UMD wrapper: exposed as global `window.TabStore` in the browser; imported as a CommonJS
+ * module in vitest.
  */
 (function (global, factory) {
   'use strict';
@@ -24,10 +27,10 @@
       var maxTabs = opts.maxTabs || 8;
       var maxRendered = opts.maxRendered || 3;
 
-      var tabs = []; // [{ path, title }]  — 顺序即 tab 栏显示顺序
-      var active = null; // 当前活动 tab 的 path
-      var touch = []; // path[]，最近使用排在末尾（用于 tab 容量淘汰）
-      var rendered = []; // path[]，最近渲染排在末尾（用于 DOM 节点 LRU）
+      var tabs = []; // [{ path, title }]  — order equals tab bar display order
+      var active = null; // currently active tab path
+      var touch = []; // path[], most recently used at the end (for tab capacity eviction)
+      var rendered = []; // path[], most recently rendered at the end (for DOM node LRU)
 
       function indexOf(path) {
         for (var i = 0; i < tabs.length; i++) if (tabs[i].path === path) return i;
@@ -39,7 +42,7 @@
         arr.push(path);
       }
 
-      /** 打开（或激活已存在的）tab。返回 { evicted: string[] }（因容量淘汰而关闭的 path）。 */
+      /** Open (or activate an existing) tab. Returns { evicted: string[] } (paths closed due to capacity). */
       function open(path, title) {
         var evicted = [];
         if (indexOf(path) < 0) {
@@ -50,7 +53,7 @@
         active = path;
         bump(touch, path);
 
-        // 超容量：淘汰最久未用的非活动 tab
+        // Over capacity: evict the least recently used non-active tab
         while (tabs.length > maxTabs) {
           var victim = null;
           for (var i = 0; i < touch.length; i++) {
@@ -59,14 +62,14 @@
               break;
             }
           }
-          if (victim == null) break; // 只剩活动 tab，停止
+          if (victim == null) break; // only active tab remains, stop
           removeTab(victim);
           evicted.push(victim);
         }
         return { evicted: evicted };
       }
 
-      /** 激活一个已存在的 tab（更新活动态与使用顺序）。 */
+      /** Activate an existing tab (updates active state and usage order). */
       function activate(path) {
         if (indexOf(path) < 0) return false;
         active = path;
@@ -83,8 +86,8 @@
       }
 
       /**
-       * 关闭一个 tab。返回 { active, closed }。
-       * 若关闭的是活动 tab，则激活相邻 tab（右侧优先，否则左侧）。
+       * Close a tab. Returns { active, closed }.
+       * If the active tab is closed, activates the adjacent tab (right first, otherwise left).
        */
       function close(path) {
         var i = indexOf(path);
@@ -95,7 +98,7 @@
           if (tabs.length === 0) {
             active = null;
           } else {
-            var next = tabs[i] || tabs[i - 1]; // 原位置现为右邻，否则取左邻
+            var next = tabs[i] || tabs[i - 1]; // current position is now the right neighbor, otherwise left
             active = next ? next.path : null;
             if (active) bump(touch, active);
           }
@@ -103,7 +106,7 @@
         return { active: active, closed: true };
       }
 
-      /** 记录某 path 的内容已渲染成 DOM 节点。返回因 LRU 超限而应被销毁的 path（或 null）。 */
+      /** Record that a path's content has been rendered as a DOM node. Returns the path to destroy (or null) due to LRU overflow. */
       function noteRendered(path) {
         bump(rendered, path);
         if (rendered.length > maxRendered) {
@@ -112,7 +115,7 @@
         return null;
       }
 
-      /** 从「已渲染」集合中移除某 path（其 DOM 节点已被销毁）。 */
+      /** Remove a path from the "rendered" set (its DOM node has been destroyed). */
       function dropRendered(path) {
         var i = rendered.indexOf(path);
         if (i >= 0) rendered.splice(i, 1);

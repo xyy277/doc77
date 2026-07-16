@@ -23,12 +23,12 @@ window.refreshStats = function() {
 };
 
 function relativeTimeText(epochMs) {
-  if (!epochMs || isNaN(epochMs)) return '尚无项目';
+  if (!epochMs || isNaN(epochMs)) return t('web.stats.noProjects');
   var diff = Math.floor((Date.now() - epochMs) / 1000);
-  if (diff < 0) return '尚无项目';
-  if (diff < 60) return '刚刚';
-  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
-  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
-  if (diff < 172800) return '昨天';
-  return Math.floor(diff / 86400) + ' 天前';
+  if (diff < 0) return t('web.stats.noProjects');
+  if (diff < 60) return t('web.stats.justNow');
+  if (diff < 3600) return t('web.stats.minutesAgo', { n: Math.floor(diff / 60) });
+  if (diff < 86400) return t('web.stats.hoursAgo', { n: Math.floor(diff / 3600) });
+  if (diff < 172800) return t('web.stats.yesterday');
+  return t('web.stats.daysAgo', { n: Math.floor(diff / 86400) });
 }

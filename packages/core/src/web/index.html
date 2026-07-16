@@ -5,7 +5,7 @@
 <style>.i18n-loading body{visibility:hidden}</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doc77 — 本地文档预览与管理</title>
+<title data-i18n="web.index.title">Doc77 — Local Document Preview &amp; Management</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
@@ -19,18 +19,18 @@
       <img src="/assets/logo-dark.svg" alt="Doc77" height="32" class="logo-dark">
     </a>
     <div style="display:flex;align-items:center;gap:16px">
-      <div class="header-greeting" id="greeting">👋 下午好</div>
+      <div class="header-greeting" id="greeting">👋 Good afternoon</div>
       <div class="header-stats">
         <span class="header-stat-badge">📂 <span id="headerProjCount">0</span></span>
         <span class="header-stat-badge">⭐ <span id="headerFavCount">0</span></span>
         <span class="header-stat-badge">🕐 <span id="headerRecentCount">0</span></span>
       </div>
-      <span class="header-status"><span class="header-dot pulse"></span>运行中</span>
-      <span class="version-badge" id="versionBadge" title="加载中...">--</span>
+      <span class="header-status"><span class="header-dot pulse"></span><span data-i18n="web.index.status.running">Running</span></span>
+      <span class="version-badge" id="versionBadge" data-i18n-title="web.index.status.loading" title="Loading...">--</span>
       <div class="header-actions">
-        <button onclick="toggleTheme()" class="btn-icon" id="themeBtn" title="切换主题">🌙</button>
-        <button onclick="document.cookie='doc77-desktop=;path=/;max-age=0';location.href='/mobile/'" class="btn-icon" title="移动版">📱</button>
-        <button class="btn-icon" title="设置" onclick="toggleSettings()">⚙</button>
+        <button onclick="toggleTheme()" class="btn-icon" id="themeBtn" data-i18n-title="web.index.theme.toggle" title="Toggle theme">🌙</button>
+        <button onclick="document.cookie='doc77-desktop=;path=/;max-age=0';location.href='/mobile/'" class="btn-icon" data-i18n-title="web.index.mobile.switch" title="Mobile">📱</button>
+        <button class="btn-icon" data-i18n-title="web.index.settings" title="Settings" onclick="toggleSettings()">⚙</button>
       </div>
     </div>
   </div>
@@ -42,12 +42,12 @@
   <div class="hero-banner">
     <div class="hero-banner-inner">
       <div class="hero-content">
-        <div class="hero-headline">Doc77 &mdash; 本地文档预览与管理 Agent</div>
-        <div class="hero-tagline">
-          默认安全、对话驱动的智能文档工作台。支持 Markdown、PDF、Office、代码文件等多种格式，集成 AI 助手、TTS 朗读、全局搜索、MCP 协议。
+        <div class="hero-headline" data-i18n="web.index.hero.headline">Doc77 &mdash; Local Document Preview &amp; Management Agent</div>
+        <div class="hero-tagline" data-i18n="web.index.hero.tagline">
+          Secure by default, conversation-driven smart document workstation. Supports Markdown, PDF, Office, code files and more, with AI assistant, TTS, global search, MCP protocol.
         </div>
         <div class="hero-actions">
-          <a href="/guide" class="hero-btn hero-btn-primary">📖 快速入门</a>
+          <a href="/guide" class="hero-btn hero-btn-primary" data-i18n="web.index.hero.quickstart">📖 Quick start</a>
           <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="hero-btn hero-btn-outline">GitHub</a>
         </div>
       </div>
@@ -57,24 +57,24 @@
   <!-- Register CTA -->
   <div class="register-cta">
     <div class="register-cta-text">
-      <div class="register-cta-title">准备开始管理你的文档？</div>
-      <div class="register-cta-desc">注册一个本地目录，体验 AI 驱动的工作流</div>
+      <div class="register-cta-title" data-i18n="web.index.registerCta.title">Ready to manage your documents?</div>
+      <div class="register-cta-desc" data-i18n="web.index.registerCta.desc">Register a local directory and experience AI-driven workflows</div>
     </div>
-    <button class="register-cta-btn" onclick="showRegisterModal()">➕ 注册项目</button>
+    <button class="register-cta-btn" onclick="showRegisterModal()" data-i18n="web.index.registerCta.button">➕ Register project</button>
   </div>
 
   <!-- Recent Strip -->
   <div class="recent-strip">
-    <span class="recent-strip-label">🕐 最近</span>
+    <span class="recent-strip-label" data-i18n="web.index.recent.label">🕐 Recent</span>
     <div class="recent-strip-items" id="recentContent">
-      <span class="recent-strip-empty">打开文档后自动出现在这里</span>
+      <span class="recent-strip-empty" data-i18n="web.index.recent.empty">Appears here after opening a document</span>
     </div>
   </div>
 
   <!-- Favorites Section -->
   <div class="favorites-section" id="favoritesSection" style="display:none">
     <div class="section-header">
-      <span class="section-title">⭐ 收藏项目 (<span id="favCount">0</span>)</span>
+      <span class="section-title" data-i18n="web.index.favorites.title">⭐ Favorites (<span id="favCount">0</span>)</span>
     </div>
     <div class="fav-list" id="favList"></div>
   </div>
@@ -83,23 +83,23 @@
   <div class="projects-section">
     <div class="section-header">
       <div class="section-header-left">
-        <span class="section-title">📂 全部项目 (<span id="projCount">0</span>)</span>
+        <span class="section-title" data-i18n="web.index.projects.title">📂 All projects (<span id="projCount">0</span>)</span>
       </div>
       <div class="section-header-right">
-        <input class="input" placeholder="🔍 搜索项目..." oninput="onFilterInput(this.value)" style="width:180px;font-size:12px">
+        <input class="input" data-i18n-placeholder="web.index.projects.searchPlaceholder" placeholder="🔍 Search projects..." oninput="onFilterInput(this.value)" style="width:180px;font-size:12px">
         <select onchange="onSortChange(this.value)" class="input" style="width:100px;font-size:12px">
-          <option value="last_opened">最近打开</option>
-          <option value="name">按名称</option>
-          <option value="created">按创建日期</option>
+          <option value="last_opened" data-i18n="web.index.projects.sortRecent">Recent</option>
+          <option value="name" data-i18n="web.index.projects.sortName">Name</option>
+          <option value="created" data-i18n="web.index.projects.sortCreated">Created</option>
         </select>
         <div class="view-toggle">
-          <button onclick="setViewMode('grid')" id="btnViewGrid" class="active" title="网格视图">▦</button>
-          <button onclick="setViewMode('list')" id="btnViewList" title="列表视图">☰</button>
+          <button onclick="setViewMode('grid')" id="btnViewGrid" class="active" data-i18n-title="web.index.projects.viewGrid" title="Grid view">▦</button>
+          <button onclick="setViewMode('list')" id="btnViewList" data-i18n-title="web.index.projects.viewList" title="List view">☰</button>
         </div>
       </div>
     </div>
     <div class="project-grid" id="projGrid">
-      <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无项目，点击 [➕ 注册项目] 开始</div><div class="empty-hint">或使用 doc77 register 命令注册</div></div>
+      <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text" data-i18n="web.index.projects.empty">No projects yet. Click [+ Register project] to start</div><div class="empty-hint" data-i18n="web.index.projects.emptyHint">Or register via: doc77 register</div></div>
     </div>
   </div>
 
@@ -109,48 +109,48 @@
 <div class="modal-overlay" id="registerModal" style="display:none" onclick="if(event.target===this)closeRegisterModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>注册项目</h3>
+      <h3 data-i18n="web.index.modal.register.title">Register Project</h3>
       <button class="btn-icon" onclick="closeRegisterModal()">✕</button>
     </div>
     <div class="modal-tabs">
-      <button class="modal-tab active" data-tab="manual" onclick="switchRegisterTab('manual')">✏️ 手动输入</button>
-      <button class="modal-tab" data-tab="discover" onclick="switchRegisterTab('discover')">🔍 扫描发现</button>
+      <button class="modal-tab active" data-tab="manual" onclick="switchRegisterTab('manual')" data-i18n="web.index.modal.register.manualTab">✏️ Manual input</button>
+      <button class="modal-tab" data-tab="discover" onclick="switchRegisterTab('discover')" data-i18n="web.index.modal.register.discoverTab">🔍 Discover</button>
     </div>
     <div class="modal-body">
       <!-- Tab: Manual -->
       <div class="tab-panel active" id="tab-manual">
         <div class="form-group">
-          <label>项目名称</label>
-          <input class="input" id="regName" placeholder="例如：客户A项目">
+          <label data-i18n="web.index.modal.register.nameLabel">Project name</label>
+          <input class="input" id="regName" data-i18n-placeholder="web.index.modal.register.namePlaceholder" placeholder="e.g., client-project">
         </div>
         <div class="form-group">
-          <label>项目路径</label>
+          <label data-i18n="web.index.modal.register.pathLabel">Project path</label>
           <div class="form-row">
-            <input class="input" id="regPath" placeholder="~/work/my-docs">
-            <button class="btn" onclick="openDirDialog()">📂 浏览</button>
+            <input class="input" id="regPath" data-i18n-placeholder="web.index.modal.register.pathPlaceholder" placeholder="~/work/my-docs">
+            <button class="btn" onclick="openDirDialog()" data-i18n="web.index.modal.register.browse">📂 Browse</button>
           </div>
         </div>
         <div class="form-group">
           <div id="regError" style="color:var(--danger);font-size:12px;display:none"></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-          <button class="btn" onclick="closeRegisterModal()">取消</button>
-          <button class="btn btn-primary" onclick="doRegister()">注册项目</button>
+          <button class="btn" onclick="closeRegisterModal()" data-i18n="common.confirm.cancel">Cancel</button>
+          <button class="btn btn-primary" onclick="doRegister()" data-i18n="web.index.modal.register.submit">Register Project</button>
         </div>
       </div>
       <!-- Tab: Discover -->
       <div class="tab-panel" id="tab-discover">
         <div class="form-group">
-          <label>扫描目录</label>
+          <label data-i18n="web.index.modal.discover.scanDirLabel">Scan directory</label>
           <div class="form-row">
             <input class="input" id="discoverPath" value="~" placeholder="~/projects">
-            <button class="btn btn-primary" id="btnDiscover" onclick="doDiscover()">🔍 扫描</button>
+            <button class="btn btn-primary" id="btnDiscover" onclick="doDiscover()" data-i18n="web.index.modal.discover.scanBtn">🔍 Scan</button>
           </div>
         </div>
         <div id="discoverStatus" class="discover-status"></div>
         <div id="discoverCandidates"></div>
         <div id="discoverActions" style="margin-top:12px;display:none">
-          <button class="btn btn-primary" onclick="batchRegister()" style="width:100%">📋 批量注册选中</button>
+          <button class="btn btn-primary" onclick="batchRegister()" style="width:100%" data-i18n="web.index.modal.discover.batchRegisterBtn">📋 Batch register selected</button>
         </div>
       </div>
     </div>
@@ -162,18 +162,18 @@
   <div class="settings-backdrop" onclick="toggleSettings()"></div>
   <div class="settings-panel">
     <div style="height:56px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0">
-      <span style="font-weight:700;font-size:16px;color:var(--text-primary)">⚙ 设置</span>
+      <span style="font-weight:700;font-size:16px;color:var(--text-primary)" data-i18n="web.index.settings.title">⚙ Settings</span>
       <button onclick="toggleSettings()" class="btn-icon">✕</button>
     </div>
     <div style="display:flex;border-bottom:1px solid var(--border-light);flex-shrink:0" id="settingsTabs">
-      <button onclick="switchSettingsTab('system')" class="modal-tab active" data-tab="system" style="border-bottom:none">💾 系统</button>
-      <button onclick="switchSettingsTab('ai')" class="modal-tab" data-tab="ai" style="border-bottom:none">🤖 AI</button>
-      <button onclick="switchSettingsTab('account')" class="modal-tab" data-tab="account" style="border-bottom:none">👤 账户</button>
+      <button onclick="switchSettingsTab('system')" class="modal-tab active" data-tab="system" style="border-bottom:none" data-i18n="web.index.settings.systemTab">💾 System</button>
+      <button onclick="switchSettingsTab('ai')" class="modal-tab" data-tab="ai" style="border-bottom:none" data-i18n="web.index.settings.aiTab">🤖 AI</button>
+      <button onclick="switchSettingsTab('account')" class="modal-tab" data-tab="account" style="border-bottom:none" data-i18n="web.index.settings.accountTab">👤 Account</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px" id="settingsContent"></div>
     <div style="padding:12px;border-top:1px solid var(--border-light);flex-shrink:0;display:flex;gap:8px">
-      <button onclick="resetDefaults()" class="btn" style="color:var(--danger);flex:1">恢复默认值</button>
-      <button onclick="saveSettings()" class="btn btn-primary" style="flex:1">💾 保存设置</button>
+      <button onclick="resetDefaults()" class="btn" style="color:var(--danger);flex:1" data-i18n="web.index.settings.resetDefaults">Reset defaults</button>
+      <button onclick="saveSettings()" class="btn btn-primary" style="flex:1" data-i18n="web.index.settings.save">💾 Save settings</button>
     </div>
   </div>
 </div>
@@ -182,21 +182,22 @@
 <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener"
    style="position:fixed;bottom:24px;right:24px;z-index:40;display:flex;align-items:center;gap:8px;background:#1e293b;color:#f1f5f9;padding:10px 18px;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.2);text-decoration:none;font-size:13px;font-weight:500;transition:all .2s"
    onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'"
-   title="给 Doc77 点个 Star ⭐">
-  ⭐ 点个 Star 吧
+   data-i18n-title="web.index.github.title"
+   title="Star Doc77 on GitHub ⭐">
+  <span data-i18n="web.index.github.button">⭐ Star on GitHub</span>
 </a>
 
 <!-- Recovery Codes Modal -->
 <div id="recoveryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center">
   <div style="background:var(--bg-card);border-radius:16px;padding:32px;max-width:480px;width:90%">
-    <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 8px 0">保存恢复码</h2>
-    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px 0">如果忘记密码，可使用恢复码重置密码。每个恢复码只能使用一次。</p>
+    <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 8px 0" data-i18n="web.index.recovery.title">Save recovery codes</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px 0" data-i18n="web.index.recovery.desc">If you forget your password, you can use a recovery code to reset it. Each code can be used only once.</p>
     <div id="rcList" style="background:var(--bg-page);border-radius:8px;padding:16px;font-family:monospace;font-size:13px;color:var(--text-primary);margin-bottom:16px;display:flex;flex-direction:column;gap:6px"></div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button onclick="copyRC()" class="btn" style="flex:1;font-size:12px">复制全部</button>
-      <button onclick="closeRecoveryModal()" class="btn btn-primary" style="flex:1;font-size:12px">我知道了</button>
+      <button onclick="copyRC()" class="btn" style="flex:1;font-size:12px" data-i18n="web.index.recovery.copyAll">Copy all</button>
+      <button onclick="closeRecoveryModal()" class="btn btn-primary" style="flex:1;font-size:12px" data-i18n="web.index.recovery.gotIt">Got it</button>
     </div>
-    <p style="font-size:11px;color:var(--text-muted);margin:0;text-align:center">此页面关闭后将无法再次查看恢复码</p>
+    <p style="font-size:11px;color:var(--text-muted);margin:0;text-align:center" data-i18n="web.index.recovery.warning">Recovery codes cannot be viewed again once this page is closed</p>
   </div>
 </div>
 

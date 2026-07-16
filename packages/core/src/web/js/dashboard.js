@@ -24,7 +24,7 @@ async function load() {
     window.renderRecent();
   } catch(e) {
     document.getElementById('projGrid').innerHTML =
-      '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败</div></div>';
+      '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">' + t('web.dashboard.loadFailed') + '</div></div>';
   }
 }
 
@@ -33,13 +33,13 @@ function updateGreeting() {
   var now = new Date();
   var hour = now.getHours();
   var greeting;
-  if (hour < 6) greeting = '🌙 夜深了';
-  else if (hour < 12) greeting = '👋 早上好';
-  else if (hour < 14) greeting = '👋 中午好';
-  else if (hour < 18) greeting = '👋 下午好';
-  else greeting = '🌆 晚上好';
+  if (hour < 6) greeting = t('web.dashboard.greeting.lateNight');
+  else if (hour < 12) greeting = t('web.dashboard.greeting.morning');
+  else if (hour < 14) greeting = t('web.dashboard.greeting.noon');
+  else if (hour < 18) greeting = t('web.dashboard.greeting.afternoon');
+  else greeting = t('web.dashboard.greeting.evening');
   var timeStr = String(hour).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-  document.getElementById('greeting').innerHTML = greeting + '，现在 ' + timeStr;
+  document.getElementById('greeting').innerHTML = t('web.dashboard.greeting.withTime', { greeting: greeting, time: timeStr });
 }
 
 // ═══ View Mode ═══
@@ -67,16 +67,17 @@ function applyViewMode() {
 
 // ═══ Filter & Sort ═══
 window.filterAndSort = function() {
+  var lang = window.__doc77_lang || 'zh-CN';
   var q = filterText.toLowerCase();
   var filtered = projects.filter(function(p) {
     return !q || p.name.toLowerCase().indexOf(q) >= 0 || p.path.toLowerCase().indexOf(q) >= 0;
   });
 
   filtered.sort(function(a, b) {
-    if (sortBy === 'name') return a.name.localeCompare(b.name, 'zh-CN');
+    if (sortBy === 'name') return a.name.localeCompare(b.name, lang);
     if (sortBy === 'created') return new Date(b.created_at) - new Date(a.created_at);
     // last_opened (default)
-    if (!a.last_opened && !b.last_opened) return a.name.localeCompare(b.name, 'zh-CN');
+    if (!a.last_opened && !b.last_opened) return a.name.localeCompare(b.name, lang);
     if (!a.last_opened) return 1;
     if (!b.last_opened) return -1;
     return new Date(b.last_opened) - new Date(a.last_opened);
@@ -101,8 +102,8 @@ window.renderGrid = function(items) {
 
   if (!items.length) {
     grid.innerHTML = filterText
-      ? '<div class="empty-state"><div class="empty-text">没有匹配 "' + esc(filterText) + '" 的项目</div></div>'
-      : '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无项目，点击 [➕ 注册项目] 开始</div><div class="empty-hint">或使用 doc77 register 命令注册</div></div>';
+      ? '<div class="empty-state"><div class="empty-text">' + t('web.dashboard.filterNoMatch', { filter: esc(filterText) }) + '</div></div>'
+      : '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">' + t('web.dashboard.projectsEmpty') + '</div><div class="empty-hint">' + t('web.dashboard.projectsEmptyHint') + '</div></div>';
     return;
   }
 
@@ -120,11 +121,12 @@ function shortPath(fullPath) {
 
 // ═══ Shared: Render a compact card (used by dashboard.js and favorites.js) ═══
 function renderCompactCard(p, inFavorites) {
+  var lang = window.__doc77_lang || 'zh-CN';
   var starClass = p.favorited ? 'fav-star favorited' : 'fav-star';
   var starIcon = p.favorited ? '★' : '☆';
   var dateLabel = sortBy === 'last_opened' && p.last_opened
-    ? '最近: ' + new Date(p.last_opened).toLocaleDateString('zh-CN', {month:'short',day:'numeric'})
-    : '创建: ' + new Date(p.created_at).toLocaleDateString('zh-CN', {month:'short',day:'numeric'});
+    ? t('web.dashboard.dateRecent') + ' ' + new Date(p.last_opened).toLocaleDateString(lang, {month:'short',day:'numeric'})
+    : t('web.dashboard.dateCreated') + ' ' + new Date(p.created_at).toLocaleDateString(lang, {month:'short',day:'numeric'});
 
   return '<div class="card card-compact animate-in" data-id="' + p.id + '" onclick="openProject(' + p.id + ')">' +
     '<button class="' + starClass + '" data-id="' + p.id + '" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')">' + starIcon + '</button>' +
@@ -135,19 +137,19 @@ function renderCompactCard(p, inFavorites) {
       '<div class="card-date">' + dateLabel + '</div>' +
     '</div>' +
     '<div class="card-actions">' +
-      '<button class="btn-icon" onclick="event.stopPropagation();startEdit(' + p.id + ')" title="编辑">✏️</button>' +
-      '<button class="btn-icon" onclick="event.stopPropagation();doDelete(' + p.id + ')" title="删除">🗑</button>' +
+      '<button class="btn-icon" onclick="event.stopPropagation();startEdit(' + p.id + ')" title="' + t('web.dashboard.edit') + '">✏️</button>' +
+      '<button class="btn-icon" onclick="event.stopPropagation();doDelete(' + p.id + ')" title="' + t('web.dashboard.delete') + '">🗑</button>' +
     '</div>' +
     // Inline edit form (hidden by default)
     '<div class="edit-form hidden" id="editForm-' + p.id + '" onclick="event.stopPropagation()">' +
-      '<input id="editName-' + p.id + '" value="' + escAttr(p.name) + '" placeholder="项目名称" class="input" style="width:100%;margin-bottom:8px">' +
+      '<input id="editName-' + p.id + '" value="' + escAttr(p.name) + '" placeholder="' + t('web.dashboard.projectName') + '" class="input" style="width:100%;margin-bottom:8px">' +
       '<div class="form-row" style="margin-bottom:8px">' +
-        '<input id="editPath-' + p.id + '" value="' + escAttr(p.path) + '" placeholder="项目路径" class="input">' +
+        '<input id="editPath-' + p.id + '" value="' + escAttr(p.path) + '" placeholder="' + t('web.dashboard.projectPath') + '" class="input">' +
         '<button onclick="openDirDialog(' + p.id + ')" class="btn">📂</button>' +
       '</div>' +
       '<div style="display:flex;gap:8px">' +
-        '<button onclick="doUpdate(' + p.id + ')" class="btn btn-primary" style="font-size:12px">💾 保存</button>' +
-        '<button onclick="cancelEdit(' + p.id + ')" class="btn" style="font-size:12px">✕ 取消</button>' +
+        '<button onclick="doUpdate(' + p.id + ')" class="btn btn-primary" style="font-size:12px">💾 ' + t('web.dashboard.save') + '</button>' +
+        '<button onclick="cancelEdit(' + p.id + ')" class="btn" style="font-size:12px">✕ ' + t('web.dashboard.cancel') + '</button>' +
       '</div>' +
       '<div id="editError-' + p.id + '" style="color:var(--danger);font-size:12px;display:none;margin-top:6px"></div>' +
     '</div>' +
@@ -184,7 +186,7 @@ window.renderRecent = async function() {
     if (hrc) hrc.textContent = recentFiles.filter(function(f) { return f.viewedAt; }).length;
 
     if (!recentProjects.length && !recentFiles.length) {
-      panel.innerHTML = '<span class="recent-strip-empty">打开文档后自动出现在这里</span>';
+      panel.innerHTML = '<span class="recent-strip-empty">' + t('web.dashboard.recentEmpty') + '</span>';
       return;
     }
 
@@ -211,7 +213,7 @@ window.renderRecent = async function() {
 
     panel.innerHTML = parts.join('');
   } catch(e) {
-    panel.innerHTML = '<span class="recent-strip-empty">加载失败</span>';
+    panel.innerHTML = '<span class="recent-strip-empty">' + t('web.dashboard.loadFailed') + '</span>';
   }
 };
 
@@ -219,13 +221,13 @@ function relativeTime(epochMs) {
   if (!epochMs || isNaN(epochMs)) return '';
   var diff = Math.floor((Date.now() - epochMs) / 1000);
   if (diff < 0) return '';
-  if (diff < 60) return '刚刚';
-  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
-  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
-  return Math.floor(diff / 86400) + ' 天前';
+  if (diff < 60) return t('web.dashboard.time.justNow');
+  if (diff < 3600) return t('web.dashboard.time.minutesAgo', { n: Math.floor(diff / 60) });
+  if (diff < 86400) return t('web.dashboard.time.hoursAgo', { n: Math.floor(diff / 3600) });
+  return t('web.dashboard.time.daysAgo', { n: Math.floor(diff / 86400) });
 }
 
-// ═══ Edit / Delete / Register (legacy functions preserved) ═══
+// ═══ Edit / Delete / Register ═══
 window.startEdit = function(id) {
   document.querySelectorAll('.edit-form').forEach(function(f) { f.classList.add('hidden'); });
   var form = document.getElementById('editForm-' + id);
@@ -243,25 +245,25 @@ window.doUpdate = async function(id) {
   var errEl = document.getElementById('editError-' + id);
   var btn = document.querySelector('#editForm-' + id + ' .btn-primary');
   errEl.style.display = 'none';
-  if (!name && !pth) { errEl.textContent = '名称或路径至少填一项'; errEl.style.display = 'block'; return; }
+  if (!name && !pth) { errEl.textContent = t('web.dashboard.nameOrPathRequired'); errEl.style.display = 'block'; return; }
   if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   var body = {};
   if (name) body.name = name;
   if (pth) body.path = pth;
   try {
     var r = await fetch('/api/projects/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!r.ok) { var d = await r.json(); errEl.textContent = d.error || '更新失败'; errEl.style.display = 'block'; return; }
-    toast('项目已更新', 'success');
+    if (!r.ok) { var d = await r.json(); errEl.textContent = d.error || t('web.dashboard.updateFailed'); errEl.style.display = 'block'; return; }
+    toast(t('web.dashboard.projectUpdated'), 'success');
     load();
   } catch(e) {
-    errEl.textContent = '网络错误: ' + e.message; errEl.style.display = 'block';
+    errEl.textContent = t('web.dashboard.networkError') + ': ' + e.message; errEl.style.display = 'block';
   } finally {
     if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
   }
 };
 
 window.doDelete = async function(id) {
-  if (!await confirmDialog('确定移除此项目？文件不会被删除。')) return;
+  if (!await confirmDialog(t('web.dashboard.confirmDelete'))) return;
   await fetch('/api/projects/' + id, { method: 'DELETE' });
   load();
 };
@@ -272,17 +274,17 @@ window.doRegister = async function() {
   var err = document.getElementById('regError');
   var btn = document.querySelector('#tab-manual .btn-primary');
   err.style.display = 'none';
-  if (!name || !pth) { err.textContent = '请填写项目名称和路径'; err.style.display = 'block'; return; }
+  if (!name || !pth) { err.textContent = t('web.dashboard.nameAndPathRequired'); err.style.display = 'block'; return; }
   if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
     var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth}) });
-    if (!r.ok) { var d = await r.json(); err.textContent = d.error || '注册失败'; err.style.display = 'block'; return; }
+    if (!r.ok) { var d = await r.json(); err.textContent = d.error || t('web.dashboard.registerFailed'); err.style.display = 'block'; return; }
     document.getElementById('regName').value = '';
     document.getElementById('regPath').value = '';
     closeRegisterModal();
     load();
   } catch(e) {
-    err.textContent = '网络错误: ' + e.message; err.style.display = 'block';
+    err.textContent = t('web.dashboard.networkError') + ': ' + e.message; err.style.display = 'block';
   } finally {
     if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
   }
@@ -336,7 +338,7 @@ window.navigateFsBrowser = function(forEditId, dirPath) {
   overlay.id = overlayId;
   overlay.className = 'confirm-overlay';
   overlay.style.zIndex = '102';
-  overlay.innerHTML = '<div class="confirm-box" style="max-width:600px;max-height:80vh;display:flex;flex-direction:column" id="fsBrowserBox"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0"><span style="font-weight:600;font-size:13px">📂 服务端文件浏览</span><button onclick="document.getElementById(\'fsBrowserOverlay\').remove()" class="btn-icon" style="font-size:18px">✕</button></div><div id="fsBrowserContent" style="font-size:11px;color:var(--text-muted)">加载中...</div></div>';
+  overlay.innerHTML = '<div class="confirm-box" style="max-width:600px;max-height:80vh;display:flex;flex-direction:column" id="fsBrowserBox"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0"><span style="font-weight:600;font-size:13px">' + t('web.dashboard.fsBrowserTitle') + '</span><button onclick="document.getElementById(\'fsBrowserOverlay\').remove()" class="btn-icon" style="font-size:18px">✕</button></div><div id="fsBrowserContent" style="font-size:11px;color:var(--text-muted)">' + t('web.dashboard.loading') + '</div></div>';
   document.body.appendChild(overlay);
 
   overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
@@ -350,7 +352,7 @@ window.navigateFsBrowser = function(forEditId, dirPath) {
     }
     renderFsBrowser(forEditId, d);
   }).catch(function() {
-    document.getElementById('fsBrowserContent').innerHTML = '<p style="color:var(--danger)">加载失败</p>';
+    document.getElementById('fsBrowserContent').innerHTML = '<p style="color:var(--danger)">' + t('web.dashboard.loadFailed') + '</p>';
   });
 };
 
@@ -360,7 +362,7 @@ function renderFsBrowser(forEditId, data) {
   // Breadcrumb + back
   html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:8px;flex-wrap:wrap;font-size:12px">';
   if (data.parent) {
-    html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(data.parent) + '\')" style="padding:2px 8px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-primary)">⬆ 上级</button>';
+    html += '<button onclick="navigateFsBrowser(' + forEditId + ',\'' + escAttr(data.parent) + '\')" style="padding:2px 8px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-primary)">⬆ ' + t('web.dashboard.fsParentDir') + '</button>';
   }
   // Root shortcuts
   if (data.roots && data.roots.length > 0) {
@@ -372,14 +374,15 @@ function renderFsBrowser(forEditId, data) {
   html += '</div>';
 
   // Current path
-  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:10px;color:var(--text-muted)">当前:</span><span style="font-size:12px;font-family:monospace;color:var(--text-secondary);background:var(--bg-hover);padding:2px 8px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(data.path) + '</span></div>';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:10px;color:var(--text-muted)">' + t('web.dashboard.fsCurrentDir') + ':</span><span style="font-size:12px;font-family:monospace;color:var(--text-secondary);background:var(--bg-hover);padding:2px 8px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(data.path) + '</span></div>';
 
   // "Select this directory" button
-  html += '<button onclick="fillPath(' + forEditId + ',\'' + escAttr(data.path) + '\');document.getElementById(\'fsBrowserOverlay\').remove();toast(\'路径已选择: ' + escAttr(data.path) + '\',\'success\')" style="width:100%;padding:8px 0;margin-bottom:8px;background:#059669;color:#fff;font-size:13px;border:none;border-radius:6px;cursor:pointer;font-weight:500">✅ 选择此目录</button>';
+  html += '<button onclick="fillPath(' + forEditId + ',\'' + escAttr(data.path) + '\');document.getElementById(\'fsBrowserOverlay\').remove();' +
+    'toast(\'' + t('web.dashboard.pathSelected') + ': ' + escAttr(data.path) + '\',\'success\')" style="width:100%;padding:8px 0;margin-bottom:8px;background:#059669;color:#fff;font-size:13px;border:none;border-radius:6px;cursor:pointer;font-weight:500">✅ ' + t('web.dashboard.fsSelectDir') + '</button>';
 
   // Directory listing
   if (data.entries.length === 0) {
-    html += '<p style="font-size:12px;color:var(--text-muted);padding:16px 0;text-align:center">此目录为空</p>';
+    html += '<p style="font-size:12px;color:var(--text-muted);padding:16px 0;text-align:center">' + t('web.dashboard.fsEmptyDir') + '</p>';
   } else {
     html += '<div style="overflow-y:auto;flex:1;max-height:300px"><div style="display:flex;flex-direction:column;gap:2px">';
     for (var i = 0; i < data.entries.length; i++) {
@@ -407,4 +410,4 @@ function syncHeaderCounts() {
 }
 
 // ═══ Init ═══
-load();
+__doc77_i18n_ready.then(load);

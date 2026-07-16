@@ -12,42 +12,42 @@ window.doDiscover = async function() {
   var btn = document.getElementById('btnDiscover');
 
   var scanPath = pathInput.value.trim() || '~';
-  status.textContent = '🔍 扫描中...';
+  status.textContent = t('web.discover.scanning');
   candidates.innerHTML = '';
   actions.style.display = 'none';
   btn.disabled = true;
-  btn.innerHTML = '⏳ 扫描中...';
+  btn.innerHTML = t('web.discover.scanningBtn');
   btn.classList.add('btn-loading');
 
   try {
     var r = await fetch('/api/discover?path=' + encodeURIComponent(scanPath) + '&depth=2');
     if (!r.ok) {
       var err = await r.json();
-      status.textContent = '❌ ' + (err.error || '扫描失败');
+      status.textContent = '❌ ' + (err.error || t('web.discover.scanFailed'));
       btn.disabled = false;
-      btn.innerHTML = '🔍 扫描';
+      btn.innerHTML = t('web.discover.scanBtn');
       btn.classList.remove('btn-loading');
       return;
     }
     discoverResults = await r.json();
 
     if (!discoverResults.length) {
-      status.textContent = '未发现候选项目（需要 .git + 至少 1 个 .md 文件）';
+      status.textContent = t('web.discover.noCandidates');
       btn.disabled = false;
-      btn.innerHTML = '🔍 扫描';
+      btn.innerHTML = t('web.discover.scanBtn');
       btn.classList.remove('btn-loading');
       return;
     }
 
-    status.textContent = '发现 ' + discoverResults.length + ' 个候选项目';
+    status.textContent = t('web.discover.foundCandidates', { n: discoverResults.length });
     renderDiscoverCandidates();
     actions.style.display = 'block';
   } catch(e) {
-    status.textContent = '❌ 网络错误';
+    status.textContent = t('web.discover.networkError');
   }
 
   btn.disabled = false;
-  btn.innerHTML = '🔍 扫描';
+  btn.innerHTML = t('web.discover.scanBtn');
   btn.classList.remove('btn-loading');
 };
 
@@ -74,16 +74,16 @@ window.updateBatchButton = function() {
   var checked = document.querySelectorAll('#discoverCandidates input:checked').length;
   var btn = document.querySelector('#discoverActions .btn');
   if (btn) {
-    btn.textContent = '📋 批量注册选中 (' + checked + ')';
+    btn.textContent = t('web.discover.batchRegisterCount', { n: checked });
     btn.disabled = checked === 0;
   }
 };
 
 window.batchRegister = async function() {
   var checked = document.querySelectorAll('#discoverCandidates input:checked');
-  if (!checked.length) { toast('请至少选择一个项目', 'info'); return; }
+  if (!checked.length) { toast(t('web.discover.selectAtLeastOne'), 'info'); return; }
 
-  showLoading('正在批量注册 ' + checked.length + ' 个项目...');
+  showLoading(t('web.discover.batchRegistering', { n: checked.length }));
   var successCount = 0;
   var failCount = 0;
 
@@ -111,7 +111,7 @@ window.batchRegister = async function() {
   hideLoading();
 
   if (successCount > 0) {
-    toast('成功注册 ' + successCount + ' 个项目', 'success');
+    toast(t('web.discover.registerSuccess', { n: successCount }), 'success');
     // Refresh the main dashboard
     fetch('/api/projects').then(function(r) { return r.json(); }).then(function(allProjects) {
       projects = allProjects;
@@ -122,6 +122,6 @@ window.batchRegister = async function() {
     });
   }
   if (failCount > 0) {
-    toast(failCount + ' 个注册失败（可能已存在）', 'error');
+    toast(t('web.discover.registerFailed', { n: failCount }), 'error');
   }
 };

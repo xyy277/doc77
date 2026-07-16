@@ -6,7 +6,7 @@
 window.toggleFavorite = async function(projectId) {
   try {
     var r = await fetch('/api/projects/' + projectId + '/favorite', { method: 'PUT' });
-    if (!r.ok) { toast('操作失败', 'error'); return; }
+    if (!r.ok) { toast(t('web.favorites.operationFailed'), 'error'); return; }
     var d = await r.json();
     // Update star buttons in DOM
     updateStarButtons(projectId, d.favorited);
@@ -20,9 +20,9 @@ window.toggleFavorite = async function(projectId) {
     window.refreshFavorites();
     window.filterAndSort();
     window.refreshStats();
-    toast(d.favorited ? '已收藏' : '已取消收藏', 'success');
+    toast(d.favorited ? t('web.favorites.favorited') : t('web.favorites.unfavorited'), 'success');
   } catch(e) {
-    toast('操作失败', 'error');
+    toast(t('web.favorites.operationFailed'), 'error');
   }
 };
 
@@ -61,7 +61,7 @@ window.renderFavorites = function(projects) {
   var html = '<div class="fav-pills">';
   favProjects.forEach(function(p) {
     html += '<span class="fav-pill" onclick="location.href=\'/preview.html?id=' + p.id + '\'" style="cursor:pointer" title="' + escAttr(p.name) + '">📂 <span class="fav-pill-name">' + esc(p.name) + '</span>' +
-      '<button class="fav-pill-remove" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')" title="取消收藏">✕</button></span>';
+      '<button class="fav-pill-remove" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')" title="' + t('web.favorites.removeFavorite') + '">✕</button></span>';
   });
   html += '</div>';
   list.innerHTML = html;
