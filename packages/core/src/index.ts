@@ -121,3 +121,6 @@ export {
   UNSUPPORTED_EXTENSIONS,
   FORMAT_SIZE_LIMITS,
 } from './renderers/index.js';
+
+// Export & Share
+export { bundleHTML, ShareManager } from './export/index.js';
