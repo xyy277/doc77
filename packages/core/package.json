@@ -1,6 +1,6 @@
 {
   "name": "@doc77/core",
-  "version": "0.7.3",
+  "version": "0.7.5",
   "description": "Doc77 核心引擎 — 数据库、文件系统抽象层、预览引擎、Express Server",
   "license": "MIT",
   "repository": {
@@ -47,6 +47,7 @@
     "sql.js": "^1.11.0"
   },
   "devDependencies": {
+    "@huggingface/transformers": "4.2.0",
     "@types/express": "^5.0.0"
   },
   "peerDependencies": {
