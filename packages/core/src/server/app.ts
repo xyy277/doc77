@@ -44,6 +44,9 @@ import { VERSION } from '../version.gen.js';
 import { getConfig } from '../db/config.js';
 import { initI18n } from '../i18n/index.js';
 import { buildI18nResponse } from './i18n-route.js';
+import { bundleHTML, ShareManager } from '../export/index.js';
+import { getLocalIP, renderSharePage, renderShareError } from '../export/helpers.js';
+import QRCode from 'qrcode';
 
 /** Lazy import from @doc77/mcp — optional peer dep, may not be installed */
 async function auditLog(entry: Record<string, unknown>) {
@@ -59,6 +62,15 @@ async function auditLog(entry: Record<string, unknown>) {
 let _capabilities = { ai: false, mcp: false, translate: false };
 export function setCapabilities(caps: { ai: boolean; mcp: boolean; translate: boolean }) {
   _capabilities = caps;
+}
+
+// Server info — populated by CLI layer at startup for share link construction
+let _serverInfo = { bind: '0.0.0.0', port: 2777 };
+export function setServerInfo(info: { bind: string; port: number }) {
+  _serverInfo = info;
+}
+function getServerInfo() {
+  return _serverInfo;
 }
 
 /**
@@ -77,6 +89,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
   // Parse JSON bodies
   app.use(express.json({ limit: '5mb' }));
+
+  // Share manager — manages share token lifecycle and cleanup
+  const shareManager = new ShareManager();
 
   // === Resolve web directory (unchanged logic) ===
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -1103,6 +1118,244 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         return;
       }
       res.status(500).json({ error: message });
+    }
+  });
+
+  // ── Export: self-contained HTML ──
+
+  app.post('/api/export/html', async (req: Request, res: Response) => {
+    try {
+      const { title, content, styles, images, theme } = req.body;
+
+      if (!content || typeof content !== 'string') {
+        res.status(400).json({ error: 'content is required' });
+        return;
+      }
+
+      // Resolve local images to base64
+      const resolvedImages: Array<{ url: string; base64: string }> = [];
+      if (Array.isArray(images)) {
+        for (const img of images) {
+          if (!img.url || !img.path) continue;
+          try {
+            // img.path is the physical file path (resolved by frontend from project root)
+            const data = fs.readFileSync(img.path);
+            const ext = path.extname(img.path).toLowerCase();
+            const mimeMap: Record<string, string> = {
+              '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+              '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
+              '.bmp': 'image/bmp', '.ico': 'image/x-icon',
+            };
+            const mime = mimeMap[ext] || 'application/octet-stream';
+            resolvedImages.push({ url: img.url, base64: `data:${mime};base64,${data.toString('base64')}` });
+          } catch {
+            // Skip unresolvable images
+          }
+        }
+      }
+
+      const maxSize = parseInt(getConfig('export.html.maxFileSizeMB') || '10', 10);
+      const htmlSizeKB = Math.round((content.length + JSON.stringify(styles).length) / 1024);
+      if (htmlSizeKB > maxSize * 1024) {
+        res.status(413).json({ error: `文件过大 (${Math.round(htmlSizeKB/1024)}MB)，导出上限 ${maxSize}MB` });
+        return;
+      }
+
+      const html = bundleHTML({
+        title: title || 'untitled',
+        content,
+        styles: Array.isArray(styles) ? styles : [],
+        images: resolvedImages,
+        theme: theme === 'dark' ? 'dark' : 'light',
+      });
+
+      const safeFilename = (title || 'untitled').replace(/[^a-zA-Z0-9一-鿿_-]/g, '_') + '.html';
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+      res.send(html);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || '导出失败' });
+    }
+  });
+
+  // ── Share: create, view, list, revoke ──
+
+  /** POST /api/share — Create a share link */
+  app.post('/api/share', (req: Request, res: Response) => {
+    try {
+      const { projectId, filePath, title, theme } = req.body;
+      if (!projectId || !filePath) {
+        res.status(400).json({ error: 'projectId and filePath are required' });
+        return;
+      }
+
+      // Check bind_address — sharing only works when bound to 0.0.0.0
+      const bindAddr = getConfig('security.bind_address') || '127.0.0.1';
+      if (bindAddr === '127.0.0.1') {
+        res.status(403).json({ error: '分享功能需要绑定 0.0.0.0（局域网访问）。请在设置中修改 bind_address 并重启。' });
+        return;
+      }
+
+      // Validate file through existing security chain
+      const project = getProjectById(projectId);
+      if (!project) {
+        res.status(404).json({ error: '项目不存在' });
+        return;
+      }
+      const projectRoot = resolveProjectPath(project.path);
+      const resolvedPath = validatePath(projectRoot, filePath);
+      if (!resolvedPath) {
+        res.status(404).json({ error: '文件路径不在项目范围内' });
+        return;
+      }
+      if (isSensitiveFile(resolvedPath)) {
+        res.status(403).json({ error: '无法分享敏感文件' });
+        return;
+      }
+
+      const ttlHours = parseInt(getConfig('export.share.ttl_hours') || '24', 10);
+      const ttlMs = Math.min(Math.max(ttlHours, 1), 168) * 60 * 60 * 1000; // 1h min, 168h max
+
+      const token = shareManager.create({
+        projectId,
+        filePath: resolvedPath,
+        title: title || path.basename(filePath, path.extname(filePath)),
+        theme: theme || 'light',
+        ttlMs,
+      });
+
+      // Get the runtime bind address and port from server info
+      const serverInfo = getServerInfo ? getServerInfo() : { bind: '0.0.0.0', port: 2777 };
+      const shareUrl = `http://${getLocalIP()}:${serverInfo.port}/s/${token.token}`;
+
+      // Audit log
+      auditLog({
+        action: 'share:create',
+        token: token.token,
+        projectId,
+        filePath: resolvedPath,
+      });
+
+      res.json({
+        token: token.token,
+        url: shareUrl,
+        expiresAt: token.expiresAt,
+        documentTitle: token.documentTitle,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || '创建分享失败' });
+    }
+  });
+
+  /** GET /s/:token — Share page (read-only preview) */
+  app.get('/s/:token', (req: Request, res: Response) => {
+    const token = shareManager.validate(req.params.token);
+    if (!token) {
+      res.status(404).send(renderShareError('此链接已过期或无效'));
+      return;
+    }
+    res.send(renderSharePage(token));
+  });
+
+  /** GET /api/share/:token/data — Get rendered content for share page */
+  app.get('/api/share/:token/data', (req: Request, res: Response) => {
+    const token = shareManager.validate(req.params.token);
+    if (!token) {
+      res.status(404).json({ error: '此链接已过期或无效' });
+      return;
+    }
+
+    try {
+      const content = readFile(token.filePath);
+      const ext = path.extname(token.filePath).toLowerCase();
+      const renderer = getRendererForFile(token.filePath);
+      let rendered: { type: string; content: string; rawUrl?: string };
+
+      if (renderer === 'markdown') {
+        rendered = {
+          type: 'markdown',
+          content: renderMarkdown(content, { projectId: token.projectId, filePath: token.filePath }),
+        };
+      } else if (renderer === 'code') {
+        rendered = {
+          type: 'code',
+          content: renderCode(content, ext),
+        };
+      } else if (renderer === 'mermaid') {
+        rendered = {
+          type: 'mermaid',
+          content: `<pre class="mermaid">${content}</pre>`,
+        };
+      } else if (renderer === 'image' || renderer === 'pdf') {
+        rendered = {
+          type: renderer,
+          rawUrl: `/api/raw/${token.projectId}?path=${encodeURIComponent(token.filePath)}`,
+          content: '',
+        };
+      } else {
+        rendered = {
+          type: 'text',
+          content: `<pre class="text-sm whitespace-pre-wrap font-mono">${content}</pre>`,
+        };
+      }
+
+      // Audit log the access
+      auditLog({
+        action: 'share:access',
+        token: token.token,
+        projectId: token.projectId,
+        filePath: token.filePath,
+      });
+
+      res.json({ ...rendered, title: token.documentTitle, theme: token.theme });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || '读取文件失败' });
+    }
+  });
+
+  /** GET /api/share/:token/qrcode — QR code SVG for share link */
+  app.get('/api/share/:token/qrcode', async (req: Request, res: Response) => {
+    const token = shareManager.validate(req.params.token);
+    if (!token) {
+      res.status(404).send('Token invalid or expired');
+      return;
+    }
+
+    // Reconstruct the share URL (we don't store it, but we know the token)
+    const serverInfo = getServerInfo ? getServerInfo() : { bind: '0.0.0.0', port: 2777 };
+    const shareUrl = `http://${getLocalIP()}:${serverInfo.port}/s/${token.token}`;
+
+    try {
+      const svg = await QRCode.toString(shareUrl, { type: 'svg', margin: 2, width: 300, color: { dark: '#1e293b', light: '#ffffff' } });
+      res.setHeader('Content-Type', 'image/svg+xml');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(svg);
+    } catch (err: any) {
+      res.status(500).json({ error: 'QR code generation failed' });
+    }
+  });
+
+  /** GET /api/shares — List active share tokens */
+  app.get('/api/shares', (_req: Request, res: Response) => {
+    const shares = shareManager.list().map(t => ({
+      token: t.token,
+      documentTitle: t.documentTitle,
+      createdAt: t.createdAt,
+      expiresAt: t.expiresAt,
+      projectId: t.projectId,
+      filePath: t.filePath,
+    }));
+    res.json(shares);
+  });
+
+  /** DELETE /api/share/:token — Revoke a share */
+  app.delete('/api/share/:token', (req: Request, res: Response) => {
+    const revoked = shareManager.revoke(req.params.token);
+    if (revoked) {
+      auditLog({ action: 'share:revoke', token: req.params.token });
+      res.json({ ok: true });
+    } else {
+      res.status(404).json({ error: 'Token not found' });
     }
   });
 
@@ -2194,6 +2447,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     });
   });
 
+  // Cleanup ShareManager on server close
+  app.on('close', () => {
+    shareManager.destroy();
+  });
+
   return app;
 }
 
@@ -2268,6 +2526,14 @@ function getFileCategory(filePath: string): string {
     '.pptx': 'presentation',
   };
   return map[ext] || 'unknown';
+}
+
+/**
+ * Look up a project by its numeric ID.
+ */
+function getProjectById(id: number) {
+  const projects = listProjects();
+  return projects.find((p: any) => p.id === id);
 }
 
 /**
