@@ -135,7 +135,7 @@ function printBanner() {
   const padEnd = (s: string, w: number) => {
     let d = 0;
     for (const c of s) d += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(c) ? 2 : 1;
-    return s + ' '.repeat(w - d);
+    return s + ' '.repeat(Math.max(0, w - d));
   };
   // Inner width = 36 display columns
   console.log(
