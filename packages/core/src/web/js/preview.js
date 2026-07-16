@@ -124,6 +124,8 @@ function applyCapabilities() {
   }).catch(function(){});
   // Preload editor module in background
   if (window.EditorCore) window.EditorCore.load();
+  // Ensure i18n dictionary is loaded before any t() calls
+  try { await (window.__doc77_i18n_ready || Promise.resolve()); } catch(e) {}
   try {
     var r = await fetch('/api/projects');
     projects = await r.json();
@@ -582,7 +584,7 @@ function afterActivate(path, d) {
   if (editBtnEl) {
     editBtnEl.style.display = isEditable ? '' : 'none';
     editBtnEl.classList.toggle('editing-active', editMode);
-    editBtnEl.title = editMode ? t('web.preview.exitEditMode') : t('web.preview.editFile');
+    editBtnEl.title = editMode ? t('web.preview.exitEditMode') : t('web.preview.edit.editFile');
     editBtnEl.onclick = toggleEditMode;
   }
   // Run 按钮：仅 js/py 显示
@@ -1038,7 +1040,7 @@ var ttsActive = false;
 function toggleTTS() {
   if (ttsActive) { window.speechSynthesis.cancel(); ttsActive = false; document.getElementById('ttsBtn').textContent = '🔊'; document.getElementById('ttsRate').classList.add('hidden'); return; }
   var text = (document.getElementById('docContent') || document.querySelector('.doc-content'))?.textContent;
-  if (!text) { toast(t('web.preview.codeRun.openDoc'),'error'); return; }
+  if (!text) { toast(t('web.preview.openDocFirst'),'error'); return; }
   ttsActive = true;
   document.getElementById('ttsBtn').textContent = '⏹';
   document.getElementById('ttsRate').classList.remove('hidden');
@@ -1789,7 +1791,7 @@ function appendChatMsg(role, content) {
 function sendQuickMsg(m, contextFile) { pendingContextFile = contextFile || null; document.getElementById('chatInput').value = m; sendMessage(); }
 // 智能归类：让 AI 分析文件组织并用 batch_operations 提交一个待审批的整理方案（依赖 Phase 2 写工具）。
 function doSmartClassify() {
-  if (!CAPABILITIES.ai) { toast(t('web.preview.toolbar.aiNotInstalled'), 'info'); return; }
+  if (!CAPABILITIES.ai) { toast(t('web.preview.aiNotInstalled'), 'info'); return; }
   if (!CAPABILITIES.mcp) { toast(t('web.preview.toolbar.classifyNeedsMCP'), 'info'); return; }
   sendQuickMsg(t('web.preview.toolbar.classifyPrompt'));
 }
