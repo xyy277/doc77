@@ -4,6 +4,8 @@ export interface Project {
   id: number;
   name: string;
   path: string;
+  obsidian_mode: boolean;
+  tags: string[];
   created_at: string;
   last_opened: string | null;
 }
@@ -11,16 +13,20 @@ export interface Project {
 export interface ProjectUpdate {
   name?: string;
   path?: string;
+  obsidian_mode?: boolean;
+  tags?: string[];
 }
 
 /**
  * Register a new project.
  * Throws if the path already exists (UNIQUE constraint).
  */
-export function registerProject(name: string, projectPath: string): Project {
+export function registerProject(name: string, projectPath: string, obsidianMode?: boolean, tags?: string[]): Project {
   const db = getConnection();
-  const stmt = db.prepare(`INSERT INTO projects (name, path) VALUES (?, ?)`);
-  const result = stmt.run(name, projectPath);
+  const stmt = db.prepare(
+    `INSERT INTO projects (name, path, obsidian_mode, tags) VALUES (?, ?, ?, ?)`
+  );
+  const result = stmt.run(name, projectPath, obsidianMode ? 1 : 0, JSON.stringify(tags || []));
   if (result.lastInsertRowid === 0) {
     throw new Error(`Project path already exists: ${projectPath}`);
   }
@@ -28,6 +34,8 @@ export function registerProject(name: string, projectPath: string): Project {
     id: Number(result.lastInsertRowid),
     name,
     path: projectPath,
+    obsidian_mode: !!obsidianMode,
+    tags: tags || [],
     created_at: new Date().toISOString(),
     last_opened: null,
   };
@@ -38,9 +46,14 @@ export function registerProject(name: string, projectPath: string): Project {
  */
 export function listProjects(): Project[] {
   const db = getConnection();
-  return db
-    .prepare('SELECT id, name, path, created_at, last_opened FROM projects ORDER BY name')
-    .all() as Project[];
+  const rows = db
+    .prepare('SELECT id, name, path, obsidian_mode, tags, created_at, last_opened FROM projects ORDER BY name')
+    .all() as Array<Project & { obsidian_mode: number; tags: string }>;
+  return rows.map(r => ({
+    ...r,
+    obsidian_mode: !!r.obsidian_mode,
+    tags: JSON.parse(r.tags || '[]'),
+  }));
 }
 
 /**
@@ -62,7 +75,7 @@ export function touchProject(id: number): void {
 }
 
 /**
- * Update project name and/or path.
+ * Update project name, path, obsidian_mode, and/or tags.
  */
 export function updateProject(id: number, updates: ProjectUpdate): void {
   const db = getConnection();
@@ -76,6 +89,14 @@ export function updateProject(id: number, updates: ProjectUpdate): void {
   if (updates.path !== undefined) {
     sets.push('path = ?');
     params.push(updates.path);
+  }
+  if (updates.obsidian_mode !== undefined) {
+    sets.push('obsidian_mode = ?');
+    params.push(updates.obsidian_mode ? 1 : 0);
+  }
+  if (updates.tags !== undefined) {
+    sets.push('tags = ?');
+    params.push(JSON.stringify(updates.tags));
   }
 
   if (sets.length === 0) return;
