@@ -2241,13 +2241,13 @@ function initDropZone() {
 async function exportHTML() {
   var contentEl = document.getElementById('docContent');
   if (!contentEl) {
-    toast('没有可导出的内容', 'warning');
+    toast(t('web.preview.export.noContent'), 'warning');
     return;
   }
 
   var btn = document.getElementById('exportBtn');
   btn.disabled = true;
-  btn.innerHTML = '⏳ <span class="hidden sm:inline">打包中...</span>';
+  btn.innerHTML = '⏳ <span class="hidden sm:inline">' + t('web.preview.toolbar.exportPacking') + '</span>';
 
   try {
     // 1. Wait for any ongoing rendering to finish
@@ -2332,9 +2332,9 @@ async function exportHTML() {
 
     if (!resp.ok) {
       var err = await resp.json().catch(function() {
-        return { error: '导出失败' };
+        return { error: t('web.preview.export.failed') };
       });
-      toast(err.error || '导出失败 (' + resp.status + ')', 'error');
+      toast(err.error || t('web.preview.export.failedStatus', { status: resp.status }), 'error');
       return;
     }
 
@@ -2349,12 +2349,12 @@ async function exportHTML() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toast('✅ 导出完成：' + title + '.html', 'success');
+    toast(t('web.preview.export.done', { file: title + '.html' }), 'success');
   } catch (e) {
-    toast('导出失败：' + e.message, 'error');
+    toast(t('web.preview.export.failedMsg', { message: e.message }), 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '📥 <span class="hidden sm:inline">导出</span>';
+    btn.innerHTML = '📥 <span class="hidden sm:inline">' + t('web.preview.toolbar.export') + '</span>';
   }
 }
 
@@ -2364,7 +2364,7 @@ async function exportHTML() {
 async function shareDocument() {
   var btn = document.getElementById('shareBtn');
   btn.disabled = true;
-  btn.innerHTML = '⏳ <span class="hidden sm:inline">创建中...</span>';
+  btn.innerHTML = '⏳ <span class="hidden sm:inline">' + t('web.preview.share.creating') + '</span>';
 
   try {
     var theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
@@ -2391,17 +2391,17 @@ async function shareDocument() {
 
     var data = await resp.json();
     if (!resp.ok) {
-      toast(data.error || '创建分享失败', 'error');
+      toast(data.error || t('web.preview.share.createFailed'), 'error');
       return;
     }
 
     // Show share card UI
     showShareCard(data.url, data.expiresAt, title);
   } catch (e) {
-    toast('创建分享失败：' + e.message, 'error');
+    toast(t('web.preview.share.createFailedMsg', { message: e.message }), 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '🔗 <span class="hidden sm:inline">分享</span>';
+    btn.innerHTML = '🔗 <span class="hidden sm:inline">' + t('web.preview.toolbar.share') + '</span>';
   }
 }
 
@@ -2412,7 +2412,7 @@ function showShareCard(url, expiresAt, title) {
   if (existing) existing.remove();
 
   var expiresDate = new Date(expiresAt);
-  var expiresStr = expiresDate.toLocaleString('zh-CN', {
+  var expiresStr = expiresDate.toLocaleString(window.__doc77_lang || 'zh-CN', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -2430,11 +2430,11 @@ function showShareCard(url, expiresAt, title) {
   card.innerHTML =
     '<div style="background:var(--bg-card,#fff);border-radius:12px;padding:24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.15);text-align:center;position:relative;color:var(--text-primary,#1e293b)">' +
     '<button onclick="this.closest(\'#shareCard\').remove()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted,#94a3b8)">✕</button>' +
-    '<div style="font-size:14px;font-weight:600;margin-bottom:4px">🔗 分享链接已创建</div>' +
+    '<div style="font-size:14px;font-weight:600;margin-bottom:4px">' + t('web.preview.share.created') + '</div>' +
     '<div style="font-size:11px;color:var(--text-muted,#94a3b8);margin-bottom:16px">' +
     title +
-    ' · 有效期至 ' +
-    expiresStr +
+    ' · ' +
+    t('common.share.expiresAt', { time: expiresStr }) +
     '</div>' +
     '<div style="background:var(--bg-body,#f8fafc);border:1px solid var(--border-light,#e2e8f0);border-radius:8px;padding:12px;font-size:12px;font-family:monospace;word-break:break-all;margin-bottom:16px;text-align:left">' +
     url +
@@ -2442,13 +2442,13 @@ function showShareCard(url, expiresAt, title) {
     '<div style="display:flex;gap:8px;justify-content:center">' +
     '<button onclick="copyShareLink(\'' +
     url.replace(/'/g, "\\'") +
-    '\')" style="flex:1;padding:8px 0;font-size:13px;font-weight:500;background:var(--accent,#6366f1);color:#fff;border:none;border-radius:8px;cursor:pointer">📋 复制链接</button>' +
+    '\')" style="flex:1;padding:8px 0;font-size:13px;font-weight:500;background:var(--accent,#6366f1);color:#fff;border:none;border-radius:8px;cursor:pointer">' + t('web.preview.share.copyLink') + '</button>' +
     '<button onclick="showQRCode(this,\'' +
     token +
-    '\')" style="flex:1;padding:8px 0;font-size:13px;font-weight:500;background:var(--bg-card,#fff);color:var(--text-primary,#1e293b);border:1px solid var(--border-light,#e2e8f0);border-radius:8px;cursor:pointer">📱 二维码</button>' +
+    '\')" style="flex:1;padding:8px 0;font-size:13px;font-weight:500;background:var(--bg-card,#fff);color:var(--text-primary,#1e293b);border:1px solid var(--border-light,#e2e8f0);border-radius:8px;cursor:pointer">' + t('web.preview.share.qrcode') + '</button>' +
     '</div>' +
     '<div id="qrcodeContainer" style="display:none;margin-top:16px;text-align:center"><img id="qrcodeImg" src="" alt="QR Code" style="width:180px;height:180px;border-radius:8px;border:1px solid var(--border-light,#e2e8f0)"></div>' +
-    '<div style="margin-top:14px;font-size:10px;color:#ef4444">⚠️ 请确保接收设备在同一 Wi-Fi 网络</div>' +
+    '<div style="margin-top:14px;font-size:10px;color:#ef4444">' + t('web.preview.share.wifiWarning') + '</div>' +
     '</div>';
 
   document.body.appendChild(card);
@@ -2460,7 +2460,7 @@ function copyShareLink(url) {
     navigator.clipboard
       .writeText(url)
       .then(function() {
-        toast('✅ 链接已复制', 'success');
+        toast(t('web.preview.share.linkCopied'), 'success');
       })
       .catch(function() {
         fallbackCopy(url);
@@ -2479,7 +2479,7 @@ function fallbackCopy(text) {
   ta.select();
   document.execCommand('copy');
   document.body.removeChild(ta);
-  toast('✅ 链接已复制', 'success');
+  toast(t('web.preview.share.linkCopied'), 'success');
 }
 
 /** Show QR code image in the share card. */

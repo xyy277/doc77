@@ -73,7 +73,7 @@ window.doGitDiscover = async function () {
   var actions = document.getElementById('gitDiscoverActions');
   var btn = document.getElementById('btnGitDiscover');
 
-  status.textContent = '扫描中...';
+  status.textContent = t('web.register.scanning');
   candidates.innerHTML = '';
   actions.style.display = 'none';
   btn.disabled = true;
@@ -84,13 +84,13 @@ window.doGitDiscover = async function () {
     );
     var d = await r.json();
     if (!r.ok) {
-      status.textContent = '❌ ' + (d.error || '扫描失败');
+      status.textContent = '❌ ' + (d.error || t('web.register.scanFailed'));
       return;
     }
 
-    status.textContent = '找到 ' + d.repositories.length + ' 个 Git 项目';
+    status.textContent = t('web.register.gitFound', { n: d.repositories.length });
     if (!d.repositories.length) {
-      status.textContent += ' (无新项目)';
+      status.textContent += ' ' + t('web.register.noNew');
       return;
     }
 
@@ -122,7 +122,7 @@ window.doGitDiscover = async function () {
       .join('');
     actions.style.display = 'block';
   } catch (e) {
-    status.textContent = '❌ 网络错误: ' + e.message;
+    status.textContent = t('web.register.networkError', { message: e.message });
   } finally {
     btn.disabled = false;
   }
@@ -132,7 +132,7 @@ window.doGitDiscover = async function () {
 window.batchRegisterGit = async function () {
   var checks = document.querySelectorAll('.git-candidate:checked');
   var status = document.getElementById('gitDiscoverStatus');
-  status.textContent = '注册中...';
+  status.textContent = t('web.register.registering');
 
   var count = 0;
   for (var i = 0; i < checks.length; i++) {
@@ -146,7 +146,7 @@ window.batchRegisterGit = async function () {
       if (r.ok) count++;
     } catch (e) {}
   }
-  status.textContent = '✅ 已注册 ' + count + '/' + checks.length + ' 个项目';
+  status.textContent = t('web.register.registered', { n: count, total: checks.length });
   if (window.load) window.load();
 };
 
@@ -155,12 +155,12 @@ window.importWorkspace = async function () {
   var input = document.getElementById('workspacePath');
   var wsPath = input.value.trim();
   if (!wsPath) {
-    wsPath = window.prompt('请输入 .code-workspace 文件路径:', '~/my.code-workspace');
+    wsPath = window.prompt(t('web.register.wsPrompt'), '~/my.code-workspace');
     if (!wsPath) return;
     input.value = wsPath;
   }
   var status = document.getElementById('workspaceStatus');
-  status.textContent = '导入中...';
+  status.textContent = t('web.register.importing');
   try {
     var r = await fetch('/api/projects/import-workspace', {
       method: 'POST',
@@ -169,11 +169,11 @@ window.importWorkspace = async function () {
     });
     var d = await r.json();
     if (!r.ok) {
-      status.textContent = '❌ ' + (d.error || '导入失败');
+      status.textContent = '❌ ' + (d.error || t('web.register.importFailed'));
       return;
     }
-    var msg = '✅ 已注册 ' + d.imported.length + ' 个项目';
-    if (d.skipped.length) msg += ' (跳过 ' + d.skipped.length + ' 个已存在)';
+    var msg = t('web.register.imported', { n: d.imported.length });
+    if (d.skipped.length) msg += ' ' + t('web.register.skipped', { n: d.skipped.length });
     status.textContent = msg;
     if (window.load) window.load();
   } catch (e) {

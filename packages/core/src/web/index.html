@@ -105,17 +105,17 @@
 
   <!-- Mobile Companion QR -->
   <div id="mobileCompanion" style="display:none">
-    <div class="section-title" style="margin-top:24px">📱 随身文档</div>
+    <div class="section-title" style="margin-top:24px" data-i18n="web.index.mobileQr.title">📱 Mobile companion</div>
     <div style="display:flex;gap:20px;align-items:center;background:var(--bg-card);border:1px solid var(--border-light);border-radius:12px;padding:16px 20px;margin-top:8px">
       <div style="width:100px;height:100px;background:var(--bg-body);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="mobileQrContainer">
         <div id="mobileQrCode" style="width:100px;height:100px"></div>
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;margin-bottom:4px">📱 在手机上查看</div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">扫码即访问，无需配置</div>
-        <div style="font-size:11px;color:var(--text-muted);font-family:monospace" id="mobileUrlDisplay">加载中...</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px" data-i18n="web.index.mobileQr.viewOnPhone">📱 View on your phone</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px" data-i18n="web.index.mobileQr.scanToAccess">Scan to access — no setup needed</div>
+        <div style="font-size:11px;color:var(--text-muted);font-family:monospace" id="mobileUrlDisplay" data-i18n="web.index.status.loading">Loading...</div>
       </div>
-      <button onclick="refreshMobileQR()" class="btn-icon" title="刷新二维码" style="flex-shrink:0">🔄</button>
+      <button onclick="refreshMobileQR()" class="btn-icon" data-i18n-title="web.index.mobileQr.refresh" title="Refresh QR code" style="flex-shrink:0">🔄</button>
     </div>
   </div>
 
@@ -131,7 +131,7 @@
     <div class="modal-tabs">
       <button class="modal-tab active" data-tab="manual" onclick="switchRegisterTab('manual')" data-i18n="web.index.modal.register.manualTab">✏️ Manual input</button>
       <button class="modal-tab" data-tab="discover" onclick="switchRegisterTab('discover')" data-i18n="web.index.modal.register.discoverTab">🔍 Discover</button>
-      <button class="modal-tab" data-tab="import" onclick="switchRegisterTab('import')">📦 导入</button>
+      <button class="modal-tab" data-tab="import" onclick="switchRegisterTab('import')" data-i18n="web.index.modal.register.importTab">📦 Import</button>
     </div>
     <div class="modal-body">
       <!-- Tab: Manual -->
@@ -150,7 +150,7 @@
         <div class="form-group">
           <label class="checkbox-row">
             <input type="checkbox" id="regObsidian">
-            <span>这是一个 Obsidian vault <span class="badge" style="font-size:10px;opacity:.7">启用 [[wikilink]] 解析</span></span>
+            <span><span data-i18n="web.index.modal.register.obsidianLabel">This is an Obsidian vault</span> <span class="badge" style="font-size:10px;opacity:.7" data-i18n="web.index.modal.register.obsidianBadge">Enables [[wikilink]] resolution</span></span>
           </label>
         </div>
         <div class="form-group">
@@ -178,37 +178,37 @@
       </div>
       <!-- Tab: Import -->
       <div class="tab-panel" id="tab-import">
-        <div class="section-title" style="font-size:13px;margin-bottom:8px">🔍 Git 项目扫描</div>
+        <div class="section-title" style="font-size:13px;margin-bottom:8px" data-i18n="web.index.modal.import.gitScanTitle">🔍 Git project scan</div>
         <div class="form-group">
-          <label>扫描目录</label>
+          <label data-i18n="web.index.modal.discover.scanDirLabel">Scan directory</label>
           <div class="form-row">
             <input class="input" id="gitDiscoverPath" value="~" placeholder="~/projects">
-            <button class="btn btn-primary" id="btnGitDiscover" onclick="doGitDiscover()">🔍 扫描</button>
+            <button class="btn btn-primary" id="btnGitDiscover" onclick="doGitDiscover()" data-i18n="web.index.modal.discover.scanBtn">🔍 Scan</button>
           </div>
         </div>
         <div class="form-group">
-          <label>扫描深度</label>
+          <label data-i18n="web.index.modal.import.depthLabel">Scan depth</label>
           <select id="gitDepth" class="input" style="width:auto">
-            <option value="2">2 (浅)</option>
-            <option value="3" selected>3 (默认)</option>
-            <option value="4">4 (深)</option>
-            <option value="5">5 (最深)</option>
+            <option value="2" data-i18n="web.index.modal.import.depthShallow">2 (shallow)</option>
+            <option value="3" selected data-i18n="web.index.modal.import.depthDefault">3 (default)</option>
+            <option value="4" data-i18n="web.index.modal.import.depthDeep">4 (deep)</option>
+            <option value="5" data-i18n="web.index.modal.import.depthDeepest">5 (deepest)</option>
           </select>
         </div>
         <div id="gitDiscoverStatus" class="discover-status"></div>
         <div id="gitDiscoverCandidates"></div>
         <div id="gitDiscoverActions" style="margin-top:12px;display:none">
-          <button class="btn btn-primary" onclick="batchRegisterGit()" style="width:100%">📋 批量注册选中</button>
+          <button class="btn btn-primary" onclick="batchRegisterGit()" style="width:100%" data-i18n="web.index.modal.discover.batchRegisterBtn">📋 Batch register selected</button>
         </div>
         <hr style="margin:16px 0;border-color:var(--border-light)">
-        <div class="section-title" style="font-size:13px;margin-bottom:8px">📂 导入 VS Code workspace</div>
+        <div class="section-title" style="font-size:13px;margin-bottom:8px" data-i18n="web.index.modal.import.workspaceTitle">📂 Import VS Code workspace</div>
         <div class="form-group">
-          <label>选择 .code-workspace 文件路径</label>
+          <label data-i18n="web.index.modal.import.workspacePathLabel">Path to .code-workspace file</label>
           <div class="form-row">
             <input class="input" id="workspacePath" placeholder="~/my.code-workspace">
-            <button class="btn btn-primary" onclick="importWorkspace()">📂 导入</button>
+            <button class="btn btn-primary" onclick="importWorkspace()" data-i18n="web.index.modal.import.workspaceImportBtn">📂 Import</button>
           </div>
-          <div class="settings-tip">解析 workspace 中的文件夹引用并批量注册项目</div>
+          <div class="settings-tip" data-i18n="web.index.modal.import.workspaceTip">Parses folder references in the workspace and registers them in bulk</div>
         </div>
         <div id="workspaceStatus" style="font-size:12px;margin-top:8px"></div>
       </div>

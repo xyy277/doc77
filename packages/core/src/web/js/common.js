@@ -280,11 +280,11 @@ function toggleSettings() {
 // ═══ Unified Settings Tabs ═══
 
 var SETTINGS_TABS = [
-  { id: 'system', label: '💾 系统' },
-  { id: 'ai', label: '🤖 AI' },
-  { id: 'account', label: '👤 账户' },
-  { id: 'translate', label: '🌐 翻译' },
-  { id: 'share', label: '🔗 分享' },
+  { id: 'system', labelKey: 'web.index.settings.systemTab' },
+  { id: 'ai', labelKey: 'web.index.settings.aiTab' },
+  { id: 'account', labelKey: 'web.index.settings.accountTab' },
+  { id: 'translate', labelKey: 'web.index.settings.translateTab' },
+  { id: 'share', labelKey: 'web.index.settings.shareTab' },
 ];
 
 function renderSettingsTabs() {
@@ -295,7 +295,7 @@ function renderSettingsTabs() {
       return '<button onclick="switchSettingsTab(\'' + tb.id + '\')" class="modal-tab' +
         (i === 0 ? ' active' : '') +
         '" data-tab="' + tb.id + '" style="border-bottom:none">' +
-        tb.label + '</button>';
+        t(tb.labelKey) + '</button>';
     })
     .join('');
 }
@@ -351,7 +351,7 @@ function switchSettingsTab(tab) {
       '<option value="qwen">' + t('common.settings.qwenAlibaba') + '</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">' + t('common.settings.glmZhipu') + '</option></select></div>' +
       settingRow('Base URL','ai.base_url','text','https://api.deepseek.com') +
       '<div class="settings-row"><span class="settings-label">' + t('common.settings.model') + '</span>' +
-      '<input id="aiModelInput" data-key="ai.model" list="aiModelSuggestions" class="settings-input" placeholder="选择或输入模型名称" style="flex:1;min-width:0">' +
+      '<input id="aiModelInput" data-key="ai.model" list="aiModelSuggestions" class="settings-input" placeholder="' + t('common.settings.modelPlaceholder') + '" style="flex:1;min-width:0">' +
       '<datalist id="aiModelSuggestions"></datalist></div>' +
       settingRow(t('common.settings.apiToken'),'ai.token','password','sk-...') +
       '<div class="settings-tip" style="margin-left:4px">' + t('common.settings.tokenSavedLocally') + '</div>' +
@@ -967,8 +967,8 @@ async function copyRC(){
 function loadActiveShares(container) {
   if (!container) container = document.getElementById('settingsContent');
   container.innerHTML =
-    '<div class="section-title">活跃分享</div>' +
-    '<div id="shareList" style="font-size:12px;color:var(--text-muted)">加载中...</div>';
+    '<div class="section-title">' + t('common.share.activeTitle') + '</div>' +
+    '<div id="shareList" style="font-size:12px;color:var(--text-muted)">' + t('common.share.loading') + '</div>';
 
   fetch('/api/shares')
     .then(function(r) { return r.json(); })
@@ -976,14 +976,14 @@ function loadActiveShares(container) {
       var list = document.getElementById('shareList');
       if (!list) return;
       if (!shares || shares.length === 0) {
-        list.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--text-muted)">暂无活跃分享</div>';
+        list.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--text-muted)">' + t('common.share.empty') + '</div>';
         return;
       }
       var html = '';
       for (var i = 0; i < shares.length; i++) {
         var s = shares[i];
         var expiresAt = new Date(s.expiresAt);
-        var expiresStr = expiresAt.toLocaleString('zh-CN');
+        var expiresStr = expiresAt.toLocaleString(window.__doc77_lang || 'zh-CN');
         // Reconstruct host URL (use the current page origin)
         var shareUrl = window.location.origin + '/s/' + s.token;
         html +=
@@ -991,39 +991,39 @@ function loadActiveShares(container) {
           '<div style="font-weight:600;margin-bottom:4px">📄 ' + escHtml(s.documentTitle) + '</div>' +
           '<div style="font-family:monospace;font-size:11px;color:var(--text-secondary);word-break:break-all;margin-bottom:6px">' + escHtml(shareUrl) + '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<span style="color:var(--text-muted);font-size:11px">有效期至 ' + expiresStr + '</span>' +
-          '<button onclick="revokeShare(\'' + s.token + '\', this)" style="padding:3px 10px;font-size:11px;color:#ef4444;border:1px solid #ef4444;background:transparent;border-radius:4px;cursor:pointer">撤销</button>' +
+          '<span style="color:var(--text-muted);font-size:11px">' + t('common.share.expiresAt', { time: expiresStr }) + '</span>' +
+          '<button onclick="revokeShare(\'' + s.token + '\', this)" style="padding:3px 10px;font-size:11px;color:#ef4444;border:1px solid #ef4444;background:transparent;border-radius:4px;cursor:pointer">' + t('common.share.revoke') + '</button>' +
           '</div></div>';
       }
       list.innerHTML = html;
     })
     .catch(function() {
       var list = document.getElementById('shareList');
-      if (list) list.innerHTML = '<div style="padding:16px 0;text-align:center;color:#ef4444">加载失败</div>';
+      if (list) list.innerHTML = '<div style="padding:16px 0;text-align:center;color:#ef4444">' + t('common.share.loadFailed') + '</div>';
     });
 }
 
 /** Revoke a share token. */
 function revokeShare(token, btn) {
-  if (!confirm('确定要撤销此分享链接？撤销后已打开的页面将无法访问。')) return;
+  if (!confirm(t('common.share.revokeConfirm'))) return;
   btn.disabled = true;
-  btn.textContent = '撤销中...';
+  btn.textContent = t('common.share.revoking');
   fetch('/api/share/' + token, { method: 'DELETE' })
     .then(function(r) {
       if (r.ok) {
-        toast('✅ 分享链接已撤销', 'success');
+        toast(t('common.share.revoked'), 'success');
         // Reload the share list
         loadActiveShares();
       } else {
-        toast('撤销失败', 'error');
+        toast(t('common.share.revokeFailed'), 'error');
         btn.disabled = false;
-        btn.textContent = '撤销';
+        btn.textContent = t('common.share.revoke');
       }
     })
     .catch(function() {
-      toast('撤销失败', 'error');
+      toast(t('common.share.revokeFailed'), 'error');
       btn.disabled = false;
-      btn.textContent = '撤销';
+      btn.textContent = t('common.share.revoke');
     });
 }
 

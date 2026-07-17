@@ -1,4 +1,5 @@
 import * as os from 'node:os';
+import { t, getLocale } from '../i18n/index.js';
 
 /**
  * Get the local LAN IP address (non-loopback IPv4).
@@ -20,10 +21,10 @@ export function getLocalIP(): string {
  */
 export function renderShareError(message: string): string {
   return `<!DOCTYPE html>
-<html lang="zh">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Doc77 — 分享</title>
+<html lang="${getLocale()}">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${escapeHtml(t('web.sharePage.title'))}</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#1e293b}.card{text-align:center;padding:3rem}.error-icon{font-size:3rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;color:#64748b}p{font-size:.875rem;color:#94a3b8}</style></head>
-<body><div class="card"><div class="error-icon">🔗</div><h1>${escapeHtml(message)}</h1><p>请联系分享者重新获取链接</p></div></body></html>`;
+<body><div class="card"><div class="error-icon">🔗</div><h1>${escapeHtml(message)}</h1><p>${escapeHtml(t('web.sharePage.contactSharer'))}</p></div></body></html>`;
 }
 
 /**
@@ -31,7 +32,7 @@ export function renderShareError(message: string): string {
  */
 export function renderSharePage(token: { documentTitle: string; theme: string }): string {
   return `<!DOCTYPE html>
-<html lang="zh" class="${token.theme === 'dark' ? 'dark' : ''}">
+<html lang="${getLocale()}" class="${token.theme === 'dark' ? 'dark' : ''}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -59,10 +60,10 @@ body{margin:0;background:var(--bg-body);color:var(--text-primary);font-family:-a
 <div class="doc77-share-page">
   <header class="doc77-share-header">
     <a href="https://doc77.dev" class="brand" target="_blank" rel="noopener">Doc77</a>
-    <span class="info">只读分享 · 通过 Doc77 分享</span>
+    <span class="info">${escapeHtml(t('web.sharePage.readonlyBadge'))}</span>
   </header>
   <div class="doc77-content" id="content">
-    <div class="loading">加载中...</div>
+    <div class="loading">${escapeHtml(t('web.sharePage.loading'))}</div>
   </div>
   <footer class="doc77-share-footer">
     Powered by <a href="https://doc77.dev" target="_blank" rel="noopener">Doc77</a>
@@ -87,7 +88,7 @@ fetch('/api/share/' + window.location.pathname.split('/').pop() + '/data')
     if(typeof hljs !== 'undefined') { document.querySelectorAll('pre code').forEach(function(b){ hljs.highlightElement(b); }); }
   })
   .catch(function(){
-    document.getElementById('content').innerHTML = '<div class="loading">此链接已过期或无效</div>';
+    document.getElementById('content').innerHTML = '<div class="loading">${t('web.sharePage.expired').replace(/'/g, "\\'")}</div>';
   });
 </script>
 </body>

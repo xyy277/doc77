@@ -530,7 +530,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     try {
       const folders = parseCodeWorkspace(workspacePath);
       if (!folders.length) {
-        res.status(400).json({ error: '无效的 workspace 文件或无文件夹引用' });
+        res.status(400).json({ error: t('api.import.invalidWorkspace'), code: 'INVALID_WORKSPACE' });
         return;
       }
 
@@ -1294,7 +1294,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       if (htmlSizeKB > maxSize * 1024) {
         res
           .status(413)
-          .json({ error: `文件过大 (${Math.round(htmlSizeKB / 1024)}MB)，导出上限 ${maxSize}MB` });
+          .json({
+            error: t('api.export.tooLarge', { sizeMB: Math.round(htmlSizeKB / 1024), maxMB: maxSize }),
+            code: 'EXPORT_TOO_LARGE',
+          });
         return;
       }
 
@@ -1314,7 +1317,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       );
       res.send(html);
     } catch (err: any) {
-      res.status(500).json({ error: err.message || '导出失败' });
+      res.status(500).json({ error: err.message || t('api.export.failed'), code: 'EXPORT_FAILED' });
     }
   });
 
@@ -1325,7 +1328,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     try {
       // Kill switch: check export.share.enabled
       if (getConfig('export.share.enabled') === 'false') {
-        res.status(403).json({ error: '分享功能已禁用' });
+        res.status(403).json({ error: t('api.share.disabled'), code: 'SHARE_DISABLED' });
         return;
       }
 
@@ -1338,26 +1341,24 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       // Check bind_address — sharing only works when bound to 0.0.0.0
       const bindAddr = getConfig('security.bind_address') || '127.0.0.1';
       if (bindAddr === '127.0.0.1') {
-        res.status(403).json({
-          error: '分享功能需要绑定 0.0.0.0（局域网访问）。请在设置中修改 bind_address 并重启。',
-        });
+        res.status(403).json({ error: t('api.share.bindRequired'), code: 'SHARE_BIND_REQUIRED' });
         return;
       }
 
       // Validate file through existing security chain
       const project = getProjectById(projectId);
       if (!project) {
-        res.status(404).json({ error: '项目不存在' });
+        res.status(404).json({ error: t('api.project.notFound'), code: 'PROJECT_NOT_FOUND' });
         return;
       }
       const projectRoot = resolveProjectPath(project.path);
       const resolvedPath = validatePath(projectRoot, filePath);
       if (!resolvedPath) {
-        res.status(404).json({ error: '文件路径不在项目范围内' });
+        res.status(404).json({ error: t('api.share.pathOutsideProject'), code: 'PATH_OUTSIDE_PROJECT' });
         return;
       }
       if (isSensitiveFile(resolvedPath)) {
-        res.status(403).json({ error: '无法分享敏感文件' });
+        res.status(403).json({ error: t('api.share.sensitiveFile'), code: 'SHARE_SENSITIVE_FILE' });
         return;
       }
 
@@ -1391,7 +1392,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         documentTitle: token.documentTitle,
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || '创建分享失败' });
+      res.status(500).json({ error: err.message || t('api.share.createFailed'), code: 'SHARE_CREATE_FAILED' });
     }
   });
 
@@ -1399,7 +1400,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.get('/s/:token', (req: Request, res: Response) => {
     const token = shareManager.validate(req.params.token);
     if (!token) {
-      res.status(404).send(renderShareError('此链接已过期或无效'));
+      res.status(404).send(renderShareError(t('api.share.expired')));
       return;
     }
     res.send(renderSharePage(token));
@@ -1409,7 +1410,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   app.get('/api/share/:token/data', (req: Request, res: Response) => {
     const token = shareManager.validate(req.params.token);
     if (!token) {
-      res.status(404).json({ error: '此链接已过期或无效' });
+      res.status(404).json({ error: t('api.share.expired'), code: 'SHARE_EXPIRED' });
       return;
     }
 
@@ -1460,7 +1461,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
       res.json({ ...rendered, title: token.documentTitle, theme: token.theme });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || '读取文件失败' });
+      res.status(500).json({ error: err.message || t('api.file.readFailed'), code: 'READ_FAILED' });
     }
   });
 

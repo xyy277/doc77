@@ -406,7 +406,7 @@ function resolveWikilinks(html: string, projectId: number, filePath: string): st
         .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;');
-      return `<span class="wikilink-dead" title="未找到笔记: ${escapedTitle}">[[${escapedTitle}]]</span>`;
+      return `<span class="wikilink-dead" title="${t('web.preview.wikilinkNotFound', { title: escapedTitle })}">[[${escapedTitle}]]</span>`;
     },
   );
 }
