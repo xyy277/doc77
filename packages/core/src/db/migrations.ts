@@ -46,6 +46,9 @@ export function runMigrations(db?: DatabaseCompat): void {
   for (const [col, def] of v2Columns) {
     addColumnIfNotExists(conn, 'user_auth', col, def);
   }
+
+  // v3: Obsidian vault mode
+  addColumnIfNotExists(conn, 'projects', 'obsidian_mode', 'INTEGER NOT NULL DEFAULT 0');
 }
 
 const SCHEMA_SQL = `
@@ -54,6 +57,7 @@ CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
+    obsidian_mode INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_opened DATETIME
 );
