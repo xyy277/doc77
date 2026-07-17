@@ -2,7 +2,7 @@
  * Doc77 Electron — System tray
  */
 import { Tray, Menu, app, nativeImage } from 'electron';
-import { t } from '@doc77/core';
+import { t } from './i18n';
 
 export function createTray(iconPath: string, onClick: () => void): Tray {
   const icon = nativeImage.createFromPath(iconPath);

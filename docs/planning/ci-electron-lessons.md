@@ -59,3 +59,17 @@ pnpm store cache → .npmrc (hoisted) → pnpm install → sync-version → buil
 | `.github/workflows/release-electron.yml` | CI 工作流 |
 | `packages/electron/electron-builder.yml` | 打包配置 |
 | `packages/electron/package.json` | 依赖 + repository + author |
+
+## 2026-07-17 — 1.0.0-beta.1 安装包启动崩溃：ERR_REQUIRE_ESM
+
+**症状**：三平台安装包全部启动即崩 `Error [ERR_REQUIRE_ESM]: require() of ES Module .../marked/lib/marked.esm.js from .../@doc77/core/dist/index.cjs`。CI 全绿、本地测试全绿。
+
+**根因**：i18n 改造在 `main.ts`/`tray.ts` 加了静态 `import { t } from '@doc77/core'`，tsc（module:commonjs）转译为 `require('@doc77/core')` → core 的 CJS 构建在加载时 `require('marked')`，hoisted 安装下解析到 ESM-only 的 marked → Electron 33 内置 Node 20 不支持 require(esm)。
+
+**为何所有门禁都没拦住**：本地与 CI 的 Node ≥ 22.12 默认启用 require(esm)，同样的 require 链不报错——只有 Electron 打包产物内的旧 Node 才会崩。
+
+**修复**（`electron/src/i18n.ts` shim）：主进程恒定原则——**@doc77/core 只能经 `dynamicImport()` 加载**（server.ts loadCore 既有模式）；`t()` 走延迟绑定 shim，server 启动后 `bindCoreT(core.t)`。
+
+**防回归**：`packages/electron/scripts/verify-no-static-core.cjs` 已接入 electron build 脚本（本地与 release CI 都会跑）——dist 里出现 `require("@doc77/core")` 即失败。
+
+**复现/验证方法**（无需装机）：`electron-builder --dir` → 解包 app.asar → `node --no-experimental-require-module -e "require('./dist/main.js')"`（stub electron 模块）模拟 Electron 内置 Node 语义。

@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as net from 'net';
 import * as http from 'http';
+import { bindCoreT, TFn } from './i18n';
 
 const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
 
@@ -19,6 +20,7 @@ interface CoreModule {
   initDatabase: (filePath: string) => Promise<unknown>;
   loadDefaults: () => void;
   runMigrations: () => void;
+  t: TFn;
 }
 
 async function loadCore(): Promise<CoreModule> {
@@ -60,8 +62,10 @@ export async function startServer(port: number): Promise<ServerProcess> {
     process.env.DOC77_VENDOR_DIR = path.join(os.homedir(), '.doc77', 'vendor');
   }
 
-  const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } =
-    await loadCore();
+  const core = await loadCore();
+  const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } = core;
+  // Make core's t() available to tray/dialog (see ./i18n shim).
+  bindCoreT(core.t);
 
   await initDatabase(DB_PATH);
   runMigrations();

@@ -4,7 +4,7 @@
  */
 import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
-import { t } from '@doc77/core';
+import { t } from './i18n';
 import { findAvailablePort, startServer, ServerProcess } from './server';
 import { createTray } from './tray';
 

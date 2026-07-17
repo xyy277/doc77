@@ -4,6 +4,13 @@
 
 ---
 
+## [2026-07-17] — `1.0.0-beta.2`
+
+### 全包 (`1.0.0-beta.2`)
+
+**Fixed**
+- Electron 桌面版启动崩溃 `ERR_REQUIRE_ESM`：主进程静态 `import { t } from '@doc77/core'` 被 tsc 转译为 require，而 core 的 CJS 构建加载 ESM-only 的 marked，Electron 内置 Node 20 不支持 require(esm)。改为延迟绑定 shim（core 仅经动态 import 加载），并新增构建门禁 `verify-no-static-core.cjs` 防回归
+
 ## [2026-07-17] — `1.0.0-beta.1`
 
 ### 全包 (`1.0.0-beta.1`)
