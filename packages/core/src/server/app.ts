@@ -2814,7 +2814,7 @@ export function createAIChatHandler(deps: {
   getWriteTools?: () => unknown[];
   writeFns?: AiWriteFns;
 }) {
-  const { getReadTools } = deps;
+  const { AiProvider, DocAgent, getReadTools } = deps;
   // One limiter for the lifetime of the handler (persists across requests).
   const aiRateLimiter = createRateLimiter();
 
