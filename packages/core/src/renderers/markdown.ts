@@ -224,7 +224,8 @@ const wikilinkExtension = {
     };
   },
   renderer(token: { title: string; display: string }) {
-    return `<a href="doc77-wikilink:${encodeURIComponent(token.title)}" data-display="${token.display.replace(/"/g, '&quot;')}">${token.display}</a>`;
+    const escapedDisplay = token.display.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    return `<a href="doc77-wikilink:${encodeURIComponent(token.title)}" data-display="${escapedDisplay}">${escapedDisplay}</a>`;
   },
 };
 
@@ -384,7 +385,7 @@ function resolveWikilinks(html: string, projectId: number, filePath: string): st
     /<a href="doc77-wikilink:([^"]+)"[^>]*>([^<]+)<\/a>/g,
     (_match: string, encoded: string, display: string) => {
       const title = decodeURIComponent(encoded);
-      const resolved = resolveWikilink(title, projectId, filePath, projectRoot);
+      const resolved = resolveWikilink(title, projectId, projectRoot);
       if (resolved) {
         // Convert resolved absolute path to doc77 API URL
         const rootPrefix = projectRoot.endsWith(path.sep) ? projectRoot : projectRoot + path.sep;
@@ -395,7 +396,8 @@ function resolveWikilinks(html: string, projectId: number, filePath: string): st
         return `<a href="${apiUrl}" class="wikilink">${display}</a>`;
       }
       // Dead link
-      return `<span class="wikilink-dead" title="未找到笔记: ${title}">[[${title}]]</span>`;
+      const escapedTitle = title.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      return `<span class="wikilink-dead" title="未找到笔记: ${escapedTitle}">[[${escapedTitle}]]</span>`;
     },
   );
 }

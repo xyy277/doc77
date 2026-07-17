@@ -38,32 +38,32 @@ describe('resolveWikilink', () => {
 
   it('should find exact match for a note in root', async () => {
     const { resolveWikilink } = await import('./wikilink.js');
-    const result = resolveWikilink('Note A', projectId, '', projectRoot);
+    const result = resolveWikilink('Note A', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'Note A.md'));
   });
 
   it('should find exact match with .md suffix in title', async () => {
     const { resolveWikilink } = await import('./wikilink.js');
-    const result = resolveWikilink('Note A.md', projectId, '', projectRoot);
+    const result = resolveWikilink('Note A.md', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'Note A.md'));
   });
 
   it('should find a file via case-insensitive match', async () => {
     const { resolveWikilink } = await import('./wikilink.js');
     // File is 'NOTE_A.md', title is 'note_a' — differs only in case
-    const result = resolveWikilink('note_a', projectId, '', projectRoot);
+    const result = resolveWikilink('note_a', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'NOTE_A.md'));
   });
 
   it('should find a file in subfolder', async () => {
     const { resolveWikilink } = await import('./wikilink.js');
-    const result = resolveWikilink('Deep Note', projectId, '', projectRoot);
+    const result = resolveWikilink('Deep Note', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'subfolder', 'Deep Note.md'));
   });
 
   it('should return null for non-existent note (dead link)', async () => {
     const { resolveWikilink } = await import('./wikilink.js');
-    const result = resolveWikilink('NonExistent', projectId, '', projectRoot);
+    const result = resolveWikilink('NonExistent', projectId, projectRoot);
     expect(result).toBeNull();
   });
 
@@ -76,7 +76,7 @@ describe('resolveWikilink', () => {
     );
     // Clear cache so it picks up new files
     clearWikilinkCache(projectId);
-    const result = resolveWikilink('Shortcut', projectId, '', projectRoot);
+    const result = resolveWikilink('Shortcut', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'Note A.md'));
   });
 
@@ -87,7 +87,7 @@ describe('resolveWikilink', () => {
       'Shortcut = Note A.md\n',
     );
     clearWikilinkCache(projectId);
-    const result = resolveWikilink('Shortcut', projectId, '', projectRoot);
+    const result = resolveWikilink('Shortcut', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'Note A.md'));
   });
 
@@ -98,7 +98,7 @@ describe('resolveWikilink', () => {
       '# This is a comment\n\nAlias → Note A.md\n',
     );
     clearWikilinkCache(projectId);
-    const result = resolveWikilink('Alias', projectId, '', projectRoot);
+    const result = resolveWikilink('Alias', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'Note A.md'));
   });
 });
@@ -124,13 +124,13 @@ describe('clearWikilinkCache', () => {
   it('should clear cache for a specific project', async () => {
     const { resolveWikilink, clearWikilinkCache } = await import('./wikilink.js');
     // First call populates cache
-    resolveWikilink('test', projectId, '', projectRoot);
+    resolveWikilink('test', projectId, projectRoot);
     // Create a new file
     fs.writeFileSync(path.join(projectRoot, 'new.md'), '# new');
     // Clear cache for this project
     clearWikilinkCache(projectId);
     // Should find the new file now
-    const result = resolveWikilink('new', projectId, '', projectRoot);
+    const result = resolveWikilink('new', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'new.md'));
   });
 

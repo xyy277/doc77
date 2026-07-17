@@ -145,6 +145,9 @@ function renderCompactCard(p, inFavorites) {
         '<input id="editPath-' + p.id + '" value="' + escAttr(p.path) + '" placeholder="项目路径" class="input">' +
         '<button onclick="openDirDialog(' + p.id + ')" class="btn">📂</button>' +
       '</div>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:8px">' +
+        '<input type="checkbox" id="editObsidian-' + p.id + '" ' + (p.obsidian_mode ? 'checked' : '') + '>' +
+        ' Obsidian vault</label>' +
       '<div style="display:flex;gap:8px">' +
         '<button onclick="doUpdate(' + p.id + ')" class="btn btn-primary" style="font-size:12px">💾 保存</button>' +
         '<button onclick="cancelEdit(' + p.id + ')" class="btn" style="font-size:12px">✕ 取消</button>' +
@@ -240,6 +243,8 @@ window.cancelEdit = function(id) {
 window.doUpdate = async function(id) {
   var name = document.getElementById('editName-' + id).value.trim();
   var pth = document.getElementById('editPath-' + id).value.trim();
+  var obsidianEl = document.getElementById('editObsidian-' + id);
+  var newObsidian = obsidianEl ? obsidianEl.checked : undefined;
   var errEl = document.getElementById('editError-' + id);
   var btn = document.querySelector('#editForm-' + id + ' .btn-primary');
   errEl.style.display = 'none';
@@ -248,6 +253,7 @@ window.doUpdate = async function(id) {
   var body = {};
   if (name) body.name = name;
   if (pth) body.path = pth;
+  if (newObsidian !== undefined) body.obsidian_mode = newObsidian;
   try {
     var r = await fetch('/api/projects/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) { var d = await r.json(); errEl.textContent = d.error || '更新失败'; errEl.style.display = 'block'; return; }

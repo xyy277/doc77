@@ -44,7 +44,7 @@ function loadAliasMap(projectRoot: string): Map<string, string> {
     for (const line of content.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
-      const match = trimmed.match(/^(.+?)\s*[→➜=]\s*(.+)$/);
+      const match = trimmed.match(/^(.+?)\s*(?:→|➜|\s*=\s*)\s*(.+)$/);
       if (match) {
         map.set(match[1].trim(), match[2].trim());
       }
@@ -65,7 +65,6 @@ function loadAliasMap(projectRoot: string): Map<string, string> {
 export function resolveWikilink(
   title: string,
   projectId: number,
-  currentFilePath: string,
   projectRoot: string,
 ): string | null {
   const allFiles = getProjectFiles(projectId, projectRoot);
@@ -75,6 +74,8 @@ export function resolveWikilink(
   const aliased = aliasMap.get(title);
   if (aliased) {
     const aliasPath = path.resolve(projectRoot, aliased);
+    const relative = path.relative(projectRoot, aliasPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
     if (allFiles.includes(aliasPath)) return aliasPath;
   }
 
