@@ -35,7 +35,7 @@ describe('ShareManager', () => {
 
   it('should return null for expired token', async () => {
     const t = sm.create({ projectId: 1, filePath: '/a.md', title: 'a', theme: 'light', ttlMs: 1 });
-    await new Promise(r => setTimeout(r, 10)); // wait for expiry
+    await new Promise((r) => setTimeout(r, 10)); // wait for expiry
     expect(sm.validate(t.token)).toBeNull();
   });
 

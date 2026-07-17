@@ -224,13 +224,18 @@ const wikilinkExtension = {
     };
   },
   renderer(token: { title: string; display: string }) {
-    const escapedDisplay = token.display.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const escapedDisplay = token.display
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/"/g, '&quot;');
     return `<a href="doc77-wikilink:${encodeURIComponent(token.title)}" data-display="${escapedDisplay}">${escapedDisplay}</a>`;
   },
 };
 
 // Register extensions
-marked.use({ extensions: [highlightExtension, emojiExtension, footnoteExtension, wikilinkExtension] });
+marked.use({
+  extensions: [highlightExtension, emojiExtension, footnoteExtension, wikilinkExtension],
+});
 
 // ---------------------------------------------------------------------------
 // URL rewriting
@@ -396,7 +401,10 @@ function resolveWikilinks(html: string, projectId: number, filePath: string): st
         return `<a href="${apiUrl}" class="wikilink">${display}</a>`;
       }
       // Dead link
-      const escapedTitle = title.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      const escapedTitle = title
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
       return `<span class="wikilink-dead" title="未找到笔记: ${escapedTitle}">[[${escapedTitle}]]</span>`;
     },
   );
@@ -406,7 +414,8 @@ function resolveWikilinks(html: string, projectId: number, filePath: string): st
 function getProjectRoot(projectId: number): string | null {
   try {
     const db = getConnection();
-    const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
+    const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+      { path: string } | undefined;
     if (!row) return null;
     return resolveProjectPath(row.path);
   } catch {

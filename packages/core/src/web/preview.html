@@ -1,282 +1,893 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN" class="h-full tw-loading">
-<head>
-<script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
-<style>.i18n-loading body{visibility:hidden}</style>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doc77 — 预览</title>
-<!-- 尽早应用主题 + 隐藏内容直到 Tailwind 就绪，避免切换/进入项目时的样式闪烁(FOUC) -->
-<script>(function(){try{var s=localStorage.getItem('doc77-theme');var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();</script>
-<style>
-html{background:#f8fafc}html.dark{background:#0f172a}
-/* Tailwind 就绪前隐藏正文，只显示加载动画，避免样式闪烁(FOUC) */
-html.tw-loading body{visibility:hidden}
-.boot-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;visibility:visible;z-index:9999}
-html:not(.tw-loading) .boot-overlay{display:none}
-.boot-spinner{width:34px;height:34px;border:3px solid rgba(100,116,139,.25);border-top-color:#3b82f6;border-radius:50%;animation:bootspin .7s linear infinite}
-@keyframes bootspin{to{transform:rotate(360deg)}}
-</style>
-<script>window.__VENDOR_READY=false;fetch('/vendor/.ready').then(r=>{if(r.ok)window.__VENDOR_READY=true}).catch(()=>{});</script>
-<script>
-(function(){
-  var revealed = false;
-  function reveal(){ if (revealed) return; revealed = true; document.documentElement.classList.remove('tw-loading'); }
-  var s = document.createElement('script');
-  s.src = (window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com');
-  s.onload = function() {
-    try { tailwind.config = { darkMode: 'class', theme: { extend: {} } }; } catch(e) {}
-    // 等 JIT 应用 config 后再显示，避免闪一下默认样式
-    requestAnimationFrame(function(){ requestAnimationFrame(reveal); });
-  };
-  s.onerror = reveal; // CDN 不可达也不能一直隐藏
-  document.head.appendChild(s);
-  setTimeout(reveal, 3000); // 兜底：无论如何 3s 后显示
-})();
-</script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme">
-<link rel="stylesheet" id="katexCss" href="about:blank" data-src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="css/app.css">
-  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-</head>
-<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden">
-<!-- 加载动画：Tailwind 就绪后由 tw-loading 移除自动隐藏 -->
-<div class="boot-overlay"><div class="boot-spinner"></div></div>
+  <head>
+    <script>
+      document.documentElement.classList.add('i18n-loading');
+      setTimeout(function () {
+        document.documentElement.classList.remove('i18n-loading');
+      }, 1500);
+    </script>
+    <style>
+      .i18n-loading body {
+        visibility: hidden;
+      }
+    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Doc77 — 预览</title>
+    <!-- 尽早应用主题 + 隐藏内容直到 Tailwind 就绪，避免切换/进入项目时的样式闪烁(FOUC) -->
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem('doc77-theme');
+          var d = s === 'dark' || (!s && window.matchMedia('(prefers-color-scheme:dark)').matches);
+          document.documentElement.classList.toggle('dark', d);
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      html {
+        background: #f8fafc;
+      }
+      html.dark {
+        background: #0f172a;
+      }
+      /* Tailwind 就绪前隐藏正文，只显示加载动画，避免样式闪烁(FOUC) */
+      html.tw-loading body {
+        visibility: hidden;
+      }
+      .boot-overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        visibility: visible;
+        z-index: 9999;
+      }
+      html:not(.tw-loading) .boot-overlay {
+        display: none;
+      }
+      .boot-spinner {
+        width: 34px;
+        height: 34px;
+        border: 3px solid rgba(100, 116, 139, 0.25);
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: bootspin 0.7s linear infinite;
+      }
+      @keyframes bootspin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+    <script>
+      window.__VENDOR_READY = false;
+      fetch('/vendor/.ready')
+        .then((r) => {
+          if (r.ok) window.__VENDOR_READY = true;
+        })
+        .catch(() => {});
+    </script>
+    <script>
+      (function () {
+        var revealed = false;
+        function reveal() {
+          if (revealed) return;
+          revealed = true;
+          document.documentElement.classList.remove('tw-loading');
+        }
+        var s = document.createElement('script');
+        s.src = window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com';
+        s.onload = function () {
+          try {
+            tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+          } catch (e) {}
+          // 等 JIT 应用 config 后再显示，避免闪一下默认样式
+          requestAnimationFrame(function () {
+            requestAnimationFrame(reveal);
+          });
+        };
+        s.onerror = reveal; // CDN 不可达也不能一直隐藏
+        document.head.appendChild(s);
+        setTimeout(reveal, 3000); // 兜底：无论如何 3s 后显示
+      })();
+    </script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+      id="hljsTheme"
+    />
+    <link
+      rel="stylesheet"
+      id="katexCss"
+      href="about:blank"
+      data-src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+    />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body
+    class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden"
+  >
+    <!-- 加载动画：Tailwind 就绪后由 tw-loading 移除自动隐藏 -->
+    <div class="boot-overlay"><div class="boot-spinner"></div></div>
 
-<div class="flex h-screen w-full">
-
-  <!-- ══════ 左侧栏 ══════ -->
-  <aside id="leftPanel" class="bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col z-20 shrink-0 transition-all duration-300 overflow-hidden" style="width:288px">
-    <div class="h-14 px-4 border-b border-slate-800 flex items-center justify-between shrink-0">
-      <a href="/" class="flex items-center gap-2 text-white font-bold text-lg no-underline shrink-0">
-        <img src="/assets/logo-dark.svg" alt="Doc77" height="32" class="h-8 collapsible-content">
-        <svg id="logoIconCollapsed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="h-6 w-6 shrink-0" style="display:none">
-          <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#3B82F6"/>
-          <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#93C5FD"/>
-          <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FDE68A"/>
-        </svg>
-      </a>
-      <div class="flex items-center gap-1">
-        <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-sm" title="切换主题" id="themeBtn">🌙</button>
-        <button class="text-slate-400 hover:text-white transition-colors" title="设置" onclick="toggleSettings()">⚙</button>
-      </div>
-    </div>
-
-    <!-- Project Switcher -->
-    <div class="p-3 relative collapsible-content">
-      <button id="projBtn" onclick="toggleProjMenu()" class="w-full text-left rounded-md px-3 py-2 text-sm flex items-center justify-between text-slate-200 cursor-pointer border transition-colors bg-slate-800 border-slate-700 hover:border-slate-600">
-        <span class="font-medium truncate" id="projName">💼 加载中...</span>
-        <span id="projChev" class="transition-transform text-xs">▾</span>
-      </button>
-      <div id="projMenu" class="hidden absolute top-[3.75rem] left-3 right-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-30" role="listbox"></div>
-    </div>
-
-    <!-- ⭐ Bookmarks -->
-    <div class="px-3 collapsible-content" id="bookmarkSection">
-      <div onclick="toggleBookmarkSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between cursor-pointer hover:text-slate-300 transition-colors select-none">
-        <span><span id="bookmarkArrow">▸</span> ⭐ 收藏</span><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
-      </div>
-      <div id="bookmarkList" class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
-    </div>
-
-    <!-- 🕐 Recent Files -->
-    <div class="px-3 collapsible-content" id="recentSection">
-      <div onclick="toggleRecentSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center cursor-pointer hover:text-slate-300 transition-colors select-none">
-        <span><span id="recentArrow">▸</span> 🕐 近期文件</span>
-      </div>
-      <div id="recentList" class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
-    </div>
-
-    <!-- Tree (wrapper stays flex-1 to push status bar to bottom) -->
-    <div class="flex-1 flex flex-col min-h-0">
-      <div class="collapsible-content flex flex-col flex-1 min-h-0">
-      <div class="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider flex justify-between items-center shrink-0">目录树<button class="hover:text-slate-300 transition-colors" title="刷新缓存" onclick="refreshTree()">🔄</button></div>
-      <div class="px-3 mb-2 shrink-0"><div class="relative"><span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="fileFilter" placeholder="过滤文件..." oninput="applyFilter()" class="w-full bg-slate-950 border border-slate-800 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"></div></div>
-      <div class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-dark" id="tree" role="tree"><div class="text-center py-6 text-slate-500 text-xs">选择一个项目开始</div></div>
-      </div>
-    </div>
-
-    <!-- 🔎 Global Search -->
-    <div class="px-3 py-2.5 border-t border-slate-800 shrink-0 collapsible-content">
-      <div class="relative">
-        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔎</span>
-        <input id="globalSearch" placeholder="全局搜索..." onkeydown="if(event.key==='Enter')doGlobalSearch()" class="w-full bg-slate-950 border border-slate-700 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600">
-      </div>
-      <div id="searchResults" class="hidden mt-2 max-h-48 overflow-y-auto scrollbar-dark space-y-1"></div>
-    </div>
-
-    <!-- Status -->
-    <div class="px-3 py-2.5 border-t border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/50">
-      <div id="sseInd" class="flex items-center gap-1.5 text-xs text-emerald-500 font-medium shrink-0"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span><span class="collapsible-content">实时</span></div>
-      <span class="text-[10px] text-slate-600 collapsible-content flex-1 text-right">v0.2.0</span>
-      <button onclick="toggleCollapse()" class="text-slate-500 hover:text-slate-300 transition-colors shrink-0" title="折叠侧栏" id="collapseLeftBtn">☰</button>
-    </div>
-  </aside>
-
-  <div class="w-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-blue-400 cursor-col-resize z-30 transition-colors hidden md:block border-x border-slate-300 dark:border-slate-700 shrink-0"></div>
-
-  <!-- ══════ 中间栏 ══════ -->
-  <main class="flex-1 flex flex-col bg-white dark:bg-slate-900 min-w-0 relative">
-    <div id="readingProgress" style="width:0%"></div>
-
-    <!-- Toolbar -->
-    <div class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 bg-white dark:bg-slate-900 shadow-sm z-10 shrink-0">
-      <div class="flex items-center gap-2 min-w-0">
-        <button id="showLeftBtn" class="hidden p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors" title="显示侧栏" onclick="togglePanel('left')">◀</button>
-        <div id="breadcrumb" class="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 min-w-0 overflow-hidden"><span id="breadcrumbPath" class="text-slate-400 text-sm">未选择文件</span></div>
-        <span id="readTime" class="text-[10px] text-slate-400 hidden ml-1 whitespace-nowrap"></span>
-      </div>
-      <div class="flex items-center gap-1 sm:gap-2 shrink-0">
-        <button id="docSearchBtn" disabled onclick="toggleDocSearch()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="文档内搜索 (Ctrl+F)">🔍</button>
-        <button id="autoScrollBtn" disabled onclick="toggleAutoScroll()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="自动滚动">▶</button>
-        <select id="scrollSpeed" class="text-[10px] border border-slate-200 dark:border-slate-600 rounded px-1 py-1 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hidden">
-          <option value="30">慢速</option><option value="60" selected>中速</option><option value="120">快速</option><option value="200">极速</option>
-        </select>
-        <button id="ttsBtn" disabled onclick="toggleTTS()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="朗读 (TTS)">🔊</button>
-        <button id="translateBtn" disabled onclick="toggleTranslate()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed hidden" title="离线翻译">🌐</button>
-        <select id="ttsRate" class="text-[10px] border border-slate-200 dark:border-slate-600 rounded px-1 py-1 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hidden" onchange="updateTTSRate()">
-          <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.5">1.5x</option><option value="2">2x</option>
-        </select>
-        <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
-        <button id="runBtn" disabled onclick="runCode()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed hidden" title="运行代码">▶ <span class="hidden sm:inline">运行</span></button>
-        <button id="aiBtn" disabled onclick="doAISummary()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md transition-colors border border-purple-100 dark:border-purple-800 disabled:opacity-40 disabled:cursor-not-allowed">✨ <span class="hidden sm:inline">AI 总结</span></button>
-        <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
-        <button id="editBtn" disabled onclick="revealFile('edit')" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">📝 编辑器打开</button>
-        <button id="revealBtn" disabled onclick="revealFile('reveal')" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">📂 <span class="hidden sm:inline">文件夹中显示</span></button>
-        <button id="exportBtn" disabled onclick="exportHTML()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="导出为自包含 HTML">📥 <span class="hidden sm:inline">导出</span></button>
-        <button id="shareBtn" disabled onclick="shareDocument()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="创建局域网分享链接">🔗 <span class="hidden sm:inline">分享</span></button>
-      </div>
-    </div>
-
-    <!-- Doc Search Bar -->
-    <div id="docSearchBar" class="hidden border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-1.5 flex items-center gap-2 shrink-0">
-      <input id="docSearchInput" placeholder="搜索..." oninput="doDocSearch()" onkeydown="if(event.key==='Enter')nextSearchMatch(1);if(event.key==='Escape')toggleDocSearch()" class="flex-1 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500">
-      <span id="searchCount" class="text-xs text-slate-500 whitespace-nowrap"></span>
-      <button onclick="nextSearchMatch(1)" class="text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-700">↓</button>
-      <button onclick="nextSearchMatch(-1)" class="text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-700">↑</button>
-      <button onclick="toggleDocSearch()" class="text-xs text-slate-400 hover:text-slate-600">✕</button>
-    </div>
-
-    <!-- Tab Bar (多文档) -->
-    <div id="tabBar" class="hidden items-stretch gap-1 px-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-950 overflow-x-auto scrollbar-thin shrink-0"></div>
-
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto scrollbar-light bg-slate-50 dark:bg-slate-900" id="contentArea" onscroll="onContentScroll()" style="position:relative">
-      <div id="docPaneHost"></div>
-      <div id="emptyState" class="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-8">
-        <span class="text-6xl mb-4 text-slate-300 dark:text-slate-600">📄</span>
-        <h2 class="text-xl font-medium text-slate-600 dark:text-slate-400 mb-2">Doc77 预览引擎</h2>
-        <p class="text-sm text-center max-w-sm mb-6 text-slate-400 dark:text-slate-500 leading-relaxed">从左侧目录树选择文件以进行只读预览。</p>
-        <button onclick="togglePanel('right');setActiveTab('chat')" class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-all flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">✨ 唤起 AI 助手</button>
-      </div>
-      <button id="backToTopBtn" onclick="document.getElementById('contentArea').scrollTo({top:0,behavior:'smooth'})" title="回到顶部" style="position:sticky;bottom:24px;float:right;margin-right:12px;z-index:20;width:36px;height:36px;border-radius:50%;background:var(--accent,#2563eb);color:#fff;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:opacity 0.2s,transform 0.2s" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-      </button>
-    </div>
-
-    <!-- AI Summary Card -->
-    <div id="summaryCard" class="summary-card hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-5 animate-in">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-bold text-slate-800 dark:text-slate-100">✨ AI 摘要</span>
-        <div class="flex gap-1">
-          <button onclick="readSummary()" class="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-200">🔊 朗读</button>
-          <button onclick="document.getElementById('summaryCard').classList.add('hidden')" class="text-xs text-slate-400 hover:text-slate-600">✕</button>
+    <div class="flex h-screen w-full">
+      <!-- ══════ 左侧栏 ══════ -->
+      <aside
+        id="leftPanel"
+        class="bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col z-20 shrink-0 transition-all duration-300 overflow-hidden"
+        style="width: 288px"
+      >
+        <div class="h-14 px-4 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <a
+            href="/"
+            class="flex items-center gap-2 text-white font-bold text-lg no-underline shrink-0"
+          >
+            <img
+              src="/assets/logo-dark.svg"
+              alt="Doc77"
+              height="32"
+              class="h-8 collapsible-content"
+            />
+            <svg
+              id="logoIconCollapsed"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 32 32"
+              class="h-6 w-6 shrink-0"
+              style="display: none"
+            >
+              <path
+                d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z"
+                fill="#3B82F6"
+              />
+              <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#93C5FD" />
+              <path
+                d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24"
+                stroke="white"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                fill="none"
+              />
+              <path
+                d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z"
+                fill="#FDE68A"
+              />
+            </svg>
+          </a>
+          <div class="flex items-center gap-1">
+            <button
+              onclick="toggleTheme()"
+              class="text-slate-400 hover:text-white transition-colors text-sm"
+              title="切换主题"
+              id="themeBtn"
+            >
+              🌙
+            </button>
+            <button
+              class="text-slate-400 hover:text-white transition-colors"
+              title="设置"
+              onclick="toggleSettings()"
+            >
+              ⚙
+            </button>
+          </div>
         </div>
-      </div>
-      <p id="summaryText" class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-h-48 overflow-y-auto">生成中...</p>
-    </div>
-  </main>
 
-  <div class="w-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-amber-400 cursor-col-resize z-30 transition-colors hidden md:block border-x border-slate-300 dark:border-slate-700 shrink-0"></div>
+        <!-- Project Switcher -->
+        <div class="p-3 relative collapsible-content">
+          <button
+            id="projBtn"
+            onclick="toggleProjMenu()"
+            class="w-full text-left rounded-md px-3 py-2 text-sm flex items-center justify-between text-slate-200 cursor-pointer border transition-colors bg-slate-800 border-slate-700 hover:border-slate-600"
+          >
+            <span class="font-medium truncate" id="projName">💼 加载中...</span>
+            <span id="projChev" class="transition-transform text-xs">▾</span>
+          </button>
+          <div
+            id="projMenu"
+            class="hidden absolute top-[3.75rem] left-3 right-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-30"
+            role="listbox"
+          ></div>
+        </div>
 
-  <!-- ══════ 右侧栏悬浮球 ══════ -->
-  <button id="capsuleBtn" onclick="togglePanel('right')" class="fixed z-30 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 shadow-lg flex items-center justify-center text-base text-slate-500 dark:text-slate-300 hover:scale-110 transition-all duration-300 animate-pulse cursor-pointer" style="right:316px;animation-duration:4s">
-    <span id="capsuleIcon">▶</span>
-  </button>
+        <!-- ⭐ Bookmarks -->
+        <div class="px-3 collapsible-content" id="bookmarkSection">
+          <div
+            onclick="toggleBookmarkSection()"
+            class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between cursor-pointer hover:text-slate-300 transition-colors select-none"
+          >
+            <span><span id="bookmarkArrow">▸</span> ⭐ 收藏</span
+            ><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
+          </div>
+          <div
+            id="bookmarkList"
+            class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"
+          ></div>
+        </div>
 
-  <!-- ══════ 右侧栏 ══════ -->
-  <aside id="rightPanel" class="w-80 shrink-0 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 transition-all duration-300">
-    <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 items-center pr-1 relative">
-      <button id="tabOutline" onclick="setActiveTab('outline')" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400 bg-white dark:bg-slate-900">📑 大纲</button>
-      <button id="tabChat" onclick="setActiveTab('chat')" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200">💬 助手</button>
-      <button id="tabQueue" onclick="setActiveTab('queue')" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200">📋 审批<span id="pendingBadge" class="hidden ml-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span></button>
-    </div>
-    <div class="flex-1 overflow-hidden relative">
-      <div id="chatPanel" class="absolute inset-0 flex flex-col bg-slate-50/50 dark:bg-slate-900/50">
-        <div id="ctxBanner" class="hidden bg-blue-50/80 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800 px-3 py-1.5 flex items-center gap-2 text-xs text-blue-800 dark:text-blue-300 shadow-sm shrink-0">📄 <span class="truncate font-medium" id="ctxText"></span></div>
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-light" id="chatMessages">
-          <div id="welcomeCard" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm animate-in">
-            <div class="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 mb-2">🤖 您好！我是 Doc77 AI 助手</div>
-            <p class="text-xs text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">我可以分析项目结构、阅读文档内容，并给出整理和分类建议。</p>
-            <div class="space-y-2">
-              <button onclick="sendQuickMsg('请分析当前项目的目录结构')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">📊 分析项目结构</button>
-              <button onclick="sendQuickMsg('请总结当前打开的文档内容')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">📝 总结当前文档</button>
-              <button onclick="sendQuickMsg('请检查项目中是否有重复或冗余的文件')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">🔍 查找重复文件</button>
-              <button id="btnClassify" onclick="doSmartClassify()" class="w-full text-left text-xs bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 p-2 rounded-md transition-colors">🗂️ 智能归类（生成待审批方案）</button>
+        <!-- 🕐 Recent Files -->
+        <div class="px-3 collapsible-content" id="recentSection">
+          <div
+            onclick="toggleRecentSection()"
+            class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center cursor-pointer hover:text-slate-300 transition-colors select-none"
+          >
+            <span><span id="recentArrow">▸</span> 🕐 近期文件</span>
+          </div>
+          <div
+            id="recentList"
+            class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"
+          ></div>
+        </div>
+
+        <!-- Tree (wrapper stays flex-1 to push status bar to bottom) -->
+        <div class="flex-1 flex flex-col min-h-0">
+          <div class="collapsible-content flex flex-col flex-1 min-h-0">
+            <div
+              class="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider flex justify-between items-center shrink-0"
+            >
+              目录树<button
+                class="hover:text-slate-300 transition-colors"
+                title="刷新缓存"
+                onclick="refreshTree()"
+              >
+                🔄
+              </button>
+            </div>
+            <div class="px-3 mb-2 shrink-0">
+              <div class="relative">
+                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"
+                  >🔍</span
+                ><input
+                  id="fileFilter"
+                  placeholder="过滤文件..."
+                  oninput="applyFilter()"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"
+                />
+              </div>
+            </div>
+            <div
+              class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-dark"
+              id="tree"
+              role="tree"
+            >
+              <div class="text-center py-6 text-slate-500 text-xs">选择一个项目开始</div>
             </div>
           </div>
         </div>
-        <div class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0">
-          <div class="relative"><textarea id="chatInput" rows="2" placeholder="发送自然语言指令..." class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-3 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 resize-none outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-            <button onclick="sendMessage()" id="sendBtn" disabled class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">➤</button></div>
+
+        <!-- 🔎 Global Search -->
+        <div class="px-3 py-2.5 border-t border-slate-800 shrink-0 collapsible-content">
+          <div class="relative">
+            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"
+              >🔎</span
+            >
+            <input
+              id="globalSearch"
+              placeholder="全局搜索..."
+              onkeydown="if (event.key === 'Enter') doGlobalSearch();"
+              class="w-full bg-slate-950 border border-slate-700 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"
+            />
+          </div>
+          <div
+            id="searchResults"
+            class="hidden mt-2 max-h-48 overflow-y-auto scrollbar-dark space-y-1"
+          ></div>
         </div>
-      </div>
-      <div id="outlinePanel" class="absolute inset-0 flex flex-col bg-white dark:bg-slate-900 hidden">
-        <div class="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0">文档大纲</div>
-        <div class="flex-1 overflow-y-auto p-2 scrollbar-light" id="outlineList"><div class="text-center py-12 text-slate-400 text-xs">请先打开一个 Markdown 文档</div></div>
-      </div>
-      <div id="queuePanel" class="absolute inset-0 flex flex-col bg-slate-50 dark:bg-slate-900 hidden">
-        <div class="p-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex justify-between items-center shrink-0 shadow-sm z-10">
-          <div class="text-sm font-bold text-slate-800 dark:text-slate-100">待处理任务 (<span id="pendingCount">0</span>)</div>
-          <div class="space-x-1.5">
-            <button onclick="approveAll()" class="text-[11px] px-2 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-md font-medium shadow-sm transition-colors">批准全部</button>
-            <button onclick="rejectAll()" class="text-[11px] px-2 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md font-medium transition-colors border border-slate-200 dark:border-slate-600">拒绝全部</button>
+
+        <!-- Status -->
+        <div
+          class="px-3 py-2.5 border-t border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/50"
+        >
+          <div
+            id="sseInd"
+            class="flex items-center gap-1.5 text-xs text-emerald-500 font-medium shrink-0"
+          >
+            <span class="relative flex h-2 w-2"
+              ><span
+                class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+              ></span
+              ><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span
+            ><span class="collapsible-content">实时</span>
+          </div>
+          <span class="text-[10px] text-slate-600 collapsible-content flex-1 text-right"
+            >v0.2.0</span
+          >
+          <button
+            onclick="toggleCollapse()"
+            class="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+            title="折叠侧栏"
+            id="collapseLeftBtn"
+          >
+            ☰
+          </button>
+        </div>
+      </aside>
+
+      <div
+        class="w-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-blue-400 cursor-col-resize z-30 transition-colors hidden md:block border-x border-slate-300 dark:border-slate-700 shrink-0"
+      ></div>
+
+      <!-- ══════ 中间栏 ══════ -->
+      <main class="flex-1 flex flex-col bg-white dark:bg-slate-900 min-w-0 relative">
+        <div id="readingProgress" style="width: 0%"></div>
+
+        <!-- Toolbar -->
+        <div
+          class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 bg-white dark:bg-slate-900 shadow-sm z-10 shrink-0"
+        >
+          <div class="flex items-center gap-2 min-w-0">
+            <button
+              id="showLeftBtn"
+              class="hidden p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+              title="显示侧栏"
+              onclick="togglePanel('left')"
+            >
+              ◀
+            </button>
+            <div
+              id="breadcrumb"
+              class="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 min-w-0 overflow-hidden"
+            >
+              <span id="breadcrumbPath" class="text-slate-400 text-sm">未选择文件</span>
+            </div>
+            <span
+              id="readTime"
+              class="text-[10px] text-slate-400 hidden ml-1 whitespace-nowrap"
+            ></span>
+          </div>
+          <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+            <button
+              id="docSearchBtn"
+              disabled
+              onclick="toggleDocSearch()"
+              class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="文档内搜索 (Ctrl+F)"
+            >
+              🔍
+            </button>
+            <button
+              id="autoScrollBtn"
+              disabled
+              onclick="toggleAutoScroll()"
+              class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="自动滚动"
+            >
+              ▶
+            </button>
+            <select
+              id="scrollSpeed"
+              class="text-[10px] border border-slate-200 dark:border-slate-600 rounded px-1 py-1 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hidden"
+            >
+              <option value="30">慢速</option>
+              <option value="60" selected>中速</option>
+              <option value="120">快速</option>
+              <option value="200">极速</option>
+            </select>
+            <button
+              id="ttsBtn"
+              disabled
+              onclick="toggleTTS()"
+              class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="朗读 (TTS)"
+            >
+              🔊
+            </button>
+            <button
+              id="translateBtn"
+              disabled
+              onclick="toggleTranslate()"
+              class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed hidden"
+              title="离线翻译"
+            >
+              🌐
+            </button>
+            <select
+              id="ttsRate"
+              class="text-[10px] border border-slate-200 dark:border-slate-600 rounded px-1 py-1 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hidden"
+              onchange="updateTTSRate()"
+            >
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+            <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
+            <button
+              id="runBtn"
+              disabled
+              onclick="runCode()"
+              class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed hidden"
+              title="运行代码"
+            >
+              ▶ <span class="hidden sm:inline">运行</span>
+            </button>
+            <button
+              id="aiBtn"
+              disabled
+              onclick="doAISummary()"
+              class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md transition-colors border border-purple-100 dark:border-purple-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ✨ <span class="hidden sm:inline">AI 总结</span>
+            </button>
+            <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
+            <button
+              id="editBtn"
+              disabled
+              onclick="revealFile('edit')"
+              class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              📝 编辑器打开
+            </button>
+            <button
+              id="revealBtn"
+              disabled
+              onclick="revealFile('reveal')"
+              class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              📂 <span class="hidden sm:inline">文件夹中显示</span>
+            </button>
+            <button
+              id="exportBtn"
+              disabled
+              onclick="exportHTML()"
+              class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="导出为自包含 HTML"
+            >
+              📥 <span class="hidden sm:inline">导出</span>
+            </button>
+            <button
+              id="shareBtn"
+              disabled
+              onclick="shareDocument()"
+              class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="创建局域网分享链接"
+            >
+              🔗 <span class="hidden sm:inline">分享</span>
+            </button>
           </div>
         </div>
-        <div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-light" id="queueList"><div class="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-2">✅<br>队列已清空</div></div>
-        <div class="p-3 bg-slate-900 dark:bg-black border-t border-slate-800 text-[11px] text-slate-300 flex items-center justify-between shrink-0">
-          <span class="flex items-center gap-1"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span> 事务锁: <strong class="text-white">监控中</strong></span>
-          <span>Shadow: <strong class="text-emerald-400">已开启</strong></span>
+
+        <!-- Doc Search Bar -->
+        <div
+          id="docSearchBar"
+          class="hidden border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-1.5 flex items-center gap-2 shrink-0"
+        >
+          <input
+            id="docSearchInput"
+            placeholder="搜索..."
+            oninput="doDocSearch()"
+            onkeydown="
+              if (event.key === 'Enter') nextSearchMatch(1);
+              if (event.key === 'Escape') toggleDocSearch();
+            "
+            class="flex-1 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
+          />
+          <span id="searchCount" class="text-xs text-slate-500 whitespace-nowrap"></span>
+          <button
+            onclick="nextSearchMatch(1)"
+            class="text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
+          >
+            ↓
+          </button>
+          <button
+            onclick="nextSearchMatch(-1)"
+            class="text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
+          >
+            ↑
+          </button>
+          <button onclick="toggleDocSearch()" class="text-xs text-slate-400 hover:text-slate-600">
+            ✕
+          </button>
+        </div>
+
+        <!-- Tab Bar (多文档) -->
+        <div
+          id="tabBar"
+          class="hidden items-stretch gap-1 px-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-950 overflow-x-auto scrollbar-thin shrink-0"
+        ></div>
+
+        <!-- Content -->
+        <div
+          class="flex-1 overflow-y-auto scrollbar-light bg-slate-50 dark:bg-slate-900"
+          id="contentArea"
+          onscroll="onContentScroll()"
+          style="position: relative"
+        >
+          <div id="docPaneHost"></div>
+          <div
+            id="emptyState"
+            class="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-8"
+          >
+            <span class="text-6xl mb-4 text-slate-300 dark:text-slate-600">📄</span>
+            <h2 class="text-xl font-medium text-slate-600 dark:text-slate-400 mb-2">
+              Doc77 预览引擎
+            </h2>
+            <p
+              class="text-sm text-center max-w-sm mb-6 text-slate-400 dark:text-slate-500 leading-relaxed"
+            >
+              从左侧目录树选择文件以进行只读预览。
+            </p>
+            <button
+              onclick="
+                togglePanel('right');
+                setActiveTab('chat');
+              "
+              class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-all flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"
+            >
+              ✨ 唤起 AI 助手
+            </button>
+          </div>
+          <button
+            id="backToTopBtn"
+            onclick="
+              document.getElementById('contentArea').scrollTo({ top: 0, behavior: 'smooth' })
+            "
+            title="回到顶部"
+            style="
+              position: sticky;
+              bottom: 24px;
+              float: right;
+              margin-right: 12px;
+              z-index: 20;
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              background: var(--accent, #2563eb);
+              color: #fff;
+              border: none;
+              cursor: pointer;
+              display: none;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+              transition:
+                opacity 0.2s,
+                transform 0.2s;
+            "
+            onmouseover="this.style.transform = 'scale(1.1)'"
+            onmouseout="this.style.transform = 'scale(1)'"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="18 15 12 9 6 15" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- AI Summary Card -->
+        <div
+          id="summaryCard"
+          class="summary-card hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-5 animate-in"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-bold text-slate-800 dark:text-slate-100">✨ AI 摘要</span>
+            <div class="flex gap-1">
+              <button
+                onclick="readSummary()"
+                class="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-200"
+              >
+                🔊 朗读
+              </button>
+              <button
+                onclick="document.getElementById('summaryCard').classList.add('hidden')"
+                class="text-xs text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          <p
+            id="summaryText"
+            class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-h-48 overflow-y-auto"
+          >
+            生成中...
+          </p>
+        </div>
+      </main>
+
+      <div
+        class="w-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-amber-400 cursor-col-resize z-30 transition-colors hidden md:block border-x border-slate-300 dark:border-slate-700 shrink-0"
+      ></div>
+
+      <!-- ══════ 右侧栏悬浮球 ══════ -->
+      <button
+        id="capsuleBtn"
+        onclick="togglePanel('right')"
+        class="fixed z-30 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 shadow-lg flex items-center justify-center text-base text-slate-500 dark:text-slate-300 hover:scale-110 transition-all duration-300 animate-pulse cursor-pointer"
+        style="right: 316px; animation-duration: 4s"
+      >
+        <span id="capsuleIcon">▶</span>
+      </button>
+
+      <!-- ══════ 右侧栏 ══════ -->
+      <aside
+        id="rightPanel"
+        class="w-80 shrink-0 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 transition-all duration-300"
+      >
+        <div
+          class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 items-center pr-1 relative"
+        >
+          <button
+            id="tabOutline"
+            onclick="setActiveTab('outline')"
+            class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400 bg-white dark:bg-slate-900"
+          >
+            📑 大纲
+          </button>
+          <button
+            id="tabChat"
+            onclick="setActiveTab('chat')"
+            class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+          >
+            💬 助手
+          </button>
+          <button
+            id="tabQueue"
+            onclick="setActiveTab('queue')"
+            class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+          >
+            📋 审批<span
+              id="pendingBadge"
+              class="hidden ml-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+              >0</span
+            >
+          </button>
+        </div>
+        <div class="flex-1 overflow-hidden relative">
+          <div
+            id="chatPanel"
+            class="absolute inset-0 flex flex-col bg-slate-50/50 dark:bg-slate-900/50"
+          >
+            <div
+              id="ctxBanner"
+              class="hidden bg-blue-50/80 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800 px-3 py-1.5 flex items-center gap-2 text-xs text-blue-800 dark:text-blue-300 shadow-sm shrink-0"
+            >
+              📄 <span class="truncate font-medium" id="ctxText"></span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-light" id="chatMessages">
+              <div
+                id="welcomeCard"
+                class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm animate-in"
+              >
+                <div
+                  class="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 mb-2"
+                >
+                  🤖 您好！我是 Doc77 AI 助手
+                </div>
+                <p class="text-xs text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
+                  我可以分析项目结构、阅读文档内容，并给出整理和分类建议。
+                </p>
+                <div class="space-y-2">
+                  <button
+                    onclick="sendQuickMsg('请分析当前项目的目录结构')"
+                    class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300"
+                  >
+                    📊 分析项目结构
+                  </button>
+                  <button
+                    onclick="sendQuickMsg('请总结当前打开的文档内容')"
+                    class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300"
+                  >
+                    📝 总结当前文档
+                  </button>
+                  <button
+                    onclick="sendQuickMsg('请检查项目中是否有重复或冗余的文件')"
+                    class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300"
+                  >
+                    🔍 查找重复文件
+                  </button>
+                  <button
+                    id="btnClassify"
+                    onclick="doSmartClassify()"
+                    class="w-full text-left text-xs bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 p-2 rounded-md transition-colors"
+                  >
+                    🗂️ 智能归类（生成待审批方案）
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0"
+            >
+              <div class="relative">
+                <textarea
+                  id="chatInput"
+                  rows="2"
+                  placeholder="发送自然语言指令..."
+                  class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-3 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 resize-none outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                  onkeydown="
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage();
+                    }
+                  "
+                ></textarea>
+                <button
+                  onclick="sendMessage()"
+                  id="sendBtn"
+                  disabled
+                  class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ➤
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            id="outlinePanel"
+            class="absolute inset-0 flex flex-col bg-white dark:bg-slate-900 hidden"
+          >
+            <div
+              class="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0"
+            >
+              文档大纲
+            </div>
+            <div class="flex-1 overflow-y-auto p-2 scrollbar-light" id="outlineList">
+              <div class="text-center py-12 text-slate-400 text-xs">请先打开一个 Markdown 文档</div>
+            </div>
+          </div>
+          <div
+            id="queuePanel"
+            class="absolute inset-0 flex flex-col bg-slate-50 dark:bg-slate-900 hidden"
+          >
+            <div
+              class="p-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex justify-between items-center shrink-0 shadow-sm z-10"
+            >
+              <div class="text-sm font-bold text-slate-800 dark:text-slate-100">
+                待处理任务 (<span id="pendingCount">0</span>)
+              </div>
+              <div class="space-x-1.5">
+                <button
+                  onclick="approveAll()"
+                  class="text-[11px] px-2 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-md font-medium shadow-sm transition-colors"
+                >
+                  批准全部
+                </button>
+                <button
+                  onclick="rejectAll()"
+                  class="text-[11px] px-2 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md font-medium transition-colors border border-slate-200 dark:border-slate-600"
+                >
+                  拒绝全部
+                </button>
+              </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-light" id="queueList">
+              <div
+                class="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-2"
+              >
+                ✅<br />队列已清空
+              </div>
+            </div>
+            <div
+              class="p-3 bg-slate-900 dark:bg-black border-t border-slate-800 text-[11px] text-slate-300 flex items-center justify-between shrink-0"
+            >
+              <span class="flex items-center gap-1"
+                ><span class="relative flex h-2 w-2"
+                  ><span
+                    class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                  ></span
+                  ><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span
+                ></span>
+                事务锁: <strong class="text-white">监控中</strong></span
+              >
+              <span>Shadow: <strong class="text-emerald-400">已开启</strong></span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div
+      id="settingsOverlay"
+      class="fixed inset-0 z-50 flex justify-end pointer-events-none"
+      onclick="if (event.target === this) toggleSettings();"
+    >
+      <div
+        class="settings-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm opacity-0 transition-opacity duration-300"
+        onclick="toggleSettings()"
+      ></div>
+      <div
+        class="settings-panel relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col translate-x-full transition-transform duration-300"
+      >
+        <div
+          class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0"
+        >
+          <span class="font-bold text-slate-800 dark:text-slate-100 text-lg">⚙ 设置</span>
+          <button
+            onclick="toggleSettings()"
+            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl"
+          >
+            ✕
+          </button>
+        </div>
+        <div
+          class="flex border-b border-slate-200 dark:border-slate-700 shrink-0"
+          id="settingsTabs"
+        >
+          <button
+            onclick="switchSettingsTab('system')"
+            class="flex-1 py-2.5 text-xs font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+            data-tab="system"
+          >
+            💾 系统
+          </button>
+          <button
+            onclick="switchSettingsTab('ai')"
+            class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700"
+            data-tab="ai"
+          >
+            🤖 AI
+          </button>
+          <button
+            onclick="switchSettingsTab('account')"
+            class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700"
+            data-tab="account"
+          >
+            👤 账户
+          </button>
+          <button
+            onclick="switchSettingsTab('translate')"
+            class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700"
+            data-tab="translate"
+          >
+            🌐 翻译
+          </button>
+          <button
+            onclick="switchSettingsTab('share')"
+            class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700"
+            data-tab="share"
+          >
+            🔗 分享
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="settingsContent"></div>
+        <div class="p-3 border-t border-slate-200 dark:border-slate-700 shrink-0 flex gap-2">
+          <button
+            onclick="resetDefaults()"
+            class="flex-1 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+          >
+            恢复默认值
+          </button>
+          <button
+            onclick="saveSettings()"
+            class="flex-1 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            💾 保存设置
+          </button>
         </div>
       </div>
     </div>
-  </aside>
-</div>
 
-<!-- Settings Overlay -->
-<div id="settingsOverlay" class="fixed inset-0 z-50 flex justify-end pointer-events-none" onclick="if(event.target===this)toggleSettings()">
-  <div class="settings-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="toggleSettings()"></div>
-  <div class="settings-panel relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
-    <div class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
-      <span class="font-bold text-slate-800 dark:text-slate-100 text-lg">⚙ 设置</span>
-      <button onclick="toggleSettings()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl">✕</button>
+    <!-- Right-click context menu -->
+    <div id="ctxMenu" class="ctx-menu hidden"></div>
+
+    <!-- Drop zone overlay -->
+    <div id="dropOverlay" class="hidden">
+      <div id="dropOverlayContent">
+        <span class="text-6xl mb-4 block">📎</span
+        ><span class="text-lg font-medium">拖拽文件以临时预览</span
+        ><span class="text-sm opacity-70">支持 Markdown / 代码 / 图片 / PDF 等格式</span>
+      </div>
     </div>
-    <div class="flex border-b border-slate-200 dark:border-slate-700 shrink-0" id="settingsTabs">
-      <button onclick="switchSettingsTab('system')" class="flex-1 py-2.5 text-xs font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" data-tab="system">💾 系统</button>
-      <button onclick="switchSettingsTab('ai')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700" data-tab="ai">🤖 AI</button>
-      <button onclick="switchSettingsTab('account')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700" data-tab="account">👤 账户</button>
-      <button onclick="switchSettingsTab('translate')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700" data-tab="translate">🌐 翻译</button>
-      <button onclick="switchSettingsTab('share')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700" data-tab="share">🔗 分享</button>
-    </div>
-    <div class="flex-1 overflow-y-auto p-4 space-y-4" id="settingsContent"></div>
-    <div class="p-3 border-t border-slate-200 dark:border-slate-700 shrink-0 flex gap-2">
-      <button onclick="resetDefaults()" class="flex-1 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">恢复默认值</button>
-      <button onclick="saveSettings()" class="flex-1 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">💾 保存设置</button>
-    </div>
-  </div>
-</div>
 
-<!-- Right-click context menu -->
-<div id="ctxMenu" class="ctx-menu hidden"></div>
-
-<!-- Drop zone overlay -->
-<div id="dropOverlay" class="hidden"><div id="dropOverlayContent"><span class="text-6xl mb-4 block">📎</span><span class="text-lg font-medium">拖拽文件以临时预览</span><span class="text-sm opacity-70">支持 Markdown / 代码 / 图片 / PDF 等格式</span></div></div>
-
-<script src="js/editor-core.js"></script>
-<script src="js/common.js"></script>
-<script src="js/tabs.js"></script>
-<script src="js/temp-preview.js"></script>
-<script src="js/preview.js"></script>
-</body>
+    <script src="js/editor-core.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/tabs.js"></script>
+    <script src="js/temp-preview.js"></script>
+    <script src="js/preview.js"></script>
+  </body>
 </html>

@@ -26,7 +26,9 @@ function getProjectFiles(projectId: number, projectRoot: string): string[] {
           files.push(fullPath);
         }
       }
-    } catch { /* skip unreadable dirs */ }
+    } catch {
+      /* skip unreadable dirs */
+    }
   }
   walk(projectRoot);
   fileListCache.set(projectId, { mtime: Date.now(), files });
@@ -49,7 +51,9 @@ function loadAliasMap(projectRoot: string): Map<string, string> {
         map.set(match[1].trim(), match[2].trim());
       }
     }
-  } catch { /* .doc77links may not exist */ }
+  } catch {
+    /* .doc77links may not exist */
+  }
   return map;
 }
 
@@ -81,12 +85,12 @@ export function resolveWikilink(
 
   // 2. Exact match
   const targetFile = title.endsWith('.md') ? title : title + '.md';
-  const exact = allFiles.find(f => path.basename(f) === targetFile);
+  const exact = allFiles.find((f) => path.basename(f) === targetFile);
   if (exact) return exact;
 
   // 3. Case-insensitive match
   const lowerTarget = targetFile.toLowerCase();
-  const ci = allFiles.find(f => path.basename(f).toLowerCase() === lowerTarget);
+  const ci = allFiles.find((f) => path.basename(f).toLowerCase() === lowerTarget);
   if (ci) return ci;
 
   // 4. Not found

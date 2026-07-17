@@ -3,7 +3,7 @@
  */
 
 // ═══ Modal Show/Hide ═══
-window.showRegisterModal = function() {
+window.showRegisterModal = function () {
   var modal = document.getElementById('registerModal');
   if (modal) modal.style.display = 'flex';
   window.switchRegisterTab('manual');
@@ -12,17 +12,17 @@ window.showRegisterModal = function() {
   document.getElementById('regError').style.display = 'none';
 };
 
-window.closeRegisterModal = function() {
+window.closeRegisterModal = function () {
   var modal = document.getElementById('registerModal');
   if (modal) modal.style.display = 'none';
 };
 
 // ═══ Tab Switching ═══
-window.switchRegisterTab = function(tab) {
-  document.querySelectorAll('#registerModal .modal-tab').forEach(function(btn) {
+window.switchRegisterTab = function (tab) {
+  document.querySelectorAll('#registerModal .modal-tab').forEach(function (btn) {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
-  document.querySelectorAll('#registerModal .tab-panel').forEach(function(panel) {
+  document.querySelectorAll('#registerModal .tab-panel').forEach(function (panel) {
     panel.classList.remove('active');
   });
   var target = document.getElementById('tab-' + tab);
@@ -42,18 +42,30 @@ window.switchRegisterTab = function(tab) {
 
 // ═══ Tag label/icon maps ═══
 var TAG_ICONS = {
-  'nodejs': '🟢', 'typescript': '🔷', 'python': '🐍',
-  'go': '🔵', 'rust': '🦀', 'java': '☕',
-  'dotnet': '💠', 'git': '📦', 'obsidian': '🗳️',
+  nodejs: '🟢',
+  typescript: '🔷',
+  python: '🐍',
+  go: '🔵',
+  rust: '🦀',
+  java: '☕',
+  dotnet: '💠',
+  git: '📦',
+  obsidian: '🗳️',
 };
 var TAG_LABELS = {
-  'nodejs': 'Node', 'typescript': 'TS', 'python': 'Py',
-  'go': 'Go', 'rust': 'Rust', 'java': 'Java',
-  'dotnet': '.NET', 'git': 'Git', 'obsidian': 'Obsidian',
+  nodejs: 'Node',
+  typescript: 'TS',
+  python: 'Py',
+  go: 'Go',
+  rust: 'Rust',
+  java: 'Java',
+  dotnet: '.NET',
+  git: 'Git',
+  obsidian: 'Obsidian',
 };
 
 // ═══ Git Discover ═══
-window.doGitDiscover = async function() {
+window.doGitDiscover = async function () {
   var dirPath = document.getElementById('gitDiscoverPath').value.trim() || '~';
   var depth = parseInt(document.getElementById('gitDepth').value, 10) || 3;
   var status = document.getElementById('gitDiscoverStatus');
@@ -67,23 +79,49 @@ window.doGitDiscover = async function() {
   btn.disabled = true;
 
   try {
-    var r = await fetch('/api/discover/git?path=' + encodeURIComponent(dirPath) + '&depth=' + depth);
+    var r = await fetch(
+      '/api/discover/git?path=' + encodeURIComponent(dirPath) + '&depth=' + depth,
+    );
     var d = await r.json();
-    if (!r.ok) { status.textContent = '❌ ' + (d.error || '扫描失败'); return; }
+    if (!r.ok) {
+      status.textContent = '❌ ' + (d.error || '扫描失败');
+      return;
+    }
 
     status.textContent = '找到 ' + d.repositories.length + ' 个 Git 项目';
-    if (!d.repositories.length) { status.textContent += ' (无新项目)'; return; }
+    if (!d.repositories.length) {
+      status.textContent += ' (无新项目)';
+      return;
+    }
 
-    candidates.innerHTML = d.repositories.map(function(repo) {
-      var tagHtml = (repo.tags || []).map(function(t) {
-        return ' <span style="font-size:10px;opacity:0.7">' + (TAG_ICONS[t] || '') + (TAG_LABELS[t] || t) + '</span>';
-      }).join('');
-      return '<label class="checkbox-row" style="margin-bottom:6px">' +
-        '<input type="checkbox" class="git-candidate" data-path="' + escAttr(repo.path) + '" data-name="' + escAttr(repo.name) + '" checked>' +
-        '<span>' + esc(repo.name) + tagHtml + '</span></label>';
-    }).join('');
+    candidates.innerHTML = d.repositories
+      .map(function (repo) {
+        var tagHtml = (repo.tags || [])
+          .map(function (t) {
+            return (
+              ' <span style="font-size:10px;opacity:0.7">' +
+              (TAG_ICONS[t] || '') +
+              (TAG_LABELS[t] || t) +
+              '</span>'
+            );
+          })
+          .join('');
+        return (
+          '<label class="checkbox-row" style="margin-bottom:6px">' +
+          '<input type="checkbox" class="git-candidate" data-path="' +
+          escAttr(repo.path) +
+          '" data-name="' +
+          escAttr(repo.name) +
+          '" checked>' +
+          '<span>' +
+          esc(repo.name) +
+          tagHtml +
+          '</span></label>'
+        );
+      })
+      .join('');
     actions.style.display = 'block';
-  } catch(e) {
+  } catch (e) {
     status.textContent = '❌ 网络错误: ' + e.message;
   } finally {
     btn.disabled = false;
@@ -91,7 +129,7 @@ window.doGitDiscover = async function() {
 };
 
 // ═══ Git batch register ═══
-window.batchRegisterGit = async function() {
+window.batchRegisterGit = async function () {
   var checks = document.querySelectorAll('.git-candidate:checked');
   var status = document.getElementById('gitDiscoverStatus');
   status.textContent = '注册中...';
@@ -106,14 +144,14 @@ window.batchRegisterGit = async function() {
         body: JSON.stringify({ name: ch.dataset.name, path: ch.dataset.path }),
       });
       if (r.ok) count++;
-    } catch(e) {}
+    } catch (e) {}
   }
   status.textContent = '✅ 已注册 ' + count + '/' + checks.length + ' 个项目';
   if (window.load) window.load();
 };
 
 // ═══ VS Code workspace import ═══
-window.importWorkspace = async function() {
+window.importWorkspace = async function () {
   var input = document.getElementById('workspacePath');
   var wsPath = input.value.trim();
   if (!wsPath) {
@@ -130,15 +168,22 @@ window.importWorkspace = async function() {
       body: JSON.stringify({ workspacePath: wsPath }),
     });
     var d = await r.json();
-    if (!r.ok) { status.textContent = '❌ ' + (d.error || '导入失败'); return; }
+    if (!r.ok) {
+      status.textContent = '❌ ' + (d.error || '导入失败');
+      return;
+    }
     var msg = '✅ 已注册 ' + d.imported.length + ' 个项目';
     if (d.skipped.length) msg += ' (跳过 ' + d.skipped.length + ' 个已存在)';
     status.textContent = msg;
     if (window.load) window.load();
-  } catch(e) {
+  } catch (e) {
     status.textContent = '❌ ' + e.message;
   }
 };
 
-function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}

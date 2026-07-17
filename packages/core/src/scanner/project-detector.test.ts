@@ -83,7 +83,7 @@ describe('discoverGitProjects', () => {
 
   it('should detect tags for git repos', () => {
     const results = discoverGitProjects(tmpDir, 2);
-    const repo1 = results.find(r => r.name === 'repo1');
+    const repo1 = results.find((r) => r.name === 'repo1');
     expect(repo1?.tags).toContain('nodejs');
     expect(repo1?.tags).toContain('git');
   });
@@ -104,12 +104,12 @@ describe('parseCodeWorkspace', () => {
 
   it('should parse workspace folders', () => {
     const wsPath = path.join(tmpDir, 'test.code-workspace');
-    fs.writeFileSync(wsPath, JSON.stringify({
-      folders: [
-        { path: 'packages/core' },
-        { path: 'lib', name: 'Shared Lib' },
-      ],
-    }));
+    fs.writeFileSync(
+      wsPath,
+      JSON.stringify({
+        folders: [{ path: 'packages/core' }, { path: 'lib', name: 'Shared Lib' }],
+      }),
+    );
     const results = parseCodeWorkspace(wsPath);
     expect(results.length).toBe(2);
     expect(results[1].name).toBe('Shared Lib');

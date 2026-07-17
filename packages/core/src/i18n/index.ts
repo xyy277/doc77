@@ -104,9 +104,7 @@ export function resolveLocale(explicit?: string, hint?: string): string {
 export function t(key: string, params?: Record<string, string | number>): string {
   const v = dicts[current]?.[key] ?? dicts[FALLBACK]?.[key] ?? key;
   if (!params) return v;
-  return v.replace(/\{(\w+)\}/g, (m, name: string) =>
-    name in params ? String(params[name]) : m,
-  );
+  return v.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? String(params[name]) : m));
 }
 
 export function setLocale(lang: string): void {

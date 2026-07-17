@@ -21,10 +21,15 @@ export interface ProjectUpdate {
  * Register a new project.
  * Throws if the path already exists (UNIQUE constraint).
  */
-export function registerProject(name: string, projectPath: string, obsidianMode?: boolean, tags?: string[]): Project {
+export function registerProject(
+  name: string,
+  projectPath: string,
+  obsidianMode?: boolean,
+  tags?: string[],
+): Project {
   const db = getConnection();
   const stmt = db.prepare(
-    `INSERT INTO projects (name, path, obsidian_mode, tags) VALUES (?, ?, ?, ?)`
+    `INSERT INTO projects (name, path, obsidian_mode, tags) VALUES (?, ?, ?, ?)`,
   );
   const result = stmt.run(name, projectPath, obsidianMode ? 1 : 0, JSON.stringify(tags || []));
   if (result.lastInsertRowid === 0) {
@@ -47,9 +52,11 @@ export function registerProject(name: string, projectPath: string, obsidianMode?
 export function listProjects(): Project[] {
   const db = getConnection();
   const rows = db
-    .prepare('SELECT id, name, path, obsidian_mode, tags, created_at, last_opened FROM projects ORDER BY name')
+    .prepare(
+      'SELECT id, name, path, obsidian_mode, tags, created_at, last_opened FROM projects ORDER BY name',
+    )
     .all() as Array<Project & { obsidian_mode: number; tags: string }>;
-  return rows.map(r => ({
+  return rows.map((r) => ({
     ...r,
     obsidian_mode: !!r.obsidian_mode,
     tags: JSON.parse(r.tags || '[]'),

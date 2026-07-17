@@ -1,479 +1,868 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
-<style>.i18n-loading body{visibility:hidden}</style>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<base href="/mobile/">
-<title>Doc77 控制台</title>
-  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<style>
-  /* ══════════ Theme Tokens ══════════ */
-  :root {
-    --bg-body: #f8fafc;
-    --bg-card: #ffffff;
-    --bg-header: rgba(248,250,252,0.85);
-    --bg-nav: rgba(255,255,255,0.92);
-    --bg-hover: #f1f5f9;
-    --bg-code: #f1f5f9;
-
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
-    --text-inverse: #ffffff;
-
-    --border-light: #e2e8f0;
-    --border-medium: #cbd5e1;
-
-    --accent: #2563eb;
-    --accent-light-bg: #dbeafe;
-  }
-  .dark {
-    --bg-body: #0f172a;
-    --bg-card: #1e293b;
-    --bg-header: rgba(15,23,42,0.85);
-    --bg-nav: rgba(15,23,42,0.92);
-    --bg-hover: #1e293b;
-    --bg-code: #1e293b;
-
-    --text-primary: #e2e8f0;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    --text-inverse: #ffffff;
-
-    --border-light: #334155;
-    --border-medium: #475569;
-
-    --accent: #60a5fa;
-    --accent-light-bg: #1e3a5f;
-  }
-
-  /* ══════════ Reset ══════════ */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  /* ══════════ Base ══════════ */
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background: var(--bg-body); color: var(--text-primary);
-    min-height: 100vh; min-height: 100dvh;
-    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
-  }
-
-  /* Header */
-  .header {
-    position: sticky; top: 0; z-index: 10;
-    background: var(--bg-header); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    padding: 16px 20px 12px; border-bottom: 1px solid var(--border-light);
-  }
-  .header h1 { font-size: 22px; font-weight: 700; }
-
-  .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 20px; background: var(--bg-header);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-light);
-    position: sticky; top: 0; z-index: 20;
-  }
-  .topbar .theme-btn {
-    background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px;
-  }
-  .star-badge {
-    font-size: 11px; font-weight: 600; color: #cbd5e1;
-    text-decoration: none; padding: 4px 10px;
-    border: 1px solid rgba(255,255,255,0.15); border-radius: 16px;
-    transition: all .2s; position: relative;
-  }
-  .star-badge:hover {
-    background: rgba(255,255,255,0.1); color: #fbbf24; border-color: #fbbf24;
-  }
-  .star-badge:hover::after {
-    content: attr(title);
-    position: absolute; top: 110%; right: 0;
-    background: #1e293b; color: #e2e8f0; font-size: 10px; font-weight: 400;
-    padding: 5px 10px; border-radius: 6px; white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 50;
-  }
-
-  /* Content */
-  .content { padding: 16px 16px 100px; }
-
-  /* Cards */
-  .project-card {
-    display: flex; align-items: center; gap: 14px; padding: 16px;
-    background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-light);
-    margin-bottom: 10px; cursor: pointer; transition: transform .1s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .project-card:active { transform: scale(0.97); }
-  .project-icon {
-    width: 48px; height: 48px; border-radius: 12px; background: var(--accent);
-    color: var(--text-inverse); display: flex; align-items: center; justify-content: center;
-    font-size: 22px; flex-shrink: 0;
-  }
-  .project-info { flex: 1; min-width: 0; }
-  .project-name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .project-path { font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .project-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-  .project-arrow { color: var(--border-medium); font-size: 18px; flex-shrink: 0; }
-
-  /* Empty / Loading */
-  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
-  .empty-icon { font-size: 48px; margin-bottom: 16px; }
-  .loading { text-align: center; padding: 40px; color: var(--text-muted); }
-
-  /* Bottom Nav */
-  .bottom-nav {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
-    background: var(--bg-nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border-light); padding: 8px 24px calc(20px + env(safe-area-inset-bottom, 0px));
-    display: flex; justify-content: space-around; align-items: flex-start;
-  }
-  .nav-item {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    cursor: pointer; padding: 8px 12px; -webkit-tap-highlight-color: transparent;
-    color: var(--text-muted); transition: color .2s; font-size: 10px; font-weight: 600;
-    border: none; background: none;
-  }
-  .nav-item.active { color: var(--accent); }
-  .nav-item .nav-icon { font-size: 22px; }
-
-  /* Settings */
-  .settings-section { margin-bottom: 20px; }
-  .settings-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 8px; padding: 0 4px; }
-  .settings-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; background: var(--bg-card); border-radius: 12px;
-    border: 1px solid var(--border-light); margin-bottom: 6px; font-size: 14px;
-  }
-  .settings-row .label { font-weight: 500; }
-  .settings-row .value { color: var(--text-muted); font-size: 13px; }
-
-  /* Tabs */
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* Accent link color for breadcrumb-like elements */
-  .recent-icon { background: var(--bg-code); color: var(--text-secondary); }
-
-  /* Favorite star */
-  .fav-star { color: var(--text-muted); }
-  .fav-star.favorited { color: #f59e0b; }
-  .dark .fav-star { color: #94a3b8; }
-  .dark .fav-star.favorited { color: #fbbf24; }
-
-  /* Loading overlay */
-  .loading-overlay {
-    position: fixed; inset: 0; z-index: 300;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 20px;
-    background: rgba(0,0,0,0.35); backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    animation: fadeIn .2s ease-out;
-  }
-  .loading-overlay .loading-spinner {
-    width: 40px; height: 40px;
-    border: 3px solid rgba(255,255,255,0.2);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin .7s linear infinite;
-  }
-  .loading-overlay .loading-text {
-    font-size: 14px; font-weight: 500;
-    color: #fff; text-align: center;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-  /* Login exit transition */
-  @keyframes loginRippleExpand {
-    0%   { width: 0; height: 0; opacity: 1; }
-    70%  { width: 200vmax; height: 200vmax; opacity: 0.6; }
-    100% { width: 200vmax; height: 200vmax; opacity: 0; }
-  }
-  .login-gate-ripple {
-    position: fixed; pointer-events: none; z-index: 201;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.3) 30%, transparent 65%);
-    animation: loginRippleExpand 0.5s cubic-bezier(0.15, 0.6, 0.35, 1) forwards;
-  }
-  @keyframes loginGateDissolve { from { opacity: 1; } to { opacity: 0; } }
-  .login-gate-dissolve { animation: loginGateDissolve 0.35s ease-out forwards; }
-  @keyframes loginCardFadeUp {
-    from { opacity: 1; transform: translateY(0) scale(1); }
-    to   { opacity: 0; transform: translateY(-24px) scale(0.97); }
-  }
-  .login-gate-dissolve .login-gate-card {
-    animation: loginCardFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-
-  /* Button loading state */
-  .btn-loading {
-    position: relative; pointer-events: none;
-    color: transparent !important;
-  }
-  .btn-loading::after {
-    content: '';
-    position: absolute; width: 20px; height: 20px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: #fff; border-radius: 50%;
-    animation: spin .6s linear infinite;
-    top: 50%; left: 50%; margin-top: -10px; margin-left: -10px;
-  }
-
-  /* Progress overlay */
-  .progress-overlay {
-    position: fixed; inset: 0; z-index: 300;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    animation: fadeIn .25s ease-out;
-  }
-  .progress-card {
-    background: var(--bg-card); border-radius: 18px;
-    padding: 28px 24px; max-width: 360px; width: 90%;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-  }
-  .dark .progress-card {
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    border: 1px solid rgba(255,255,255,0.06);
-  }
-  .progress-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 20px; text-align: center; }
-  .progress-steps { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
-  .progress-step { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-muted); transition: color .3s; }
-  .progress-step .step-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; background: var(--bg-hover); color: var(--text-muted); border: 1px solid var(--border-light); transition: all .3s; }
-  .progress-step.active { color: var(--text-primary); }
-  .progress-step.active .step-icon { background: var(--accent-light-bg); color: var(--accent); border-color: var(--accent); }
-  .progress-step.completed { color: #059669; }
-  .progress-step.completed .step-icon { background: rgba(5,150,105,0.1); color: #059669; border-color: #059669; }
-  .progress-bar-track { width: 100%; height: 4px; background: var(--bg-hover); border-radius: 2px; overflow: hidden; }
-  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .5s cubic-bezier(0.16, 1, 0.3, 1); }
-</style>
-</head>
-<body>
-  <!-- Top Bar -->
-  <div class="topbar" id="topbar">
-    <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" style="height:28px;cursor:pointer" onclick="location.href='/'">
-    <div style="display:flex;align-items:center;gap:8px">
-      <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="star-badge" title="xyy277 · 907507646@qq.com">⭐ 点个 Star</a>
-      <button onclick="toggleTheme()" class="theme-btn" title="切换主题" id="themeBtn">🌙</button>
-    </div>
-  </div>
-
-  <div style="padding:8px 20px 0;font-size:16px;font-weight:600" id="mobileGreeting">👋 下午好</div>
-
-  <div id="app" style="display:none">
-
-    <!-- ═══ Tab: Recent ═══ -->
-    <div id="tab-recent" class="tab-content">
-      <div class="header"><h1>最近浏览</h1></div>
-      <div class="content" id="recentList">
-        <div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>
-      </div>
-    </div>
-
-    <!-- ═══ Tab: Browse ═══ -->
-    <div id="tab-browse" class="tab-content active">
-      <div class="header" style="display:flex;align-items:baseline;gap:6px"><h1 style="margin:0">项目</h1><span id="mobileProjCount" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span></div>
-      <div class="content" id="projectList">
-        <div class="loading">加载中…</div>
-      </div>
-    </div>
-
-    <!-- ═══ Tab: Settings ═══ -->
-    <div id="tab-settings" class="tab-content">
-      <div class="header"><h1>设置</h1></div>
-      <div class="content">
-        <div class="settings-section">
-          <h3>通用</h3>
-          <div class="settings-row" onclick="toggleTheme()" style="cursor:pointer">
-            <span class="label">深色模式</span><span class="value" id="themeLabel">浅色</span>
-          </div>
-          <div class="settings-row" onclick="viewDesktop()" style="cursor:pointer">
-            <span class="label">桌面版</span><span class="value">→</span>
-          </div>
-        </div>
-        <div class="settings-section">
-          <h3>关于</h3>
-          <div class="settings-row">
-            <span class="label">Doc77 预览引擎</span><span class="value" id="versionLabel">---</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ Bottom Nav ═══ -->
-    <nav class="bottom-nav">
-      <button class="nav-item" data-tab="recent" onclick="switchTab('recent')">
-        <span class="nav-icon">🕐</span><span>最近</span>
-      </button>
-      <button class="nav-item active" data-tab="browse" onclick="switchTab('browse')">
-        <span class="nav-icon">📂</span><span>项目</span>
-      </button>
-      <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
-        <span class="nav-icon">⚙️</span><span>设置</span>
-      </button>
-    </nav>
-  </div>
-
-  <script src="js/common.js"></script>
-  <script>
-    // ══════════ Dashboard Logic ══════════
-
-    function boot() {
-      // Fetch version
-      fetch('/api/health').then(function(r){return r.json()}).then(function(d){
-        var el = document.getElementById('versionLabel');
-        if (el && d.version) el.textContent = 'v' + d.version;
-      }).catch(function(){});
-
-      if (!sessionStorage.getItem('doc77-auth')) {
-        fetch('/api/auth/status').then(function (r) { return r.json(); }).then(function (d) {
-          if (!d.hasPassword) { document.getElementById('app').style.display = 'block'; loadProjects(); return; }
-          if (sessionStorage.getItem('doc77-auth')) { document.getElementById('app').style.display = 'block'; loadProjects(); return; }
-          setTimeout(boot, 500);
-        }).catch(function () { setTimeout(boot, 500); });
-        return;
+  <head>
+    <script>
+      document.documentElement.classList.add('i18n-loading');
+      setTimeout(function () {
+        document.documentElement.classList.remove('i18n-loading');
+      }, 1500);
+    </script>
+    <style>
+      .i18n-loading body {
+        visibility: hidden;
       }
-      document.getElementById('app').style.display = 'block';
-      loadProjects();
-    }
+    </style>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <base href="/mobile/" />
+    <title>Doc77 控制台</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <style>
+      /* ══════════ Theme Tokens ══════════ */
+      :root {
+        --bg-body: #f8fafc;
+        --bg-card: #ffffff;
+        --bg-header: rgba(248, 250, 252, 0.85);
+        --bg-nav: rgba(255, 255, 255, 0.92);
+        --bg-hover: #f1f5f9;
+        --bg-code: #f1f5f9;
 
-    window.switchTab = function (name) {
-      document.querySelectorAll('.tab-content').forEach(function (el) { el.classList.remove('active'); });
-      document.querySelectorAll('.nav-item').forEach(function (el) { el.classList.remove('active'); });
-      var tab = document.getElementById('tab-' + name);
-      if (tab) tab.classList.add('active');
-      var btn = document.querySelector('[data-tab="' + name + '"]');
-      if (btn) btn.classList.add('active');
-    };
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --text-muted: #94a3b8;
+        --text-inverse: #ffffff;
 
-    window.viewDesktop = function () {
-      document.cookie = 'doc77-desktop=1;path=/;max-age=86400';
-      location.href = '/';
-    };
+        --border-light: #e2e8f0;
+        --border-medium: #cbd5e1;
 
-    async function loadProjects() {
-      var container = document.getElementById('projectList');
-      try {
-        // Verify server reachable + save connection
-        var infoR = await fetch('/api/mobile/info');
-        if (infoR.ok) {
-          var info = await infoR.json();
-          var su = window.location.protocol + '//' + window.location.host;
-          localStorage.setItem('doc77_last_server', JSON.stringify({url: su, hostname: info.hostname, version: info.version}));
+        --accent: #2563eb;
+        --accent-light-bg: #dbeafe;
+      }
+      .dark {
+        --bg-body: #0f172a;
+        --bg-card: #1e293b;
+        --bg-header: rgba(15, 23, 42, 0.85);
+        --bg-nav: rgba(15, 23, 42, 0.92);
+        --bg-hover: #1e293b;
+        --bg-code: #1e293b;
+
+        --text-primary: #e2e8f0;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+        --text-inverse: #ffffff;
+
+        --border-light: #334155;
+        --border-medium: #475569;
+
+        --accent: #60a5fa;
+        --accent-light-bg: #1e3a5f;
+      }
+
+      /* ══════════ Reset ══════════ */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* ══════════ Base ══════════ */
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: var(--bg-body);
+        color: var(--text-primary);
+        min-height: 100vh;
+        min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* Header */
+      .header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--bg-header);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 16px 20px 12px;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .header h1 {
+        font-size: 22px;
+        font-weight: 700;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: var(--bg-header);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border-light);
+        position: sticky;
+        top: 0;
+        z-index: 20;
+      }
+      .topbar .theme-btn {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px;
+      }
+      .star-badge {
+        font-size: 11px;
+        font-weight: 600;
+        color: #cbd5e1;
+        text-decoration: none;
+        padding: 4px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        transition: all 0.2s;
+        position: relative;
+      }
+      .star-badge:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fbbf24;
+        border-color: #fbbf24;
+      }
+      .star-badge:hover::after {
+        content: attr(title);
+        position: absolute;
+        top: 110%;
+        right: 0;
+        background: #1e293b;
+        color: #e2e8f0;
+        font-size: 10px;
+        font-weight: 400;
+        padding: 5px 10px;
+        border-radius: 6px;
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 50;
+      }
+
+      /* Content */
+      .content {
+        padding: 16px 16px 100px;
+      }
+
+      /* Cards */
+      .project-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px;
+        background: var(--bg-card);
+        border-radius: 16px;
+        border: 1px solid var(--border-light);
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: transform 0.1s;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .project-card:active {
+        transform: scale(0.97);
+      }
+      .project-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--text-inverse);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+      .project-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .project-name {
+        font-size: 16px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .project-path {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .project-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+      .project-arrow {
+        color: var(--border-medium);
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+
+      /* Empty / Loading */
+      .empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+      }
+      .empty-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: var(--text-muted);
+      }
+
+      /* Bottom Nav */
+      .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 40;
+        background: var(--bg-nav);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border-light);
+        padding: 8px 24px calc(20px + env(safe-area-inset-bottom, 0px));
+        display: flex;
+        justify-content: space-around;
+        align-items: flex-start;
+      }
+      .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        padding: 8px 12px;
+        -webkit-tap-highlight-color: transparent;
+        color: var(--text-muted);
+        transition: color 0.2s;
+        font-size: 10px;
+        font-weight: 600;
+        border: none;
+        background: none;
+      }
+      .nav-item.active {
+        color: var(--accent);
+      }
+      .nav-item .nav-icon {
+        font-size: 22px;
+      }
+
+      /* Settings */
+      .settings-section {
+        margin-bottom: 20px;
+      }
+      .settings-section h3 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        padding: 0 4px;
+      }
+      .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        background: var(--bg-card);
+        border-radius: 12px;
+        border: 1px solid var(--border-light);
+        margin-bottom: 6px;
+        font-size: 14px;
+      }
+      .settings-row .label {
+        font-weight: 500;
+      }
+      .settings-row .value {
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      /* Tabs */
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+
+      /* Accent link color for breadcrumb-like elements */
+      .recent-icon {
+        background: var(--bg-code);
+        color: var(--text-secondary);
+      }
+
+      /* Favorite star */
+      .fav-star {
+        color: var(--text-muted);
+      }
+      .fav-star.favorited {
+        color: #f59e0b;
+      }
+      .dark .fav-star {
+        color: #94a3b8;
+      }
+      .dark .fav-star.favorited {
+        color: #fbbf24;
+      }
+
+      /* Loading overlay */
+      .loading-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 300;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        animation: fadeIn 0.2s ease-out;
+      }
+      .loading-overlay .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      .loading-overlay .loading-text {
+        font-size: 14px;
+        font-weight: 500;
+        color: #fff;
+        text-align: center;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
-      } catch(e) { /* offline — errors handled below */ }
-      try {
-        var r = await fetch('/api/projects');
-        var projects = await r.json();
-        if (!projects.length) {
-          container.innerHTML = '<div class="empty"><div class="empty-icon">📁</div><p>暂无项目</p><p style="font-size:12px;margin-top:4px">请在桌面端注册项目</p></div>';
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* Login exit transition */
+      @keyframes loginRippleExpand {
+        0% {
+          width: 0;
+          height: 0;
+          opacity: 1;
+        }
+        70% {
+          width: 200vmax;
+          height: 200vmax;
+          opacity: 0.6;
+        }
+        100% {
+          width: 200vmax;
+          height: 200vmax;
+          opacity: 0;
+        }
+      }
+      .login-gate-ripple {
+        position: fixed;
+        pointer-events: none;
+        z-index: 201;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.9) 0%,
+          rgba(255, 255, 255, 0.3) 30%,
+          transparent 65%
+        );
+        animation: loginRippleExpand 0.5s cubic-bezier(0.15, 0.6, 0.35, 1) forwards;
+      }
+      @keyframes loginGateDissolve {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+      .login-gate-dissolve {
+        animation: loginGateDissolve 0.35s ease-out forwards;
+      }
+      @keyframes loginCardFadeUp {
+        from {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: translateY(-24px) scale(0.97);
+        }
+      }
+      .login-gate-dissolve .login-gate-card {
+        animation: loginCardFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      /* Button loading state */
+      .btn-loading {
+        position: relative;
+        pointer-events: none;
+        color: transparent !important;
+      }
+      .btn-loading::after {
+        content: '';
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        top: 50%;
+        left: 50%;
+        margin-top: -10px;
+        margin-left: -10px;
+      }
+
+      /* Progress overlay */
+      .progress-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 300;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        animation: fadeIn 0.25s ease-out;
+      }
+      .progress-card {
+        background: var(--bg-card);
+        border-radius: 18px;
+        padding: 28px 24px;
+        max-width: 360px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+      }
+      .dark .progress-card {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .progress-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .progress-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-bottom: 20px;
+      }
+      .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        color: var(--text-muted);
+        transition: color 0.3s;
+      }
+      .progress-step .step-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 12px;
+        background: var(--bg-hover);
+        color: var(--text-muted);
+        border: 1px solid var(--border-light);
+        transition: all 0.3s;
+      }
+      .progress-step.active {
+        color: var(--text-primary);
+      }
+      .progress-step.active .step-icon {
+        background: var(--accent-light-bg);
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+      .progress-step.completed {
+        color: #059669;
+      }
+      .progress-step.completed .step-icon {
+        background: rgba(5, 150, 105, 0.1);
+        color: #059669;
+        border-color: #059669;
+      }
+      .progress-bar-track {
+        width: 100%;
+        height: 4px;
+        background: var(--bg-hover);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .progress-bar-fill {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 2px;
+        transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top Bar -->
+    <div class="topbar" id="topbar">
+      <img
+        id="siteLogo"
+        src="/assets/logo.svg"
+        alt="Doc77"
+        height="28"
+        style="height: 28px; cursor: pointer"
+        onclick="location.href = '/'"
+      />
+      <div style="display: flex; align-items: center; gap: 8px">
+        <a
+          href="https://github.com/xyy277/doc77"
+          target="_blank"
+          rel="noopener"
+          class="star-badge"
+          title="xyy277 · 907507646@qq.com"
+          >⭐ 点个 Star</a
+        >
+        <button onclick="toggleTheme()" class="theme-btn" title="切换主题" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div style="padding: 8px 20px 0; font-size: 16px; font-weight: 600" id="mobileGreeting">
+      👋 下午好
+    </div>
+
+    <div id="app" style="display: none">
+      <!-- ═══ Tab: Recent ═══ -->
+      <div id="tab-recent" class="tab-content">
+        <div class="header"><h1>最近浏览</h1></div>
+        <div class="content" id="recentList">
+          <div class="empty">
+            <div class="empty-icon">🕐</div>
+            <p>暂无浏览记录</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Tab: Browse ═══ -->
+      <div id="tab-browse" class="tab-content active">
+        <div class="header" style="display: flex; align-items: baseline; gap: 6px">
+          <h1 style="margin: 0">项目</h1>
+          <span
+            id="mobileProjCount"
+            style="font-size: 12px; color: var(--text-muted); white-space: nowrap"
+          ></span>
+        </div>
+        <div class="content" id="projectList">
+          <div class="loading">加载中…</div>
+        </div>
+      </div>
+
+      <!-- ═══ Tab: Settings ═══ -->
+      <div id="tab-settings" class="tab-content">
+        <div class="header"><h1>设置</h1></div>
+        <div class="content">
+          <div class="settings-section">
+            <h3>通用</h3>
+            <div class="settings-row" onclick="toggleTheme()" style="cursor: pointer">
+              <span class="label">深色模式</span><span class="value" id="themeLabel">浅色</span>
+            </div>
+            <div class="settings-row" onclick="viewDesktop()" style="cursor: pointer">
+              <span class="label">桌面版</span><span class="value">→</span>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>关于</h3>
+            <div class="settings-row">
+              <span class="label">Doc77 预览引擎</span
+              ><span class="value" id="versionLabel">---</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Bottom Nav ═══ -->
+      <nav class="bottom-nav">
+        <button class="nav-item" data-tab="recent" onclick="switchTab('recent')">
+          <span class="nav-icon">🕐</span><span>最近</span>
+        </button>
+        <button class="nav-item active" data-tab="browse" onclick="switchTab('browse')">
+          <span class="nav-icon">📂</span><span>项目</span>
+        </button>
+        <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+          <span class="nav-icon">⚙️</span><span>设置</span>
+        </button>
+      </nav>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+      // ══════════ Dashboard Logic ══════════
+
+      function boot() {
+        // Fetch version
+        fetch('/api/health')
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (d) {
+            var el = document.getElementById('versionLabel');
+            if (el && d.version) el.textContent = 'v' + d.version;
+          })
+          .catch(function () {});
+
+        if (!sessionStorage.getItem('doc77-auth')) {
+          fetch('/api/auth/status')
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (d) {
+              if (!d.hasPassword) {
+                document.getElementById('app').style.display = 'block';
+                loadProjects();
+                return;
+              }
+              if (sessionStorage.getItem('doc77-auth')) {
+                document.getElementById('app').style.display = 'block';
+                loadProjects();
+                return;
+              }
+              setTimeout(boot, 500);
+            })
+            .catch(function () {
+              setTimeout(boot, 500);
+            });
           return;
         }
-        var html = '';
-        projects.forEach(function (p) {
-          html +=
-            '<div class="project-card" onclick="openProject(' + p.id + ')">' +
+        document.getElementById('app').style.display = 'block';
+        loadProjects();
+      }
+
+      window.switchTab = function (name) {
+        document.querySelectorAll('.tab-content').forEach(function (el) {
+          el.classList.remove('active');
+        });
+        document.querySelectorAll('.nav-item').forEach(function (el) {
+          el.classList.remove('active');
+        });
+        var tab = document.getElementById('tab-' + name);
+        if (tab) tab.classList.add('active');
+        var btn = document.querySelector('[data-tab="' + name + '"]');
+        if (btn) btn.classList.add('active');
+      };
+
+      window.viewDesktop = function () {
+        document.cookie = 'doc77-desktop=1;path=/;max-age=86400';
+        location.href = '/';
+      };
+
+      async function loadProjects() {
+        var container = document.getElementById('projectList');
+        try {
+          // Verify server reachable + save connection
+          var infoR = await fetch('/api/mobile/info');
+          if (infoR.ok) {
+            var info = await infoR.json();
+            var su = window.location.protocol + '//' + window.location.host;
+            localStorage.setItem(
+              'doc77_last_server',
+              JSON.stringify({ url: su, hostname: info.hostname, version: info.version }),
+            );
+          }
+        } catch (e) {
+          /* offline — errors handled below */
+        }
+        try {
+          var r = await fetch('/api/projects');
+          var projects = await r.json();
+          if (!projects.length) {
+            container.innerHTML =
+              '<div class="empty"><div class="empty-icon">📁</div><p>暂无项目</p><p style="font-size:12px;margin-top:4px">请在桌面端注册项目</p></div>';
+            return;
+          }
+          var html = '';
+          projects.forEach(function (p) {
+            html +=
+              '<div class="project-card" onclick="openProject(' +
+              p.id +
+              ')">' +
               '<div class="project-icon">📁</div>' +
               '<div class="project-info">' +
-                '<div class="project-name">' + esc(p.name) + '</div>' +
-                '<div class="project-path">' + esc(p.path) + '</div>' +
-                '<div class="project-meta">' + (p.last_opened ? '上次: ' + fmtDate(p.last_opened) : '') + '</div>' +
+              '<div class="project-name">' +
+              esc(p.name) +
               '</div>' +
-              '<button class="fav-star" style="flex-shrink:0;width:36px;height:36px;border:none;background:none;font-size:20px;cursor:pointer;padding:0" data-id="' + p.id + '" onclick="event.stopPropagation();toggleMobileFavorite(' + p.id + ', this)">' + (p.favorited ? '★' : '☆') + '</button>' +
+              '<div class="project-path">' +
+              esc(p.path) +
+              '</div>' +
+              '<div class="project-meta">' +
+              (p.last_opened ? '上次: ' + fmtDate(p.last_opened) : '') +
+              '</div>' +
+              '</div>' +
+              '<button class="fav-star" style="flex-shrink:0;width:36px;height:36px;border:none;background:none;font-size:20px;cursor:pointer;padding:0" data-id="' +
+              p.id +
+              '" onclick="event.stopPropagation();toggleMobileFavorite(' +
+              p.id +
+              ', this)">' +
+              (p.favorited ? '★' : '☆') +
+              '</button>' +
               '<span class="project-arrow">›</span>' +
-            '</div>';
-        });
-        container.innerHTML = html;
-        document.getElementById('mobileProjCount').textContent = '(' + projects.length + ')';
-        loadRecent();
-        // Restore saved tab (e.g. coming back from preview)
-        var savedTab = sessionStorage.getItem('doc77-mobile-tab');
-        if (savedTab) { sessionStorage.removeItem('doc77-mobile-tab'); switchTab(savedTab); }
-      } catch (e) {
-        container.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>加载失败</p></div>';
+              '</div>';
+          });
+          container.innerHTML = html;
+          document.getElementById('mobileProjCount').textContent = '(' + projects.length + ')';
+          loadRecent();
+          // Restore saved tab (e.g. coming back from preview)
+          var savedTab = sessionStorage.getItem('doc77-mobile-tab');
+          if (savedTab) {
+            sessionStorage.removeItem('doc77-mobile-tab');
+            switchTab(savedTab);
+          }
+        } catch (e) {
+          container.innerHTML =
+            '<div class="empty"><div class="empty-icon">⚠️</div><p>加载失败</p></div>';
+        }
       }
-    }
 
-    // ── Load recent files (B3 fixed: theme-aware icon) ──
-    function loadRecent() {
-      var container = document.getElementById('recentList');
-      try {
-        var raw = localStorage.getItem('doc77_recent_files');
-        if (!raw) { container.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>'; return; }
-        var files = JSON.parse(raw);
-        if (!files.length) { container.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>'; return; }
-        var html = '';
-        files.slice(0, 10).forEach(function (f) {
-          html +=
-            '<div class="project-card" onclick="location.href=\'/preview.html?id=' + (f.projectId || '') + '&path=' + encodeURIComponent(f.path || '') + '\'">' +
+      // ── Load recent files (B3 fixed: theme-aware icon) ──
+      function loadRecent() {
+        var container = document.getElementById('recentList');
+        try {
+          var raw = localStorage.getItem('doc77_recent_files');
+          if (!raw) {
+            container.innerHTML =
+              '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>';
+            return;
+          }
+          var files = JSON.parse(raw);
+          if (!files.length) {
+            container.innerHTML =
+              '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>';
+            return;
+          }
+          var html = '';
+          files.slice(0, 10).forEach(function (f) {
+            html +=
+              '<div class="project-card" onclick="location.href=\'/preview.html?id=' +
+              (f.projectId || '') +
+              '&path=' +
+              encodeURIComponent(f.path || '') +
+              '\'">' +
               '<div class="project-icon recent-icon" style="font-size:18px">📄</div>' +
               '<div class="project-info">' +
-                '<div class="project-name" style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.name || '') + '</div>' +
-                '<div class="project-path">' + esc(f.path || '') + '</div>' +
+              '<div class="project-name" style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+              esc(f.name || '') +
+              '</div>' +
+              '<div class="project-path">' +
+              esc(f.path || '') +
+              '</div>' +
               '</div>' +
               '<span class="project-arrow">›</span>' +
-            '</div>';
-        });
-        container.innerHTML = html;
-      } catch (e) {
-        container.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>';
+              '</div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML =
+            '<div class="empty"><div class="empty-icon">🕐</div><p>暂无浏览记录</p></div>';
+        }
       }
-    }
 
-    window.openProject = function (id) {
-      sessionStorage.setItem('doc77-mobile-tab', 'browse');
-      location.href = '/preview.html?id=' + id;
-    };
+      window.openProject = function (id) {
+        sessionStorage.setItem('doc77-mobile-tab', 'browse');
+        location.href = '/preview.html?id=' + id;
+      };
 
-    function esc(s) {
-      if (!s) return '';
-      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-    function fmtDate(d) {
-      try { return new Date(d).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }); } catch (e) { return ''; }
-    }
+      function esc(s) {
+        if (!s) return '';
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+      function fmtDate(d) {
+        try {
+          return new Date(d).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+        } catch (e) {
+          return '';
+        }
+      }
 
-    // ── Theme label ──
-    // ── Theme: logo + label sync ──
-    function applyThemeUI() {
-      var isDark = document.documentElement.classList.contains('dark');
-      var logo = document.getElementById('siteLogo');
-      if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
-      var tl = document.getElementById('themeLabel');
-      if (tl) tl.textContent = isDark ? '深色' : '浅色';
-    }
-    applyThemeUI();
-    var origToggle = window.toggleTheme;
-    window.toggleTheme = function () { origToggle(); applyThemeUI(); };
+      // ── Theme label ──
+      // ── Theme: logo + label sync ──
+      function applyThemeUI() {
+        var isDark = document.documentElement.classList.contains('dark');
+        var logo = document.getElementById('siteLogo');
+        if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
+        var tl = document.getElementById('themeLabel');
+        if (tl) tl.textContent = isDark ? '深色' : '浅色';
+      }
+      applyThemeUI();
+      var origToggle = window.toggleTheme;
+      window.toggleTheme = function () {
+        origToggle();
+        applyThemeUI();
+      };
 
-    // Greeting
-    (function() {
-      var hour = new Date().getHours();
-      var g;
-      if (hour < 6) g = '🌙 夜深了';
-      else if (hour < 12) g = '👋 早上好';
-      else if (hour < 14) g = '👋 中午好';
-      else if (hour < 18) g = '👋 下午好';
-      else g = '🌆 晚上好';
-      var el = document.getElementById('mobileGreeting');
-      if (el) el.textContent = g;
-    })();
+      // Greeting
+      (function () {
+        var hour = new Date().getHours();
+        var g;
+        if (hour < 6) g = '🌙 夜深了';
+        else if (hour < 12) g = '👋 早上好';
+        else if (hour < 14) g = '👋 中午好';
+        else if (hour < 18) g = '👋 下午好';
+        else g = '🌆 晚上好';
+        var el = document.getElementById('mobileGreeting');
+        if (el) el.textContent = g;
+      })();
 
-    // Favorite toggle
-    window.toggleMobileFavorite = async function(projectId, btn) {
-      try {
-        var r = await fetch('/api/projects/' + projectId + '/favorite', { method: 'PUT' });
-        if (!r.ok) return;
-        var d = await r.json();
-        btn.textContent = d.favorited ? '★' : '☆';
-      } catch(e) {}
-    };
+      // Favorite toggle
+      window.toggleMobileFavorite = async function (projectId, btn) {
+        try {
+          var r = await fetch('/api/projects/' + projectId + '/favorite', { method: 'PUT' });
+          if (!r.ok) return;
+          var d = await r.json();
+          btn.textContent = d.favorited ? '★' : '☆';
+        } catch (e) {}
+      };
 
-    boot();
-  </script>
-</body>
+      boot();
+    </script>
+  </body>
 </html>

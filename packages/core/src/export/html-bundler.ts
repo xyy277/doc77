@@ -22,17 +22,11 @@ export function bundleHTML(params: BundleParams): string {
   // 1. Replace local image src with base64 data URIs
   let html = content;
   for (const img of images) {
-    html = html.replaceAll(
-      `src="${img.url}"`,
-      `src="${img.base64}"`,
-    );
+    html = html.replaceAll(`src="${img.url}"`, `src="${img.base64}"`);
   }
 
   // 2. Remove interactive elements (code copy buttons, etc.)
-  html = html.replace(
-    /<button class="code-copy-btn[^>]*><\/button>/g,
-    '',
-  );
+  html = html.replace(/<button class="code-copy-btn[^>]*><\/button>/g, '');
 
   // 3. Merge all CSS into one block
   const mergedCSS = styles.join('\n');
@@ -70,5 +64,9 @@ ${mergedCSS}
 }
 
 function escapeHTML(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

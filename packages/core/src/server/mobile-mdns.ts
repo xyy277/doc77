@@ -12,20 +12,38 @@ export async function publishMdns(port: number): Promise<{ destroy: () => void }
     const mdns = multicastdns();
     mdns.on('ready', () => {
       mdns.on('query', (query: any) => {
-        const isOurService = query.questions?.some((q: any) => q.name === '_doc77._tcp.local' && q.type === 'PTR');
+        const isOurService = query.questions?.some(
+          (q: any) => q.name === '_doc77._tcp.local' && q.type === 'PTR',
+        );
         if (!isOurService) return;
         mdns.respond({
           answers: [
             { name: '_doc77._tcp.local', type: 'PTR', data: `Doc77-${hostname}._doc77._tcp.local` },
-            { name: `Doc77-${hostname}._doc77._tcp.local`, type: 'SRV', data: { priority: 10, weight: 1, port, target: os.hostname() } },
-            { name: `Doc77-${hostname}._doc77._tcp.local`, type: 'TXT', data: [`version=${VERSION}`] },
+            {
+              name: `Doc77-${hostname}._doc77._tcp.local`,
+              type: 'SRV',
+              data: { priority: 10, weight: 1, port, target: os.hostname() },
+            },
+            {
+              name: `Doc77-${hostname}._doc77._tcp.local`,
+              type: 'TXT',
+              data: [`version=${VERSION}`],
+            },
             { name: `Doc77-${hostname}._doc77._tcp.local`, type: 'A', data: getLocalIP() },
           ],
         });
       });
     });
-    return { destroy: () => { try { mdns.destroy(); } catch {} } };
-  } catch { return null; }
+    return {
+      destroy: () => {
+        try {
+          mdns.destroy();
+        } catch {}
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 function getLocalIP(): string {

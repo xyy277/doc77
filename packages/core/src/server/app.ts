@@ -7,7 +7,11 @@ import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
 import { discoverProjects } from '../scanner/discover.js';
-import { detectProjectTags, discoverGitProjects, parseCodeWorkspace } from '../scanner/project-detector.js';
+import {
+  detectProjectTags,
+  discoverGitProjects,
+  parseCodeWorkspace,
+} from '../scanner/project-detector.js';
 import {
   registerProject,
   listProjects,
@@ -215,7 +219,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   // --- mDNS publisher for mobile companion discovery ---
   let mdnsService: { destroy: () => void } | null = null;
   if (port) {
-    publishMdns(port).then((s) => { mdnsService = s; });
+    publishMdns(port).then((s) => {
+      mdnsService = s;
+    });
   }
 
   // --- API Routes ---
@@ -500,8 +506,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     try {
       const repos = discoverGitProjects(dirPath, depth);
       // Filter out already-registered paths
-      const existingPaths = new Set(listProjects().map(p => path.resolve(p.path)));
-      const filtered = repos.filter(r => !existingPaths.has(r.path));
+      const existingPaths = new Set(listProjects().map((p) => path.resolve(p.path)));
+      const filtered = repos.filter((r) => !existingPaths.has(r.path));
 
       res.json({ root: dirPath, repositories: filtered, count: filtered.length });
     } catch (err: unknown) {
@@ -525,7 +531,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         return;
       }
 
-      const existingPaths = new Set(listProjects().map(p => p.path));
+      const existingPaths = new Set(listProjects().map((p) => p.path));
       const imported: Array<{ path: string; name: string; tags: string[]; id?: number }> = [];
       const skipped: string[] = [];
 
@@ -564,10 +570,16 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
        ORDER BY p.name`,
       )
       .all() as any[];
-    const projects = rows.map(r => ({
+    const projects = rows.map((r) => ({
       ...r,
       obsidian_mode: !!r.obsidian_mode,
-      tags: (() => { try { return JSON.parse(r.tags || '[]'); } catch { return []; } })(),
+      tags: (() => {
+        try {
+          return JSON.parse(r.tags || '[]');
+        } catch {
+          return [];
+        }
+      })(),
     }));
     res.json(projects);
   });
@@ -1051,8 +1063,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
     try {
       const db = getConnection();
-      const project = db.prepare('SELECT path, obsidian_mode FROM projects WHERE id = ?').get(projectId) as
-        { path: string; obsidian_mode: number } | undefined;
+      const project = db
+        .prepare('SELECT path, obsidian_mode FROM projects WHERE id = ?')
+        .get(projectId) as { path: string; obsidian_mode: number } | undefined;
 
       if (!project) {
         res.status(404).json({ error: 'Project not found' });
@@ -1242,12 +1255,20 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
             const data = fs.readFileSync(validatedPath);
             const ext = path.extname(validatedPath).toLowerCase();
             const mimeMap: Record<string, string> = {
-              '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-              '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
-              '.bmp': 'image/bmp', '.ico': 'image/x-icon',
+              '.png': 'image/png',
+              '.jpg': 'image/jpeg',
+              '.jpeg': 'image/jpeg',
+              '.gif': 'image/gif',
+              '.svg': 'image/svg+xml',
+              '.webp': 'image/webp',
+              '.bmp': 'image/bmp',
+              '.ico': 'image/x-icon',
             };
             const mime = mimeMap[ext] || 'application/octet-stream';
-            resolvedImages.push({ url: img.url, base64: `data:${mime};base64,${data.toString('base64')}` });
+            resolvedImages.push({
+              url: img.url,
+              base64: `data:${mime};base64,${data.toString('base64')}`,
+            });
           } catch {
             // Skip unresolvable images
           }
@@ -1255,9 +1276,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       }
 
       const maxSize = parseInt(getConfig('export.html.maxFileSizeMB') || '10', 10);
-      const htmlSizeKB = Math.round((content.length + JSON.stringify(styles).length + JSON.stringify(images || []).length) / 1024);
+      const htmlSizeKB = Math.round(
+        (content.length + JSON.stringify(styles).length + JSON.stringify(images || []).length) /
+          1024,
+      );
       if (htmlSizeKB > maxSize * 1024) {
-        res.status(413).json({ error: `文件过大 (${Math.round(htmlSizeKB/1024)}MB)，导出上限 ${maxSize}MB` });
+        res
+          .status(413)
+          .json({ error: `文件过大 (${Math.round(htmlSizeKB / 1024)}MB)，导出上限 ${maxSize}MB` });
         return;
       }
 
@@ -1271,7 +1297,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
       const safeFilename = (title || 'untitled').replace(/[^a-zA-Z0-9一-鿿_-]/g, '_') + '.html';
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`,
+      );
       res.send(html);
     } catch (err: any) {
       res.status(500).json({ error: err.message || '导出失败' });
@@ -1298,7 +1327,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       // Check bind_address — sharing only works when bound to 0.0.0.0
       const bindAddr = getConfig('security.bind_address') || '127.0.0.1';
       if (bindAddr === '127.0.0.1') {
-        res.status(403).json({ error: '分享功能需要绑定 0.0.0.0（局域网访问）。请在设置中修改 bind_address 并重启。' });
+        res.status(403).json({
+          error: '分享功能需要绑定 0.0.0.0（局域网访问）。请在设置中修改 bind_address 并重启。',
+        });
         return;
       }
 
@@ -1380,7 +1411,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       if (renderer === 'markdown') {
         rendered = {
           type: 'markdown',
-          content: renderMarkdown(content, { projectId: token.projectId, filePath: token.filePath }),
+          content: renderMarkdown(content, {
+            projectId: token.projectId,
+            filePath: token.filePath,
+          }),
         };
       } else if (renderer === 'code') {
         rendered = {
@@ -1432,7 +1466,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const shareUrl = `http://${getLocalIP()}:${serverInfo.port}/s/${token.token}`;
 
     try {
-      const svg = await QRCode.toString(shareUrl, { type: 'svg', margin: 2, width: 300, color: { dark: '#1e293b', light: '#ffffff' } });
+      const svg = await QRCode.toString(shareUrl, {
+        type: 'svg',
+        margin: 2,
+        width: 300,
+        color: { dark: '#1e293b', light: '#ffffff' },
+      });
       res.setHeader('Content-Type', 'image/svg+xml');
       res.setHeader('Cache-Control', 'no-cache');
       res.send(svg);
@@ -1443,7 +1482,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
   /** GET /api/shares — List active share tokens */
   app.get('/api/shares', (_req: Request, res: Response) => {
-    const shares = shareManager.list().map(t => ({
+    const shares = shareManager.list().map((t) => ({
       token: t.token,
       documentTitle: t.documentTitle,
       createdAt: t.createdAt,

@@ -12,13 +12,14 @@ export interface I18nResponse {
   etag: string;
 }
 
-export function buildI18nResponse(q: {
-  lang: string;
-  hint: string;
-  global: string;
-}): I18nResponse {
+export function buildI18nResponse(q: { lang: string; hint: string; global: string }): I18nResponse {
   const lang = resolveLocale(q.lang || q.global, q.hint);
   const dict = getDict(lang);
-  const etag = '"' + createHash('sha1').update(lang + JSON.stringify(dict)).digest('hex') + '"';
+  const etag =
+    '"' +
+    createHash('sha1')
+      .update(lang + JSON.stringify(dict))
+      .digest('hex') +
+    '"';
   return { lang, dict, available: listLocales(), global: q.global, etag };
 }

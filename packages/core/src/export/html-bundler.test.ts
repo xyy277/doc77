@@ -40,7 +40,8 @@ describe('bundleHTML', () => {
   it('should remove code-copy-btn elements', () => {
     const params: BundleParams = {
       ...minimalParams,
-      content: '<div class="doc77-code-block"><button class="code-copy-btn" title="复制"></button><pre><code>hi</code></pre></div>',
+      content:
+        '<div class="doc77-code-block"><button class="code-copy-btn" title="复制"></button><pre><code>hi</code></pre></div>',
     };
     const result = bundleHTML(params);
     expect(result).not.toContain('code-copy-btn');

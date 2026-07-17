@@ -4,7 +4,7 @@
 
 var discoverResults = [];
 
-window.doDiscover = async function() {
+window.doDiscover = async function () {
   var pathInput = document.getElementById('discoverPath');
   var status = document.getElementById('discoverStatus');
   var candidates = document.getElementById('discoverCandidates');
@@ -42,7 +42,7 @@ window.doDiscover = async function() {
     status.textContent = '发现 ' + discoverResults.length + ' 个候选项目';
     renderDiscoverCandidates();
     actions.style.display = 'block';
-  } catch(e) {
+  } catch (e) {
     status.textContent = '❌ 网络错误';
   }
 
@@ -55,22 +55,31 @@ function renderDiscoverCandidates() {
   var container = document.getElementById('discoverCandidates');
   var html = '';
 
-  discoverResults.forEach(function(item, index) {
-    html += '<label class="discover-candidate">' +
-      '<input type="checkbox" data-index="' + index + '" onchange="updateBatchButton()">' +
+  discoverResults.forEach(function (item, index) {
+    html +=
+      '<label class="discover-candidate">' +
+      '<input type="checkbox" data-index="' +
+      index +
+      '" onchange="updateBatchButton()">' +
       '<span>📂</span>' +
       '<div class="candidate-info">' +
-        '<div class="candidate-name">' + esc(item.name) + '</div>' +
-        '<div class="candidate-path">' + esc(item.path) + '</div>' +
+      '<div class="candidate-name">' +
+      esc(item.name) +
       '</div>' +
-      '<span style="font-size:11px;color:var(--text-muted)">' + item.mdCount + ' .md</span>' +
-    '</label>';
+      '<div class="candidate-path">' +
+      esc(item.path) +
+      '</div>' +
+      '</div>' +
+      '<span style="font-size:11px;color:var(--text-muted)">' +
+      item.mdCount +
+      ' .md</span>' +
+      '</label>';
   });
 
   container.innerHTML = html;
 }
 
-window.updateBatchButton = function() {
+window.updateBatchButton = function () {
   var checked = document.querySelectorAll('#discoverCandidates input:checked').length;
   var btn = document.querySelector('#discoverActions .btn');
   if (btn) {
@@ -79,9 +88,12 @@ window.updateBatchButton = function() {
   }
 };
 
-window.batchRegister = async function() {
+window.batchRegister = async function () {
   var checked = document.querySelectorAll('#discoverCandidates input:checked');
-  if (!checked.length) { toast('请至少选择一个项目', 'info'); return; }
+  if (!checked.length) {
+    toast('请至少选择一个项目', 'info');
+    return;
+  }
 
   showLoading('正在批量注册 ' + checked.length + ' 个项目...');
   var successCount = 0;
@@ -103,7 +115,7 @@ window.batchRegister = async function() {
       } else {
         failCount++;
       }
-    } catch(e) {
+    } catch (e) {
       failCount++;
     }
   }
@@ -113,13 +125,17 @@ window.batchRegister = async function() {
   if (successCount > 0) {
     toast('成功注册 ' + successCount + ' 个项目', 'success');
     // Refresh the main dashboard
-    fetch('/api/projects').then(function(r) { return r.json(); }).then(function(allProjects) {
-      projects = allProjects;
-      document.getElementById('projCount').textContent = allProjects.length;
-      window.filterAndSort();
-      window.renderFavorites(allProjects);
-      window.renderStats();
-    });
+    fetch('/api/projects')
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (allProjects) {
+        projects = allProjects;
+        document.getElementById('projCount').textContent = allProjects.length;
+        window.filterAndSort();
+        window.renderFavorites(allProjects);
+        window.renderStats();
+      });
   }
   if (failCount > 0) {
     toast(failCount + ' 个注册失败（可能已存在）', 'error');

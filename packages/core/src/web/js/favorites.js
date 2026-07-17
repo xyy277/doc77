@@ -3,16 +3,19 @@
  */
 
 // ═══ Favorite Toggle ═══
-window.toggleFavorite = async function(projectId) {
+window.toggleFavorite = async function (projectId) {
   try {
     var r = await fetch('/api/projects/' + projectId + '/favorite', { method: 'PUT' });
-    if (!r.ok) { toast('操作失败', 'error'); return; }
+    if (!r.ok) {
+      toast('操作失败', 'error');
+      return;
+    }
     var d = await r.json();
     // Update star buttons in DOM
     updateStarButtons(projectId, d.favorited);
     // Update local projects array so filterAndSort picks up the change
     if (typeof projects !== 'undefined') {
-      projects.forEach(function(p) {
+      projects.forEach(function (p) {
         if (p.id === projectId) p.favorited = d.favorited ? 1 : 0;
       });
     }
@@ -21,14 +24,14 @@ window.toggleFavorite = async function(projectId) {
     window.filterAndSort();
     window.refreshStats();
     toast(d.favorited ? '已收藏' : '已取消收藏', 'success');
-  } catch(e) {
+  } catch (e) {
     toast('操作失败', 'error');
   }
 };
 
 function updateStarButtons(projectId, favorited) {
   var buttons = document.querySelectorAll('.fav-star[data-id="' + projectId + '"]');
-  buttons.forEach(function(btn) {
+  buttons.forEach(function (btn) {
     if (favorited) {
       btn.classList.add('favorited');
       btn.textContent = '★';
@@ -40,8 +43,10 @@ function updateStarButtons(projectId, favorited) {
 }
 
 // ═══ Render Favorites Section ═══
-window.renderFavorites = function(projects) {
-  var favProjects = projects.filter(function(p) { return p.favorited; });
+window.renderFavorites = function (projects) {
+  var favProjects = projects.filter(function (p) {
+    return p.favorited;
+  });
   var section = document.getElementById('favoritesSection');
   var list = document.getElementById('favList');
   var countEl = document.getElementById('favCount');
@@ -59,18 +64,32 @@ window.renderFavorites = function(projects) {
 
   section.style.display = 'block';
   var html = '<div class="fav-pills">';
-  favProjects.forEach(function(p) {
-    html += '<span class="fav-pill" onclick="location.href=\'/preview.html?id=' + p.id + '\'" style="cursor:pointer" title="' + escAttr(p.name) + '">📂 <span class="fav-pill-name">' + esc(p.name) + '</span>' +
-      '<button class="fav-pill-remove" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')" title="取消收藏">✕</button></span>';
+  favProjects.forEach(function (p) {
+    html +=
+      '<span class="fav-pill" onclick="location.href=\'/preview.html?id=' +
+      p.id +
+      '\'" style="cursor:pointer" title="' +
+      escAttr(p.name) +
+      '">📂 <span class="fav-pill-name">' +
+      esc(p.name) +
+      '</span>' +
+      '<button class="fav-pill-remove" onclick="event.stopPropagation();toggleFavorite(' +
+      p.id +
+      ')" title="取消收藏">✕</button></span>';
   });
   html += '</div>';
   list.innerHTML = html;
 };
 
 // ═══ Refresh (called by other modules after state change) ═══
-window.refreshFavorites = function() {
+window.refreshFavorites = function () {
   // Re-fetch projects to get latest favorited status
-  fetch('/api/projects').then(function(r) { return r.json(); }).then(function(projects) {
-    window.renderFavorites(projects);
-  }).catch(function() {});
+  fetch('/api/projects')
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (projects) {
+      window.renderFavorites(projects);
+    })
+    .catch(function () {});
 };

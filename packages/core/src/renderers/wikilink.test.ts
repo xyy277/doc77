@@ -70,10 +70,7 @@ describe('resolveWikilink', () => {
   it('should resolve via alias map in .doc77links', async () => {
     const { resolveWikilink, clearWikilinkCache } = await import('./wikilink.js');
     // Create .doc77links file with alias
-    fs.writeFileSync(
-      path.join(projectRoot, '.doc77links'),
-      '# Aliases\nShortcut → Note A.md\n',
-    );
+    fs.writeFileSync(path.join(projectRoot, '.doc77links'), '# Aliases\nShortcut → Note A.md\n');
     // Clear cache so it picks up new files
     clearWikilinkCache(projectId);
     const result = resolveWikilink('Shortcut', projectId, projectRoot);
@@ -82,10 +79,7 @@ describe('resolveWikilink', () => {
 
   it('should resolve via alias map with = separator', async () => {
     const { resolveWikilink, clearWikilinkCache } = await import('./wikilink.js');
-    fs.writeFileSync(
-      path.join(projectRoot, '.doc77links'),
-      'Shortcut = Note A.md\n',
-    );
+    fs.writeFileSync(path.join(projectRoot, '.doc77links'), 'Shortcut = Note A.md\n');
     clearWikilinkCache(projectId);
     const result = resolveWikilink('Shortcut', projectId, projectRoot);
     expect(result).toBe(path.join(projectRoot, 'Note A.md'));

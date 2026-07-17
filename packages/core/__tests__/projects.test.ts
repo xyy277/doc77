@@ -135,7 +135,7 @@ describe('Project CRUD', () => {
       const p = registerProject('Toggle', projectDir);
       updateProject(p.id, { obsidian_mode: true });
       const projects = listProjects();
-      const updated = projects.find(pr => pr.id === p.id);
+      const updated = projects.find((pr) => pr.id === p.id);
       expect(updated?.obsidian_mode).toBe(true);
     });
   });
@@ -152,7 +152,7 @@ describe('Project CRUD', () => {
     it('should update tags', () => {
       const p = registerProject('TagUpdate', projectDir);
       updateProject(p.id, { tags: ['python'] });
-      const updated = listProjects().find(pr => pr.id === p.id);
+      const updated = listProjects().find((pr) => pr.id === p.id);
       expect(updated?.tags).toEqual(['python']);
     });
   });

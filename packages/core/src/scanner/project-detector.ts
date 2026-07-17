@@ -33,20 +33,21 @@ export function detectProjectTags(dirPath: string): string[] {
     if (signal.matchGlob) {
       try {
         const entries = fs.readdirSync(expanded, { withFileTypes: true });
-        const found = entries.some(e =>
-          e.isFile() &&
-          signal.files.some(f => {
-            if (!f.startsWith('*.')) return e.name === f;
-            const ext = f.slice(1); // *.csproj → .csproj
-            return e.name.endsWith(ext);
-          })
+        const found = entries.some(
+          (e) =>
+            e.isFile() &&
+            signal.files.some((f) => {
+              if (!f.startsWith('*.')) return e.name === f;
+              const ext = f.slice(1); // *.csproj → .csproj
+              return e.name.endsWith(ext);
+            }),
         );
         if (found) tags.push(signal.tag);
       } catch {
         /* skip unreadable directories */
       }
     } else {
-      const found = signal.files.some(f => hasFile(expanded, f));
+      const found = signal.files.some((f) => hasFile(expanded, f));
       if (found) tags.push(signal.tag);
     }
   }
@@ -56,9 +57,22 @@ export function detectProjectTags(dirPath: string): string[] {
 
 /** Directories always skipped during git discovery */
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '__pycache__', '.svn', '.hg',
-  '.venv', 'venv', '.tox', 'dist', '.cache', '.next', '.nuxt',
-  'build', 'target', '.terraform', '.serverless',
+  'node_modules',
+  '.git',
+  '__pycache__',
+  '.svn',
+  '.hg',
+  '.venv',
+  'venv',
+  '.tox',
+  'dist',
+  '.cache',
+  '.next',
+  '.nuxt',
+  'build',
+  'target',
+  '.terraform',
+  '.serverless',
 ]);
 
 /**
@@ -96,7 +110,7 @@ export function discoverGitProjects(
 
     // Check for .git in subdirectories only (not the root itself)
     if (d > 0) {
-      const hasGit = entries.some(e => e.name === '.git' && e.isDirectory());
+      const hasGit = entries.some((e) => e.name === '.git' && e.isDirectory());
       if (hasGit) {
         const fullPath = path.resolve(dir);
         const tags = detectProjectTags(fullPath);
@@ -120,9 +134,7 @@ export function discoverGitProjects(
 /**
  * Parse a VS Code .code-workspace file and resolve folder paths.
  */
-export function parseCodeWorkspace(
-  workspacePath: string,
-): Array<{ path: string; name: string }> {
+export function parseCodeWorkspace(workspacePath: string): Array<{ path: string; name: string }> {
   let expanded = workspacePath.startsWith('~')
     ? os.homedir() + workspacePath.slice(1)
     : workspacePath;

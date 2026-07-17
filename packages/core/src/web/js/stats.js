@@ -2,7 +2,7 @@
  * Doc77 Stats JS — statistics panel rendering (updates header badges)
  */
 
-window.renderStats = async function() {
+window.renderStats = async function () {
   try {
     var r = await fetch('/api/stats');
     var d = await r.json();
@@ -13,12 +13,12 @@ window.renderStats = async function() {
     if (projEl) projEl.textContent = d.projects;
     if (favEl) favEl.textContent = d.favoriteCount;
     // recentCount is synced by dashboard.js renderRecent
-  } catch(e) {
+  } catch (e) {
     // silent fail — badges just show "0"
   }
 };
 
-window.refreshStats = function() {
+window.refreshStats = function () {
   window.renderStats();
 };
 

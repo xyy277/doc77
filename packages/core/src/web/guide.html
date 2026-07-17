@@ -1,710 +1,1333 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
-<style>.i18n-loading body{visibility:hidden}</style>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doc77 — 功能引导</title>
-<script>
-(function(){
-  var s = document.createElement('script');
-  s.src = (window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com');
-  s.onload = function() { tailwind.config = { darkMode: 'class', theme: { extend: {} } }; };
-  document.head.appendChild(s);
-})();
-</script>
-<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/app.css">
-<style>
-  /* ═══ Guide Page Overrides ═══ */
-  html { scroll-behavior: smooth; overflow-y: auto; }
-  body { overflow-y: visible; height: auto; min-height: 100vh; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  <head>
+    <script>
+      document.documentElement.classList.add('i18n-loading');
+      setTimeout(function () {
+        document.documentElement.classList.remove('i18n-loading');
+      }, 1500);
+    </script>
+    <style>
+      .i18n-loading body {
+        visibility: hidden;
+      }
+    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Doc77 — 功能引导</title>
+    <script>
+      (function () {
+        var s = document.createElement('script');
+        s.src = window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com';
+        s.onload = function () {
+          tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+        };
+        document.head.appendChild(s);
+      })();
+    </script>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/app.css" />
+    <style>
+      /* ═══ Guide Page Overrides ═══ */
+      html {
+        scroll-behavior: smooth;
+        overflow-y: auto;
+      }
+      body {
+        overflow-y: visible;
+        height: auto;
+        min-height: 100vh;
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
 
-  /* Guide header */
-  .guide-header {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    position: sticky; top: 0; z-index: 50;
-  }
-  .dark .guide-header {
-    background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
-  }
-  .guide-header-inner {
-    max-width: 72rem; margin: 0 auto; padding: 0 24px;
-    height: 56px; display: flex; align-items: center; justify-content: space-between;
-  }
-  .guide-header a { text-decoration: none; }
-  .guide-header .logo img { height: 32px; }
-  .guide-header-actions { display: flex; align-items: center; gap: 12px; }
-  .guide-header-link {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-size: 13px; font-weight: 500; color: #94a3b8;
-    transition: color 0.2s; text-decoration: none; padding: 6px 10px; border-radius: 6px;
-  }
-  .guide-header-link:hover { color: #f1f5f9; background: rgba(255,255,255,0.06); }
+      /* Guide header */
+      .guide-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+      .dark .guide-header {
+        background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+      }
+      .guide-header-inner {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 0 24px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .guide-header a {
+        text-decoration: none;
+      }
+      .guide-header .logo img {
+        height: 32px;
+      }
+      .guide-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .guide-header-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #94a3b8;
+        transition: color 0.2s;
+        text-decoration: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+      }
+      .guide-header-link:hover {
+        color: #f1f5f9;
+        background: rgba(255, 255, 255, 0.06);
+      }
 
-  /* Hero */
-  .guide-hero {
-    position: relative; overflow: hidden;
-    padding: 56px 24px 48px;
-    background: linear-gradient(180deg, #0f172a 0%, #1e293b 60%, var(--bg-body) 100%);
-  }
-  .dark .guide-hero {
-    background: linear-gradient(180deg, #020617 0%, #0f172a 50%, var(--bg-body) 100%);
-  }
-  .guide-hero-inner { max-width: 72rem; margin: 0 auto; }
-  .guide-hero-label {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-size: 12px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase;
-    color: #60a5fa; margin-bottom: 16px;
-  }
-  .guide-hero h1 {
-    font-size: 2.5rem; font-weight: 800; line-height: 1.15; letter-spacing: -0.025em;
-    color: #f8fafc; margin: 0 0 12px 0; max-width: 14ch;
-  }
-  .guide-hero p {
-    font-size: 15px; line-height: 1.7; color: #94a3b8;
-    max-width: 56ch; margin: 0 0 24px 0;
-  }
+      /* Hero */
+      .guide-hero {
+        position: relative;
+        overflow: hidden;
+        padding: 56px 24px 48px;
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 60%, var(--bg-body) 100%);
+      }
+      .dark .guide-hero {
+        background: linear-gradient(180deg, #020617 0%, #0f172a 50%, var(--bg-body) 100%);
+      }
+      .guide-hero-inner {
+        max-width: 72rem;
+        margin: 0 auto;
+      }
+      .guide-hero-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+        color: #60a5fa;
+        margin-bottom: 16px;
+      }
+      .guide-hero h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+        color: #f8fafc;
+        margin: 0 0 12px 0;
+        max-width: 14ch;
+      }
+      .guide-hero p {
+        font-size: 15px;
+        line-height: 1.7;
+        color: #94a3b8;
+        max-width: 56ch;
+        margin: 0 0 24px 0;
+      }
 
-  /* Layout */
-  .guide-layout { max-width: 72rem; margin: 0 auto; padding: 0 24px; display: flex; gap: 40px; }
-  .guide-sidebar {
-    width: 200px; flex-shrink: 0;
-    position: sticky; top: 72px; align-self: flex-start;
-    max-height: calc(100vh - 88px); overflow-y: auto;
-    padding-right: 4px;
-    display: flex; flex-direction: column; gap: 2px;
-  }
-  .guide-sidebar::-webkit-scrollbar { width: 3px; }
-  .guide-sidebar::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 4px; }
-  .guide-sidebar::-webkit-scrollbar-track { background: transparent; }
-  .guide-sidebar-title {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 8px;
-  }
-  .guide-nav-link {
-    display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary);
-    text-decoration: none; padding: 6px 10px; border-radius: 6px;
-    transition: all 0.15s; border-left: 2px solid transparent;
-  }
-  .guide-nav-link:hover {
-    color: var(--text-primary); background: var(--bg-hover); border-left-color: var(--border-medium);
-  }
-  .guide-nav-link.active {
-    color: var(--accent); background: var(--accent-light-bg); border-left-color: var(--accent);
-  }
+      /* Layout */
+      .guide-layout {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 0 24px;
+        display: flex;
+        gap: 40px;
+      }
+      .guide-sidebar {
+        width: 200px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 72px;
+        align-self: flex-start;
+        max-height: calc(100vh - 88px);
+        overflow-y: auto;
+        padding-right: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .guide-sidebar::-webkit-scrollbar {
+        width: 3px;
+      }
+      .guide-sidebar::-webkit-scrollbar-thumb {
+        background: var(--border-medium);
+        border-radius: 4px;
+      }
+      .guide-sidebar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .guide-sidebar-title {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+      .guide-nav-link {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-decoration: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+        transition: all 0.15s;
+        border-left: 2px solid transparent;
+      }
+      .guide-nav-link:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+        border-left-color: var(--border-medium);
+      }
+      .guide-nav-link.active {
+        color: var(--accent);
+        background: var(--accent-light-bg);
+        border-left-color: var(--accent);
+      }
 
-  .guide-main { flex: 1; min-width: 0; padding-bottom: 64px; }
+      .guide-main {
+        flex: 1;
+        min-width: 0;
+        padding-bottom: 64px;
+      }
 
-  /* Sections */
-  .guide-section {
-    scroll-margin-top: 80px;
-    padding-top: 40px; margin-top: 8px;
-    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .guide-section:first-of-type { padding-top: 32px; }
-  .guide-section-header {
-    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-  }
-  .guide-section-badge {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
-  }
-  .guide-section h2 {
-    font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;
-    letter-spacing: -0.01em;
-  }
-  .guide-section-desc {
-    font-size: 13px; color: var(--text-secondary); line-height: 1.6;
-    margin: 4px 0 20px 32px; max-width: 64ch;
-  }
+      /* Sections */
+      .guide-section {
+        scroll-margin-top: 80px;
+        padding-top: 40px;
+        margin-top: 8px;
+        animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .guide-section:first-of-type {
+        padding-top: 32px;
+      }
+      .guide-section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .guide-section-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        flex-shrink: 0;
+      }
+      .guide-section h2 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .guide-section-desc {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin: 4px 0 20px 32px;
+        max-width: 64ch;
+      }
 
-  /* Step cards */
-  .steps-grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: 16px; margin-bottom: 24px;
-  }
-  .step-card {
-    background: var(--bg-card); border: 1px solid var(--border-light);
-    border-radius: 12px; padding: 20px; position: relative;
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
-  }
-  .dark .step-card { border-color: rgba(255,255,255,0.06); }
-  .step-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  }
-  .dark .step-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
-  .step-number {
-    display: flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--accent); color: #fff;
-    font-size: 12px; font-weight: 700; margin-bottom: 12px;
-  }
-  .step-card h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 6px 0; }
-  .step-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0; }
+      /* Step cards */
+      .steps-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .step-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 20px;
+        position: relative;
+        transition:
+          transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+          box-shadow 0.2s;
+      }
+      .dark .step-card {
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .step-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+      }
+      .dark .step-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      }
+      .step-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      .step-card h3 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0 0 6px 0;
+      }
+      .step-card p {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin: 0;
+      }
 
-  /* Feature table */
-  .feature-table-wrap {
-    background: var(--bg-card); border: 1px solid var(--border-light);
-    border-radius: 12px; overflow: hidden; margin-bottom: 24px;
-    transition: box-shadow 0.2s;
-  }
-  .dark .feature-table-wrap { border-color: rgba(255,255,255,0.06); }
-  .feature-table-wrap:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
-  .feature-table { width: 100%; border-collapse: collapse; }
-  .feature-table tr {
-    transition: background 0.12s;
-  }
-  .feature-table tr:hover { background: var(--bg-hover); }
-  .feature-table tr:not(:last-child) { border-bottom: 1px solid var(--border-light); }
-  .feature-table td { padding: 12px 16px; vertical-align: middle; }
-  .feature-icon-cell { width: 40px; text-align: center; }
-  .feature-icon-wrap {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px; border-radius: 6px;
-    background: var(--accent-light-bg); color: var(--accent);
-  }
-  .feature-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; width: 100px; }
-  .feature-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
-  .feature-desc kbd {
-    display: inline-block; padding: 1px 5px; font-size: 10px; font-family: 'SF Mono', 'Fira Code', monospace;
-    background: var(--bg-code); color: var(--text-secondary); border-radius: 4px;
-    border: 1px solid var(--border-light);
-  }
-  .dark .feature-desc kbd { background: #334155; color: #cbd5e1; border-color: #475569; }
+      /* Feature table */
+      .feature-table-wrap {
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 24px;
+        transition: box-shadow 0.2s;
+      }
+      .dark .feature-table-wrap {
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .feature-table-wrap:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      }
+      .feature-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .feature-table tr {
+        transition: background 0.12s;
+      }
+      .feature-table tr:hover {
+        background: var(--bg-hover);
+      }
+      .feature-table tr:not(:last-child) {
+        border-bottom: 1px solid var(--border-light);
+      }
+      .feature-table td {
+        padding: 12px 16px;
+        vertical-align: middle;
+      }
+      .feature-icon-cell {
+        width: 40px;
+        text-align: center;
+      }
+      .feature-icon-wrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: var(--accent-light-bg);
+        color: var(--accent);
+      }
+      .feature-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        width: 100px;
+      }
+      .feature-desc {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+      .feature-desc kbd {
+        display: inline-block;
+        padding: 1px 5px;
+        font-size: 10px;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        background: var(--bg-code);
+        color: var(--text-secondary);
+        border-radius: 4px;
+        border: 1px solid var(--border-light);
+      }
+      .dark .feature-desc kbd {
+        background: #334155;
+        color: #cbd5e1;
+        border-color: #475569;
+      }
 
-  /* Format grid */
-  .format-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px;
-  }
-  .format-card {
-    background: var(--bg-card); border: 1px solid var(--border-light);
-    border-radius: 10px; padding: 14px 12px; text-align: center;
-    transition: transform 0.15s, border-color 0.15s;
-  }
-  .dark .format-card { border-color: rgba(255,255,255,0.06); }
-  .format-card:hover { transform: translateY(-1px); border-color: var(--accent); }
-  .format-card-icon { margin-bottom: 6px; }
-  .format-card-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
-  .format-card-ext { font-size: 10px; color: var(--text-muted); margin-top: 2px; font-family: 'SF Mono', 'Fira Code', monospace; }
+      /* Format grid */
+      .format-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 24px;
+      }
+      .format-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        padding: 14px 12px;
+        text-align: center;
+        transition:
+          transform 0.15s,
+          border-color 0.15s;
+      }
+      .dark .format-card {
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .format-card:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+      }
+      .format-card-icon {
+        margin-bottom: 6px;
+      }
+      .format-card-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .format-card-ext {
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 2px;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+      }
 
-  /* CTA */
-  .guide-cta {
-    background: var(--bg-card); border: 1px solid var(--border-light);
-    border-radius: 14px; padding: 32px; text-align: center;
-    margin-top: 40px;
-  }
-  .dark .guide-cta { border-color: rgba(255,255,255,0.06); }
-  .guide-cta h2 { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px 0; }
-  .guide-cta p { font-size: 13px; color: var(--text-secondary); margin: 0 0 20px 0; max-width: 40ch; margin-left: auto; margin-right: auto; line-height: 1.6; }
-  .guide-cta .intro-actions { justify-content: center; }
+      /* CTA */
+      .guide-cta {
+        background: var(--bg-card);
+        border: 1px solid var(--border-light);
+        border-radius: 14px;
+        padding: 32px;
+        text-align: center;
+        margin-top: 40px;
+      }
+      .dark .guide-cta {
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .guide-cta h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 8px 0;
+      }
+      .guide-cta p {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 0 0 20px 0;
+        max-width: 40ch;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.6;
+      }
+      .guide-cta .intro-actions {
+        justify-content: center;
+      }
 
-  /* Responsive */
-  @media (max-width: 1024px) {
-    .guide-sidebar { display: none; }
-    .guide-layout { padding: 0 16px; }
-    .guide-main { padding-bottom: 48px; }
-  }
-  @media (max-width: 768px) {
-    .guide-hero h1 { font-size: 1.75rem; }
-    .steps-grid { grid-template-columns: 1fr; }
-    .format-grid { grid-template-columns: repeat(2, 1fr); }
-    .guide-hero { padding: 40px 16px 32px; }
-    .guide-layout { flex-direction: column; gap: 0; }
-  }
+      /* Responsive */
+      @media (max-width: 1024px) {
+        .guide-sidebar {
+          display: none;
+        }
+        .guide-layout {
+          padding: 0 16px;
+        }
+        .guide-main {
+          padding-bottom: 48px;
+        }
+      }
+      @media (max-width: 768px) {
+        .guide-hero h1 {
+          font-size: 1.75rem;
+        }
+        .steps-grid {
+          grid-template-columns: 1fr;
+        }
+        .format-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .guide-hero {
+          padding: 40px 16px 32px;
+        }
+        .guide-layout {
+          flex-direction: column;
+          gap: 0;
+        }
+      }
 
-  /* Scroll progress */
-  .scroll-progress {
-    position: fixed; top: 0; left: 0; height: 2px;
-    background: var(--accent); z-index: 100;
-    transition: width 0.1s linear;
-  }
+      /* Scroll progress */
+      .scroll-progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 2px;
+        background: var(--accent);
+        z-index: 100;
+        transition: width 0.1s linear;
+      }
 
-  /* Back to top */
-  .back-to-top {
-    position: fixed; bottom: 80px; right: 24px; z-index: 90;
-    width: 40px; height: 40px; border-radius: 50%;
-    background: var(--accent); color: #fff; border: none;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    opacity: 0; pointer-events: none;
-    transform: translateY(12px);
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .back-to-top.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
-  .back-to-top:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
-  .dark .back-to-top { box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-</style>
-</head>
-<body>
+      /* Back to top */
+      .back-to-top {
+        position: fixed;
+        bottom: 80px;
+        right: 24px;
+        z-index: 90;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(12px);
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .back-to-top.visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+      .back-to-top:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+      }
+      .dark .back-to-top {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Scroll Progress -->
+    <div class="scroll-progress" id="scrollProgress"></div>
 
-<!-- Scroll Progress -->
-<div class="scroll-progress" id="scrollProgress"></div>
+    <!-- Back to Top -->
+    <button
+      class="back-to-top"
+      id="backToTop"
+      onclick="window.scrollTo({ top: 0, behavior: 'smooth' })"
+      title="回到顶部"
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="18 15 12 9 6 15" />
+      </svg>
+    </button>
 
-<!-- Back to Top -->
-<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到顶部">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-</button>
-
-<!-- Guide Header -->
-<header class="guide-header">
-  <div class="guide-header-inner">
-    <a href="/" class="logo">
-      <img src="/assets/logo-dark.svg" alt="Doc77" height="32">
-    </a>
-    <div class="guide-header-actions">
-      <button onclick="toggleTheme()" class="guide-header-link" id="themeBtn" title="切换主题">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-      </button>
-      <a href="/" class="guide-header-link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        首页
-      </a>
-    </div>
-  </div>
-</header>
-
-<!-- Hero -->
-<div class="guide-hero">
-  <div class="guide-hero-inner">
-    <div class="guide-hero-label">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      GETTING STARTED
-    </div>
-    <h1>5 分钟掌握 Doc77</h1>
-    <p>
-      Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。
-      <br class="hidden sm:block">
-      从目录树到 AI 助手，了解每个功能的用法。
-    </p>
-    <div class="intro-actions">
-      <a href="#quickstart" class="intro-btn intro-btn-primary" style="background:#2563eb;color:#fff;border:none;padding:10px 22px;font-size:14px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        开始上手
-      </a>
-      <a href="/" class="intro-btn intro-btn-secondary" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);padding:10px 22px;font-size:14px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        注册项目
-      </a>
-    </div>
-  </div>
-</div>
-
-<!-- Content Layout -->
-<div class="guide-layout">
-
-  <!-- Sidebar Nav -->
-  <nav class="guide-sidebar" id="guideSidebar">
-    <div class="guide-sidebar-title">目录</div>
-    <a href="#quickstart" class="guide-nav-link" data-section="quickstart">
-      <span style="display:flex;align-items:center;gap:6px">
-        ▶
-        快速开始
-      </span>
-    </a>
-    <a href="#sidebar" class="guide-nav-link" data-section="sidebar">
-      <span style="display:flex;align-items:center;gap:6px">
-        ◀
-        侧边栏
-      </span>
-    </a>
-    <a href="#toolbar" class="guide-nav-link" data-section="toolbar">
-      <span style="display:flex;align-items:center;gap:6px">
-        ▶
-        阅读工具栏
-      </span>
-    </a>
-    <a href="#right-panel" class="guide-nav-link" data-section="right-panel">
-      <span style="display:flex;align-items:center;gap:6px">
-        📑
-        右侧面板
-      </span>
-    </a>
-    <a href="#dashboard" class="guide-nav-link" data-section="dashboard">
-      <span style="display:flex;align-items:center;gap:6px">
-        📊
-        仪表盘
-      </span>
-    </a>
-    <a href="#formats" class="guide-nav-link" data-section="formats">
-      <span style="display:flex;align-items:center;gap:6px">
-        📝
-        支持格式
-      </span>
-    </a>
-  </nav>
-
-  <!-- Main Content -->
-  <main class="guide-main">
-
-    <!-- Section: Quick Start -->
-    <div class="guide-section" id="quickstart">
-      <div class="guide-section-header">
-        <div class="guide-section-badge" style="background:var(--accent-light-bg);color:var(--accent)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    <!-- Guide Header -->
+    <header class="guide-header">
+      <div class="guide-header-inner">
+        <a href="/" class="logo">
+          <img src="/assets/logo-dark.svg" alt="Doc77" height="32" />
+        </a>
+        <div class="guide-header-actions">
+          <button onclick="toggleTheme()" class="guide-header-link" id="themeBtn" title="切换主题">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              id="themeIcon"
+            >
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+          <a href="/" class="guide-header-link">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            首页
+          </a>
         </div>
-        <h2>快速开始</h2>
       </div>
-      <p class="guide-section-desc">三步完成环境配置，开始使用 Doc77 管理你的文档。</p>
+    </header>
 
-      <div class="steps-grid">
-        <div class="step-card">
-          <div class="step-number">1</div>
-          📂
-          <h3>注册项目</h3>
-          <p>在首页添加本地文档目录，Doc77 会记住每个项目并自动索引文件结构。</p>
+    <!-- Hero -->
+    <div class="guide-hero">
+      <div class="guide-hero-inner">
+        <div class="guide-hero-label">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          GETTING STARTED
         </div>
-        <div class="step-card">
-          <div class="step-number">2</div>
-          📂
-          <h3>选择文件</h3>
-          <p>在左侧目录树中浏览并点击文件，即刻预览。支持收藏夹和近期文件快速访问。</p>
-        </div>
-        <div class="step-card">
-          <div class="step-number">3</div>
-          ✨
-          <h3>开始阅读</h3>
-          <p>阅读、搜索、听读、AI 总结 &mdash; 一站式文档工作台，提升你的阅读效率。</p>
+        <h1>5 分钟掌握 Doc77</h1>
+        <p>
+          Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。
+          <br class="hidden sm:block" />
+          从目录树到 AI 助手，了解每个功能的用法。
+        </p>
+        <div class="intro-actions">
+          <a
+            href="#quickstart"
+            class="intro-btn intro-btn-primary"
+            style="
+              background: #2563eb;
+              color: #fff;
+              border: none;
+              padding: 10px 22px;
+              font-size: 14px;
+            "
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            开始上手
+          </a>
+          <a
+            href="/"
+            class="intro-btn intro-btn-secondary"
+            style="
+              background: rgba(255, 255, 255, 0.06);
+              color: #cbd5e1;
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              padding: 10px 22px;
+              font-size: 14px;
+            "
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            注册项目
+          </a>
         </div>
       </div>
+    </div>
 
-      <div class="feature-table-wrap">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border-light);background:var(--bg-hover)">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="width:6px;height:6px;border-radius:50%;background:#22c55e"></div>
-            <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">系统状态</span>
+    <!-- Content Layout -->
+    <div class="guide-layout">
+      <!-- Sidebar Nav -->
+      <nav class="guide-sidebar" id="guideSidebar">
+        <div class="guide-sidebar-title">目录</div>
+        <a href="#quickstart" class="guide-nav-link" data-section="quickstart">
+          <span style="display: flex; align-items: center; gap: 6px"> ▶ 快速开始 </span>
+        </a>
+        <a href="#sidebar" class="guide-nav-link" data-section="sidebar">
+          <span style="display: flex; align-items: center; gap: 6px"> ◀ 侧边栏 </span>
+        </a>
+        <a href="#toolbar" class="guide-nav-link" data-section="toolbar">
+          <span style="display: flex; align-items: center; gap: 6px"> ▶ 阅读工具栏 </span>
+        </a>
+        <a href="#right-panel" class="guide-nav-link" data-section="right-panel">
+          <span style="display: flex; align-items: center; gap: 6px"> 📑 右侧面板 </span>
+        </a>
+        <a href="#dashboard" class="guide-nav-link" data-section="dashboard">
+          <span style="display: flex; align-items: center; gap: 6px"> 📊 仪表盘 </span>
+        </a>
+        <a href="#formats" class="guide-nav-link" data-section="formats">
+          <span style="display: flex; align-items: center; gap: 6px"> 📝 支持格式 </span>
+        </a>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="guide-main">
+        <!-- Section: Quick Start -->
+        <div class="guide-section" id="quickstart">
+          <div class="guide-section-header">
+            <div
+              class="guide-section-badge"
+              style="background: var(--accent-light-bg); color: var(--accent)"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            </div>
+            <h2>快速开始</h2>
           </div>
-        </div>
-        <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">运行状态</div>
-            <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-primary);font-weight:500">
-              <span style="width:8px;height:8px;border-radius:50%;background:#22c55e"></span>
-              运行中
+          <p class="guide-section-desc">三步完成环境配置，开始使用 Doc77 管理你的文档。</p>
+
+          <div class="steps-grid">
+            <div class="step-card">
+              <div class="step-number">1</div>
+              📂
+              <h3>注册项目</h3>
+              <p>在首页添加本地文档目录，Doc77 会记住每个项目并自动索引文件结构。</p>
+            </div>
+            <div class="step-card">
+              <div class="step-number">2</div>
+              📂
+              <h3>选择文件</h3>
+              <p>在左侧目录树中浏览并点击文件，即刻预览。支持收藏夹和近期文件快速访问。</p>
+            </div>
+            <div class="step-card">
+              <div class="step-number">3</div>
+              ✨
+              <h3>开始阅读</h3>
+              <p>阅读、搜索、听读、AI 总结 &mdash; 一站式文档工作台，提升你的阅读效率。</p>
             </div>
           </div>
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">服务端口</div>
-            <div style="font-size:13px;color:var(--text-primary);font-weight:500;font-family:'SF Mono','Fira Code',monospace">2777</div>
+
+          <div class="feature-table-wrap">
+            <div
+              style="
+                padding: 16px 20px;
+                border-bottom: 1px solid var(--border-light);
+                background: var(--bg-hover);
+              "
+            >
+              <div style="display: flex; align-items: center; gap: 8px">
+                <div style="width: 6px; height: 6px; border-radius: 50%; background: #22c55e"></div>
+                <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary)"
+                  >系统状态</span
+                >
+              </div>
+            </div>
+            <div
+              style="padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px"
+            >
+              <div>
+                <div
+                  style="
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: var(--text-muted);
+                    margin-bottom: 4px;
+                  "
+                >
+                  运行状态
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 13px;
+                    color: var(--text-primary);
+                    font-weight: 500;
+                  "
+                >
+                  <span
+                    style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e"
+                  ></span>
+                  运行中
+                </div>
+              </div>
+              <div>
+                <div
+                  style="
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: var(--text-muted);
+                    margin-bottom: 4px;
+                  "
+                >
+                  服务端口
+                </div>
+                <div
+                  style="
+                    font-size: 13px;
+                    color: var(--text-primary);
+                    font-weight: 500;
+                    font-family: 'SF Mono', 'Fira Code', monospace;
+                  "
+                >
+                  2777
+                </div>
+              </div>
+              <div>
+                <div
+                  style="
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: var(--text-muted);
+                    margin-bottom: 4px;
+                  "
+                >
+                  版本
+                </div>
+                <div style="font-size: 13px; color: var(--text-primary); font-weight: 500">
+                  0.7.0
+                </div>
+              </div>
+              <div>
+                <div
+                  style="
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: var(--text-muted);
+                    margin-bottom: 4px;
+                  "
+                >
+                  绑定地址
+                </div>
+                <div
+                  style="
+                    font-size: 13px;
+                    color: var(--text-primary);
+                    font-weight: 500;
+                    font-family: 'SF Mono', 'Fira Code', monospace;
+                  "
+                  id="guideBindAddr"
+                >
+                  0.0.0.0
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">版本</div>
-            <div style="font-size:13px;color:var(--text-primary);font-weight:500">0.7.0</div>
+        </div>
+
+        <!-- Section: Sidebar -->
+        <div class="guide-section" id="sidebar">
+          <div class="guide-section-header">
+            <div
+              class="guide-section-badge"
+              style="
+                background: color-mix(in srgb, #8b5cf6 12%, transparent);
+                color: #8b5cf6;
+                font-size: 16px;
+              "
+            >
+              ◀
+            </div>
+            <h2>侧边栏</h2>
           </div>
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">绑定地址</div>
-            <div style="font-size:13px;color:var(--text-primary);font-weight:500;font-family:'SF Mono','Fira Code',monospace" id="guideBindAddr">0.0.0.0</div>
+          <p class="guide-section-desc">左侧面板集中了项目切换、文件导航、搜索等核心操作。</p>
+          <div class="feature-table-wrap">
+            <table class="feature-table">
+              <tbody>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">💼</div>
+                  </td>
+                  <td class="feature-name">项目切换</td>
+                  <td class="feature-desc">
+                    点击顶部按钮切换已注册的项目目录，每个项目独立管理其文件结构。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">⭐</div>
+                  </td>
+                  <td class="feature-name">收藏夹</td>
+                  <td class="feature-desc">
+                    右键文件选择收藏，常用文档快速访问。点击即打开，无需重复翻目录。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">🕐</div>
+                  </td>
+                  <td class="feature-name">近期文件</td>
+                  <td class="feature-desc">
+                    自动记录最近打开的文件，方便快速回溯。不必每次都翻目录树查找。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">📂</div>
+                  </td>
+                  <td class="feature-name">目录树</td>
+                  <td class="feature-desc">
+                    浏览项目文件夹结构，点击目录展开或收起，点击文件即时预览内容。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">🔍</div>
+                  </td>
+                  <td class="feature-name">文件过滤</td>
+                  <td class="feature-desc">
+                    在目录树上方输入关键字，快速定位目标文件，支持模糊匹配。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">🔎</div>
+                  </td>
+                  <td class="feature-name">全局搜索</td>
+                  <td class="feature-desc">
+                    搜索项目内所有文件内容（文件名 + 全文），回车触发，结果高亮显示。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">◀</div>
+                  </td>
+                  <td class="feature-name">折叠侧栏</td>
+                  <td class="feature-desc">
+                    收起侧栏为窄条（仅显示 Logo），获得更大的文档阅读空间。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">🌙</div>
+                  </td>
+                  <td class="feature-name">主题切换</td>
+                  <td class="feature-desc">一键切换深色或浅色模式，匹配你的阅读环境，保护眼睛。</td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">⚙</div>
+                  </td>
+                  <td class="feature-name">设置</td>
+                  <td class="feature-desc">
+                    配置 AI Token 与模型、网络绑定地址、访问密码、编辑器等全局选项。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+
+        <!-- Section: Toolbar -->
+        <div class="guide-section" id="toolbar">
+          <div class="guide-section-header">
+            <div
+              class="guide-section-badge"
+              style="
+                background: color-mix(in srgb, #059669 12%, transparent);
+                color: #059669;
+                font-size: 16px;
+              "
+            >
+              ▶
+            </div>
+            <h2>阅读工具栏</h2>
+          </div>
+          <p class="guide-section-desc">顶部工具栏提供了丰富的阅读辅助功能，让文档浏览更高效。</p>
+          <div class="feature-table-wrap">
+            <table class="feature-table">
+              <tbody>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">🔍</div>
+                  </td>
+                  <td class="feature-name">文档内搜索</td>
+                  <td class="feature-desc">
+                    在当前文档中搜索关键词，支持 <kbd>&uarr;</kbd>
+                    <kbd>&darr;</kbd> 跳转匹配项。快捷键 <kbd>Ctrl+F</kbd>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">▶</div>
+                  </td>
+                  <td class="feature-name">自动滚动</td>
+                  <td class="feature-desc">
+                    自动向下滚屏阅读，四档速度可调（慢/中/快/极速），解放双手。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">🔊</div>
+                  </td>
+                  <td class="feature-name">TTS 朗读</td>
+                  <td class="feature-desc">
+                    语音朗读文档，五档语速调节（0.5x &mdash; 2x）。眼睛累了就用听的。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">✨</div>
+                  </td>
+                  <td class="feature-name">AI 总结</td>
+                  <td class="feature-desc">
+                    一键生成文档摘要，支持朗读摘要。快速了解长篇文档核心内容。需配置 AI Token。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">▶</div>
+                  </td>
+                  <td class="feature-name">运行代码</td>
+                  <td class="feature-desc">
+                    打开 <kbd>.js</kbd> 或 <kbd>.py</kbd> 文件时，可在浏览器 Sandbox 或 Pyodide
+                    (WASM) 中直接执行。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">📝</div>
+                  </td>
+                  <td class="feature-name">编辑器打开</td>
+                  <td class="feature-desc">
+                    一键在 VS Code 或系统默认编辑器中打开当前文件进行编辑修改。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">📂</div>
+                  </td>
+                  <td class="feature-name">文件夹中显示</td>
+                  <td class="feature-desc">
+                    在系统文件管理器（Finder / 资源管理器）中定位并高亮当前文件位置。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section: Right Panel -->
+        <div class="guide-section" id="right-panel">
+          <div class="guide-section-header">
+            <div
+              class="guide-section-badge"
+              style="
+                background: color-mix(in srgb, #d97706 12%, transparent);
+                color: #d97706;
+                font-size: 16px;
+              "
+            >
+              📑
+            </div>
+            <h2>右侧面板</h2>
+          </div>
+          <p class="guide-section-desc">
+            右侧面板集成了 AI 助手、文档大纲和审批队列，是 Doc77 的智能核心。
+          </p>
+          <div class="feature-table-wrap">
+            <table class="feature-table">
+              <tbody>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">📑</div>
+                  </td>
+                  <td class="feature-name">文档大纲</td>
+                  <td class="feature-desc">
+                    根据 Markdown 标题自动生成文档结构导航，点击标题快速跳转至对应章节。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">💬</div>
+                  </td>
+                  <td class="feature-name">AI 助手</td>
+                  <td class="feature-desc">
+                    对话式 AI，可针对当前文档提问、请求总结、规划批量文件操作。基于 MCP 协议集成，AI
+                    可安全读写文件。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">📋</div>
+                  </td>
+                  <td class="feature-name">审批队列</td>
+                  <td class="feature-desc">
+                    MCP 写操作（创建/修改/删除文件）默认进入审批队列，确认后才执行。支持 CLI 与 Web
+                    双通道审批，事务回滚。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section: Dashboard -->
+        <div class="guide-section" id="dashboard">
+          <div class="guide-section-header">
+            <div
+              class="guide-section-badge"
+              style="
+                background: color-mix(in srgb, #2563eb 12%, transparent);
+                color: #2563eb;
+                font-size: 16px;
+              "
+            >
+              📊
+            </div>
+            <h2>仪表盘</h2>
+          </div>
+          <p class="guide-section-desc">首页仪表盘提供项目总览、统计数据和快捷操作入口。</p>
+          <div class="feature-table-wrap">
+            <table class="feature-table">
+              <tbody>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">🕐</div>
+                  </td>
+                  <td class="feature-name">最近浏览</td>
+                  <td class="feature-desc">
+                    查看最近打开的项目和文件，一键跳转。支持项目粒度和文件粒度的历史记录。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">📊</div>
+                  </td>
+                  <td class="feature-name">统计概览</td>
+                  <td class="feature-desc">
+                    显示项目总数、收藏数、最近活跃时间等关键指标，一目了然。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">⭐</div>
+                  </td>
+                  <td class="feature-name">收藏项目</td>
+                  <td class="feature-desc">星标收藏的项目集中展示，支持快速取消收藏。</td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">📂</div>
+                  </td>
+                  <td class="feature-name">项目列表</td>
+                  <td class="feature-desc">
+                    全部项目以网格或列表视图展示。支持搜索、排序（最近打开/名称/创建日期）、视图切换。
+                  </td>
+                </tr>
+                <tr>
+                  <td class="feature-icon-cell">
+                    <div class="feature-icon-wrap" style="font-size: 16px">➕</div>
+                  </td>
+                  <td class="feature-name">注册项目</td>
+                  <td class="feature-desc">
+                    支持两种方式添加项目：手动输入路径，或自动扫描目录发现可注册的项目目录。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section: Supported Formats -->
+        <div class="guide-section" id="formats">
+          <div class="guide-section-header">
+            <div
+              class="guide-section-badge"
+              style="
+                background: color-mix(in srgb, #2563eb 12%, transparent);
+                color: #2563eb;
+                font-size: 16px;
+              "
+            >
+              📝
+            </div>
+            <h2>支持的文件格式</h2>
+          </div>
+          <p class="guide-section-desc">Doc77 支持多种文档格式的预览与编辑。</p>
+          <div class="format-grid">
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">📝</div>
+              <div class="format-card-name">Markdown</div>
+              <div class="format-card-ext">.md .mdx</div>
+            </div>
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">📄</div>
+              <div class="format-card-name">PDF 文档</div>
+              <div class="format-card-ext">.pdf</div>
+            </div>
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">📊</div>
+              <div class="format-card-name">Office 文档</div>
+              <div class="format-card-ext">.docx .xlsx .xls</div>
+            </div>
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">🖼️</div>
+              <div class="format-card-name">图片</div>
+              <div class="format-card-ext">.png .jpg .gif .svg .webp .avif</div>
+            </div>
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">🔀</div>
+              <div class="format-card-name">Mermaid 图表</div>
+              <div class="format-card-ext">.mermaid .mmd</div>
+            </div>
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">💻</div>
+              <div class="format-card-name">代码文件</div>
+              <div class="format-card-ext">44 种编程语言</div>
+            </div>
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">▶️</div>
+              <div class="format-card-name">可执行代码</div>
+              <div class="format-card-ext">.js (Sandbox) .py (Pyodide)</div>
+            </div>
+            <div class="format-card">
+              <div class="format-card-icon" style="font-size: 22px; line-height: 1">📦</div>
+              <div class="format-card-name">未支持格式</div>
+              <div class="format-card-ext">显示文件信息卡</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="guide-cta">
+          <h2>准备开始了吗？</h2>
+          <p>注册一个本地文档目录，体验本地预览 + AI 驱动管理的全新工作流。</p>
+          <div class="intro-actions" style="justify-content: center">
+            <a
+              href="/"
+              class="intro-btn intro-btn-primary"
+              style="padding: 10px 24px; font-size: 14px"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              注册你的第一个项目
+            </a>
+            <a
+              href="https://github.com/xyy277/doc77"
+              target="_blank"
+              rel="noopener"
+              class="intro-btn intro-btn-secondary"
+              style="padding: 10px 24px; font-size: 14px"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                />
+              </svg>
+              GitHub
+            </a>
+          </div>
+        </div>
+      </main>
     </div>
 
-    <!-- Section: Sidebar -->
-    <div class="guide-section" id="sidebar">
-      <div class="guide-section-header">
-        <div class="guide-section-badge" style="background:color-mix(in srgb, #8b5cf6 12%, transparent);color:#8b5cf6;font-size:16px">
-          ◀
-        </div>
-        <h2>侧边栏</h2>
-      </div>
-      <p class="guide-section-desc">左侧面板集中了项目切换、文件导航、搜索等核心操作。</p>
-      <div class="feature-table-wrap">
-        <table class="feature-table">
-          <tbody>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">💼</div></td>
-              <td class="feature-name">项目切换</td>
-              <td class="feature-desc">点击顶部按钮切换已注册的项目目录，每个项目独立管理其文件结构。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⭐</div></td>
-              <td class="feature-name">收藏夹</td>
-              <td class="feature-desc">右键文件选择收藏，常用文档快速访问。点击即打开，无需重复翻目录。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🕐</div></td>
-              <td class="feature-name">近期文件</td>
-              <td class="feature-desc">自动记录最近打开的文件，方便快速回溯。不必每次都翻目录树查找。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
-              <td class="feature-name">目录树</td>
-              <td class="feature-desc">浏览项目文件夹结构，点击目录展开或收起，点击文件即时预览内容。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔍</div></td>
-              <td class="feature-name">文件过滤</td>
-              <td class="feature-desc">在目录树上方输入关键字，快速定位目标文件，支持模糊匹配。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔎</div></td>
-              <td class="feature-name">全局搜索</td>
-              <td class="feature-desc">搜索项目内所有文件内容（文件名 + 全文），回车触发，结果高亮显示。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">◀</div></td>
-              <td class="feature-name">折叠侧栏</td>
-              <td class="feature-desc">收起侧栏为窄条（仅显示 Logo），获得更大的文档阅读空间。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🌙</div></td>
-              <td class="feature-name">主题切换</td>
-              <td class="feature-desc">一键切换深色或浅色模式，匹配你的阅读环境，保护眼睛。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⚙</div></td>
-              <td class="feature-name">设置</td>
-              <td class="feature-desc">配置 AI Token 与模型、网络绑定地址、访问密码、编辑器等全局选项。</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <!-- GitHub Star -->
+    <a
+      href="https://github.com/xyy277/doc77"
+      target="_blank"
+      rel="noopener"
+      class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm font-medium no-underline hover:text-white"
+      title="给 Doc77 点个 Star"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+        />
+      </svg>
+      Star
+    </a>
 
-    <!-- Section: Toolbar -->
-    <div class="guide-section" id="toolbar">
-      <div class="guide-section-header">
-        <div class="guide-section-badge" style="background:color-mix(in srgb, #059669 12%, transparent);color:#059669;font-size:16px">
-          ▶
-        </div>
-        <h2>阅读工具栏</h2>
-      </div>
-      <p class="guide-section-desc">顶部工具栏提供了丰富的阅读辅助功能，让文档浏览更高效。</p>
-      <div class="feature-table-wrap">
-        <table class="feature-table">
-          <tbody>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔍</div></td>
-              <td class="feature-name">文档内搜索</td>
-              <td class="feature-desc">在当前文档中搜索关键词，支持 <kbd>&uarr;</kbd> <kbd>&darr;</kbd> 跳转匹配项。快捷键 <kbd>Ctrl+F</kbd></td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">▶</div></td>
-              <td class="feature-name">自动滚动</td>
-              <td class="feature-desc">自动向下滚屏阅读，四档速度可调（慢/中/快/极速），解放双手。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔊</div></td>
-              <td class="feature-name">TTS 朗读</td>
-              <td class="feature-desc">语音朗读文档，五档语速调节（0.5x &mdash; 2x）。眼睛累了就用听的。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">✨</div></td>
-              <td class="feature-name">AI 总结</td>
-              <td class="feature-desc">一键生成文档摘要，支持朗读摘要。快速了解长篇文档核心内容。需配置 AI Token。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">▶</div></td>
-              <td class="feature-name">运行代码</td>
-              <td class="feature-desc">打开 <kbd>.js</kbd> 或 <kbd>.py</kbd> 文件时，可在浏览器 Sandbox 或 Pyodide (WASM) 中直接执行。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📝</div></td>
-              <td class="feature-name">编辑器打开</td>
-              <td class="feature-desc">一键在 VS Code 或系统默认编辑器中打开当前文件进行编辑修改。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
-              <td class="feature-name">文件夹中显示</td>
-              <td class="feature-desc">在系统文件管理器（Finder / 资源管理器）中定位并高亮当前文件位置。</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <script src="js/common.js"></script>
+    <script>
+      // Scroll progress bar + back to top
+      var backBtn = document.getElementById('backToTop');
+      window.addEventListener('scroll', function () {
+        var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+        var scrollHeight =
+          document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        var progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+        document.getElementById('scrollProgress').style.width = progress + '%';
+        backBtn.classList.toggle('visible', scrollTop > 400);
+      });
 
-    <!-- Section: Right Panel -->
-    <div class="guide-section" id="right-panel">
-      <div class="guide-section-header">
-        <div class="guide-section-badge" style="background:color-mix(in srgb, #d97706 12%, transparent);color:#d97706;font-size:16px">
-          📑
-        </div>
-        <h2>右侧面板</h2>
-      </div>
-      <p class="guide-section-desc">右侧面板集成了 AI 助手、文档大纲和审批队列，是 Doc77 的智能核心。</p>
-      <div class="feature-table-wrap">
-        <table class="feature-table">
-          <tbody>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📑</div></td>
-              <td class="feature-name">文档大纲</td>
-              <td class="feature-desc">根据 Markdown 标题自动生成文档结构导航，点击标题快速跳转至对应章节。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">💬</div></td>
-              <td class="feature-name">AI 助手</td>
-              <td class="feature-desc">对话式 AI，可针对当前文档提问、请求总结、规划批量文件操作。基于 MCP 协议集成，AI 可安全读写文件。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📋</div></td>
-              <td class="feature-name">审批队列</td>
-              <td class="feature-desc">MCP 写操作（创建/修改/删除文件）默认进入审批队列，确认后才执行。支持 CLI 与 Web 双通道审批，事务回滚。</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      // Active nav link tracking
+      var sections = document.querySelectorAll('.guide-section');
+      var navLinks = document.querySelectorAll('.guide-nav-link');
+      window.addEventListener('scroll', function () {
+        var current = '';
+        sections.forEach(function (section) {
+          var top = section.offsetTop - 100;
+          if (window.scrollY >= top) {
+            current = section.getAttribute('id');
+          }
+        });
+        navLinks.forEach(function (link) {
+          link.classList.toggle('active', link.getAttribute('data-section') === current);
+        });
+      });
 
-    <!-- Section: Dashboard -->
-    <div class="guide-section" id="dashboard">
-      <div class="guide-section-header">
-        <div class="guide-section-badge" style="background:color-mix(in srgb, #2563eb 12%, transparent);color:#2563eb;font-size:16px">
-          📊
-        </div>
-        <h2>仪表盘</h2>
-      </div>
-      <p class="guide-section-desc">首页仪表盘提供项目总览、统计数据和快捷操作入口。</p>
-      <div class="feature-table-wrap">
-        <table class="feature-table">
-          <tbody>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🕐</div></td>
-              <td class="feature-name">最近浏览</td>
-              <td class="feature-desc">查看最近打开的项目和文件，一键跳转。支持项目粒度和文件粒度的历史记录。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📊</div></td>
-              <td class="feature-name">统计概览</td>
-              <td class="feature-desc">显示项目总数、收藏数、最近活跃时间等关键指标，一目了然。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⭐</div></td>
-              <td class="feature-name">收藏项目</td>
-              <td class="feature-desc">星标收藏的项目集中展示，支持快速取消收藏。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
-              <td class="feature-name">项目列表</td>
-              <td class="feature-desc">全部项目以网格或列表视图展示。支持搜索、排序（最近打开/名称/创建日期）、视图切换。</td>
-            </tr>
-            <tr>
-              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">➕</div></td>
-              <td class="feature-name">注册项目</td>
-              <td class="feature-desc">支持两种方式添加项目：手动输入路径，或自动扫描目录发现可注册的项目目录。</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Section: Supported Formats -->
-    <div class="guide-section" id="formats">
-      <div class="guide-section-header">
-        <div class="guide-section-badge" style="background:color-mix(in srgb, #2563eb 12%, transparent);color:#2563eb;font-size:16px">
-          📝
-        </div>
-        <h2>支持的文件格式</h2>
-      </div>
-      <p class="guide-section-desc">Doc77 支持多种文档格式的预览与编辑。</p>
-      <div class="format-grid">
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">📝</div>
-          <div class="format-card-name">Markdown</div>
-          <div class="format-card-ext">.md .mdx</div>
-        </div>
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">📄</div>
-          <div class="format-card-name">PDF 文档</div>
-          <div class="format-card-ext">.pdf</div>
-        </div>
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">📊</div>
-          <div class="format-card-name">Office 文档</div>
-          <div class="format-card-ext">.docx .xlsx .xls</div>
-        </div>
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">🖼️</div>
-          <div class="format-card-name">图片</div>
-          <div class="format-card-ext">.png .jpg .gif .svg .webp .avif</div>
-        </div>
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">🔀</div>
-          <div class="format-card-name">Mermaid 图表</div>
-          <div class="format-card-ext">.mermaid .mmd</div>
-        </div>
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">💻</div>
-          <div class="format-card-name">代码文件</div>
-          <div class="format-card-ext">44 种编程语言</div>
-        </div>
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">▶️</div>
-          <div class="format-card-name">可执行代码</div>
-          <div class="format-card-ext">.js (Sandbox) .py (Pyodide)</div>
-        </div>
-        <div class="format-card">
-          <div class="format-card-icon" style="font-size:22px;line-height:1">📦</div>
-          <div class="format-card-name">未支持格式</div>
-          <div class="format-card-ext">显示文件信息卡</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- CTA -->
-    <div class="guide-cta">
-      <h2>准备开始了吗？</h2>
-      <p>注册一个本地文档目录，体验本地预览 + AI 驱动管理的全新工作流。</p>
-      <div class="intro-actions" style="justify-content:center">
-        <a href="/" class="intro-btn intro-btn-primary" style="padding:10px 24px;font-size:14px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          注册你的第一个项目
-        </a>
-        <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="intro-btn intro-btn-secondary" style="padding:10px 24px;font-size:14px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-          GitHub
-        </a>
-      </div>
-    </div>
-
-  </main>
-</div>
-
-<!-- GitHub Star -->
-<a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener"
-   class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm font-medium no-underline hover:text-white"
-   title="给 Doc77 点个 Star">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-  Star
-</a>
-
-<script src="js/common.js"></script>
-<script>
-// Scroll progress bar + back to top
-var backBtn = document.getElementById('backToTop');
-window.addEventListener('scroll', function() {
-  var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
-  var scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-  var progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
-  document.getElementById('scrollProgress').style.width = progress + '%';
-  backBtn.classList.toggle('visible', scrollTop > 400);
-});
-
-// Active nav link tracking
-var sections = document.querySelectorAll('.guide-section');
-var navLinks = document.querySelectorAll('.guide-nav-link');
-window.addEventListener('scroll', function() {
-  var current = '';
-  sections.forEach(function(section) {
-    var top = section.offsetTop - 100;
-    if (window.scrollY >= top) {
-      current = section.getAttribute('id');
-    }
-  });
-  navLinks.forEach(function(link) {
-    link.classList.toggle('active', link.getAttribute('data-section') === current);
-  });
-});
-
-// Fetch server info for bind address
-fetch('/api/server-info').then(function(r) { return r.json(); }).then(function(info) {
-  var el = document.getElementById('guideBindAddr');
-  if (el && info.bindAddr) el.textContent = info.bindAddr;
-}).catch(function() {});
-</script>
-</body>
+      // Fetch server info for bind address
+      fetch('/api/server-info')
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (info) {
+          var el = document.getElementById('guideBindAddr');
+          if (el && info.bindAddr) el.textContent = info.bindAddr;
+        })
+        .catch(function () {});
+    </script>
+  </body>
 </html>
