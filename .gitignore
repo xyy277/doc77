@@ -27,6 +27,9 @@ credentials.*
 config.local.*
 *.local
 
+# Claude Code working directory
+.claude/
+
 # 常规忽略
 *.log
 .DS_Store
