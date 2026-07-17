@@ -246,7 +246,13 @@ function onLangChange(sel) {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'locale.language', value: sel.value }),
-    }).then(function () { toast(t('common.settings.globalLangSaved')); })
+    }).then(function () {
+      toast(t('common.settings.globalLangSaved'));
+      // 无浏览器级覆盖时，当前页面语言跟随全局 —— reload 使其立即生效
+      if (!localStorage.getItem('doc77_lang')) {
+        setTimeout(function () { location.reload(); }, 600);
+      }
+    })
       .catch(function(){ toast(t('common.settings.globalLangSaveFailed')); });
   }
 }

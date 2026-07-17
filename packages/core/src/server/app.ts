@@ -2606,6 +2606,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       db.prepare(
         'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ).run(key, storeValue);
+      // Language change takes effect immediately for backend t() (API errors,
+      // AI runtime). MCP tool descriptions are registered at startup and still
+      // need a restart — the settings panel toast already says so.
+      if (key === 'locale.language') {
+        initI18n(String(value || ''));
+      }
       res.json({ ok: true, key });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
