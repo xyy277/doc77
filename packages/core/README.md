@@ -32,7 +32,7 @@ import { initDatabase, getConnection, runMigrations } from '@doc77/core';
 // Server
 import { createApp } from '@doc77/core';
 const app = createApp();
-app.listen(2777);
+app.listen(27777);
 
 // Auth
 import { setupPasswordWithDEK, verifyLogin, changePassword } from '@doc77/core';

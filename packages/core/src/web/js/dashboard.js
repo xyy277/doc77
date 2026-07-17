@@ -466,7 +466,7 @@ window.initMobileQR = async function () {
       if (el) el.style.display = 'block';
     }
     var hostname = window.location.hostname || '127.0.0.1';
-    var url = 'http://' + hostname + ':' + (info.port || 2777) + '/mobile/';
+    var url = 'http://' + hostname + ':' + (info.port || 27777) + '/mobile/';
     document.getElementById('mobileUrlDisplay').textContent = url;
     renderQR(url);
   } catch (e) {}

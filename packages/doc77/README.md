@@ -17,7 +17,7 @@ doc77 register ./my-docs --name "我的文档"
 # 启动服务
 doc77 start
 
-# 浏览器打开 http://localhost:2777
+# 浏览器打开 http://localhost:27777
 ```
 
 ## What's Included

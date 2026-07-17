@@ -3,14 +3,14 @@
 # Doc77 一键重启脚本
 #
 # 用法:
-#   ./scripts/restart.sh              # 默认端口 3099
+#   ./scripts/restart.sh              # 默认端口 27777
 #   ./scripts/restart.sh --port 8080  # 自定义端口
 #   ./scripts/restart.sh -p 8080      # 简写
 #
 set -euo pipefail
 
 # === 参数解析 ===
-PORT=3099
+PORT=27777
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --port|-p)

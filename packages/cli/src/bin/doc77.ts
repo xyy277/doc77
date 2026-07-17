@@ -185,7 +185,7 @@ async function main() {
     case 'start': {
       printBanner();
       const portIdx = args.indexOf('--port');
-      const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 2777;
+      const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 27777;
       const bindIdx = args.indexOf('--bind');
       const cliBind = bindIdx !== -1 ? args[bindIdx + 1] : undefined;
 

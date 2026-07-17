@@ -71,7 +71,7 @@ export function setCapabilities(caps: { ai: boolean; mcp: boolean; translate: bo
 }
 
 // Server info — populated by CLI layer at startup for share link construction
-let _serverInfo = { bind: '0.0.0.0', port: 2777 };
+let _serverInfo = { bind: '0.0.0.0', port: 27777 };
 export function setServerInfo(info: { bind: string; port: number }) {
   _serverInfo = info;
 }
@@ -248,7 +248,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const isElectron = process.env.DOC77_ELECTRON === '1';
     const info: Record<string, unknown> = {
       version: VERSION,
-      port: port || 2777,
+      port: port || 27777,
       bindAddress: addr,
       isLocal,
       runningIn: isElectron ? 'electron' : 'cli',
@@ -274,7 +274,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
   // Mobile info — device info for companion app discovery
   app.get('/api/mobile/info', (_req: Request, res: Response) => {
-    res.json(getMobileInfo(port || 2777));
+    res.json(getMobileInfo(port || 27777));
   });
 
   // Module capabilities
