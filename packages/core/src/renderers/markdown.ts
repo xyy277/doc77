@@ -1,6 +1,9 @@
 import { marked } from 'marked';
 import * as path from 'node:path';
 import { deflateSync } from 'node:zlib';
+import { getConnection } from '../db/connection.js';
+import { resolveProjectPath } from '../fs/index.js';
+import { resolveWikilink } from './wikilink.js';
 
 /** Encode PlantUML source for kroki.io GET API (deflate + base64url). */
 function encodePlantUML(text: string): string {
@@ -201,8 +204,33 @@ const footnoteExtension = {
   },
 };
 
+/** Inline extension: [[wikilink]] syntax for Obsidian vault mode */
+const wikilinkExtension = {
+  name: 'wikilink',
+  level: 'inline' as const,
+  start(src: string) {
+    return src.indexOf('[[');
+  },
+  tokenizer(src: string) {
+    const match = /^\[\[([^\[\]]+?)(?:\|([^\[\]]*?))?\]\]/.exec(src);
+    if (!match) return undefined;
+    const title = match[1].trim();
+    const display = (match[2] || match[1]).trim();
+    return {
+      type: 'wikilink',
+      raw: match[0],
+      title,
+      display,
+    };
+  },
+  renderer(token: { title: string; display: string }) {
+    const escapedDisplay = token.display.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    return `<a href="doc77-wikilink:${encodeURIComponent(token.title)}" data-display="${escapedDisplay}">${escapedDisplay}</a>`;
+  },
+};
+
 // Register extensions
-marked.use({ extensions: [highlightExtension, emojiExtension, footnoteExtension] });
+marked.use({ extensions: [highlightExtension, emojiExtension, footnoteExtension, wikilinkExtension] });
 
 // ---------------------------------------------------------------------------
 // URL rewriting
@@ -214,7 +242,7 @@ function rewriteLocalUrl(
   filePath: string | undefined,
 ): string {
   if (!url) return url;
-  if (/^(https?:|mailto:|ftp:|data:|blob:)/i.test(url)) return url;
+  if (/^(https?:|mailto:|ftp:|data:|blob:|doc77-wikilink:)/i.test(url)) return url;
   if (url.startsWith('#')) return url;
   if (projectId == null || !filePath) return url;
 
@@ -282,11 +310,11 @@ function renderAlerts(html: string): string {
 
 export function renderMarkdown(
   content: string,
-  opts?: { projectId?: number; filePath?: string },
+  opts?: { projectId?: number; filePath?: string; obsidianMode?: boolean },
 ): string {
   if (!content) return '';
 
-  const { projectId, filePath } = opts || {};
+  const { projectId, filePath, obsidianMode } = opts || {};
 
   const renderer = new marked.Renderer();
   renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
@@ -336,5 +364,52 @@ export function renderMarkdown(
   html = renderAlerts(html);
   html = renderFootnoteRefs(html);
 
+  // Wikilink resolution (only in obsidian mode)
+  if (obsidianMode && projectId != null && filePath) {
+    html = resolveWikilinks(html, projectId, filePath);
+  }
+
   return html;
+}
+
+// ---------------------------------------------------------------------------
+// Wikilink resolution (Obsidian mode)
+// ---------------------------------------------------------------------------
+
+/** Post-process wikilink placeholder anchors into real links or dead-link spans */
+function resolveWikilinks(html: string, projectId: number, filePath: string): string {
+  const projectRoot = getProjectRoot(projectId);
+  if (!projectRoot) return html;
+
+  return html.replace(
+    /<a href="doc77-wikilink:([^"]+)"[^>]*>([^<]+)<\/a>/g,
+    (_match: string, encoded: string, display: string) => {
+      const title = decodeURIComponent(encoded);
+      const resolved = resolveWikilink(title, projectId, projectRoot);
+      if (resolved) {
+        // Convert resolved absolute path to doc77 API URL
+        const rootPrefix = projectRoot.endsWith(path.sep) ? projectRoot : projectRoot + path.sep;
+        const relative = resolved.startsWith(rootPrefix)
+          ? path.posix.normalize(resolved.slice(rootPrefix.length))
+          : path.posix.normalize(resolved);
+        const apiUrl = `/api/content/${projectId}?path=${encodeURIComponent(relative)}`;
+        return `<a href="${apiUrl}" class="wikilink">${display}</a>`;
+      }
+      // Dead link
+      const escapedTitle = title.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      return `<span class="wikilink-dead" title="未找到笔记: ${escapedTitle}">[[${escapedTitle}]]</span>`;
+    },
+  );
+}
+
+/** Get project root path from DB */
+function getProjectRoot(projectId: number): string | null {
+  try {
+    const db = getConnection();
+    const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
+    if (!row) return null;
+    return resolveProjectPath(row.path);
+  } catch {
+    return null;
+  }
 }

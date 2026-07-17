@@ -161,6 +161,20 @@ body {
   background: var(--accent-light-bg); color: var(--accent);
 }
 
+/* Obsidian Badge */
+.badge-obsidian {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #7c3aed20;
+  color: #7c3aed;
+  vertical-align: middle;
+  line-height: 1.4;
+  letter-spacing: -0.5px;
+}
+
 /* Section Title */
 .section-title {
   font-size: 11px; font-weight: 600; text-transform: uppercase;
@@ -1357,3 +1371,12 @@ mark { background: #fde68a; color: #1e293b; padding: 0 2px; border-radius: 2px; 
 /* ── Share Card ── */
 #shareCard { z-index: 9999 !important; }
 #shareCard button:active { transform: scale(0.96); }
+
+/* ── Obsidian Wikilink ── */
+a.wikilink { color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent); }
+a.wikilink:hover { border-bottom-style: solid; }
+.wikilink-dead { color: var(--text-muted); opacity: 0.6; cursor: not-allowed; }
+
+/* ── Registration form checkbox ── */
+.checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+.checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }

@@ -128,9 +128,9 @@ function renderCompactCard(p, inFavorites) {
 
   return '<div class="card card-compact animate-in" data-id="' + p.id + '" onclick="openProject(' + p.id + ')">' +
     '<button class="' + starClass + '" data-id="' + p.id + '" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')">' + starIcon + '</button>' +
-    '<div class="card-icon">📂</div>' +
+    '<div class="card-icon">' + (p.obsidian_mode ? '🗃️' : '📂') + '</div>' +
     '<div class="card-body">' +
-      '<div class="card-name">' + esc(p.name) + '</div>' +
+      '<div class="card-name">' + esc(p.name) + (p.obsidian_mode ? ' <span class="badge-obsidian">[[=]]</span>' : '') + '</div>' +
       '<div class="card-path" title="' + escAttr(p.path) + '">' + esc(shortPath(p.path)) + '</div>' +
       '<div class="card-date">' + dateLabel + '</div>' +
     '</div>' +
@@ -145,6 +145,9 @@ function renderCompactCard(p, inFavorites) {
         '<input id="editPath-' + p.id + '" value="' + escAttr(p.path) + '" placeholder="项目路径" class="input">' +
         '<button onclick="openDirDialog(' + p.id + ')" class="btn">📂</button>' +
       '</div>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:8px">' +
+        '<input type="checkbox" id="editObsidian-' + p.id + '" ' + (p.obsidian_mode ? 'checked' : '') + '>' +
+        ' Obsidian vault</label>' +
       '<div style="display:flex;gap:8px">' +
         '<button onclick="doUpdate(' + p.id + ')" class="btn btn-primary" style="font-size:12px">💾 保存</button>' +
         '<button onclick="cancelEdit(' + p.id + ')" class="btn" style="font-size:12px">✕ 取消</button>' +
@@ -240,6 +243,8 @@ window.cancelEdit = function(id) {
 window.doUpdate = async function(id) {
   var name = document.getElementById('editName-' + id).value.trim();
   var pth = document.getElementById('editPath-' + id).value.trim();
+  var obsidianEl = document.getElementById('editObsidian-' + id);
+  var newObsidian = obsidianEl ? obsidianEl.checked : undefined;
   var errEl = document.getElementById('editError-' + id);
   var btn = document.querySelector('#editForm-' + id + ' .btn-primary');
   errEl.style.display = 'none';
@@ -248,6 +253,7 @@ window.doUpdate = async function(id) {
   var body = {};
   if (name) body.name = name;
   if (pth) body.path = pth;
+  if (newObsidian !== undefined) body.obsidian_mode = newObsidian;
   try {
     var r = await fetch('/api/projects/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) { var d = await r.json(); errEl.textContent = d.error || '更新失败'; errEl.style.display = 'block'; return; }
@@ -275,7 +281,8 @@ window.doRegister = async function() {
   if (!name || !pth) { err.textContent = '请填写项目名称和路径'; err.style.display = 'block'; return; }
   if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
-    var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth}) });
+    var isObsidian = document.getElementById('regObsidian').checked;
+    var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth, obsidian_mode: isObsidian}) });
     if (!r.ok) { var d = await r.json(); err.textContent = d.error || '注册失败'; err.style.display = 'block'; return; }
     document.getElementById('regName').value = '';
     document.getElementById('regPath').value = '';
