@@ -27,17 +27,14 @@ export async function executeApprovedTasks(
   const errors: string[] = [];
 
   // Get project path
-  const project = db
-    .prepare('SELECT path FROM projects WHERE id = ?')
-    .get(projectId) as { path: string } | undefined;
+  const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+    { path: string } | undefined;
   if (!project) return { success: false, errors: ['Project not found'] };
 
   // Load tasks
   const tasks = taskIds
     .map((id) =>
-      db
-        .prepare('SELECT * FROM operation_queue WHERE id = ? AND status = ?')
-        .get(id, 'approved'),
+      db.prepare('SELECT * FROM operation_queue WHERE id = ? AND status = ?').get(id, 'approved'),
     )
     .filter(Boolean) as Array<{
     id: number;
@@ -60,9 +57,23 @@ export async function executeApprovedTasks(
   const preflight = runPreflightCheck(projectId, operations);
   if (!preflight.passed) {
     for (const t of tasks) {
-      db.prepare("UPDATE operation_queue SET status = 'failed', updated_at = datetime('now') WHERE id = ?").run(t.id);
-      eventBus.emit('task:failed', { task_id: String(t.id), project_id: projectId, error_message: preflight.errors.join('; '), rolled_back: false });
-      writeAuditLog({ project_id: projectId, operation_type: t.operation_type, operation_data: JSON.parse(t.operation_data), source: 'ai', status: 'failed', error_message: preflight.errors.join('; ') });
+      db.prepare(
+        "UPDATE operation_queue SET status = 'failed', updated_at = datetime('now') WHERE id = ?",
+      ).run(t.id);
+      eventBus.emit('task:failed', {
+        task_id: String(t.id),
+        project_id: projectId,
+        error_message: preflight.errors.join('; '),
+        rolled_back: false,
+      });
+      writeAuditLog({
+        project_id: projectId,
+        operation_type: t.operation_type,
+        operation_data: JSON.parse(t.operation_data),
+        source: 'ai',
+        status: 'failed',
+        error_message: preflight.errors.join('; '),
+      });
     }
     return { success: false, errors: preflight.errors };
   }
@@ -85,14 +96,29 @@ export async function executeApprovedTasks(
       const op = operations[i];
       const taskId = String(op.taskId);
 
-      db.prepare("UPDATE operation_queue SET status = 'executing', updated_at = datetime('now') WHERE id = ?").run(op.taskId);
+      db.prepare(
+        "UPDATE operation_queue SET status = 'executing', updated_at = datetime('now') WHERE id = ?",
+      ).run(op.taskId);
       eventBus.emit('task:executing', { task_id: taskId, project_id: projectId });
 
       try {
         await executeSingleOperation(op, project.path);
-        db.prepare("UPDATE operation_queue SET status = 'executed', updated_at = datetime('now'), executed_at = datetime('now') WHERE id = ?").run(op.taskId);
-        eventBus.emit('task:executed', { task_id: taskId, project_id: projectId, result: 'success' });
-        writeAuditLog({ project_id: projectId, operation_type: op.type, operation_data: op, source: 'ai', approved_by: 'user', status: 'executed' });
+        db.prepare(
+          "UPDATE operation_queue SET status = 'executed', updated_at = datetime('now'), executed_at = datetime('now') WHERE id = ?",
+        ).run(op.taskId);
+        eventBus.emit('task:executed', {
+          task_id: taskId,
+          project_id: projectId,
+          result: 'success',
+        });
+        writeAuditLog({
+          project_id: projectId,
+          operation_type: op.type,
+          operation_data: op,
+          source: 'ai',
+          approved_by: 'user',
+          status: 'executed',
+        });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         errors.push(`Operation ${i + 1} failed: ${msg}`);
@@ -100,24 +126,48 @@ export async function executeApprovedTasks(
         // Rollback all previous operations
         try {
           rollbackFromShadow(undoLog.slice(0, i + 1), project.path, shadowDir);
-          db.prepare("UPDATE operation_queue SET status = 'failed_and_rolled_back', updated_at = datetime('now'), executed_at = datetime('now') WHERE id = ?").run(op.taskId);
-          eventBus.emit('task:failed', { task_id: taskId, project_id: projectId, error_message: msg, rolled_back: true });
+          db.prepare(
+            "UPDATE operation_queue SET status = 'failed_and_rolled_back', updated_at = datetime('now'), executed_at = datetime('now') WHERE id = ?",
+          ).run(op.taskId);
+          eventBus.emit('task:failed', {
+            task_id: taskId,
+            project_id: projectId,
+            error_message: msg,
+            rolled_back: true,
+          });
         } catch {
-          db.prepare("UPDATE operation_queue SET status = 'failed', updated_at = datetime('now') WHERE id = ?").run(op.taskId);
+          db.prepare(
+            "UPDATE operation_queue SET status = 'failed', updated_at = datetime('now') WHERE id = ?",
+          ).run(op.taskId);
         }
 
-        writeAuditLog({ project_id: projectId, operation_type: op.type, operation_data: op, source: 'ai', status: 'failed_and_rolled_back', error_message: msg });
+        writeAuditLog({
+          project_id: projectId,
+          operation_type: op.type,
+          operation_data: op,
+          source: 'ai',
+          status: 'failed_and_rolled_back',
+          error_message: msg,
+        });
         return { success: false, errors };
       }
     }
 
     // All succeeded — clean shadow
-    try { fs.rmSync(shadowDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      fs.rmSync(shadowDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
     return { success: true, errors: [] };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     // Attempt rollback of everything
-    try { rollbackFromShadow(undoLog, project.path, shadowDir); } catch { /* ignore */ }
+    try {
+      rollbackFromShadow(undoLog, project.path, shadowDir);
+    } catch {
+      /* ignore */
+    }
     return { success: false, errors: [msg] };
   } finally {
     releaseProjectLock(projectId);
@@ -128,7 +178,15 @@ export async function executeApprovedTasks(
  * Execute a single file operation.
  */
 async function executeSingleOperation(
-  op: { type: string; file_path?: string; folder_path?: string; source?: string; target?: string; content?: string; [key: string]: unknown },
+  op: {
+    type: string;
+    file_path?: string;
+    folder_path?: string;
+    source?: string;
+    target?: string;
+    content?: string;
+    [key: string]: unknown;
+  },
   projectRoot: string,
 ): Promise<void> {
   switch (op.type) {

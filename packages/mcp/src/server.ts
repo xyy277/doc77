@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { t } from '@doc77/core';
 
 const SERVER_NAME = 'doc77';
-const SERVER_VERSION = '0.1.0';
+import { VERSION as SERVER_VERSION } from './version.gen.js';
 
 /**
  * Create and configure the Doc77 MCP server.
@@ -32,11 +33,10 @@ function registerReadonlyTools(server: McpServer): void {
   server.registerTool(
     'list_files',
     {
-      description:
-        '列出项目指定路径下的文件和文件夹，包含 name/type/size/modified。默认过滤敏感文件。',
+      description: t('mcp.tool.listFiles.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        path: z.string().optional().default('').describe('目录路径（相对于项目根目录）'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        path: z.string().optional().default('').describe(t('mcp.param.dirPath')),
       },
     },
     async (args) => {
@@ -52,10 +52,10 @@ function registerReadonlyTools(server: McpServer): void {
   server.registerTool(
     'read_file',
     {
-      description: '读取指定文件内容（仅限已注册项目内，敏感文件自动拒绝）',
+      description: t('mcp.tool.readFile.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        file_path: z.string().describe('文件路径（相对于项目根目录）'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        file_path: z.string().describe(t('mcp.param.filePath')),
       },
     },
     async (args) => {
@@ -71,10 +71,10 @@ function registerReadonlyTools(server: McpServer): void {
   server.registerTool(
     'get_file_info',
     {
-      description: '获取文件元数据（大小、修改时间、类型）',
+      description: t('mcp.tool.getFileInfo.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        file_path: z.string().describe('文件路径（相对于项目根目录）'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        file_path: z.string().describe(t('mcp.param.filePath')),
       },
     },
     async (args) => {
@@ -95,51 +95,51 @@ function registerWriteTools(server: McpServer): void {
   }> = [
     {
       name: 'write_file',
-      description: '创建或覆盖文件内容（需审批）',
+      description: t('mcp.tool.writeFile.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        file_path: z.string().describe('文件路径（相对于项目根目录）'),
-        content: z.string().describe('要写入的文件内容'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        file_path: z.string().describe(t('mcp.param.filePath')),
+        content: z.string().describe(t('mcp.param.content')),
       },
     },
     {
       name: 'create_folder',
-      description: '创建新文件夹（需审批）',
+      description: t('mcp.tool.createFolder.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        folder_path: z.string().describe('文件夹路径（相对于项目根目录）'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        folder_path: z.string().describe(t('mcp.param.folderPath')),
       },
     },
     {
       name: 'move_file',
-      description: '移动或重命名文件（需审批）',
+      description: t('mcp.tool.moveFile.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        source: z.string().describe('源文件路径'),
-        target: z.string().describe('目标文件路径'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        source: z.string().describe(t('mcp.param.sourcePath')),
+        target: z.string().describe(t('mcp.param.targetPath')),
       },
     },
     {
       name: 'delete_file',
-      description: '删除文件或空文件夹（强制审批）',
+      description: t('mcp.tool.deleteFile.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        file_path: z.string().describe('要删除的文件路径'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        file_path: z.string().describe(t('mcp.param.filePathToDelete')),
       },
     },
     {
       name: 'batch_operations',
-      description: '批量执行多个操作（整体审批，原子回滚）',
+      description: t('mcp.tool.batchOperations.desc'),
       inputSchema: {
-        project_id: z.number().describe('项目 ID'),
-        operations: z.array(z.record(z.unknown())).describe('操作数组，每个元素含 type 和对应参数'),
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        operations: z.array(z.record(z.unknown())).describe(t('mcp.param.operations')),
       },
     },
     {
       name: 'get_task_status',
-      description: '查询之前提交的写入任务状态',
+      description: t('mcp.tool.getTaskStatus.desc'),
       inputSchema: {
-        task_id: z.string().describe('任务 ID'),
+        task_id: z.string().describe(t('mcp.param.taskId')),
       },
     },
   ];
@@ -156,7 +156,7 @@ function registerWriteTools(server: McpServer): void {
           await import('./tools/write.js');
 
         // Generate a session ID for this operation
-        const { createSession } = await import('../session.js');
+        const { createSession } = await import('./session.js');
         const session = createSession();
         const sessionId = session.id;
 

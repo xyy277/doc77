@@ -1,105 +1,116 @@
 <!DOCTYPE html>
-<html lang="zh-CN" class="h-full">
+<html lang="zh-CN" class="h-full tw-loading" data-i18n-page>
 <head>
+<script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
+<style>.i18n-loading body{visibility:hidden}</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doc77 — 预览</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={darkMode:'class',theme:{extend:{}}}</script>
-<!-- Client-side renderers -->
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-<script>mermaid.initialize({startOnLoad:true,theme:document.documentElement.classList.contains('dark')?'dark':'default'});</script>
+<title data-i18n="web.preview.pageTitle">Doc77 — Preview</title>
+<!-- 尽早应用主题 + 隐藏内容直到 Tailwind 就绪，避免切换/进入项目时的样式闪烁(FOUC) -->
+<script>(function(){try{var s=localStorage.getItem('doc77-theme');var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();</script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-  /* ═══ 主题 Token ═══ */
-  :root { --bg-code: #f1f5f9; --text-code: #1e293b; }
-  .dark { --bg-code: #1e293b; --text-code: #e2e8f0; }
-  /* ═══ 滚动条 ═══ */
-  * { scrollbar-width: thin; }
-  .scrollbar-dark { scrollbar-color: #475569 #1e293b; }
-  .scrollbar-dark::-webkit-scrollbar { width:5px; }
-  .scrollbar-dark::-webkit-scrollbar-track { background:#1e293b; }
-  .scrollbar-dark::-webkit-scrollbar-thumb { background:#475569; border-radius:10px; }
-  .scrollbar-light { scrollbar-color: #cbd5e1 #f8fafc; }
-  .dark .scrollbar-light { scrollbar-color: #475569 #1e293b; }
-  .scrollbar-light::-webkit-scrollbar { width:5px; }
-  .scrollbar-light::-webkit-scrollbar-track { background:transparent; }
-  .dark .scrollbar-light::-webkit-scrollbar-track { background:#1e293b; }
-  .scrollbar-light::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:10px; }
-  .dark .scrollbar-light::-webkit-scrollbar-thumb { background:#475569; }
-  /* ═══ 文档排版 · 主题感知 ═══ */
-  .doc-content { color: var(--tw-body,inherit); }
-  .doc-content h1 { font-size:1.875rem; font-weight:700; padding-bottom:.75rem; margin-bottom:1.5rem; border-bottom:1px solid #e2e8f0; }
-  .dark .doc-content h1 { border-bottom-color:#334155; }
-  .doc-content h2 { font-size:1.25rem; font-weight:600; margin-top:2rem; margin-bottom:1rem; }
-  .doc-content h3 { font-size:1.1rem; font-weight:600; margin-top:1.5rem; margin-bottom:.75rem; }
-  .doc-content p { margin-bottom:1rem; line-height:1.75; }
-  .doc-content ul,.doc-content ol { padding-left:1.25rem; margin-bottom:1.5rem; }
-  .doc-content li { margin:.5rem 0; }
-  .doc-content table { border-collapse:collapse; width:100%; margin:1.5rem 0; font-size:.875rem; }
-  .doc-content th,.doc-content td { border:1px solid #e2e8f0; padding:.5rem .75rem; text-align:left; }
-  .dark .doc-content th,.dark .doc-content td { border-color:#334155; }
-  .doc-content th { background:#f8fafc; font-weight:600; }
-  .dark .doc-content th { background:#1e293b; }
-  .doc-content blockquote { border-left:3px solid #e2e8f0; padding-left:1rem; margin:1rem 0; }
-  .dark .doc-content blockquote { border-left-color:#475569; }
-  .doc-content code { background:var(--bg-code); color:var(--text-code); padding:.125rem .375rem; border-radius:.25rem; font-size:.875em; font-family:'Fira Code','Cascadia Code',monospace; }
-  /* 代码块 */
-  .doc77-code-block { margin:1rem 0; border-radius:.5rem; overflow:hidden; border:1px solid #e2e8f0; }
-  .dark .doc77-code-block { border-color:#334155; }
-  .doc77-code-block pre { background:var(--bg-code) !important; color:var(--text-code) !important; padding:1rem; overflow-x:auto; font-size:.8125rem; margin:0; }
-  .doc77-code-block pre code { background:none !important; color:inherit; padding:0; }
-  .doc-content pre { background:var(--bg-code); color:var(--text-code); padding:1rem; border-radius:.5rem; overflow-x:auto; font-size:.8125rem; border:1px solid #e2e8f0; }
-  .dark .doc-content pre { border-color:#334155; }
-  .doc-content pre code { background:none; padding:0; color:inherit; }
-  /* 动画 */
-  @keyframes fadeInUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-  .animate-in { animation:fadeInUp .3s ease-out; }
-  @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
-  .skeleton { background:linear-gradient(90deg,#e2e8f0 25%,#cbd5e1 50%,#e2e8f0 75%); background-size:800px 100%; animation:shimmer 1.5s infinite; border-radius:.25rem; }
-  .dark .skeleton { background:linear-gradient(90deg,#334155 25%,#475569 50%,#334155 75%); background-size:800px 100%; }
-  @keyframes ping { 75%,100%{transform:scale(2);opacity:0} }
-  .ping-dot { animation:ping 2s cubic-bezier(0,0,.2,1) infinite; }
+html{background:#f8fafc}html.dark{background:#0f172a}
+/* Tailwind 就绪前隐藏正文，只显示加载动画，避免样式闪烁(FOUC) */
+html.tw-loading body{visibility:hidden}
+.boot-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;visibility:visible;z-index:9999}
+html:not(.tw-loading) .boot-overlay{display:none}
+.boot-spinner{width:34px;height:34px;border:3px solid rgba(100,116,139,.25);border-top-color:#3b82f6;border-radius:50%;animation:bootspin .7s linear infinite}
+@keyframes bootspin{to{transform:rotate(360deg)}}
 </style>
+<script>window.__VENDOR_READY=false;fetch('/vendor/.ready').then(r=>{if(r.ok)window.__VENDOR_READY=true}).catch(()=>{});</script>
+<script>
+(function(){
+  var revealed = false;
+  function reveal(){ if (revealed) return; revealed = true; document.documentElement.classList.remove('tw-loading'); }
+  var s = document.createElement('script');
+  s.src = (window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com');
+  s.onload = function() {
+    try { tailwind.config = { darkMode: 'class', theme: { extend: {} } }; } catch(e) {}
+    // 等 JIT 应用 config 后再显示，避免闪一下默认样式
+    requestAnimationFrame(function(){ requestAnimationFrame(reveal); });
+  };
+  s.onerror = reveal; // CDN unreachable — don't hide forever
+  document.head.appendChild(s);
+  setTimeout(reveal, 3000); // fallback: show after 3s regardless
+})();
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme">
+<link rel="stylesheet" id="katexCss" data-src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="css/app.css">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
 <body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden">
+<!-- 加载动画：Tailwind 就绪后由 tw-loading 移除自动隐藏 -->
+<div class="boot-overlay"><div class="boot-spinner"></div></div>
 
 <div class="flex h-screen w-full">
 
   <!-- ══════ 左侧栏 ══════ -->
-  <aside id="leftPanel" class="w-64 shrink-0 bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col z-20 transition-all duration-300">
-    <div class="h-14 px-4 border-b border-slate-800 dark:border-slate-800 flex items-center justify-between shrink-0">
-      <a href="/" class="flex items-center gap-2 text-white font-bold text-lg no-underline">
-        <span class="bg-blue-600 text-white px-1.5 py-0.5 rounded text-sm">📁</span> Doc77
+  <aside id="leftPanel" class="bg-slate-900 dark:bg-slate-950 text-slate-300 flex flex-col z-20 shrink-0 transition-all duration-300 overflow-hidden" style="width:288px">
+    <div class="h-14 px-4 border-b border-slate-800 flex items-center justify-between shrink-0">
+      <a href="/" class="flex items-center gap-2 text-white font-bold text-lg no-underline shrink-0">
+        <img src="/assets/logo-dark.svg" alt="Doc77" height="32" class="h-8 collapsible-content">
+        <svg id="logoIconCollapsed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="h-6 w-6 shrink-0" style="display:none">
+          <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#3B82F6"/>
+          <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#93C5FD"/>
+          <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FDE68A"/>
+        </svg>
       </a>
       <div class="flex items-center gap-1">
-        <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-sm" aria-label="切换主题" title="切换浅色/深色" id="themeBtn">🌙</button>
-        <button class="text-slate-400 hover:text-white transition-colors" aria-label="设置" title="设置（待实现）">⚙</button>
+        <button onclick="toggleTheme()" class="text-slate-400 hover:text-white transition-colors text-sm" data-i18n-title="web.preview.sidebar.themeToggle" title="Toggle theme" id="themeBtn">🌙</button>
+        <button class="text-slate-400 hover:text-white transition-colors" data-i18n-title="web.preview.sidebar.settings" title="Settings" onclick="toggleSettings()">⚙</button>
       </div>
     </div>
 
     <!-- Project Switcher -->
-    <div class="p-3 relative">
-      <button id="projBtn" onclick="toggleProjMenu()"
-        class="w-full text-left rounded-md px-3 py-2 text-sm flex items-center justify-between text-slate-200 cursor-pointer border transition-colors bg-slate-800 dark:bg-slate-900 border-slate-700 hover:border-slate-600">
-        <span class="font-medium truncate" id="projName">💼 加载中...</span>
+    <div class="p-3 relative collapsible-content">
+      <button id="projBtn" onclick="toggleProjMenu()" class="w-full text-left rounded-md px-3 py-2 text-sm flex items-center justify-between text-slate-200 cursor-pointer border transition-colors bg-slate-800 border-slate-700 hover:border-slate-600">
+        <span class="font-medium truncate" id="projName">💼 <span data-i18n="web.preview.loading">Loading...</span></span>
         <span id="projChev" class="transition-transform text-xs">▾</span>
       </button>
-      <div id="projMenu" class="hidden absolute top-[3.75rem] left-3 right-3 bg-slate-800 dark:bg-slate-900 border border-slate-700 rounded-lg shadow-xl py-1 z-30" role="listbox"></div>
+      <div id="projMenu" class="hidden absolute top-[3.75rem] left-3 right-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-30" role="listbox"></div>
     </div>
 
-    <!-- Tree -->
+    <!-- ⭐ Bookmarks -->
+    <div class="px-3 collapsible-content" id="bookmarkSection">
+      <div onclick="toggleBookmarkSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between cursor-pointer hover:text-slate-300 transition-colors select-none">
+        <span><span id="bookmarkArrow">▸</span> <span data-i18n="web.preview.sidebar.bookmarks">⭐ Bookmarks</span></span><span id="bookmarkCount" class="text-[10px] text-slate-600">0</span>
+      </div>
+      <div id="bookmarkList" class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
+    </div>
+
+    <!-- 🕐 Recent Files -->
+    <div class="px-3 collapsible-content" id="recentSection">
+      <div onclick="toggleRecentSection()" class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 px-1 flex items-center cursor-pointer hover:text-slate-300 transition-colors select-none">
+        <span><span id="recentArrow">▸</span> <span data-i18n="web.preview.sidebar.recentFiles">🕐 Recent Files</span></span>
+      </div>
+      <div id="recentList" class="hidden space-y-0.5 mb-2 max-h-32 overflow-y-auto scrollbar-dark text-xs"></div>
+    </div>
+
+    <!-- Tree (wrapper stays flex-1 to push status bar to bottom) -->
     <div class="flex-1 flex flex-col min-h-0">
-      <div class="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider flex justify-between items-center shrink-0">目录树<button class="hover:text-slate-300 transition-colors" title="刷新缓存" onclick="refreshTree()">🔄</button></div>
-      <div class="px-3 mb-2 shrink-0"><div class="relative"><span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="fileFilter" placeholder="过滤文件..." oninput="applyFilter()" class="w-full bg-slate-950 dark:bg-black border border-slate-800 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"></div></div>
-      <div class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-dark" id="tree" role="tree"><div class="text-center py-6 text-slate-500 text-xs">选择一个项目开始</div></div>
+      <div class="collapsible-content flex flex-col flex-1 min-h-0">
+      <div class="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider flex justify-between items-center shrink-0"><span data-i18n="web.preview.sidebar.fileTree">File Tree</span><button class="hover:text-slate-300 transition-colors" data-i18n-title="web.preview.sidebar.refreshCache" title="Refresh cache" onclick="refreshTree()">🔄</button></div>
+      <div class="px-3 mb-2 shrink-0"><div class="relative"><span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="fileFilter" data-i18n-placeholder="web.preview.sidebar.filterFiles" placeholder="Filter files..." oninput="applyFilter()" class="w-full bg-slate-950 border border-slate-800 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"></div></div>
+      <div class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-dark" id="tree" role="tree"><div class="text-center py-6 text-slate-500 text-xs"><span data-i18n="web.preview.sidebar.selectProject">Select a project to start</span></div></div>
+      </div>
+    </div>
+
+    <!-- 🔎 Global Search -->
+    <div class="px-3 py-2.5 border-t border-slate-800 shrink-0 collapsible-content">
+      <div class="relative">
+        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔎</span>
+        <input id="globalSearch" data-i18n-placeholder="web.preview.sidebar.globalSearch" placeholder="Search globally..." onkeydown="if(event.key==='Enter')doGlobalSearch()" class="w-full bg-slate-950 border border-slate-700 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600">
+      </div>
+      <div id="searchResults" class="hidden mt-2 max-h-48 overflow-y-auto scrollbar-dark space-y-1"></div>
     </div>
 
     <!-- Status -->
-    <div class="px-3 py-2.5 border-t border-slate-800 dark:border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50 dark:bg-slate-950/50">
-      <div id="sseInd" class="flex items-center gap-1.5 text-xs text-emerald-500 font-medium"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>实时</div>
-      <span class="text-[10px] text-slate-600">v0.1.0</span>
+    <div class="px-3 py-2.5 border-t border-slate-800 flex items-center gap-2 shrink-0 bg-slate-900/50">
+      <div id="sseInd" class="flex items-center gap-1.5 text-xs text-emerald-500 font-medium shrink-0"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span><span class="collapsible-content" data-i18n="web.preview.live">Live</span></div>
+      <span class="text-[10px] text-slate-600 collapsible-content flex-1 text-right">v0.2.0</span>
+      <button onclick="toggleCollapse()" class="text-slate-500 hover:text-slate-300 transition-colors shrink-0" data-i18n-title="web.preview.sidebar.collapse" title="Collapse sidebar" id="collapseLeftBtn">☰</button>
     </div>
   </aside>
 
@@ -107,312 +118,159 @@
 
   <!-- ══════ 中间栏 ══════ -->
   <main class="flex-1 flex flex-col bg-white dark:bg-slate-900 min-w-0 relative">
+    <div id="readingProgress" style="width:0%"></div>
+
     <!-- Toolbar -->
     <div class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 bg-white dark:bg-slate-900 shadow-sm z-10 shrink-0">
       <div class="flex items-center gap-2 min-w-0">
-        <button id="showLeftBtn" class="hidden p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors" title="显示侧栏" onclick="togglePanel('left')">◀</button>
-        <div id="breadcrumb" class="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 min-w-0 overflow-hidden"><span id="breadcrumbPath" class="text-slate-400 dark:text-slate-500 text-sm">未选择文件</span></div>
+        <button id="showLeftBtn" class="hidden p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors" data-i18n-title="web.preview.toolbar.showSidebar" title="Show sidebar" onclick="togglePanel('left')">◀</button>
+        <div id="breadcrumb" class="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 min-w-0 overflow-hidden"><span id="breadcrumbPath" class="text-slate-400 text-sm" data-i18n="web.preview.toolbar.noFileSelected">No file selected</span></div>
+        <span id="readTime" class="text-[10px] text-slate-400 hidden ml-1 whitespace-nowrap"></span>
       </div>
-      <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-        <button id="aiBtn" disabled onclick="openAIChat()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md transition-colors border border-purple-100 dark:border-purple-800 disabled:opacity-40 disabled:cursor-not-allowed">✨ <span class="hidden sm:inline">AI 总结</span></button>
+      <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+        <button id="docSearchBtn" disabled onclick="toggleDocSearch()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.docSearch" title="Find in document (Ctrl+F)">🔍</button>
+        <button id="autoScrollBtn" disabled onclick="toggleAutoScroll()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.autoScroll" title="Auto scroll">▶</button>
+        <select id="scrollSpeed" class="text-[10px] border border-slate-200 dark:border-slate-600 rounded px-1 py-1 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hidden">
+          <option value="30" data-i18n="web.preview.scrollSpeed.slow">Slow</option><option value="60" selected data-i18n="web.preview.scrollSpeed.medium">Medium</option><option value="120" data-i18n="web.preview.scrollSpeed.fast">Fast</option><option value="200" data-i18n="web.preview.scrollSpeed.instant">Instant</option>
+        </select>
+        <button id="ttsBtn" disabled onclick="toggleTTS()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.tts" title="Read aloud (TTS)">🔊</button>
+        <button id="translateBtn" disabled onclick="toggleTranslate()" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed hidden" data-i18n-title="web.preview.toolbar.translate" title="Offline translate">🌐</button>
+        <select id="ttsRate" class="text-[10px] border border-slate-200 dark:border-slate-600 rounded px-1 py-1 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hidden" onchange="updateTTSRate()">
+          <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.5">1.5x</option><option value="2">2x</option>
+        </select>
         <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
-        <button id="editBtn" disabled onclick="revealFile('edit')" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">📝 编辑器打开</button>
-        <button id="revealBtn" disabled onclick="revealFile('reveal')" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">📂 <span class="hidden sm:inline">文件夹中显示</span></button>
-        <button id="showRightBtn" class="hidden p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors ml-2" title="显示 AI 面板" onclick="togglePanel('right')">▶</button>
+        <button id="runBtn" disabled onclick="runCode()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed hidden" data-i18n-title="web.preview.toolbar.runCode" title="Run code">▶ <span class="hidden sm:inline" data-i18n="web.preview.toolbar.run">Run</span></button>
+        <button id="aiBtn" disabled onclick="doAISummary()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md transition-colors border border-purple-100 dark:border-purple-800 disabled:opacity-40 disabled:cursor-not-allowed">✨ <span class="hidden sm:inline" data-i18n="web.preview.toolbar.aiSummary">AI Summary</span></button>
+        <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
+        <button id="editBtn" disabled onclick="revealFile('edit')" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">📝 <span data-i18n="web.preview.toolbar.openEditor">Open in editor</span></button>
+        <button id="revealBtn" disabled onclick="revealFile('reveal')" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">📂 <span class="hidden sm:inline" data-i18n="web.preview.toolbar.showInFolder">Show in folder</span></button>
+        <button id="exportBtn" disabled onclick="exportHTML()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.exportTitle" title="Export as self-contained HTML">📥 <span class="hidden sm:inline" data-i18n="web.preview.toolbar.export">Export</span></button>
+        <button id="shareBtn" disabled onclick="shareDocument()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.shareTitle" title="Create LAN share link">🔗 <span class="hidden sm:inline" data-i18n="web.preview.toolbar.share">Share</span></button>
       </div>
     </div>
 
+    <!-- Doc Search Bar -->
+    <div id="docSearchBar" class="hidden border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-1.5 flex items-center gap-2 shrink-0">
+      <input id="docSearchInput" data-i18n-placeholder="web.preview.toolbar.searchDoc" placeholder="Search..." oninput="doDocSearch()" onkeydown="if(event.key==='Enter')nextSearchMatch(1);if(event.key==='Escape')toggleDocSearch()" class="flex-1 border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500">
+      <span id="searchCount" class="text-xs text-slate-500 whitespace-nowrap"></span>
+      <button onclick="nextSearchMatch(1)" class="text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-700">↓</button>
+      <button onclick="nextSearchMatch(-1)" class="text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-700">↑</button>
+      <button onclick="toggleDocSearch()" class="text-xs text-slate-400 hover:text-slate-600">✕</button>
+    </div>
+
+    <!-- Tab Bar (多文档) -->
+    <div id="tabBar" class="hidden items-stretch gap-1 px-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-950 overflow-x-auto scrollbar-thin shrink-0"></div>
+
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto scrollbar-light bg-slate-50 dark:bg-slate-900" id="contentArea">
+    <div class="flex-1 overflow-y-auto scrollbar-light bg-slate-50 dark:bg-slate-900" id="contentArea" onscroll="onContentScroll()" style="position:relative">
+      <div id="docPaneHost"></div>
       <div id="emptyState" class="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-8">
         <span class="text-6xl mb-4 text-slate-300 dark:text-slate-600">📄</span>
-        <h2 class="text-xl font-medium text-slate-600 dark:text-slate-400 mb-2">Doc77 预览引擎</h2>
-        <p class="text-sm text-center max-w-sm mb-6 text-slate-400 dark:text-slate-500 leading-relaxed">从左侧目录树选择文件以进行只读预览，或通过右侧 AI 助手对整个项目进行管理与重构。</p>
-        <button onclick="togglePanel('right');setActiveTab('chat')" class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">✨ 唤起 AI 助手</button>
+        <h2 class="text-xl font-medium text-slate-600 dark:text-slate-400 mb-2" data-i18n="web.preview.empty.title">Doc77 Preview Engine</h2>
+        <p class="text-sm text-center max-w-sm mb-6 text-slate-400 dark:text-slate-500 leading-relaxed" data-i18n="web.preview.empty.desc">Select a file from the left file tree for read-only preview.</p>
+        <button onclick="togglePanel('right');setActiveTab('chat')" class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-all flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300"><span data-i18n="web.preview.empty.launchAi">✨ Launch AI Assistant</span></button>
       </div>
+      <button id="backToTopBtn" onclick="document.getElementById('contentArea').scrollTo({top:0,behavior:'smooth'})" data-i18n-title="web.preview.backToTop" title="Back to top" style="position:sticky;bottom:24px;float:right;margin-right:12px;z-index:20;width:36px;height:36px;border-radius:50%;background:var(--accent,#2563eb);color:#fff;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:opacity 0.2s,transform 0.2s" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+      </button>
+    </div>
+
+    <!-- AI Summary Card -->
+    <div id="summaryCard" class="summary-card hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-5 animate-in">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-bold text-slate-800 dark:text-slate-100" data-i18n="web.preview.aiSummary.title">✨ AI Summary</span>
+        <div class="flex gap-1">
+          <button onclick="readSummary()" class="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-200" data-i18n="web.preview.aiSummary.read">🔊 Read aloud</button>
+          <button onclick="document.getElementById('summaryCard').classList.add('hidden')" class="text-xs text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+      </div>
+      <p id="summaryText" class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-h-48 overflow-y-auto">Generating...</p>
     </div>
   </main>
 
   <div class="w-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-amber-400 cursor-col-resize z-30 transition-colors hidden md:block border-x border-slate-300 dark:border-slate-700 shrink-0"></div>
 
+  <!-- ══════ 右侧栏悬浮球 ══════ -->
+  <button id="capsuleBtn" onclick="togglePanel('right')" class="fixed z-30 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 shadow-lg flex items-center justify-center text-base text-slate-500 dark:text-slate-300 hover:scale-110 transition-all duration-300 animate-pulse cursor-pointer" style="right:316px;animation-duration:4s">
+    <span id="capsuleIcon">▶</span>
+  </button>
+
   <!-- ══════ 右侧栏 ══════ -->
   <aside id="rightPanel" class="w-80 shrink-0 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20 transition-all duration-300">
-    <!-- Tabs -->
-    <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 items-center pr-1" role="tablist">
-      <button id="tabChat" onclick="setActiveTab('chat')" role="tab" aria-selected="true" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-slate-900">💬 助手</button>
-      <button id="tabOutline" onclick="setActiveTab('outline')" role="tab" aria-selected="false" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200">📑 大纲</button>
-      <button id="tabQueue" onclick="setActiveTab('queue')" role="tab" aria-selected="false" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200">📋 审批<span id="pendingBadge" class="hidden ml-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span></button>
-      <button onclick="togglePanel('right')" class="p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md transition-colors ml-1" title="收起面板">▶</button>
+    <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 items-center pr-1 relative">
+      <button id="tabOutline" onclick="setActiveTab('outline')" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400 bg-white dark:bg-slate-900" data-i18n="web.preview.tabs.outline">📑 Outline</button>
+      <button id="tabChat" onclick="setActiveTab('chat')" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200" data-i18n="web.preview.tabs.chat">💬 Chat</button>
+      <button id="tabQueue" onclick="setActiveTab('queue')" class="flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200" ><span data-i18n="web.preview.tabs.queue">📋 Approvals</span><span id="pendingBadge" class="hidden ml-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span></button>
     </div>
     <div class="flex-1 overflow-hidden relative">
-      <!-- Chat -->
-      <div id="chatPanel" class="absolute inset-0 flex flex-col bg-slate-50/50 dark:bg-slate-900/50" role="tabpanel">
+      <div id="chatPanel" class="absolute inset-0 flex flex-col bg-slate-50/50 dark:bg-slate-900/50">
         <div id="ctxBanner" class="hidden bg-blue-50/80 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800 px-3 py-1.5 flex items-center gap-2 text-xs text-blue-800 dark:text-blue-300 shadow-sm shrink-0">📄 <span class="truncate font-medium" id="ctxText"></span></div>
         <div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-light" id="chatMessages">
           <div id="welcomeCard" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm animate-in">
-            <div class="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 mb-2">🤖 您好！我是 Doc77 助手</div>
-            <p class="text-xs text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">我可以帮您阅读、总结当前项目，或直接生成重构建议与操作指令。</p>
+            <div class="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 mb-2" data-i18n="web.preview.chat.welcomeTitle">🤖 Hello! I'm Doc77 AI Assistant</div>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mb-4 leading-relaxed" data-i18n="web.preview.chat.welcomeDesc">I can analyze project structure, read document contents, and provide organization and classification suggestions.</p>
             <div class="space-y-2">
-              <button onclick="sendQuickMsg('帮我分析整个项目的目录结构')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400 border border-slate-100 dark:border-slate-600 hover:border-blue-200 dark:hover:border-blue-800 p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">🔍 分析目录结构</button>
-              <button onclick="sendQuickMsg('请为我生成当前项目的完整摘要报告')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400 border border-slate-100 dark:border-slate-600 hover:border-blue-200 dark:hover:border-blue-800 p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300">📝 生成项目摘要</button>
+              <button onclick="sendQuickMsg(t('web.preview.chat.promptAnalyzeProject'))" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300" data-i18n="web.preview.chat.analyzeProject">📊 Analyze project structure</button>
+              <button onclick="currentFile ? sendQuickMsg(t('web.preview.chat.promptSummarizeDoc'), currentFile) : toast(t('web.preview.toolbar.noFileSelected'), 'info')" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300" data-i18n="web.preview.chat.summarizeDoc">📝 Summarize current doc</button>
+              <button onclick="sendQuickMsg(t('web.preview.chat.promptFindDuplicates'))" class="w-full text-left text-xs bg-slate-50 dark:bg-slate-700 hover:bg-blue-50 hover:text-blue-700 border p-2 rounded-md transition-colors text-slate-600 dark:text-slate-300" data-i18n="web.preview.chat.findDuplicates">🔍 Find duplicate files</button>
+              <button id="btnClassify" onclick="doSmartClassify()" class="w-full text-left text-xs bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 p-2 rounded-md transition-colors" data-i18n="web.preview.chat.smartClassify">🗂️ Smart classification (create plan)</button>
             </div>
           </div>
         </div>
         <div class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0">
-          <div class="relative"><textarea id="chatInput" rows="2" placeholder="发送自然语言指令..." class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-3 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 resize-none outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-            <button onclick="sendMessage()" id="sendBtn" disabled class="absolute right-2 bottom-2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">➤</button></div>
+          <div class="relative"><textarea id="chatInput" rows="2" data-i18n-placeholder="web.preview.chat.inputPlaceholder" placeholder="Send a message..." class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-3 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 resize-none outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+            <button onclick="sendMessage()" id="sendBtn" disabled class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">➤</button></div>
         </div>
       </div>
-      <!-- Outline -->
-      <div id="outlinePanel" class="absolute inset-0 flex flex-col bg-white dark:bg-slate-900 hidden" role="tabpanel">
-        <div class="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0">文档大纲</div>
-        <div class="flex-1 overflow-y-auto p-2 scrollbar-light" id="outlineList"><div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">请先打开一个 Markdown 文档</div></div>
+      <div id="outlinePanel" class="absolute inset-0 flex flex-col bg-white dark:bg-slate-900 hidden">
+        <div class="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0" data-i18n="web.preview.outline.title">Document Outline</div>
+        <div class="flex-1 overflow-y-auto p-2 scrollbar-light" id="outlineList"><div class="text-center py-12 text-slate-400 text-xs" data-i18n="web.preview.outline.empty">Open a Markdown document first</div></div>
       </div>
-      <!-- Queue -->
-      <div id="queuePanel" class="absolute inset-0 flex flex-col bg-slate-50 dark:bg-slate-900 hidden" role="tabpanel">
+      <div id="queuePanel" class="absolute inset-0 flex flex-col bg-slate-50 dark:bg-slate-900 hidden">
         <div class="p-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex justify-between items-center shrink-0 shadow-sm z-10">
-          <div class="text-sm font-bold text-slate-800 dark:text-slate-100">待处理任务 (<span id="pendingCount">0</span>)</div>
-          <div class="space-x-1.5" id="queueActions">
-            <button onclick="approveAll()" class="text-[11px] px-2 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-md font-medium shadow-sm transition-colors">批准全部</button>
-            <button onclick="rejectAll()" class="text-[11px] px-2 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md font-medium transition-colors border border-slate-200 dark:border-slate-600">拒绝全部</button>
+          <div class="text-sm font-bold text-slate-800 dark:text-slate-100"><span data-i18n="web.preview.queue.title">Pending Tasks</span> (<span id="pendingCount">0</span>)</div>
+          <div class="space-x-1.5">
+            <button onclick="approveAll()" class="text-[11px] px-2 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-md font-medium shadow-sm transition-colors" data-i18n="web.preview.queue.approveAll">Approve All</button>
+            <button onclick="rejectAll()" class="text-[11px] px-2 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md font-medium transition-colors border border-slate-200 dark:border-slate-600" data-i18n="web.preview.queue.rejectAll">Reject All</button>
           </div>
         </div>
-        <div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-light" id="queueList"><div class="text-center py-16 text-slate-400 dark:text-slate-500 text-sm flex flex-col items-center gap-2">✅<br>队列已清空，无待办操作</div></div>
+        <div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-light" id="queueList"><div class="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-2">✅<br><span data-i18n="web.preview.queue.empty">Queue is empty</span></div></div>
         <div class="p-3 bg-slate-900 dark:bg-black border-t border-slate-800 text-[11px] text-slate-300 flex items-center justify-between shrink-0">
-          <span class="flex items-center gap-1"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span> 事务锁: <strong class="text-white">监控中</strong></span>
-          <span>Shadow: <strong class="text-emerald-400">已开启</strong></span>
+          <span class="flex items-center gap-1"><span class="relative flex h-2 w-2"><span class="ping-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span> <span data-i18n="web.preview.queue.lockLabel">Tx Lock:</span> <strong class="text-white" data-i18n="web.preview.queue.monitoring">Monitoring</strong></span>
+          <span>Shadow: <strong class="text-emerald-400" data-i18n="web.preview.queue.shadowOn">Enabled</strong></span>
         </div>
       </div>
     </div>
   </aside>
 </div>
 
-<script>
-//══════════ Theme ══════════
-(function initTheme() {
-  const saved = localStorage.getItem('doc77-theme');
-  const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDark = saved === 'dark' || (!saved && prefers);
-  document.documentElement.classList.toggle('dark', isDark);
-  updateThemeIcon(isDark);
-})();
-function toggleTheme() {
-  const isDark = document.documentElement.classList.toggle('dark');
-  localStorage.setItem('doc77-theme', isDark ? 'dark' : 'light');
-  updateThemeIcon(isDark);
-}
-function updateThemeIcon(isDark) {
-  const btn = document.getElementById('themeBtn');
-  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
-}
+<!-- Settings Overlay -->
+<div id="settingsOverlay" class="fixed inset-0 z-50 flex justify-end pointer-events-none" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="toggleSettings()"></div>
+  <div class="settings-panel relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
+    <div class="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
+      <span class="font-bold text-slate-800 dark:text-slate-100 text-lg" data-i18n="web.preview.settings.title">⚙ Settings</span>
+      <button onclick="toggleSettings()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl">✕</button>
+    </div>
+    <div class="flex border-b border-slate-200 dark:border-slate-700 shrink-0" id="settingsTabs"></div>
+    <div class="flex-1 overflow-y-auto p-4 space-y-4" id="settingsContent"></div>
+    <div class="p-3 border-t border-slate-200 dark:border-slate-700 shrink-0 flex gap-2">
+      <button onclick="resetDefaults()" class="flex-1 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors" data-i18n="web.preview.settings.resetDefaults">Reset defaults</button>
+      <button onclick="saveSettings()" class="flex-1 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors" data-i18n="web.preview.settings.save">💾 Save settings</button>
+    </div>
+  </div>
+</div>
 
-//══════════ Data ══════════
-const pid = new URLSearchParams(location.search).get('id');
-if (!pid) location.href = '/';
-let proj = null, projects = [], currentFile = null, activeTab = 'chat';
+<!-- Right-click context menu -->
+<div id="ctxMenu" class="ctx-menu hidden"></div>
 
-(async function boot() {
-  try {
-    const r = await fetch('/api/projects');
-    projects = await r.json();
-    proj = projects.find(p => p.id === parseInt(pid));
-    if (!proj) { alert('项目未找到'); location.href='/'; return; }
-    document.getElementById('projName').textContent = '💼 ' + proj.name;
-    document.title = 'Doc77 — ' + proj.name;
-    renderProjMenu(); loadTree(''); loadTasks();
-  } catch(e) { document.getElementById('projName').textContent = '⚠ 加载失败'; }
-})();
+<!-- Drop zone overlay -->
+<div id="dropOverlay" class="hidden"><div id="dropOverlayContent"><span class="text-6xl mb-4 block">📎</span><span class="text-lg font-medium" data-i18n="web.preview.drop.title">Drop files for temporary preview</span><span class="text-sm opacity-70" data-i18n="web.preview.drop.desc">Supports Markdown, code, images, PDF, and more</span></div></div>
 
-function togglePanel(side) {
-  const panel = document.getElementById(side === 'left' ? 'leftPanel' : 'rightPanel');
-  const btn = document.getElementById(side === 'left' ? 'showLeftBtn' : 'showRightBtn');
-  const h = panel.classList.toggle('hidden');
-  btn.classList.toggle('hidden', !h);
-}
-
-function setActiveTab(t) {
-  activeTab = t;
-  ['tabChat','tabOutline','tabQueue'].forEach(id => {
-    const el = document.getElementById(id);
-    const isChat = id === 'tabChat', isOutline = id === 'tabOutline', isQueue = id === 'tabQueue';
-    const active = (isChat && t === 'chat') || (isOutline && t === 'outline') || (isQueue && t === 'queue');
-    el.className = 'flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ' +
-      (active
-        ? (isChat ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-slate-900'
-          : isOutline ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400 bg-white dark:bg-slate-900'
-          : 'text-amber-600 dark:text-amber-400 border-b-2 border-amber-600 dark:border-amber-400 bg-white dark:bg-slate-900')
-        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200');
-  });
-  document.getElementById('chatPanel').classList.toggle('hidden', t !== 'chat');
-  document.getElementById('outlinePanel').classList.toggle('hidden', t !== 'outline');
-  document.getElementById('queuePanel').classList.toggle('hidden', t !== 'queue');
-  if (t === 'queue') loadTasks();
-  if (t === 'outline') ensureOutlineBuilt();
-}
-
-// Project menu
-function toggleProjMenu() { document.getElementById('projMenu').classList.toggle('hidden'); }
-function renderProjMenu() {
-  document.getElementById('projMenu').innerHTML = projects.map(p => `<button onclick="switchProject(${p.id})" class="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 flex flex-col transition-colors"><span class="font-medium">${p.id===proj.id?'✓ ':''}💼 ${esc(p.name)}</span><span class="text-xs text-slate-500 truncate">${esc(p.path)}</span></button>`).join('') + '<div class="h-px bg-slate-700 my-1"></div><a href="/" class="block w-full text-left px-3 py-2 text-sm text-blue-400 hover:bg-slate-700 transition-colors">＋ 注册新项目</a>';
-}
-function switchProject(id) { location.href = '/preview.html?id=' + id; }
-
-// Tree (recursive)
-async function loadTree(dirPath) {
-  const tree = document.getElementById('tree');
-  tree.innerHTML = '<div class="text-center py-4"><div class="skeleton h-4 w-3/4 mx-auto mb-2"></div></div>';
-  try {
-    const r = await fetch(`/api/tree/${pid}?path=${encodeURIComponent(dirPath||'')}`);
-    const d = await r.json();
-    tree.innerHTML = '';
-    const fld = d.entries.filter(e => e.type === 'directory'), fls = d.entries.filter(e => e.type === 'file');
-    [...fld, ...fls].forEach(e => tree.appendChild(makeNode(e, dirPath||'')));
-    if (!fld.length && !fls.length) tree.innerHTML = '<div class="text-center py-4 text-slate-500 text-xs">空目录</div>';
-  } catch(e) { tree.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">加载失败</div>'; }
-}
-function refreshTree() { loadTree(''); }
-function applyFilter() {
-  const q = document.getElementById('fileFilter').value.toLowerCase();
-  document.querySelectorAll('#tree [data-name]').forEach(el => { el.style.display = (q && !el.dataset.name.toLowerCase().includes(q)) ? 'none' : ''; });
-}
-
-function makeNode(entry, parentPath) {
-  const frag = document.createDocumentFragment();
-  const isDir = entry.type === 'directory', childPath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
-  const row = document.createElement('div');
-  row.dataset.name = entry.name;
-  row.className = `flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-slate-800 text-slate-300`;
-  row.innerHTML = `<span class="w-4 shrink-0 text-center text-slate-500 text-xs">${isDir?'▸':''}</span><span class="${isDir?'text-blue-400':'text-slate-400'} shrink-0">${isDir?'📁':iconFor(entry.name)}</span><span class="truncate flex-1">${entry.name}</span>${entry.size?`<span class="text-[10px] text-slate-500 shrink-0">${fmtSize(entry.size)}</span>`:''}`;
-  frag.appendChild(row);
-  if (isDir) {
-    const wrapper = document.createElement('div'); wrapper.className = 'ml-4 hidden'; let loaded = false;
-    row.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (wrapper.classList.contains('hidden')) {
-        if (!loaded) {
-          wrapper.classList.remove('hidden'); wrapper.innerHTML = '<div class="text-slate-500 text-xs py-1 pl-2">加载中...</div>';
-          try {
-            const r = await fetch(`/api/tree/${pid}?path=${encodeURIComponent(childPath)}`);
-            const d = await r.json(); wrapper.innerHTML = '';
-            const f = d.entries.filter(e=>e.type==='directory'), l = d.entries.filter(e=>e.type==='file');
-            if (!f.length&&!l.length) wrapper.innerHTML = '<div class="text-slate-600 text-xs py-1 pl-2">空目录</div>';
-            else [...f,...l].forEach(e => wrapper.appendChild(makeNode(e, childPath)));
-            loaded = true;
-          } catch(ex) { wrapper.innerHTML = '<div class="text-red-400 text-xs py-1 pl-2">加载失败</div>'; }
-        } else { wrapper.classList.remove('hidden'); }
-        row.querySelector('span').textContent = '▾';
-      } else { wrapper.classList.add('hidden'); row.querySelector('span').textContent = '▸'; }
-    });
-    frag.appendChild(wrapper);
-  } else {
-    row.addEventListener('click', () => {
-      document.querySelectorAll('#tree .active-node').forEach(el => el.classList.remove('active-node','bg-blue-600','text-white'));
-      row.classList.add('active-node','bg-blue-600','text-white');
-      loadContent(childPath);
-    });
-  }
-  return frag;
-}
-
-// Content
-async function loadContent(filePath) {
-  currentFile = filePath; outlineBuilt = false;
-  const empty = document.getElementById('emptyState'); if (empty) empty.classList.add('hidden');
-  const area = document.getElementById('contentArea');
-  area.innerHTML = '<div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div>';
-  document.getElementById('breadcrumbPath').textContent = filePath;
-  document.getElementById('aiBtn').disabled = false; document.getElementById('editBtn').disabled = false; document.getElementById('revealBtn').disabled = false;
-  try {
-    const r = await fetch(`/api/content/${pid}?path=${encodeURIComponent(filePath)}`);
-    if (!r.ok) throw new Error('Not found');
-    const d = await r.json(); let html = '';
-    if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
-      html = `<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">${d.content}</div></div>`;
-      if (d.type === 'markdown') setTimeout(() => buildOutline(), 50);
-    } else if (d.type === 'image') {
-      html = `<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-4 sm:p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-center"><img src="${d.rawUrl}" alt="${esc(filePath)}" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm" loading="lazy" /></div>`;
-    } else if (d.type === 'pdf') {
-      html = `<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden" style="height:85vh"><iframe src="${d.rawUrl}" class="w-full h-full border-0"></iframe></div>`;
-    } else {
-      html = `<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><pre class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono">${esc(d.content)}</pre></div>`;
-      document.getElementById('outlineList').innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">仅 Markdown 文档支持大纲</div>';
-      outlineBuilt = true;
-    }
-    area.innerHTML = `<div class="p-4 sm:p-10">${html}</div>`;
-  } catch(e) { area.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">文件加载失败</p></div>'; }
-}
-
-// Outline
-let outlineHeadings = [], outlineBuilt = false;
-function ensureOutlineBuilt() { if (!outlineBuilt) { const doc = document.getElementById('docContent'); if (doc) buildOutline(); } }
-function buildOutline() {
-  const doc = document.getElementById('docContent'), list = document.getElementById('outlineList');
-  if (!doc) { list.innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">请先打开一个 Markdown 文档</div>'; outlineBuilt = false; return; }
-  const headings = doc.querySelectorAll('h1, h2, h3'); outlineHeadings = [];
-  headings.forEach((h, i) => { h.id = 'heading-' + i; outlineHeadings.push({ id: h.id, text: h.textContent || '', level: parseInt(h.tagName[1]) }); });
-  if (outlineHeadings.length === 0) { list.innerHTML = '<div class="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">此文档没有标题</div>'; outlineBuilt = true; return; }
-  list.innerHTML = outlineHeadings.map(h => `<div onclick="scrollToHeading('${h.id}')" class="flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 text-sm" style="padding-left:${(h.level-1)*12+8}px"><span class="w-1 h-4 rounded-full ${h.level===1?'bg-blue-500':h.level===2?'bg-slate-400':'bg-slate-300'} shrink-0"></span><span class="truncate text-slate-600 dark:text-slate-300 ${h.level===1?'font-semibold':''}">${esc(h.text)}</span></div>`).join('');
-  outlineBuilt = true;
-}
-function scrollToHeading(id) {
-  const el = document.getElementById(id);
-  if (el) { el.scrollIntoView({ block: 'start' }); el.style.background = '#fef3c7'; setTimeout(() => { el.style.background = ''; }, 1500); }
-}
-
-// Toolbar
-function revealFile(action) { if (currentFile) fetch(`/api/reveal/${pid}?path=${encodeURIComponent(currentFile)}&action=${action}`).catch(()=>{}); }
-function openAIChat() { togglePanel('right'); setActiveTab('chat'); if (currentFile) { document.getElementById('ctxBanner').classList.remove('hidden'); document.getElementById('ctxText').textContent = currentFile; } }
-
-// Chat
-document.getElementById('chatInput').addEventListener('input', function(){ document.getElementById('sendBtn').disabled = !this.value.trim(); });
-async function sendMessage() {
-  const input = document.getElementById('chatInput'), msg = input.value.trim(); if (!msg) return;
-  document.getElementById('welcomeCard')?.remove();
-  appendChatMsg('user', msg); input.value = ''; document.getElementById('sendBtn').disabled = true;
-  const aiMsg = appendChatMsg('ai', '分析中...');
-  try { const r = await fetch('/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg}) }); const text = await r.text(); let t = ''; text.split('\n').forEach(l => { if (l.startsWith('data:')) try { const d = JSON.parse(l.slice(5)); if (d.text) t = d.text; } catch {} }); aiMsg.querySelector('.msg-body').textContent = t || 'AI 服务暂不可用'; }
-  catch(e) { aiMsg.querySelector('.msg-body').textContent = 'AI 服务暂不可用'; }
-  document.getElementById('sendBtn').disabled = false;
-}
-function appendChatMsg(role, content) {
-  const c = document.getElementById('chatMessages'), d = document.createElement('div');
-  d.className = `flex gap-3 ${role==='user'?'flex-row-reverse':''} animate-in`;
-  d.innerHTML = `<div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs ${role==='user'?'bg-blue-100 text-blue-600':'bg-slate-800 text-white'}">${role==='user'?'👤':'🤖'}</div><div class="p-3 rounded-lg text-sm max-w-[85%] whitespace-pre-wrap leading-relaxed msg-body ${role==='user'?'bg-blue-600 text-white rounded-tr-none shadow-sm':'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-tl-none shadow-sm'}">${content}</div>`;
-  c.appendChild(d); c.scrollTop = c.scrollHeight; return d;
-}
-function sendQuickMsg(m) { document.getElementById('chatInput').value = m; sendMessage(); }
-
-// Queue
-async function loadTasks() {
-  const list = document.getElementById('queueList');
-  try {
-    const r = await fetch(`/api/queue/status?project_id=${pid}`); const tasks = await r.json();
-    const pending = tasks.filter(t => t.status === 'pending');
-    document.getElementById('pendingCount').textContent = pending.length;
-    const b = document.getElementById('pendingBadge'); b.textContent = pending.length; b.classList.toggle('hidden', pending.length === 0);
-    if (!tasks.length) { list.innerHTML = '<div class="text-center py-16 text-slate-400 dark:text-slate-500 text-sm flex flex-col items-center gap-2">✅<br>队列已清空</div>'; return; }
-    const tl = {write_file:'写入覆盖',create_folder:'创建目录',move_file:'移动文件',delete_file:'安全删除',batch_operations:'批量操作'};
-    const tc = {write_file:'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',create_folder:'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',move_file:'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',delete_file:'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',batch_operations:'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'};
-    list.innerHTML = tasks.map(t => {
-      const label = tl[t.operation_type]||t.operation_type, tcl = tc[t.operation_type]||'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200';
-      const isP = t.status==='pending', isX = t.status==='executing', isE = t.status==='executed', isR = t.status==='rejected';
-      const borderCls = isE?'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/20':isR?'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 opacity-60':isX?'border-blue-300 dark:border-blue-700 ring-2 ring-blue-100 dark:ring-blue-900':'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md';
-      const stHtml = isP?`<div class="flex gap-1"><button onclick="approveTask('${t.id}')" class="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors">✅</button><button onclick="rejectTask('${t.id}')" class="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">✕</button></div>`:isX?'<span class="text-xs font-bold text-blue-600 dark:text-blue-400">⏳ 执行中</span>':isE?'<span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">✓ 已执行</span>':'<span class="text-xs font-bold text-slate-400 dark:text-slate-500">已拒绝</span>';
-      const d = typeof t.operation_data==='string'?JSON.parse(t.operation_data):t.operation_data;
-      let pi = ''; if (d.file_path) pi+=`<div class="truncate">📄 ${esc(d.file_path)}</div>`; if (d.folder_path) pi+=`<div class="truncate">📁 ${esc(d.folder_path)}</div>`; if (d.source) pi+=`<div class="truncate opacity-70 line-through">${esc(d.source)}</div>`; if (d.target) pi+=`<div class="truncate text-blue-700 dark:text-blue-400">→ ${esc(d.target)}</div>`;
-      return `<div class="bg-white dark:bg-slate-800 border rounded-lg p-3 shadow-sm transition-all duration-500 relative overflow-hidden ${borderCls}">${isX?'<div class="absolute top-0 left-0 h-1 bg-blue-500 w-full" style="animation:pulse 1s ease-in-out infinite"></div>':''}<div class="flex items-start justify-between mb-2"><div class="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100"><span class="${tcl} px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider">${label}</span></div>${stHtml}</div><div class="text-[11px] text-slate-600 dark:text-slate-400 space-y-1 font-mono bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-700">${pi||JSON.stringify(d)}</div>${t.operation_type==='delete_file'&&isP?'<div class="mt-2 text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">🛡 操作受 Shadow 隔离保护，支持回滚。</div>':''}</div>`;
-    }).join('');
-  } catch(e) { list.innerHTML = '<div class="text-center py-8 text-red-400 text-xs">加载失败</div>'; }
-}
-async function approveTask(id) { await fetch('/api/queue/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:id})}); loadTasks(); }
-async function rejectTask(id) { await fetch('/api/queue/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:id})}); loadTasks(); }
-async function approveAll() { const r = await fetch(`/api/queue/status?project_id=${pid}`); const tasks = await r.json(); for (const t of tasks.filter(t=>t.status==='pending')) await approveTask(t.id); }
-async function rejectAll() { const r = await fetch(`/api/queue/status?project_id=${pid}`); const tasks = await r.json(); for (const t of tasks.filter(t=>t.status==='pending')) await rejectTask(t.id); }
-
-// Helpers
-function iconFor(n) { const e=n.split('.').pop()?.toLowerCase(); return ['md','markdown'].includes(e)?'📝':['mermaid','mmd'].includes(e)?'📊':e==='pdf'?'📕':['png','jpg','jpeg','gif','svg','webp','bmp'].includes(e)?'🖼':['ts','js','py','rb','go','rs','java','c','cpp'].includes(e)?'💻':['json','yaml','yml','toml'].includes(e)?'⚙':'📄'; }
-function fmtSize(b) { return b<1024?b+' B':b<1024*1024?(b/1024).toFixed(1)+' KB':(b/(1024*1024)).toFixed(1)+' MB'; }
-function esc(s) { const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
-</script>
+<script src="js/editor-core.js"></script>
+<script src="js/common.js"></script>
+<script src="js/tabs.js"></script>
+<script src="js/temp-preview.js"></script>
+<script src="js/preview.js"></script>
 </body>
 </html>

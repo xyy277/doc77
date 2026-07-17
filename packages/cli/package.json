@@ -1,21 +1,40 @@
 {
-  "name": "doc77",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Doc77 CLI — 命令行入口与集成",
+  "name": "@doc77/cli",
+  "version": "1.0.0-beta.1",
+  "description": "Doc77 CLI — 默认安全、对话驱动的智能本地文档管理 Agent",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xyy277/doc77.git"
+  },
+  "keywords": [
+    "doc77",
+    "document",
+    "manager",
+    "mcp",
+    "cli",
+    "agent"
+  ],
+  "files": [
+    "dist"
+  ],
+  "preferGlobal": true,
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./dist/bin/doc77.js": {
+      "import": "./dist/bin/doc77.js"
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
-    "doc77": "./dist/bin/doc77.js"
+    "doc77": "dist/bin/doc77.js"
   },
   "scripts": {
     "build": "tsup",
@@ -24,8 +43,22 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@doc77/core": "workspace:*",
-    "@doc77/mcp": "workspace:*",
-    "@doc77/ai": "workspace:*"
+    "@doc77/core": "workspace:^"
+  },
+  "peerDependencies": {
+    "@doc77/ai": "workspace:^",
+    "@doc77/mcp": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@doc77/mcp": {
+      "optional": true
+    },
+    "@doc77/ai": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

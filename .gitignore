@@ -1,7 +1,43 @@
 node_modules/
 dist/
+
+# 环境变量（仅允许 .env.example 模板提交）
 .env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.*.local
+
+# 密钥与证书
+*.pem
+*.key
+*.pfx
+*.p12
+*.cert
+*.crt
+
+# 凭据文件
+credentials.*
+*secret*
+*.token
+*token*
+
+# 本地配置
+config.local.*
+*.local
+
+# Claude Code working directory
+.claude/
+
+# 常规忽略
 *.log
 .DS_Store
 Thumbs.db
 ~/.doc77/
+scripts/build-portable.sh
+scripts/start-test-server.ts
+*.tsbuildinfo
+*.tgz
+release/
+version.gen.ts

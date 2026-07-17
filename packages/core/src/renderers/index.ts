@@ -29,6 +29,11 @@ const EXTENSION_MAP: Record<string, string> = {
   '.webp': 'image',
   '.bmp': 'image',
   '.ico': 'image',
+  '.avif': 'image',
+
+  // Office documents
+  '.docx': 'docx',
+  '.xlsx': 'xlsx',
 
   // Code (common source file extensions)
   '.ts': 'code',
@@ -77,6 +82,107 @@ const EXTENSION_MAP: Record<string, string> = {
 };
 
 /**
+ * Unsupportable formats — known binary/proprietary extensions that should
+ * show a file-info card rather than attempting any content render.
+ */
+export const UNSUPPORTED_EXTENSIONS = new Set([
+  // Video
+  '.mp4',
+  '.avi',
+  '.mov',
+  '.mkv',
+  '.webm',
+  '.wmv',
+  '.flv',
+  '.m4v',
+  // Audio
+  '.mp3',
+  '.wav',
+  '.ogg',
+  '.flac',
+  '.aac',
+  '.wma',
+  '.m4a',
+  '.opus',
+  // Archives
+  '.zip',
+  '.tar',
+  '.gz',
+  '.7z',
+  '.rar',
+  '.bz2',
+  '.xz',
+  '.zst',
+  // GIS / 3D
+  '.shp',
+  '.shx',
+  '.dbf',
+  '.geojson',
+  '.geotiff',
+  '.obj',
+  '.stl',
+  '.glb',
+  '.gltf',
+  // Fonts
+  '.ttf',
+  '.woff',
+  '.woff2',
+  '.otf',
+  '.eot',
+  // Binaries
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.dat',
+  '.class',
+  '.jar',
+  '.war',
+  '.o',
+  '.a',
+  '.lib',
+  '.pdb',
+  '.obj',
+  '.wasm',
+  // Databases
+  '.db',
+  '.sqlite',
+  '.sqlite3',
+  '.mdb',
+  '.accdb',
+  // Design
+  '.psd',
+  '.ai',
+  '.sketch',
+  '.fig',
+  '.xd',
+  // Other proprietary
+  '.epub',
+  '.mobi',
+  '.pages',
+  '.numbers',
+  '.key',
+  '.ppt',
+  '.pptx',
+]);
+
+/**
+ * File size limits by format (bytes). Exceeding these triggers truncation or rejection.
+ * 0 means no limit.
+ */
+export const FORMAT_SIZE_LIMITS: Record<string, number> = {
+  markdown: 5 * 1024 * 1024,
+  mermaid: 5 * 1024 * 1024,
+  code: 5 * 1024 * 1024,
+  text: 5 * 1024 * 1024,
+  docx: 50 * 1024 * 1024,
+  xlsx: 10 * 1024 * 1024,
+  pdf: 0, // unlimited — served via raw/stream
+  image: 0, // unlimited — served via raw
+};
+
+/**
  * Determine the appropriate renderer type for a given filename.
  */
 export function getRendererForFile(filename: string): string {
@@ -92,4 +198,14 @@ export function getRendererForFile(filename: string): string {
 
   const ext = basename.slice(dotIndex).toLowerCase();
   return EXTENSION_MAP[ext] || 'text';
+}
+
+/**
+ * Check if a filename's extension is in the unsupported list.
+ */
+export function isUnsupportedFormat(filename: string): boolean {
+  const basename = filename.split('/').pop() || filename;
+  const dotIndex = basename.lastIndexOf('.');
+  if (dotIndex === -1) return false;
+  return UNSUPPORTED_EXTENSIONS.has(basename.slice(dotIndex).toLowerCase());
 }

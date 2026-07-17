@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
+<style>.i18n-loading body{visibility:hidden}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<base href="/mobile/">
+<title data-i18n="web.mobile.preview.pageTitle">Preview</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<style>
+  /* ══════════ Theme Tokens ══════════ */
+  :root {
+    --bg-body: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-header-solid: #ffffff;
+    --bg-nav: rgba(255,255,255,0.92);
+    --bg-hover: #f1f5f9;
+    --bg-code: #f1f5f9;
+
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+
+    --border-light: #e2e8f0;
+    --border-medium: #cbd5e1;
+
+    --accent: #2563eb;
+    --accent-light-bg: #dbeafe;
+  }
+  .dark {
+    --bg-body: #0f172a;
+    --bg-card: #1e293b;
+    --bg-header-solid: #0f172a;
+    --bg-nav: rgba(15,23,42,0.92);
+    --bg-hover: #1e293b;
+    --bg-code: #1e293b;
+
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    --border-light: #334155;
+    --border-medium: #475569;
+
+    --accent: #60a5fa;
+    --accent-light-bg: #1e3a5f;
+  }
+
+  /* ══════════ Reset ══════════ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ══════════ Base ══════════ */
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-body); color: var(--text-primary);
+    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; gap: 8px; padding: 12px 12px;
+    background: var(--bg-header-solid); border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0; position: sticky; top: 0; z-index: 10;
+  }
+  .header-logo { height: 28px; flex-shrink: 0; }
+  .btn-back {
+    width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-light);
+    background: var(--bg-card); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px; color: var(--text-secondary); flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent; padding: 0;
+  }
+  .btn-back:active { background: var(--bg-hover); }
+  .proj-title { font-size: 15px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn-icon {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: transparent; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px; flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent; padding: 0;
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex; align-items: center; gap: 2px; padding: 8px 12px;
+    overflow-x: auto; flex-shrink: 0; font-size: 12px; white-space: nowrap;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .breadcrumb::-webkit-scrollbar { display: none; }
+  .breadcrumb span { color: var(--text-muted); }
+  .breadcrumb a { color: var(--accent); text-decoration: none; font-weight: 500; flex-shrink: 0; }
+  .breadcrumb a:active { opacity: .7; }
+  /* B2 fix: use CSS class instead of inline style */
+  .breadcrumb strong { color: var(--text-primary); }
+  .breadcrumb strong.current-file { color: var(--accent); }
+
+  /* File list */
+  .file-list { flex: 1; overflow-y: auto; padding: 4px 8px 16px; }
+  .file-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px;
+    border-radius: 12px; cursor: pointer; transition: background .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .file-item:active { background: var(--bg-hover); }
+  .file-icon {
+    width: 40px; height: 40px; border-radius: 10px; display: flex;
+    align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+  }
+  .file-icon.folder { background: var(--accent-light-bg); color: var(--accent); }
+  .file-icon.file { background: var(--bg-code); color: var(--text-secondary); }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .file-arrow { color: var(--border-medium); flex-shrink: 0; font-size: 16px; }
+
+  /* Content viewer */
+  .content-viewer { flex: 1; overflow-y: auto; padding: 16px 20px 32px; }
+  .content-viewer h1 { font-size: 1.6em; font-weight: 700; margin-bottom: 16px; line-height: 1.3; }
+  .content-viewer h2 { font-size: 1.2em; font-weight: 600; margin: 24px 0 12px; }
+  .content-viewer h3 { font-size: 1.05em; font-weight: 600; margin: 20px 0 8px; }
+  .content-viewer p { margin-bottom: 12px; line-height: 1.7; }
+  .content-viewer ul, .content-viewer ol { padding-left: 20px; margin-bottom: 16px; }
+  .content-viewer li { margin: 6px 0; line-height: 1.6; }
+  .content-viewer code {
+    background: var(--bg-code); color: var(--text-primary); padding: 2px 6px;
+    border-radius: 4px; font-size: 0.9em; font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .content-viewer pre {
+    background: var(--bg-code); color: var(--text-primary); padding: 14px;
+    border-radius: 10px; overflow-x: auto; font-size: 0.85em; line-height: 1.5;
+    margin: 12px 0; font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .content-viewer table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 0.9em; }
+  .content-viewer th, .content-viewer td { border: 1px solid var(--border-light); padding: 8px 12px; text-align: left; }
+  .content-viewer th { background: var(--bg-body); font-weight: 600; }
+  .content-viewer blockquote {
+    border-left: 3px solid var(--border-medium); padding-left: 14px;
+    margin: 12px 0; color: var(--text-secondary); font-style: italic;
+  }
+  .content-viewer img { max-width: 100%; border-radius: 8px; margin: 12px 0; }
+  .content-viewer a { color: var(--accent); }
+
+  /* Font size variants for reader */
+  .content-viewer.font-sm { font-size: 14px; }
+  .content-viewer.font-md { font-size: 16px; }
+  .content-viewer.font-lg { font-size: 18px; }
+  .content-viewer.font-sm h1 { font-size: 22px; }
+  .content-viewer.font-md h1 { font-size: 26px; }
+  .content-viewer.font-lg h1 { font-size: 30px; }
+
+  /* Reader bottom toolbar */
+  .reader-toolbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+    background: var(--bg-nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-light);
+    padding: 8px 24px calc(20px + env(safe-area-inset-bottom, 0px));
+    display: none; justify-content: space-around; align-items: flex-start;
+  }
+  .reader-toolbar.visible { display: flex; }
+  .toolbar-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    cursor: pointer; padding: 6px 14px; -webkit-tap-highlight-color: transparent;
+    color: var(--text-secondary); transition: color .2s; font-size: 10px; font-weight: 600;
+    border: none; background: none;
+  }
+  .toolbar-btn.active { color: var(--accent); }
+  .toolbar-btn .tb-icon { font-size: 20px; }
+
+  /* Auto-scroll speed slider (fixed above reader toolbar) */
+  .speed-slider-wrap {
+    display: none; align-items: center; gap: 6px;
+    padding: 4px 12px calc(16px + env(safe-area-inset-bottom, 0px)); justify-content: center;
+    position: fixed; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; z-index: 19;
+    background: var(--bg-nav); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-light);
+  }
+  .speed-slider-wrap.visible { display: flex; }
+  .speed-slider-wrap input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 120px; height: 4px;
+    background: var(--border-light); border-radius: 2px; outline: none;
+  }
+  .speed-slider-wrap input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .speed-label { font-size: 11px; color: var(--text-muted); min-width: 28px; text-align: center; }
+
+  /* TOC drawer */
+  .toc-drawer {
+    position: fixed; bottom: calc(128px + env(safe-area-inset-bottom, 0px)); left: 12px; right: 12px; z-index: 25;
+    background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12); max-height: 50vh; overflow-y: auto;
+    padding: 12px 0; display: none;
+  }
+  .toc-drawer.visible { display: block; }
+  .toc-drawer-title {
+    font-size: 13px; font-weight: 700; color: var(--text-primary);
+    padding: 0 16px 10px; border-bottom: 1px solid var(--border-light); margin-bottom: 4px;
+  }
+  .toc-item {
+    display: block; width: 100%; text-align: left; padding: 8px 16px;
+    font-size: 13px; color: var(--text-secondary); background: none; border: none;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .toc-item:active { background: var(--bg-hover); }
+  .toc-item.h2 { padding-left: 28px; font-size: 12px; }
+  .toc-item.h3 { padding-left: 40px; font-size: 11px; }
+
+  /* PDF viewer */
+  .pdf-wrapper {
+    position: relative; width: 100%; height: 100%; min-height: 70vh;
+    display: flex; flex-direction: column;
+  }
+  .pdf-wrapper iframe { flex: 1; border: none; border-radius: 8px; width: 100%; }
+  .pdf-wrapper.fullscreen { position: fixed; inset: 0; z-index: 100; background: #000; border-radius: 0; }
+  .pdf-wrapper.fullscreen iframe { border-radius: 0; }
+  .pdf-fullscreen-btn {
+    position: absolute; top: 8px; right: 8px; z-index: 5;
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.5); color: #fff; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    backdrop-filter: blur(4px);
+  }
+  .pdf-wrapper.fullscreen .pdf-fullscreen-btn { top: 16px; right: 16px; background: rgba(255,255,255,0.2); }
+
+  /* Image preview */
+  .img-preview {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 60vh; padding: 20px;
+  }
+  .img-preview img { max-width: 100%; max-height: 70vh; border-radius: 8px; object-fit: contain; }
+
+  /* Renderer placeholder */
+  .renderer-placeholder {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 60px 20px; text-align: center; color: var(--text-muted);
+  }
+  .renderer-placeholder .icon { font-size: 56px; margin-bottom: 16px; }
+
+  /* Loading / Empty */
+  .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
+  /* Mermaid dark mode */
+  body.dark .content-viewer .mermaid { filter: invert(0.85) hue-rotate(180deg); }
+
+  /* ══════════ Responsive: Tablet+ ══════════ */
+  @media (min-width: 640px) {
+    .content-viewer {
+      max-width: 720px; margin: 0 auto;
+      padding: 24px 32px 32px;
+    }
+    .file-list { max-width: 720px; margin: 0 auto; }
+    .header, .breadcrumb {
+      padding-left: calc((100% - 720px) / 2 + 12px);
+      padding-right: calc((100% - 720px) / 2 + 12px);
+    }
+  }
+  @media (min-width: 1024px) {
+    .content-viewer { font-size: 17px; max-width: 800px; }
+    .content-viewer h1 { font-size: 2em; }
+    .file-list { max-width: 800px; }
+    .header, .breadcrumb {
+      padding-left: calc((100% - 800px) / 2 + 12px);
+      padding-right: calc((100% - 800px) / 2 + 12px);
+    }
+  }
+
+</style>
+</head>
+<body>
+  <div id="app" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;flex-direction:column;overflow:hidden">
+
+    <!-- Header -->
+    <div class="header">
+      <button class="btn-back" onclick="goBack()" data-i18n-title="web.mobile.preview.back">←</button>
+      <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" class="header-logo" onclick="location.href='/'" style="cursor:pointer">
+      <div class="proj-title" id="titleBar" data-i18n="web.preview.loading">Loading...</div>
+      <button class="btn-icon" onclick="toggleTheme()" data-i18n-title="web.index.theme.toggle" id="themeIcon">🌙</button>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb" id="breadcrumb"></div>
+
+    <!-- File list -->
+    <div class="file-list" id="fileList">
+      <div class="loading" data-i18n="web.preview.loading">Loading...</div>
+    </div>
+
+    <!-- Content viewer -->
+    <div class="content-viewer" id="contentViewer" style="display:none"></div>
+
+    <!-- Reader Bottom Toolbar -->
+    <div class="reader-toolbar" id="readerToolbar">
+      <button class="toolbar-btn" id="btnToc" onclick="toggleToc()">
+        <span class="tb-icon">📑</span><span data-i18n="web.mobile.preview.outline">Outline</span>
+      </button>
+      <button class="toolbar-btn" id="btnFontSize" onclick="cycleFontSize()">
+        <span class="tb-icon">🔤</span><span id="fontSizeLabel" data-i18n="web.mobile.preview.fontSizeNormal">Normal</span>
+      </button>
+      <button class="toolbar-btn" id="btnAutoScroll" onclick="toggleAutoScroll()">
+        <span class="tb-icon" id="autoScrollIcon">▶</span><span id="autoScrollLabel" data-i18n="web.mobile.preview.autoScroll">Read</span>
+      </button>
+      <button class="toolbar-btn" onclick="toggleTheme()">
+        <span class="tb-icon" id="readerThemeIcon">🌙</span><span data-i18n="web.mobile.preview.darkTheme">Dark</span>
+      </button>
+    </div>
+    <!-- Auto-scroll speed slider -->
+    <div class="speed-slider-wrap" id="speedSliderWrap">
+      <span style="font-size:12px">🐢</span>
+      <input type="range" id="scrollSpeed" min="1" max="5" value="3" oninput="onSpeedChange(this.value)">
+      <span style="font-size:12px">🐇</span>
+      <span class="speed-label" id="speedLabel" data-i18n="web.mobile.preview.speedNormal">Normal</span>
+    </div>
+
+    <!-- TOC Drawer -->
+    <div class="toc-drawer" id="tocDrawer">
+      <div class="toc-drawer-title" data-i18n="web.preview.outline.title">Document Outline</div>
+      <div id="tocContent"></div>
+    </div>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script>
+    // ══════════ Preview Logic ══════════
+
+    var pid = new URLSearchParams(location.search).get('id');
+    if (!pid) { location.href = '/'; }
+    var directPath = new URLSearchParams(location.search).get('path') || '';
+
+    var proj = null;
+    var currentPath = '';
+    var currentFile = null;
+    var fontSizeIdx = 1; // 0=small, 1=medium, 2=large
+    var fontSizeLabels = [];
+    var fontSizeClasses = ['font-sm', 'font-md', 'font-lg'];
+    var autoScrollRAF = null, autoScrollActive = false, autoScrollSpeed = 60;
+    var speedLabels = [];
+    var speedValues = [20, 40, 60, 90, 130]; // px/s
+
+    function boot() {
+      if (!sessionStorage.getItem('doc77-auth')) {
+        fetch('/api/auth/status').then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.hasPassword) { init(); return; }
+          if (sessionStorage.getItem('doc77-auth')) { init(); return; }
+          setTimeout(boot, 500);
+        }).catch(function () { setTimeout(boot, 500); });
+        return;
+      }
+      init();
+    }
+
+    async function init() {
+      document.getElementById('app').style.display = 'flex';
+      try {
+        var r = await fetch('/api/projects');
+        var projects = await r.json();
+        proj = projects.find(function (p) { return p.id === parseInt(pid); });
+        if (!proj) { document.getElementById('fileList').innerHTML = '<div class="empty">' + t('web.preview.projectNotFound') + '</div>'; return; }
+        document.getElementById('titleBar').textContent = proj.name;
+        document.title = proj.name;
+        if (directPath) {
+          var fileName = directPath.split('/').pop();
+          openFile(directPath, fileName);
+        } else {
+          loadTree('');
+        }
+      } catch (e) {
+        document.getElementById('fileList').innerHTML = '<div class="empty">⚠️ ' + t('web.preview.loadFailed') + '</div>';
+      }
+    }
+
+    async function loadTree(dirPath) {
+      currentPath = dirPath;
+      currentFile = null;
+      document.getElementById('fileList').style.display = 'block';
+      document.getElementById('contentViewer').style.display = 'none';
+      renderBreadcrumb();
+
+      var list = document.getElementById('fileList');
+      list.innerHTML = '<div class="loading">' + t('web.preview.loading') + '</div>';
+      try {
+        var r = await fetch('/api/tree/' + pid + '?path=' + encodeURIComponent(dirPath));
+        var data = await r.json();
+        if (!data || !data.entries) { list.innerHTML = '<div class="empty">📭 ' + t('web.preview.emptyDir') + '</div>'; return; }
+
+        var children = data.entries.slice();
+        children.sort(function (a, b) {
+          if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+          return a.name.localeCompare(b.name, window.__doc77_lang || 'zh-CN');
+        });
+
+        var html = '';
+        children.forEach(function (item) {
+          var isFolder = item.type === 'directory';
+          var icon = isFolder ? '📁' : getIcon(item.name);
+          var sizeInfo = isFolder ? '' : (item.size ? formatSize(item.size) : '');
+          html +=
+            '<div class="file-item" onclick="' + (isFolder
+              ? 'loadTree(\'' + escAttr(dirPath ? dirPath + '/' + item.name : item.name) + '\')'
+              : 'openFile(\'' + escAttr(dirPath ? dirPath + '/' + item.name : item.name) + '\', \'' + escAttr(item.name) + '\')') + '">' +
+              '<div class="file-icon ' + (isFolder ? 'directory' : 'file') + '">' + icon + '</div>' +
+              '<div class="file-info">' +
+                '<div class="file-name">' + esc(item.name) + '</div>' +
+                '<div class="file-meta">' + sizeInfo + '</div>' +
+              '</div>' +
+              (isFolder ? '<span class="file-arrow">›</span>' : '') +
+            '</div>';
+        });
+        list.innerHTML = html;
+      } catch (e) {
+        list.innerHTML = '<div class="empty">⚠️ ' + t('web.preview.loadFailed') + '</div>';
+      }
+    }
+
+    async function openFile(filePath, fileName) {
+      currentFile = { path: filePath, name: fileName };
+      var parts = filePath.split('/');
+      parts.pop();
+      currentPath = parts.join('/');
+      document.getElementById('fileList').style.display = 'none';
+      document.getElementById('contentViewer').style.display = 'block';
+      showReaderToolbar();
+      renderBreadcrumb();
+
+      var cv = document.getElementById('contentViewer');
+      cv.innerHTML = '<div class="loading">' + t('web.preview.loading') + '</div>';
+      trackRecent(fileName, filePath);
+
+      try {
+        fetch('/api/recent-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: parseInt(pid), fileName: fileName, filePath: filePath }),
+        }).catch(function() {});
+      } catch(e) {}
+
+      try {
+        var r = await fetch('/api/content/' + pid + '?path=' + encodeURIComponent(filePath));
+        if (!r.ok) { cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">⚠️</div><p>' + t('web.preview.fileLoadFailed') + '</p></div>'; return; }
+        var d = await r.json();
+        if (d.type === 'pdf') {
+          cv.innerHTML = '<div class="pdf-wrapper" id="pdfContainer">' +
+            '<button class="pdf-fullscreen-btn" onclick="togglePdfFullscreen()" title="' + t('web.preview.htmlToggle.fullscreen') + '">⛶</button>' +
+            '<iframe src="' + escAttr(d.rawUrl) + '"></iframe></div>';
+        } else if (d.type === 'image') {
+          cv.innerHTML = '<div class="img-preview"><img src="' + escAttr(d.rawUrl) + '" alt="' + escAttr(fileName) + '"></div>';
+        } else if (d.content) {
+          var isHtml = /\.html?$/i.test(fileName);
+          if (isHtml && d.rawUrl) {
+            cv.innerHTML = '<div style="position:relative"><div id="htmlCodeView">' + d.content + '</div>' +
+              '<button id="htmlToggleBtn" onclick="toggleHtmlView()" style="position:absolute;top:8px;right:8px;z-index:5;padding:6px 14px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-card);color:var(--text-primary);font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1)">' + t('web.preview.htmlToggle.preview') + '</button></div>' +
+              '<div id="htmlPreview" style="display:none"><div class="pdf-wrapper" id="htmlPreviewContainer">' +
+              '<button class="pdf-fullscreen-btn" onclick="toggleHtmlFullscreen()" title="' + t('web.preview.htmlToggle.fullscreen') + '">⛶</button>' +
+              '<iframe src="' + escAttr(d.rawUrl) + '"></iframe></div></div>';
+          } else {
+            cv.innerHTML = d.content;
+          }
+        } else {
+          cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">📄</div><p>' + t('web.preview.unsupportedFormat') + '</p></div>';
+        }
+        fixMermaidTheme();
+      } catch (e) {
+        cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">⚠️</div><p>' + t('web.preview.loadFailed') + '</p></div>';
+      }
+    }
+
+    function renderBreadcrumb() {
+      var bc = document.getElementById('breadcrumb');
+      var parts = currentPath ? currentPath.split('/') : [];
+      var html = '<a href="javascript:void(0)" onclick="loadTree(\'\')">' + esc(proj.name) + '</a>';
+      var accumulated = '';
+      parts.forEach(function (part, i) {
+        accumulated += (accumulated ? '/' : '') + part;
+        html += ' <span>›</span> ';
+        if (i === parts.length - 1 && !currentFile) {
+          html += '<strong>' + esc(part) + '</strong>';
+        } else {
+          html += '<a href="javascript:void(0)" onclick="loadTree(\'' + escAttr(accumulated) + '\')">' + esc(part) + '</a>';
+        }
+      });
+      if (currentFile) {
+        html += ' <span>›</span> <strong class="current-file">' + esc(currentFile.name) + '</strong>';
+      }
+      bc.innerHTML = html;
+    }
+
+    window.goBack = function () {
+      if (currentFile) {
+        currentFile = null;
+        hideReaderToolbar();
+        document.getElementById('fileList').style.display = 'block';
+        document.getElementById('contentViewer').style.display = 'none';
+        loadTree(currentPath);
+        return;
+      }
+      if (currentPath) {
+        var parts = currentPath.split('/');
+        parts.pop();
+        loadTree(parts.join('/'));
+        return;
+      }
+      location.href = '/';
+    };
+
+    function trackRecent(fileName, filePath) {
+      try {
+        var raw = localStorage.getItem('doc77_recent_files');
+        var files = raw ? JSON.parse(raw) : [];
+        files = files.filter(function (f) { return f.name !== fileName || f.path !== filePath; });
+        files.unshift({ name: fileName, path: filePath, projectId: pid, timestamp: Date.now() });
+        files = files.slice(0, 10);
+        localStorage.setItem('doc77_recent_files', JSON.stringify(files));
+      } catch (e) {}
+    }
+
+    function fixMermaidTheme() {
+      var isDark = document.documentElement.classList.contains('dark');
+      var svgs = document.querySelectorAll('.content-viewer .mermaid svg');
+      svgs.forEach(function (svg) {
+        if (isDark) svg.style.filter = 'invert(0.85) hue-rotate(180deg)';
+      });
+    }
+
+    // ── Theme toggle (header + reader toolbar) ──
+    var origToggle = window.toggleTheme;
+    window.toggleTheme = function () {
+      origToggle();
+      var isDark = document.documentElement.classList.contains('dark');
+      var icon = isDark ? '☀️' : '🌙';
+      var label = isDark ? t('web.mobile.themeLabel.light') : t('web.mobile.themeLabel.dark');
+      var logo = document.getElementById('siteLogo');
+      if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
+      document.getElementById('themeIcon').textContent = icon;
+      var readerIcon = document.getElementById('readerThemeIcon');
+      if (readerIcon) readerIcon.textContent = icon;
+      var toolbarBtn = document.querySelector('#readerToolbar .toolbar-btn:last-child span:last-child');
+      if (toolbarBtn) toolbarBtn.textContent = label;
+      if (currentFile) fixMermaidTheme();
+    };
+
+    // ── Reader Toolbar ──
+
+    function getSafeAreaBottom() {
+      var val = getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)');
+      return parseInt(val) || 0;
+    }
+
+    function showReaderToolbar() {
+      document.getElementById('readerToolbar').classList.add('visible');
+      document.getElementById('contentViewer').style.paddingBottom = (80 + getSafeAreaBottom()) + 'px';
+    }
+    function hideReaderToolbar() {
+      if (autoScrollActive) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; autoScrollActive = false; }
+      document.getElementById('readerToolbar').classList.remove('visible');
+      document.getElementById('tocDrawer').classList.remove('visible');
+      document.getElementById('speedSliderWrap').classList.remove('visible');
+      document.getElementById('contentViewer').style.paddingBottom = '';
+    }
+
+    window.toggleToc = function () {
+      var drawer = document.getElementById('tocDrawer');
+      var btn = document.getElementById('btnToc');
+      if (drawer.classList.contains('visible')) {
+        drawer.classList.remove('visible');
+        btn.classList.remove('active');
+      } else {
+        buildToc();
+        drawer.classList.add('visible');
+        btn.classList.add('active');
+      }
+    };
+
+    window.cycleFontSize = function () {
+      var cv = document.getElementById('contentViewer');
+      cv.classList.remove(fontSizeClasses[fontSizeIdx]);
+      fontSizeIdx = (fontSizeIdx + 1) % 3;
+      cv.classList.add(fontSizeClasses[fontSizeIdx]);
+      document.getElementById('fontSizeLabel').textContent = fontSizeLabels[fontSizeIdx];
+      localStorage.setItem('doc77-reader-font-size', String(fontSizeIdx));
+    };
+
+    function buildToc() {
+      var toc = document.getElementById('tocContent');
+      var headings = document.querySelectorAll('#contentViewer h1, #contentViewer h2, #contentViewer h3');
+      if (!headings.length) { toc.innerHTML = '<div class="toc-item" style="color:var(--text-muted)">' + t('web.mobile.preview.noHeadings') + '</div>'; return; }
+      var html = '';
+      headings.forEach(function (h, i) {
+        var level = h.tagName.toLowerCase();
+        var text = h.textContent.trim();
+        if (!text) return;
+        var id = 'heading-' + i;
+        h.id = id;
+        html += '<button class="toc-item ' + level + '" onclick="scrollToHeading(\'' + id + '\')">' + esc(text) + '</button>';
+      });
+      toc.innerHTML = html || '<div class="toc-item" style="color:var(--text-muted)">' + t('web.mobile.preview.noHeadings') + '</div>';
+    }
+
+    window.scrollToHeading = function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      document.getElementById('tocDrawer').classList.remove('visible');
+      document.getElementById('btnToc').classList.remove('active');
+    };
+
+    // ── Auto-scroll ──
+
+    window.toggleAutoScroll = function () {
+      if (autoScrollActive) {
+        cancelAnimationFrame(autoScrollRAF);
+        autoScrollRAF = null;
+        autoScrollActive = false;
+        document.getElementById('autoScrollIcon').textContent = '▶';
+        document.getElementById('autoScrollLabel').textContent = t('web.mobile.preview.autoScroll');
+        document.getElementById('btnAutoScroll').classList.remove('active');
+        document.getElementById('speedSliderWrap').classList.remove('visible');
+        document.getElementById('contentViewer').style.paddingBottom = (80 + getSafeAreaBottom()) + 'px';
+        return;
+      }
+      var cv = document.getElementById('contentViewer');
+      if (cv.scrollHeight <= cv.clientHeight + 50) {
+        toast(t('web.mobile.preview.tooShort'), 'info');
+        return;
+      }
+      autoScrollActive = true;
+      document.getElementById('autoScrollIcon').textContent = '⏸';
+      document.getElementById('autoScrollLabel').textContent = t('web.mobile.preview.autoScrollPause');
+      document.getElementById('btnAutoScroll').classList.add('active');
+      document.getElementById('speedSliderWrap').classList.add('visible');
+      document.getElementById('contentViewer').style.paddingBottom = (124 + getSafeAreaBottom()) + 'px';
+
+      var lastTime = performance.now();
+      function step(time) {
+        if (!autoScrollActive) return;
+        var delta = (time - lastTime) / 1000;
+        cv.scrollTop += autoScrollSpeed * delta;
+        lastTime = time;
+        if (cv.scrollTop >= cv.scrollHeight - cv.clientHeight - 2) { window.toggleAutoScroll(); return; }
+        autoScrollRAF = requestAnimationFrame(step);
+      }
+      autoScrollRAF = requestAnimationFrame(step);
+    };
+
+    // ── HTML Preview Toggle ──
+    window.toggleHtmlView = function () {
+      var codeView = document.getElementById('htmlCodeView');
+      var preview = document.getElementById('htmlPreview');
+      var btn = document.getElementById('htmlToggleBtn');
+      if (!codeView || !preview) return;
+      if (preview.style.display === 'none') {
+        codeView.style.display = 'none'; preview.style.display = 'block';
+        if (btn) btn.textContent = t('web.preview.htmlToggle.code');
+      } else {
+        codeView.style.display = 'block'; preview.style.display = 'none';
+        if (btn) btn.textContent = t('web.preview.htmlToggle.preview');
+      }
+    };
+    window.toggleHtmlFullscreen = function () {
+      var el = document.getElementById('htmlPreviewContainer');
+      if (!el) return;
+      if (document.fullscreenElement) { document.exitFullscreen(); }
+      else { el.requestFullscreen().catch(function () {}); }
+    };
+
+    // ── PDF Fullscreen ──
+    window.togglePdfFullscreen = function () {
+      var el = document.getElementById('pdfContainer');
+      if (!el) return;
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        el.requestFullscreen().catch(function () {});
+      }
+    };
+    document.addEventListener('fullscreenchange', function () {
+      ['pdfContainer','htmlPreviewContainer'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (document.fullscreenElement === el) {
+          el.classList.add('fullscreen');
+        } else {
+          el.classList.remove('fullscreen');
+        }
+      });
+    });
+
+    window.onSpeedChange = function (val) {
+      autoScrollSpeed = speedValues[parseInt(val) - 1];
+      document.getElementById('speedLabel').textContent = speedLabels[parseInt(val) - 1];
+    };
+
+    function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function escAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+    function formatSize(bytes) {
+      if (!bytes || bytes === 0) return '';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+    function getIcon(name) {
+      var n = name.toLowerCase();
+      if (/\.(png|jpg|jpeg|gif|svg|webp)$/.test(n)) return '🖼️';
+      if (/\.(mp4|mov|avi)$/.test(n)) return '🎬';
+      if (/\.pdf$/.test(n)) return '📕';
+      if (/\.mermaid$/.test(n)) return '📊';
+      if (/\.md$/.test(n)) return '📝';
+      if (/\.(js|ts|py|rb|go|rs|java|cpp|c|css|html|json|yaml|yml|xml)$/.test(n)) return '💻';
+      return '📄';
+    }
+
+    // ── Gate on i18n ready ──
+    window.__doc77_i18n_ready.then(function () {
+      // Init theme icons
+      (function(){
+        var isDark = document.documentElement.classList.contains('dark');
+        var icon = isDark ? '☀️' : '🌙';
+        var logo = document.getElementById('siteLogo');
+        if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
+        document.getElementById('themeIcon').textContent = icon;
+        var readerIcon = document.getElementById('readerThemeIcon');
+        if (readerIcon) readerIcon.textContent = icon;
+      })();
+
+      // Init i18n labels arrays
+      fontSizeLabels = [t('web.mobile.preview.fontSizeSmall'), t('web.mobile.preview.fontSizeNormal'), t('web.mobile.preview.fontSizeLarge')];
+      speedLabels = [t('web.mobile.preview.speedSlow'), t('web.mobile.preview.speedSlower'), t('web.mobile.preview.speedNormal'), t('web.mobile.preview.speedFaster'), t('web.mobile.preview.speedFast')];
+
+      // Init reader font size from localStorage
+      (function () {
+        var saved = localStorage.getItem('doc77-reader-font-size');
+        if (saved) { fontSizeIdx = parseInt(saved) || 1; }
+        document.getElementById('contentViewer').classList.add(fontSizeClasses[fontSizeIdx]);
+        document.getElementById('fontSizeLabel').textContent = fontSizeLabels[fontSizeIdx];
+      })();
+
+      // Init speed label (default value=3 → normal)
+      document.getElementById('speedLabel').textContent = speedLabels[2];
+
+      boot();
+    });
+  </script>
+</body>
+</html>

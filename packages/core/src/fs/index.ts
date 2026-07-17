@@ -39,6 +39,70 @@ export function readFile(absolutePath: string): string {
 }
 
 /**
+ * Read a file as a raw Buffer (no encoding).
+ */
+export function readFileRaw(absolutePath: string): Buffer {
+  return fs.readFileSync(absolutePath);
+}
+
+/**
+ * Detect if a file is binary by checking for null bytes in the first 8KB.
+ * Text files virtually never contain null bytes. Returns true if binary.
+ */
+export function isBinaryFile(absolutePath: string): boolean {
+  try {
+    const fd = fs.openSync(absolutePath, 'r');
+    const buf = Buffer.alloc(8192);
+    const bytesRead = fs.readSync(fd, buf, 0, 8192, 0);
+    fs.closeSync(fd);
+    // Check for null bytes in the sample
+    for (let i = 0; i < bytesRead; i++) {
+      if (buf[i] === 0) return true;
+    }
+    return false;
+  } catch {
+    // If we can't read the file, treat as binary for safety
+    return true;
+  }
+}
+
+/**
+ * Read only the first N lines of a text file. Returns { content, truncated, totalBytes }.
+ */
+export function readFirstNLines(
+  absolutePath: string,
+  maxLines: number,
+): { content: string; truncated: boolean; totalBytes: number } {
+  const stats = fs.statSync(absolutePath);
+  const totalBytes = stats.size;
+  const fd = fs.openSync(absolutePath, 'r');
+  const buf = Buffer.alloc(65536); // 64KB chunks
+  let pos = 0,
+    lines = 0;
+  const parts: string[] = [];
+
+  while (lines < maxLines && pos < totalBytes) {
+    const bytesRead = fs.readSync(fd, buf, 0, buf.length, pos);
+    if (bytesRead === 0) break;
+    const chunk = buf.toString('utf-8', 0, bytesRead);
+    const chunkLines = chunk.split('\n');
+    lines += chunkLines.length - 1;
+    if (lines >= maxLines) {
+      // Only include lines up to maxLines
+      const takeLines = chunkLines.slice(0, maxLines - (lines - chunkLines.length + 1));
+      parts.push(takeLines.join('\n'));
+      break;
+    }
+    parts.push(chunk);
+    pos += bytesRead;
+  }
+  fs.closeSync(fd);
+
+  const content = parts.join('');
+  return { content, truncated: pos < totalBytes, totalBytes };
+}
+
+/**
  * Get file/directory stats.
  */
 export function statFile(absolutePath: string): fs.Stats {
@@ -107,7 +171,14 @@ export function validatePath(projectRoot: string, requestedPath: string): string
     throw new Error(`Path traversal denied: "${requestedPath}" is outside project root.`);
   }
 
-  // Resolve symlinks to get real path
+  // Resolve symlinks to get real path for both root and candidate
+  let realRoot: string;
+  try {
+    realRoot = fs.realpathSync(root);
+  } catch {
+    realRoot = root;
+  }
+
   let realPath: string;
   try {
     realPath = fs.realpathSync(candidate);
@@ -124,8 +195,8 @@ export function validatePath(projectRoot: string, requestedPath: string): string
     realPath = path.join(realParent, path.basename(candidate));
   }
 
-  // Recheck after symlink resolution
-  if (!realPath.startsWith(root + path.sep) && realPath !== root) {
+  // Recheck after symlink resolution (compare against resolved root)
+  if (!realPath.startsWith(realRoot + path.sep) && realPath !== realRoot) {
     throw new Error(`Symlink traversal denied: "${requestedPath}" resolves outside project root.`);
   }
 
@@ -135,12 +206,11 @@ export function validatePath(projectRoot: string, requestedPath: string): string
 /**
  * Resolve a user-provided project path to an absolute, normalized path.
  *
- * Handles:
- * - `~` expansion (e.g., `~/work/docs` → `/home/user/work/docs`)
- * - Windows path on WSL (e.g., `D:\\agent\\kit` → `/mnt/d/agent/kit`)
- * - Relative paths (e.g., `./my-project` → `/cwd/my-project`)
- *
- * Throws if the resolved path does not exist.
+ * Platform-aware logic:
+ * - Native Windows:   keeps Windows paths (D:\\foo), expands ~ to %USERPROFILE%
+ * - WSL (Linux+microsoft kernel): converts Windows paths → /mnt/d/... via wslpath
+ * - Native Linux/macOS: expands ~ to $HOME, rejects Windows paths with a clear error
+ * - Relative paths are resolved against cwd
  */
 export function resolveProjectPath(rawPath: string): string {
   let resolved = rawPath;
@@ -150,19 +220,42 @@ export function resolveProjectPath(rawPath: string): string {
     resolved = path.join(os.homedir(), resolved.slice(1));
   }
 
-  // 2. Detect Windows-style absolute paths (e.g., D:\... or C:/...)
-  //    and try to convert via wslpath if available
-  if (/^[A-Za-z]:[/\\]/.test(resolved)) {
-    const wslPath = tryWslPath(resolved);
-    if (wslPath) {
-      resolved = wslPath;
-    }
+  const isWinPath = /^[A-Za-z]:[/\\]/.test(resolved);
+
+  // 2. Native Windows — keep Windows paths as-is
+  if (process.platform === 'win32') {
+    return path.resolve(resolved);
   }
 
-  // 3. Resolve to absolute path
-  resolved = path.resolve(resolved);
+  // 3. WSL environment — convert Windows paths to Linux mount points
+  if (isWinPath && isWsl()) {
+    const converted = tryWslPath(resolved);
+    if (converted) return converted;
+    // wslpath failed but we're in WSL — fall through to resolve
+  }
 
-  return resolved;
+  // 4. Native Linux/macOS with a Windows path — error
+  if (isWinPath && !isWsl()) {
+    throw new Error(
+      `Windows path "${rawPath}" is not valid on ${process.platform}. ` +
+        'Use a Linux path (e.g., /home/user/docs) or run inside WSL for Windows paths.',
+    );
+  }
+
+  // 5. Standard Linux/macOS path
+  return path.resolve(resolved);
+}
+
+/**
+ * Check if the current process is running inside Windows Subsystem for Linux.
+ */
+function isWsl(): boolean {
+  try {
+    const content = fs.readFileSync('/proc/version', 'utf-8');
+    return content.toLowerCase().includes('microsoft') || content.toLowerCase().includes('wsl');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -175,13 +268,11 @@ function tryWslPath(windowsPath: string): string | null {
       encoding: 'utf-8',
       timeout: 3000,
     }).trim();
-    // Verify the result is a valid Linux path
     if (result.startsWith('/')) {
       return result;
     }
   } catch {
-    // wslpath not available, not on WSL, or conversion failed
+    // wslpath not available or conversion failed
   }
   return null;
 }
-

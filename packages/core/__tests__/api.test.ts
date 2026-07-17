@@ -28,7 +28,7 @@ describe('API Endpoints', () => {
   let dbPath: string;
   let projectDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-api-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
@@ -40,11 +40,11 @@ describe('API Endpoints', () => {
     fs.mkdirSync(path.join(projectDir, 'docs'));
     fs.writeFileSync(path.join(projectDir, 'docs', 'api.md'), '## API Docs');
 
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {

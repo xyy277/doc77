@@ -1,0 +1,86 @@
+name: Release Electron
+
+on:
+  push:
+    tags: ['electron-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
+          - os: ubuntu-latest
+            target: linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install Linux system deps (electron-builder)
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils fuse3
+          # AppImage needs FUSE. Ubuntu 24.04 uses libfuse2t64 or fuse3; install fuse3 + symlink if needed
+          sudo ln -sf /usr/bin/fusermount3 /usr/bin/fusermount 2>/dev/null || true
+
+      - name: Configure pnpm for electron-builder
+        run: node -e "const fs=require('fs');fs.writeFileSync('.npmrc','node-linker=hoisted\nshamefully-hoist=true\n')"
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Sync version
+        run: node scripts/sync-version.cjs
+
+      - name: Build core + CLI
+        run: |
+          pnpm --filter @doc77/core --filter @doc77/cli build
+
+      - name: Download vendor assets
+        run: |
+          node packages/cli/dist/bin/doc77.js vendor-install
+          mkdir -p packages/electron/vendor
+          cp -r ~/.doc77/vendor/* packages/electron/vendor/
+
+      - name: Build Electron
+        working-directory: packages/electron
+        run: npm run build
+
+      - name: Package Electron
+        working-directory: packages/electron
+        run: npx electron-builder --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/electron/release/*.{exe,dmg,AppImage}
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

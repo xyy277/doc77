@@ -1,26 +1,24 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import Database from 'better-sqlite3';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { initDatabase, closeConnection } from '../src/db/connection.js';
+import { initDatabase, getConnection, closeConnection } from '../src/db/connection.js';
 import { runMigrations } from '../src/db/migrations.js';
 import { getConfig, setConfig, listConfig, loadDefaults } from '../src/db/config.js';
 
 describe('Config management', () => {
   let testDir: string;
   let dbPath: string;
-  let db: Database.Database;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-config-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
-    db = initDatabase(dbPath);
-    runMigrations(db);
+    await initDatabase(dbPath);
+    runMigrations();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {
@@ -48,7 +46,9 @@ describe('Config management', () => {
   describe('setConfig', () => {
     it('should insert a new config entry', () => {
       setConfig('my.key', 'my-value');
-      const row = db.prepare('SELECT value FROM config WHERE key = ?').get('my.key') as {
+      const row = getConnection()
+        .prepare('SELECT value FROM config WHERE key = ?')
+        .get('my.key') as {
         value: string;
       };
       expect(row.value).toBe('my-value');

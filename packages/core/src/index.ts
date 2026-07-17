@@ -4,10 +4,48 @@
  * 提供数据库、文件系统抽象层、预览引擎和 Express Server。
  */
 
-export const VERSION = '0.1.0';
+export { VERSION } from './version.gen.js';
+
+// Crypto
+export {
+  encrypt,
+  decrypt,
+  deriveKey,
+  generateSalt,
+  hashPassword,
+  verifyPassword,
+  verifyPasswordLegacy,
+  LEGACY_SCRYPT_OPTIONS,
+  checkPasswordStrength,
+  isSensitiveKey,
+  maskSensitive,
+  scryptSync,
+  extractSalt,
+  derivePasswordWrapKey,
+  SCRYPT_OPTIONS,
+} from './crypto.js';
+export type { EncryptedData } from './crypto.js';
+
+// i18n
+export {
+  initI18n,
+  t,
+  setLocale,
+  getLocale,
+  listLocales,
+  resolveLocale,
+  getDict,
+} from './i18n/index.js';
+export type { LocaleInfo } from './i18n/index.js';
 
 // Database
-export { initDatabase, getConnection, closeConnection } from './db/connection.js';
+export {
+  initDatabase,
+  getConnection,
+  closeConnection,
+  DatabaseCompat,
+  StatementCompat,
+} from './db/connection.js';
 export { runMigrations } from './db/migrations.js';
 export { getConfig, setConfig, listConfig, loadDefaults } from './db/config.js';
 export { registerProject, listProjects, removeProject, updateProject } from './db/projects.js';
@@ -16,6 +54,9 @@ export type { Project, ProjectUpdate } from './db/projects.js';
 // File System
 export {
   readFile,
+  readFileRaw,
+  isBinaryFile,
+  readFirstNLines,
   statFile,
   listDir,
   isSensitiveFile,
@@ -27,9 +68,58 @@ export type { DirEntry } from './fs/index.js';
 // Scanner
 export { scanDirectory, clearCache } from './scanner/index.js';
 export type { ScanResult } from './scanner/index.js';
+export { discoverProjects } from './scanner/discover.js';
+export type { DiscoverResult } from './scanner/discover.js';
 
 // Server
-export { createApp } from './server/app.js';
+export {
+  createApp,
+  createQueueApproveHandler,
+  createAIChatHandler,
+  setCapabilities,
+} from './server/app.js';
+export { executeAiWriteTool, isAiWriteTool } from './server/ai-tools.js';
+export type { AiWriteFns, AiWriteDeps, AiWriteCtx } from './server/ai-tools.js';
+export { createEventsHandler } from './server/events.js';
+export {
+  saveAiSession,
+  loadAiSession,
+  deleteAiSession,
+  pruneAiSessions,
+} from './db/ai-sessions.js';
+
+// Auth
+export {
+  isLegacyMode,
+  setupPasswordWithDEK,
+  setupPasswordLegacy,
+  verifyLogin,
+  verifyRecoveryCode,
+  resetPasswordWithToken,
+  changePassword,
+  getRecoveryStatus,
+  regenerateRecoveryCodes,
+  forceResetPassword,
+} from './server/auth.js';
+
+// Vendor
+export {
+  fetchVendorAssets,
+  isVendorReady,
+  VENDOR_ASSETS,
+  translateModelsDir,
+} from './server/vendor.js';
+export type { VendorAsset } from './server/vendor.js';
+
+// Translate
+export {
+  isEngineAvailable,
+  isModelReady,
+  translate,
+  segmentText,
+  MODEL_PAIRS,
+} from './translate/index.js';
+export type { TranslationResult, Segment } from './translate/index.js';
 
 // Renderers
 export {
@@ -39,4 +129,10 @@ export {
   renderImage,
   renderCode,
   getRendererForFile,
+  isUnsupportedFormat,
+  UNSUPPORTED_EXTENSIONS,
+  FORMAT_SIZE_LIMITS,
 } from './renderers/index.js';
+
+// Export & Share
+export { bundleHTML, ShareManager } from './export/index.js';

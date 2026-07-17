@@ -1,46 +1,240 @@
-import Database from 'better-sqlite3';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import initSqlJs from 'sql.js';
+import type { Database as SqlJsDatabase, SqlJsStatic, Statement as SqlJsStatement } from 'sql.js';
 
-let db: Database.Database | null = null;
+/***********************************************
+ * sql.js → better-sqlite3 compatibility layer
+ *
+ * initDatabase() is async (loads WASM once).
+ * After init, getConnection() returns a
+ * DatabaseCompat with .prepare().get()/.all()/.run()
+ * and .transaction() — same API as better-sqlite3.
+ ***********************************************/
 
-/**
- * Initialize the SQLite database connection.
- * Creates parent directories if needed, enables WAL mode and foreign keys.
- */
-export function initDatabase(dbPath: string): Database.Database {
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+let rawDb: SqlJsDatabase | null = null;
+let dbPath: string | null = null;
+let wrappedDb: DatabaseCompat | null = null;
+
+// ── Debounced auto-persist ─────────────────────────────
+
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _persistDb(): void {
+  if (rawDb && dbPath) {
+    const data = rawDb.export();
+    const buf = Buffer.from(data);
+    const tmp = dbPath + '.tmp';
+    fs.writeFileSync(tmp, buf);
+    fs.renameSync(tmp, dbPath);
   }
+}
 
-  db = new Database(dbPath);
-
-  // Enable WAL mode for better concurrent read performance
-  db.pragma('journal_mode = WAL');
-  // Enforce foreign key constraints
-  db.pragma('foreign_keys = ON');
-
-  return db;
+function _scheduleSave(): void {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    _persistDb();
+  }, 500);
+  _saveTimer?.unref();
 }
 
 /**
- * Get the current database connection.
- * Throws if initDatabase hasn't been called.
+ * Force-sync all pending writes to disk immediately.
+ * Used by restart/shutdown paths that need durability before exit.
  */
-export function getConnection(): Database.Database {
-  if (!db) {
+export function flushDatabase(): void {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+  _persistDb();
+}
+
+// ── Statement wrapper ──────────────────────────────────
+
+export class StatementCompat {
+  private _db: SqlJsDatabase;
+  private _sql: string;
+
+  constructor(db: SqlJsDatabase, sql: string) {
+    this._db = db;
+    this._sql = sql;
+  }
+
+  run(...params: unknown[]) {
+    const stmt = this._db.prepare(this._sql);
+    if (params.length > 0) stmt.bind(params);
+    stmt.step(); // Don't catch — let constraint violations throw
+    let lastInsertRowid = 0;
+    let changes = 0;
+    if (/^\s*INSERT\b/i.test(this._sql.trim())) {
+      const idStmt = this._db.prepare('SELECT last_insert_rowid() as id');
+      if (idStmt.step()) lastInsertRowid = idStmt.getAsObject().id as number;
+      idStmt.free();
+      changes = this._db.getRowsModified();
+    } else if (/^\s*(UPDATE|DELETE)\b/i.test(this._sql.trim())) {
+      changes = this._db.getRowsModified();
+    }
+    stmt.free();
+
+    // Auto-persist to disk after any write mutation
+    if (/^\s*(INSERT|UPDATE|DELETE)\b/i.test(this._sql.trim())) {
+      _scheduleSave();
+    }
+
+    return { changes, lastInsertRowid };
+  }
+
+  get<T = Record<string, unknown>>(...params: unknown[]): T | undefined {
+    const stmt = this._db.prepare(this._sql);
+    if (params.length > 0) stmt.bind(params);
+    try {
+      if (stmt.step()) {
+        const r = stmt.getAsObject() as T;
+        stmt.free();
+        return r;
+      }
+    } catch {
+      stmt.free();
+      return undefined;
+    }
+    stmt.free();
+    return undefined;
+  }
+
+  all<T = Record<string, unknown>>(...params: unknown[]): T[] {
+    const stmt = this._db.prepare(this._sql);
+    if (params.length > 0) stmt.bind(params);
+    const results: T[] = [];
+    try {
+      while (stmt.step()) results.push(stmt.getAsObject() as T);
+    } catch {}
+    stmt.free();
+    return results;
+  }
+}
+
+// ── Database wrapper ───────────────────────────────────
+
+export class DatabaseCompat {
+  private _db: SqlJsDatabase;
+
+  constructor(db: SqlJsDatabase) {
+    this._db = db;
+  }
+
+  get open(): boolean {
+    try {
+      this._db.exec('SELECT 1');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  exec(sql: string) {
+    this._db.run(sql);
+  }
+
+  prepare(sql: string): StatementCompat {
+    return new StatementCompat(this._db, sql);
+  }
+
+  transaction<TArgs extends unknown[], TResult>(
+    fn: (...args: TArgs) => TResult,
+  ): (...args: TArgs) => TResult {
+    return (...args: TArgs): TResult => {
+      try {
+        this._db.run('BEGIN');
+        const r = fn(...args);
+        this._db.run('COMMIT');
+        return r;
+      } catch (err) {
+        try {
+          this._db.run('ROLLBACK');
+        } catch {}
+        throw err;
+      }
+    };
+  }
+
+  /** Internal: persist to disk without closing */
+  _persist(filePath: string) {
+    const data = this._db.export();
+    const buf = Buffer.from(data);
+    const tmp = filePath + '.tmp';
+    fs.writeFileSync(tmp, buf);
+    fs.renameSync(tmp, filePath);
+  }
+
+  /** Internal: persist to disk and close */
+  _saveAndClose(filePath: string) {
+    this._persist(filePath);
+    this._db.close();
+  }
+}
+
+// ── Exported API ───────────────────────────────────────
+
+let sqlModule: SqlJsStatic | null = null;
+let initPromise: Promise<DatabaseCompat> | null = null;
+
+/**
+ * Initialize the database.
+ * On first call, loads sql.js WASM (async).
+ * Subsequent calls with same path reuse existing connection.
+ * Uses a promise guard to prevent race conditions.
+ */
+export async function initDatabase(filePath: string): Promise<DatabaseCompat> {
+  if (rawDb && wrappedDb) return wrappedDb;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    if (!sqlModule) {
+      sqlModule = await initSqlJs();
+    }
+
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    let buffer: Buffer | undefined;
+    if (fs.existsSync(filePath)) buffer = fs.readFileSync(filePath);
+
+    rawDb = new sqlModule.Database(buffer);
+    dbPath = filePath;
+    rawDb.run('PRAGMA foreign_keys = ON');
+    wrappedDb = new DatabaseCompat(rawDb);
+    return wrappedDb;
+  })();
+
+  return initPromise;
+}
+
+/** Get current connection (must call initDatabase first). */
+export function getConnection(): DatabaseCompat {
+  if (!rawDb || !wrappedDb) {
     throw new Error('Database not initialized. Call initDatabase() first.');
   }
-  return db;
+  return wrappedDb;
 }
 
-/**
- * Close the database connection gracefully.
- */
+/** Close and save the database. */
 export function closeConnection(): void {
-  if (db) {
-    db.close();
-    db = null;
+  if (rawDb && dbPath) {
+    // Cancel pending debounced save — we'll sync-persist right now
+    if (_saveTimer) {
+      clearTimeout(_saveTimer);
+      _saveTimer = null;
+    }
+    try {
+      wrappedDb?._saveAndClose(dbPath);
+    } catch {
+      rawDb.close();
+    }
+    rawDb = null;
+    wrappedDb = null;
+    dbPath = null;
+    initPromise = null;
   }
 }

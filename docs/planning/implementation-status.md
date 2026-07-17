@@ -1,8 +1,56 @@
 # Doc77 实施状态
 
-> 最后更新：2026-07-07
+> 最后更新：2026-07-09
 
-## 总进度：40 / 40 Tasks 完成（100%）
+## 总进度：40 / 40 Tasks 完成（100%）+ v0.3 增强
+
+---
+
+## v0.3 增强（2026-07-08 ~ 2026-07-09）
+
+> 在原 40 个 Task 基础上，根据实际使用反馈进行的 UI 改造、跨平台适配和品牌建设。
+
+### 品牌与 Logo
+- [x] SVG Logo 设计（favicon + 深色/浅色双模标题 Logo）
+- [x] Web 全局部署 favicon + Header Logo
+- [x] Console ASCII Banner
+- [x] 移动端 Logo
+- [x] 功能引导页 guide.html
+
+### UI / UX 改造
+- [x] 左侧栏折叠（☰ 按钮 + 56px 窄条 + 平滑动画）
+- [x] 左侧栏拖动 resize 与折叠联动
+- [x] 设置面板抽屉滑入动画（opacity + transform）
+- [x] 收藏区折叠 + 5 条限高
+- [x] 首页介绍区 + GitHub Star 按钮
+- [x] 点 backdrop 关闭设置
+- [x] 浏览文件夹策略重排（移除慢 PowerShell，浏览器 picker 为主力）
+
+### Windows 兼容
+- [x] `/api/browse-fs` 路径兼容（驱动器字母、SAFE_ROOTS → 黑名单）
+- [x] 全局搜索去 grep（Node.js 原生 searchInFiles）
+- [x] 常用用户目录快捷入口（Desktop、Documents、Downloads）
+- [x] winToWsl double-resolve bug 修复
+
+### 安全
+- [x] 白名单路径 → 黑名单拦截（开放除系统目录外的所有路径）
+- [x] `isLocalAccess` 检测 `0.0.0.0` + localhost 场景
+- [x] 设置页 security.bind_address 保存被覆盖修复
+- [x] 重启前自动保存设置
+
+### Bug 修复
+- [x] 重启 spawn 无错误处理
+- [x] CLI help 文本补全 `--bind`
+- [x] README 文档补全 `--bind` / `0.0.0.0`
+- [x] 左侧栏 Logo 折叠/展开切换逻辑反转
+- [x] 拖动 resize 双 Logo bug
+- [x] PowerShell 对话框超时 120s → 30s
+
+### 发布
+- [x] @doc77/core v0.3.0
+- [x] @doc77/mcp v0.2.0
+- [x] @doc77/ai v0.2.0
+- [x] @doc77/cli v0.2.0
 
 ---
 
@@ -119,6 +167,42 @@
 
 ---
 
+## v0.9 扩展功能（2026-07-14 ~ 2026-07-17）
+
+> 4 个 Feature 分支全部完成并集成到 main。
+
+### Export & Share（feat/export-share）
+- [x] 自包含 HTML 导出（mermaid SVG + KaTeX + 代码高亮内联）
+- [x] 分享链接（24h TTL，UUID token，读取只读）
+- [x] 分享 QR 码
+- [x] i18n 国际化支持（zh-CN / en-US）
+- [x] 导出安全审查（路径验证、XSS 防护、文件大小限制）
+
+### Obsidian Vault Import（feat/obsidian-import）
+- [x] `[[wikilink]]` 渲染（marked 扩展 + Markdown 后处理）
+- [x] 别名文件 `.doc77links` 支持
+- [x] 项目数据库中添加 `obsidian_mode` 列
+- [x] Dashboard 卡片显示 Obsidian badge（🗃️ + [[=]]标签）
+- [x] 注册/编辑表单支持 Obsidian 模式开关
+
+### VS Code / Git 项目导入（feat/vscode-git-import）
+- [x] Git 仓库自动发现（递归扫描 `.git` 目录，跳过 node_modules 等）
+- [x] VS Code `.code-workspace` 文件解析与批量导入
+- [x] 项目语言自动检测（package.json、go.mod、Cargo.toml、requirements.txt 等）
+- [x] Dashboard 卡片显示语言标签（Node.js / TypeScript / Python / Go 等）
+- [x] 8 种标签颜色 CSS
+- [x] `tags` JSON 数组字段 + migration v4
+
+### Mobile Companion（feat/mobile-companion）
+- [x] mDNS 服务发布（`_doc77._tcp`，multicast-dns 纯 JS）
+- [x] `/api/mobile/info` 端点（hostname、version、port）
+- [x] Dashboard QR 码连接卡片
+- [x] 移动端连接持久化（localStorage）
+- [x] 移动端连接失败提示 + 重试
+- [x] 7 个文件变更，141 行新增
+
+---
+
 ## 阻塞记录
 
 > 暂无
@@ -135,3 +219,13 @@
 | 2026-07-07 | ✅ Phase 4 完成：MCP Server + 8 Tools + Security + Session（116 tests） |
 | 2026-07-07 | ✅ Phase 5 完成：Queue + Approval + Shadow/Rollback + Lock + GC（138 tests） |
 | 2026-07-07 | ✅ Phase 6-8 完成：AI Module + CLI + Polish（138 tests, 40/40 Tasks） |
+
+## 附加改造记录
+
+### i18n 多语言化（2026-07-17 完成，不在原 40-task 计划内）
+
+- 自研零依赖 i18n 模块（packages/core/src/i18n/），753 个词条 key，zh-CN / en-US 内置
+- 覆盖六层：Web UI、CLI、API 错误（含 code 字段）、MCP/AI tool descriptions、AI system prompt、Electron 托盘
+- 外部语言包目录 ~/.doc77/locales/*.json（下载命令留待未来）
+- `pnpm check:i18n` 覆盖率门禁已纳入 CI
+- Spec: docs/superpowers/specs/2026-07-16-i18n-design.md / Plan: docs/superpowers/plans/2026-07-16-i18n.md

@@ -1,0 +1,31 @@
+appId: com.doc77.desktop
+productName: Doc77
+directories:
+  output: release
+
+publish: null
+
+extraResources:
+  - from: "vendor"
+    to: "vendor"
+
+files:
+  - "dist/**/*"
+  - "assets/**/*"
+  - "node_modules/**/*"
+  - "!node_modules/.cache"
+  - "!node_modules/@doc77/mcp"
+  - "!node_modules/@doc77/ai"
+
+win:
+  target: nsis
+  icon: assets/icon.png
+mac:
+  target: dmg
+  category: public.app-category.productivity
+linux:
+  target: AppImage
+  category: Utility
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

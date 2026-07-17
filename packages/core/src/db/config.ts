@@ -4,6 +4,7 @@ import { getConnection } from './connection.js';
  * Default configuration values defined in architecture doc §7.3.
  */
 const DEFAULTS: Record<string, string> = {
+  'ai.provider': 'custom',
   'ai.enabled': 'false',
   'ai.auto_mode': 'false',
   'ai.risk_level': 'medium',
@@ -13,6 +14,8 @@ const DEFAULTS: Record<string, string> = {
   'ai.max_depth': '5',
   'ai.read_limit_per_session': '200',
   'editor.default': 'vscode',
+  'editor.maxFileSizeMB': '2',
+  'editor.autoSave': 'true',
   'security.follow_symlinks': 'false',
   'transaction.shadow_dir': '~/.doc77/shadow',
   'transaction.file_size_threshold_mb': '50',
@@ -31,6 +34,15 @@ const DEFAULTS: Record<string, string> = {
   'transport.mcp_stdio_enabled': 'true',
   'transport.mcp_http_enabled': 'true',
   'transport.mcp_http_port': '8899',
+  'translate.enabled': 'true',
+  'translate.mirror': 'false',
+  'translate.default_source': 'auto',
+  'translate.default_target': 'zh',
+  'translate.max_segment_length': '500',
+  'locale.language': '', // empty = auto-detect (system LANG / browser Accept-Language)
+  'export.html.maxFileSizeMB': '10',
+  'export.share.ttl_hours': '24',
+  'export.share.enabled': 'true',
 };
 
 /**

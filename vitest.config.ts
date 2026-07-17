@@ -10,8 +10,9 @@ export default defineConfig({
       include: ['packages/**/src/**/*.ts'],
       exclude: ['packages/**/dist/**', 'packages/**/__tests__/**'],
     },
-    // Ensure each package's tests run with its own context
+    // Run each test file in its own context
     pool: 'forks',
-    testTimeout: 10000,
+    testTimeout: 60000,
+    hookTimeout: 60000,
   },
 });

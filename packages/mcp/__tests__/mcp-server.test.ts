@@ -21,7 +21,7 @@ describe('MCP Read-only Tools', () => {
   let projectDir: string;
   let projectId: number;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-mcp-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
@@ -33,13 +33,13 @@ describe('MCP Read-only Tools', () => {
     fs.mkdirSync(path.join(projectDir, 'docs'));
     fs.writeFileSync(path.join(projectDir, 'docs', 'api.md'), '## API');
 
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
     const proj = registerProject('MCP Test', projectDir);
     projectId = proj.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {

@@ -13,7 +13,7 @@ describe('Directory Scanner', () => {
   let projectDir: string;
   let projectId: number;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `doc77-scanner-test-${Date.now()}`);
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
@@ -31,13 +31,13 @@ describe('Directory Scanner', () => {
     fs.writeFileSync(path.join(projectDir, 'node_modules', 'dep.js'), '');
     fs.writeFileSync(path.join(projectDir, '.env'), 'SECRET=123');
 
-    initDatabase(dbPath);
+    await initDatabase(dbPath);
     runMigrations();
     const project = registerProject('Scanner Test', projectDir);
     projectId = project.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       closeConnection();
     } catch {

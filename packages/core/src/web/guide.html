@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
+<style>.i18n-loading body{visibility:hidden}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="web.guide.pageTitle">Doc77 — Guide</title>
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = (window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com');
+  s.onload = function() { tailwind.config = { darkMode: 'class', theme: { extend: {} } }; };
+  document.head.appendChild(s);
+})();
+</script>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  /* ═══ Guide Page Overrides ═══ */
+  html { scroll-behavior: smooth; overflow-y: auto; }
+  body { overflow-y: visible; height: auto; min-height: 100vh; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+  /* Guide header */
+  .guide-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .dark .guide-header {
+    background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+  }
+  .guide-header-inner {
+    max-width: 72rem; margin: 0 auto; padding: 0 24px;
+    height: 56px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .guide-header a { text-decoration: none; }
+  .guide-header .logo img { height: 32px; }
+  .guide-header-actions { display: flex; align-items: center; gap: 12px; }
+  .guide-header-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; color: #94a3b8;
+    transition: color 0.2s; text-decoration: none; padding: 6px 10px; border-radius: 6px;
+  }
+  .guide-header-link:hover { color: #f1f5f9; background: rgba(255,255,255,0.06); }
+
+  /* Hero */
+  .guide-hero {
+    position: relative; overflow: hidden;
+    padding: 56px 24px 48px;
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 60%, var(--bg-body) 100%);
+  }
+  .dark .guide-hero {
+    background: linear-gradient(180deg, #020617 0%, #0f172a 50%, var(--bg-body) 100%);
+  }
+  .guide-hero-inner { max-width: 72rem; margin: 0 auto; }
+  .guide-hero-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase;
+    color: #60a5fa; margin-bottom: 16px;
+  }
+  .guide-hero h1 {
+    font-size: 2.5rem; font-weight: 800; line-height: 1.15; letter-spacing: -0.025em;
+    color: #f8fafc; margin: 0 0 12px 0; max-width: 14ch;
+  }
+  .guide-hero p {
+    font-size: 15px; line-height: 1.7; color: #94a3b8;
+    max-width: 56ch; margin: 0 0 24px 0;
+  }
+
+  /* Layout */
+  .guide-layout { max-width: 72rem; margin: 0 auto; padding: 0 24px; display: flex; gap: 40px; }
+  .guide-sidebar {
+    width: 200px; flex-shrink: 0;
+    position: sticky; top: 72px; align-self: flex-start;
+    max-height: calc(100vh - 88px); overflow-y: auto;
+    padding-right: 4px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .guide-sidebar::-webkit-scrollbar { width: 3px; }
+  .guide-sidebar::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 4px; }
+  .guide-sidebar::-webkit-scrollbar-track { background: transparent; }
+  .guide-sidebar-title {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .guide-nav-link {
+    display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+    text-decoration: none; padding: 6px 10px; border-radius: 6px;
+    transition: all 0.15s; border-left: 2px solid transparent;
+  }
+  .guide-nav-link:hover {
+    color: var(--text-primary); background: var(--bg-hover); border-left-color: var(--border-medium);
+  }
+  .guide-nav-link.active {
+    color: var(--accent); background: var(--accent-light-bg); border-left-color: var(--accent);
+  }
+
+  .guide-main { flex: 1; min-width: 0; padding-bottom: 64px; }
+
+  /* Sections */
+  .guide-section {
+    scroll-margin-top: 80px;
+    padding-top: 40px; margin-top: 8px;
+    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .guide-section:first-of-type { padding-top: 32px; }
+  .guide-section-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .guide-section-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
+  }
+  .guide-section h2 {
+    font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .guide-section-desc {
+    font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+    margin: 4px 0 20px 32px; max-width: 64ch;
+  }
+
+  /* Step cards */
+  .steps-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px; margin-bottom: 24px;
+  }
+  .step-card {
+    background: var(--bg-card); border: 1px solid var(--border-light);
+    border-radius: 12px; padding: 20px; position: relative;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  }
+  .dark .step-card { border-color: rgba(255,255,255,0.06); }
+  .step-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  }
+  .dark .step-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+  .step-number {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 12px; font-weight: 700; margin-bottom: 12px;
+  }
+  .step-card h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 6px 0; }
+  .step-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0; }
+
+  /* Feature table */
+  .feature-table-wrap {
+    background: var(--bg-card); border: 1px solid var(--border-light);
+    border-radius: 12px; overflow: hidden; margin-bottom: 24px;
+    transition: box-shadow 0.2s;
+  }
+  .dark .feature-table-wrap { border-color: rgba(255,255,255,0.06); }
+  .feature-table-wrap:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+  .feature-table { width: 100%; border-collapse: collapse; }
+  .feature-table tr {
+    transition: background 0.12s;
+  }
+  .feature-table tr:hover { background: var(--bg-hover); }
+  .feature-table tr:not(:last-child) { border-bottom: 1px solid var(--border-light); }
+  .feature-table td { padding: 12px 16px; vertical-align: middle; }
+  .feature-icon-cell { width: 40px; text-align: center; }
+  .feature-icon-wrap {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 6px;
+    background: var(--accent-light-bg); color: var(--accent);
+  }
+  .feature-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; width: 100px; }
+  .feature-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .feature-desc kbd {
+    display: inline-block; padding: 1px 5px; font-size: 10px; font-family: 'SF Mono', 'Fira Code', monospace;
+    background: var(--bg-code); color: var(--text-secondary); border-radius: 4px;
+    border: 1px solid var(--border-light);
+  }
+  .dark .feature-desc kbd { background: #334155; color: #cbd5e1; border-color: #475569; }
+
+  /* Format grid */
+  .format-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px;
+  }
+  .format-card {
+    background: var(--bg-card); border: 1px solid var(--border-light);
+    border-radius: 10px; padding: 14px 12px; text-align: center;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .dark .format-card { border-color: rgba(255,255,255,0.06); }
+  .format-card:hover { transform: translateY(-1px); border-color: var(--accent); }
+  .format-card-icon { margin-bottom: 6px; }
+  .format-card-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .format-card-ext { font-size: 10px; color: var(--text-muted); margin-top: 2px; font-family: 'SF Mono', 'Fira Code', monospace; }
+
+  /* CTA */
+  .guide-cta {
+    background: var(--bg-card); border: 1px solid var(--border-light);
+    border-radius: 14px; padding: 32px; text-align: center;
+    margin-top: 40px;
+  }
+  .dark .guide-cta { border-color: rgba(255,255,255,0.06); }
+  .guide-cta h2 { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px 0; }
+  .guide-cta p { font-size: 13px; color: var(--text-secondary); margin: 0 0 20px 0; max-width: 40ch; margin-left: auto; margin-right: auto; line-height: 1.6; }
+  .guide-cta .intro-actions { justify-content: center; }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .guide-sidebar { display: none; }
+    .guide-layout { padding: 0 16px; }
+    .guide-main { padding-bottom: 48px; }
+  }
+  @media (max-width: 768px) {
+    .guide-hero h1 { font-size: 1.75rem; }
+    .steps-grid { grid-template-columns: 1fr; }
+    .format-grid { grid-template-columns: repeat(2, 1fr); }
+    .guide-hero { padding: 40px 16px 32px; }
+    .guide-layout { flex-direction: column; gap: 0; }
+  }
+
+  /* Scroll progress */
+  .scroll-progress {
+    position: fixed; top: 0; left: 0; height: 2px;
+    background: var(--accent); z-index: 100;
+    transition: width 0.1s linear;
+  }
+
+  /* Back to top */
+  .back-to-top {
+    position: fixed; bottom: 80px; right: 24px; z-index: 90;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0; pointer-events: none;
+    transform: translateY(12px);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .back-to-top.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .back-to-top:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+  .dark .back-to-top { box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+</style>
+</head>
+<body>
+
+<!-- Scroll Progress -->
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<!-- Back to Top -->
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" data-i18n-title="web.preview.backToTop" title="Back to top">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
+<!-- Guide Header -->
+<header class="guide-header">
+  <div class="guide-header-inner">
+    <a href="/" class="logo">
+      <img src="/assets/logo-dark.svg" alt="Doc77" height="32">
+    </a>
+    <div class="guide-header-actions">
+      <button onclick="toggleTheme()" class="guide-header-link" id="themeBtn" data-i18n-title="web.preview.sidebar.themeToggle" title="Toggle theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+      <a href="/" class="guide-header-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span data-i18n="web.guide.home">Home</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<div class="guide-hero">
+  <div class="guide-hero-inner">
+    <div class="guide-hero-label">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span data-i18n="web.guide.hero.label">GETTING STARTED</span>
+    </div>
+    <h1 data-i18n="web.guide.hero.title">Master Doc77 in 5 Minutes</h1>
+    <p>
+      <span data-i18n="web.guide.hero.desc1">Doc77 is a secure-by-default, conversation-driven local document management Agent.</span>
+      <br class="hidden sm:block">
+      <span data-i18n="web.guide.hero.desc2">From the file tree to the AI assistant, learn how each feature works.</span>
+    </p>
+    <div class="intro-actions">
+      <a href="#quickstart" class="intro-btn intro-btn-primary" style="background:#2563eb;color:#fff;border:none;padding:10px 22px;font-size:14px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span data-i18n="web.guide.hero.startBtn">Get Started</span>
+      </a>
+      <a href="/" class="intro-btn intro-btn-secondary" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);padding:10px 22px;font-size:14px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span data-i18n="web.guide.hero.registerBtn">Register Project</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Content Layout -->
+<div class="guide-layout">
+
+  <!-- Sidebar Nav -->
+  <nav class="guide-sidebar" id="guideSidebar">
+    <div class="guide-sidebar-title" data-i18n="web.guide.sidebar.title">Contents</div>
+    <a href="#quickstart" class="guide-nav-link" data-section="quickstart">
+      <span style="display:flex;align-items:center;gap:6px"><span>▶</span><span data-i18n="web.guide.sidebar.quickstart">Quick Start</span></span>
+    </a>
+    <a href="#sidebar" class="guide-nav-link" data-section="sidebar">
+      <span style="display:flex;align-items:center;gap:6px"><span>◀</span><span data-i18n="web.guide.sidebar.sidebar">Sidebar</span></span>
+    </a>
+    <a href="#toolbar" class="guide-nav-link" data-section="toolbar">
+      <span style="display:flex;align-items:center;gap:6px"><span>▶</span><span data-i18n="web.guide.sidebar.toolbar">Reading Toolbar</span></span>
+    </a>
+    <a href="#right-panel" class="guide-nav-link" data-section="right-panel">
+      <span style="display:flex;align-items:center;gap:6px"><span>📑</span><span data-i18n="web.guide.sidebar.rightPanel">Right Panel</span></span>
+    </a>
+    <a href="#dashboard" class="guide-nav-link" data-section="dashboard">
+      <span style="display:flex;align-items:center;gap:6px"><span>📊</span><span data-i18n="web.guide.sidebar.dashboard">Dashboard</span></span>
+    </a>
+    <a href="#formats" class="guide-nav-link" data-section="formats">
+      <span style="display:flex;align-items:center;gap:6px"><span>📝</span><span data-i18n="web.guide.sidebar.formats">Supported Formats</span></span>
+    </a>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="guide-main">
+
+    <!-- Section: Quick Start -->
+    <div class="guide-section" id="quickstart">
+      <div class="guide-section-header">
+        <div class="guide-section-badge" style="background:var(--accent-light-bg);color:var(--accent)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+        <h2 data-i18n="web.guide.quickstart.title">Quick Start</h2>
+      </div>
+      <p class="guide-section-desc" data-i18n="web.guide.quickstart.desc">Set up your environment in three steps and start managing documents with Doc77.</p>
+
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          📂
+          <h3 data-i18n="web.guide.quickstart.step1Title">Register a Project</h3>
+          <p data-i18n="web.guide.quickstart.step1Desc">Add a local document directory on the homepage. Doc77 remembers each project and automatically indexes its file structure.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">2</div>
+          📂
+          <h3 data-i18n="web.guide.quickstart.step2Title">Select a File</h3>
+          <p data-i18n="web.guide.quickstart.step2Desc">Browse and click files in the left file tree for instant preview. Supports favorites and quick access to recent files.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">3</div>
+          ✨
+          <h3 data-i18n="web.guide.quickstart.step3Title">Start Reading</h3>
+          <p data-i18n="web.guide.quickstart.step3Desc">Read, search, listen, AI summarize &mdash; an all-in-one document workspace that boosts your reading efficiency.</p>
+        </div>
+      </div>
+
+      <div class="feature-table-wrap">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border-light);background:var(--bg-hover)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:6px;height:6px;border-radius:50%;background:#22c55e"></div>
+            <span style="font-size:12px;font-weight:600;color:var(--text-secondary)" data-i18n="web.guide.quickstart.systemStatus">System Status</span>
+          </div>
+        </div>
+        <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusRunningLabel">Running Status</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-primary);font-weight:500">
+              <span style="width:8px;height:8px;border-radius:50%;background:#22c55e"></span>
+              <span data-i18n="web.guide.quickstart.statusRunningValue">Running</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusPortLabel">Service Port</div>
+            <div style="font-size:13px;color:var(--text-primary);font-weight:500;font-family:'SF Mono','Fira Code',monospace">27777</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusVersionLabel">Version</div>
+            <div style="font-size:13px;color:var(--text-primary);font-weight:500">0.7.0</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusBindLabel">Bind Address</div>
+            <div style="font-size:13px;color:var(--text-primary);font-weight:500;font-family:'SF Mono','Fira Code',monospace" id="guideBindAddr">0.0.0.0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Sidebar -->
+    <div class="guide-section" id="sidebar">
+      <div class="guide-section-header">
+        <div class="guide-section-badge" style="background:color-mix(in srgb, #8b5cf6 12%, transparent);color:#8b5cf6;font-size:16px">
+          ◀
+        </div>
+        <h2 data-i18n="web.guide.sidebarSection.title">Sidebar</h2>
+      </div>
+      <p class="guide-section-desc" data-i18n="web.guide.sidebarSection.desc">The left panel centralizes project switching, file navigation, search, and other core operations.</p>
+      <div class="feature-table-wrap">
+        <table class="feature-table">
+          <tbody>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">💼</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.switchProject">Switch Project</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.switchProjectDesc">Click the top button to switch between registered project directories. Each project manages its own file structure.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⭐</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.favorites">Favorites</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.favoritesDesc">Right-click a file to add it to favorites for quick access to frequently used documents. Click to open without navigating directories.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🕐</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.recent">Recent Files</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.recentDesc">Automatically tracks recently opened files for quick backtracking. No need to browse the tree every time.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.fileTree">File Tree</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.fileTreeDesc">Browse project folder structure. Click directories to expand or collapse, click files to preview content instantly.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔍</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.fileFilter">Filter Files</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.fileFilterDesc">Type keywords above the file tree to quickly locate target files. Supports fuzzy matching.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔎</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.globalSearch">Global Search</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.globalSearchDesc">Search all file content within the project (file names + full text). Press Enter to trigger, results are highlighted.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">◀</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.collapse">Collapse Sidebar</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.collapseDesc">Collapse the sidebar into a narrow strip (logo only) for more document reading space.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🌙</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.themeToggle">Theme</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.themeToggleDesc">Toggle between dark and light modes to match your reading environment and protect your eyes.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⚙</div></td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.settings">Settings</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.settingsDesc">Configure AI Token and model, network bind address, access password, editor, and other global options.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: Toolbar -->
+    <div class="guide-section" id="toolbar">
+      <div class="guide-section-header">
+        <div class="guide-section-badge" style="background:color-mix(in srgb, #059669 12%, transparent);color:#059669;font-size:16px">
+          ▶
+        </div>
+        <h2 data-i18n="web.guide.toolbar.title">Reading Toolbar</h2>
+      </div>
+      <p class="guide-section-desc" data-i18n="web.guide.toolbar.desc">The top toolbar provides rich reading aids for more efficient document browsing.</p>
+      <div class="feature-table-wrap">
+        <table class="feature-table">
+          <tbody>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔍</div></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.docSearch">Find in Document</td>
+              <td class="feature-desc">
+                <span data-i18n="web.guide.toolbar.docSearch.desc1">Search for keywords in the current document, supports </span>
+                <kbd>&uarr;</kbd> <kbd>&darr;</kbd>
+                <span data-i18n="web.guide.toolbar.docSearch.desc2"> to jump between matches. Shortcut </span>
+                <kbd>Ctrl+F</kbd>
+              </td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">▶</div></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.autoScroll">Auto Scroll</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.autoScrollDesc">Automatically scrolls down for hands-free reading with four speed settings (Slow / Medium / Fast / Instant).</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔊</div></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.tts">TTS Read Aloud</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.ttsDesc">Reads documents aloud with five speed settings (0.5x &mdash; 2x). Listen when your eyes are tired.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">✨</div></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.aiSummary">AI Summary</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.aiSummaryDesc">Generate a document summary with one click, with read-aloud support. Quickly understand the core content of long documents. Requires AI Token configuration.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">▶</div></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.runCode">Run Code</td>
+              <td class="feature-desc">
+                <span data-i18n="web.guide.toolbar.runCode.desc1">Open </span>
+                <kbd>.js</kbd>
+                <span data-i18n="web.guide.toolbar.runCode.desc2"> or </span>
+                <kbd>.py</kbd>
+                <span data-i18n="web.guide.toolbar.runCode.desc3"> files to run directly in the browser Sandbox or Pyodide (WASM).</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📝</div></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.editor">Open in Editor</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.editorDesc">Open the current file in VS Code or your system default editor for editing with one click.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.showInFolder">Show in Folder</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.showInFolderDesc">Locate and highlight the current file in the system file manager (Finder / File Explorer).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: Right Panel -->
+    <div class="guide-section" id="right-panel">
+      <div class="guide-section-header">
+        <div class="guide-section-badge" style="background:color-mix(in srgb, #d97706 12%, transparent);color:#d97706;font-size:16px">
+          📑
+        </div>
+        <h2 data-i18n="web.guide.rightPanel.title">Right Panel</h2>
+      </div>
+      <p class="guide-section-desc" data-i18n="web.guide.rightPanel.desc">The right panel integrates the AI assistant, document outline, and approval queue — the intelligent core of Doc77.</p>
+      <div class="feature-table-wrap">
+        <table class="feature-table">
+          <tbody>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📑</div></td>
+              <td class="feature-name" data-i18n="web.guide.rightPanel.outline">Document Outline</td>
+              <td class="feature-desc" data-i18n="web.guide.rightPanel.outlineDesc">Automatically generates a document structure navigation from Markdown headings. Click headings to quickly jump to the corresponding section.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">💬</div></td>
+              <td class="feature-name" data-i18n="web.guide.rightPanel.aiAssistant">AI Assistant</td>
+              <td class="feature-desc" data-i18n="web.guide.rightPanel.aiAssistantDesc">A conversational AI that can answer questions about the current document, request summaries, and plan batch file operations. Built on the MCP protocol, the AI can safely read and write files.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📋</div></td>
+              <td class="feature-name" data-i18n="web.guide.rightPanel.approval">Approval Queue</td>
+              <td class="feature-desc" data-i18n="web.guide.rightPanel.approvalDesc">MCP write operations (create/modify/delete files) enter the approval queue by default and are executed only after confirmation. Supports CLI and Web dual-channel approval with transaction rollback.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: Dashboard -->
+    <div class="guide-section" id="dashboard">
+      <div class="guide-section-header">
+        <div class="guide-section-badge" style="background:color-mix(in srgb, #2563eb 12%, transparent);color:#2563eb;font-size:16px">
+          📊
+        </div>
+        <h2 data-i18n="web.guide.dashboard.title">Dashboard</h2>
+      </div>
+      <p class="guide-section-desc" data-i18n="web.guide.dashboard.desc">The home dashboard provides project overview, statistics, and quick action shortcuts.</p>
+      <div class="feature-table-wrap">
+        <table class="feature-table">
+          <tbody>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🕐</div></td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.recent">Recent Browsing</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.recentDesc">View recently opened projects and files, jump with one click. Supports project-level and file-level history.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📊</div></td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.stats">Statistics</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.statsDesc">Displays key metrics at a glance: total projects, favorites count, last active time, and more.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⭐</div></td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.favorites">Favorite Projects</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.favoritesDesc">Starred favorite projects are showcased together, with quick unfollow support.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.projectList">Project List</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.projectListDesc">All projects displayed in grid or list view. Supports search, sorting (recent / name / created date), and view switching.</td>
+            </tr>
+            <tr>
+              <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">➕</div></td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.register">Register Project</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.registerDesc">Two ways to add a project: manually enter a path, or auto-scan directories to discover registerable project directories.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: Supported Formats -->
+    <div class="guide-section" id="formats">
+      <div class="guide-section-header">
+        <div class="guide-section-badge" style="background:color-mix(in srgb, #2563eb 12%, transparent);color:#2563eb;font-size:16px">
+          📝
+        </div>
+        <h2 data-i18n="web.guide.formats.title">Supported File Formats</h2>
+      </div>
+      <p class="guide-section-desc" data-i18n="web.guide.formats.desc">Doc77 supports previewing and editing a variety of document formats.</p>
+      <div class="format-grid">
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">📝</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.markdown">Markdown</div>
+          <div class="format-card-ext">.md .mdx</div>
+        </div>
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">📄</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.pdf">PDF Document</div>
+          <div class="format-card-ext">.pdf</div>
+        </div>
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">📊</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.office">Office Document</div>
+          <div class="format-card-ext">.docx .xlsx .xls</div>
+        </div>
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">🖼️</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.image">Image</div>
+          <div class="format-card-ext">.png .jpg .gif .svg .webp .avif</div>
+        </div>
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">🔀</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.mermaid">Mermaid Diagram</div>
+          <div class="format-card-ext">.mermaid .mmd</div>
+        </div>
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">💻</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.code">Code File</div>
+          <div class="format-card-ext" data-i18n="web.guide.formats.codeExt">44 programming languages</div>
+        </div>
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">▶️</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.executable">Executable Code</div>
+          <div class="format-card-ext">.js (Sandbox) .py (Pyodide)</div>
+        </div>
+        <div class="format-card">
+          <div class="format-card-icon" style="font-size:22px;line-height:1">📦</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.unsupported">Unsupported Format</div>
+          <div class="format-card-ext" data-i18n="web.guide.formats.unsupportedExt">Shows file info card</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="guide-cta">
+      <h2 data-i18n="web.guide.cta.title">Ready to get started?</h2>
+      <p data-i18n="web.guide.cta.desc">Register a local document directory and experience a new workflow with local preview and AI-driven management.</p>
+      <div class="intro-actions" style="justify-content:center">
+        <a href="/" class="intro-btn intro-btn-primary" style="padding:10px 24px;font-size:14px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span data-i18n="web.guide.cta.registerBtn">Register Your First Project</span>
+        </a>
+        <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="intro-btn intro-btn-secondary" style="padding:10px 24px;font-size:14px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- GitHub Star -->
+<a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener"
+   class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm font-medium no-underline hover:text-white"
+   data-i18n-title="web.guide.starLink" title="Star Doc77 on GitHub">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+  <span data-i18n="web.guide.starText">Star</span>
+</a>
+
+<script src="js/common.js"></script>
+<script>
+// Scroll progress bar + back to top
+var backBtn = document.getElementById('backToTop');
+window.addEventListener('scroll', function() {
+  var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+  var scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+  var progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+  document.getElementById('scrollProgress').style.width = progress + '%';
+  backBtn.classList.toggle('visible', scrollTop > 400);
+});
+
+// Active nav link tracking
+var sections = document.querySelectorAll('.guide-section');
+var navLinks = document.querySelectorAll('.guide-nav-link');
+window.addEventListener('scroll', function() {
+  var current = '';
+  sections.forEach(function(section) {
+    var top = section.offsetTop - 100;
+    if (window.scrollY >= top) {
+      current = section.getAttribute('id');
+    }
+  });
+  navLinks.forEach(function(link) {
+    link.classList.toggle('active', link.getAttribute('data-section') === current);
+  });
+});
+
+// Fetch server info for bind address
+fetch('/api/server-info').then(function(r) { return r.json(); }).then(function(info) {
+  var el = document.getElementById('guideBindAddr');
+  if (el && info.bindAddr) el.textContent = info.bindAddr;
+}).catch(function() {});
+</script>
+</body>
+</html>

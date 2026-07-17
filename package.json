@@ -1,28 +1,35 @@
 {
   "name": "doc77-monorepo",
-  "version": "0.1.0",
+  "version": "1.0.0-beta.1",
   "private": true,
   "type": "module",
   "description": "Doc77 — 默认安全、对话驱动的智能本地文档管理 Agent",
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "node scripts/sync-version.cjs && pnpm -r build",
+    "dev": "pnpm --filter @doc77/core dev",
+    "dev-electron": "node scripts/sync-version.cjs && pnpm --filter @doc77/core build && pnpm --filter @doc77/electron dev",
+    "electron:dev": "pnpm run dev-electron",
+    "dev:start": "fuser -k 27777/tcp 2>/dev/null; sleep 1; pnpm --filter @doc77/cli... build && node packages/cli/dist/bin/doc77.js start --bind 0.0.0.0",
+    "dev:restart": "fuser -k 27777/tcp 2>/dev/null; sleep 1; pnpm --filter @doc77/cli... build && node packages/cli/dist/bin/doc77.js start --bind 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint packages --ext .ts",
     "format": "prettier --write \"packages/**/*.ts\"",
     "format:check": "prettier --check \"packages/**/*.ts\"",
-    "clean": "pnpm -r clean"
+    "clean": "pnpm -r clean",
+    "check:i18n": "bash scripts/check-i18n.sh"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
     "prettier": "^3.5.0",
     "tsup": "^8.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.1.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0"
+    "vitest": "^3.1.0"
   },
   "engines": {
     "node": ">=22.0.0",

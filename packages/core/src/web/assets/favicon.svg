@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Document Base -->
+  <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#2563EB"/>
+  <!-- Folded Corner -->
+  <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA"/>
+  <!-- 77 Marks -->
+  <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- AI Sparkle -->
+  <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FCD34D"/>
+</svg>
