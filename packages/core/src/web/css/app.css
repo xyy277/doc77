@@ -1368,3 +1368,12 @@ mark { background: #fde68a; color: #1e293b; padding: 0 2px; border-radius: 2px; 
   #editBtn { display: none !important; }
 }
 
+/* ── Obsidian Wikilink ── */
+a.wikilink { color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent); }
+a.wikilink:hover { border-bottom-style: solid; }
+.wikilink-dead { color: var(--text-muted); opacity: 0.6; cursor: not-allowed; }
+
+/* ── Registration form checkbox ── */
+.checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+.checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
