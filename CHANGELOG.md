@@ -4,6 +4,46 @@
 
 ---
 
+## [2026-07-17] — `1.0.0-beta.1`
+
+### 全包 (`1.0.0-beta.1`)
+
+**Added**
+- 多语言 UI：简体中文 / English 内置双语，自动检测浏览器与系统语言，`~/.doc77/locales/<lang>.json` 外部语言包目录扩展任意语言（755+ 词条，六层覆盖：Web/CLI/API/MCP/AI/Electron）
+- 导出自包含 HTML：一键导出自包含 HTML（内联样式与图片、保留深浅主题底色、舒适留白），footer 链接更正为 GitHub 仓库
+- 局域网只读分享：创建分享链接（`/s/<token>`，二维码，可撤销），有效期可配置，敏感文件过滤
+- 离线翻译：Opus-MT ONNX 模型完全本地运行（en↔zh），自动语言检测（CJK 启发式），划词即译 + 长文档分段翻译
+- 项目导入增强：Obsidian vault（`[[wikilink]]` 解析）、Git 项目批量扫描注册、VS Code workspace 一键导入、技术栈标签识别
+- 移动伴侣：Dashboard 扫码直达手机版，mDNS 局域网发现，移动端自适应 UI
+- 多 tab 预览：多文档标签页（LRU 渲染缓存），临时文件拖放预览，轻量文本编辑（外部修改冲突检测）
+- Dashboard 快捷卡片：收藏夹计数、近期文件 strip、项目标签徽章、Obsidian 图标
+- AI 模型输入框：datalist 替代硬编码 select，支持自定义模型名称
+- 动态设置 tabs：系统/AI/账户/翻译/分享统一渲染（主页 + 预览页）
+- pre-commit 门禁扩展：`pnpm check:i18n` 覆盖硬编码中文扫描 + data-i18n 嵌套约束 + t 形参遮蔽检测
+
+**Changed**
+- 默认端口：CLI `2777 → 27777`，Electron 桌面版默认 `28888`（防止与 CLI 实例端口冲突）
+- 后端 t() 全局语言切换即时生效（不依赖重启），前端无覆盖时自动 reload
+- `getReadTools/getWriteTools` 工厂化（惰性求值，避免模块加载时序问题）
+- MCP tool descriptions 按全局语言本地化
+- AI system prompt 中英文双版本
+
+**Fixed**
+- `applyI18n` 用 textContent 替换文本导致嵌套子元素（`#favCount`/`#projCount`/`#pendingBadge`）被摧毁 → 移到内层纯文本 span；`check-i18n` 新增此类违规的门禁规则
+- `renderTabBar`/`loadTasks` 回调形参 `t` 遮蔽全局 i18n `t()` → 全仓重命名 + `check-i18n` 新增禁止规则
+- `createAIChatHandler` 工厂化解构丢失 `AiProvider`/`DocAgent` → 每次 AI 对话抛 ReferenceError
+- `translate()` 无实际语言检测，「文档」→ 英中模型 → 退化复读 → 新增 `detectLang()` + 同语言 no-op
+- 划词翻译 popup 8s 自动移除竞态：慢翻译结果渲染到已移除节点 → 点击翻译时取消空闲计时器
+- 导出产物尾部三处死链 `doc77.dev` → GitHub 仓库
+- index/preview.html 设置 tabs 不一致（preview 缺分享 tab、样式未对齐）
+- Dashboard QR 代码移入 hero 右侧，窄屏自动隐藏
+- `katexCss` 去掉 `href="about:blank"`（消除 `ERR_UNKNOWN_URL_SCHEME` 控制台噪音）
+- transformers.js MarianTokenizer 已知无害警告抑制
+
+**Design**（参考 spec）
+- 多语言化设计方案：`docs/superpowers/specs/2026-07-16-i18n-design.md`
+- 多语言化实施计划：`docs/superpowers/plans/2026-07-16-i18n.md`（18 tasks）
+
 ## [2026-07-16]
 
 ### @doc77/core `0.9.0`

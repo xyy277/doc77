@@ -59,28 +59,39 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Resolve npm dist-tag
+        id: dist_tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            echo "tag=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+          echo "dist-tag: $(cat "$GITHUB_OUTPUT")"
+
       - name: Publish @doc77/core
-        run: pnpm --filter @doc77/core publish --access public --no-git-checks
+        run: pnpm --filter @doc77/core publish --access public --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @doc77/mcp
-        run: pnpm --filter @doc77/mcp publish --access public --no-git-checks
+        run: pnpm --filter @doc77/mcp publish --access public --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @doc77/ai
-        run: pnpm --filter @doc77/ai publish --access public --no-git-checks
+        run: pnpm --filter @doc77/ai publish --access public --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @doc77/cli
-        run: pnpm --filter @doc77/cli publish --no-git-checks
+        run: pnpm --filter @doc77/cli publish --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish idoc77
-        run: pnpm --filter idoc77 publish --no-git-checks
+        run: pnpm --filter idoc77 publish --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -88,5 +99,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          prerelease: ${{ steps.dist_tag.outputs.tag != 'latest' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
