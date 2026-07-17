@@ -448,25 +448,30 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const db = getConnection();
     const projects = db
       .prepare(
-        `SELECT p.id, p.name, p.path, p.created_at, p.last_opened,
+        `SELECT p.id, p.name, p.path, p.obsidian_mode, p.created_at, p.last_opened,
               CASE WHEN f.project_id IS NOT NULL THEN 1 ELSE 0 END as favorited
        FROM projects p
        LEFT JOIN favorites f ON f.project_id = p.id
        ORDER BY p.name`,
       )
-      .all();
-    res.json(projects);
+      .all() as Array<Record<string, unknown>>;
+    res.json(
+      projects.map((p) => ({
+        ...p,
+        obsidian_mode: p.obsidian_mode === 1,
+      })),
+    );
   });
 
   app.post('/api/projects', (req: Request, res: Response) => {
-    const { name, path: projectPath } = req.body;
+    const { name, path: projectPath, obsidian_mode } = req.body;
     if (!name || !projectPath) {
       res.status(400).json({ error: 'name and path are required' });
       return;
     }
     try {
       const resolved = resolveProjectPath(projectPath);
-      const project = registerProject(name, resolved);
+      const project = registerProject(name, resolved, Boolean(obsidian_mode));
       res.status(201).json(project);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -491,18 +496,18 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   // Update project
   app.put('/api/projects/:id', (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
-    const { name, path: newPath } = req.body;
+    const { name, path: newPath, obsidian_mode } = req.body;
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid project id' });
       return;
     }
-    if (!name && !newPath) {
-      res.status(400).json({ error: 'name or path required' });
+    if (!name && !newPath && obsidian_mode === undefined) {
+      res.status(400).json({ error: 'name, path, or obsidian_mode required' });
       return;
     }
     try {
       const resolved = newPath ? resolveProjectPath(newPath) : undefined;
-      updateProject(id, { name, path: resolved });
+      updateProject(id, { name, path: resolved, obsidian_mode });
       res.json({ ok: true });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Unknown error';
@@ -936,13 +941,15 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
     try {
       const db = getConnection();
-      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
-        { path: string } | undefined;
+      const project = db.prepare('SELECT path, obsidian_mode FROM projects WHERE id = ?').get(projectId) as
+        { path: string; obsidian_mode: number } | undefined;
 
       if (!project) {
         res.status(404).json({ error: 'Project not found' });
         return;
       }
+
+      const obsidianMode = project.obsidian_mode === 1;
 
       const absPath = validatePath(project.path, filePath);
       const stats = fs.statSync(absPath);
@@ -1008,7 +1015,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
           res.json({
             path: filePath,
             type: 'markdown',
-            content: renderMarkdown(raw, { projectId, filePath }),
+            content: renderMarkdown(raw, { projectId, filePath, obsidianMode }),
             size: stats.size,
             modified: stats.mtime.toISOString(),
           });
