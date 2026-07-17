@@ -35,6 +35,14 @@ if [ $# -eq 0 ]; then
     echo "$NESTED"
     FAIL=1
   fi
+
+  # 4) 前端 JS 禁止用 t 作为回调形参（会遮蔽全局 t()，运行时 TypeError）
+  SHADOW=$(grep -rnP 'function\s*\(\s*t\s*[,)]' packages/core/src/web --include='*.js' 2>/dev/null || true)
+  if [ -n "$SHADOW" ]; then
+    echo "❌ 回调形参命名为 t 会遮蔽全局 i18n t()，请换名（tab/task/tag 等）:"
+    echo "$SHADOW"
+    FAIL=1
+  fi
 fi
 
 if [ $FAIL -eq 0 ]; then

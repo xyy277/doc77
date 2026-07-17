@@ -35,7 +35,7 @@ html:not(.tw-loading) .boot-overlay{display:none}
 })();
 </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme">
-<link rel="stylesheet" id="katexCss" href="about:blank" data-src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" id="katexCss" data-src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="css/app.css">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
@@ -252,12 +252,7 @@ html:not(.tw-loading) .boot-overlay{display:none}
       <span class="font-bold text-slate-800 dark:text-slate-100 text-lg" data-i18n="web.preview.settings.title">⚙ Settings</span>
       <button onclick="toggleSettings()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl">✕</button>
     </div>
-    <div class="flex border-b border-slate-200 dark:border-slate-700 shrink-0" id="settingsTabs">
-      <button onclick="switchSettingsTab('system')" class="flex-1 py-2.5 text-xs font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" data-tab="system" data-i18n="web.preview.settings.systemTab">💾 System</button>
-      <button onclick="switchSettingsTab('ai')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700" data-tab="ai" data-i18n="web.preview.settings.aiTab">🤖 AI</button>
-      <button onclick="switchSettingsTab('account')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700" data-tab="account" data-i18n="web.preview.settings.accountTab">👤 Account</button>
-      <button onclick="switchSettingsTab('translate')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700" data-tab="translate" data-i18n="web.preview.settings.translateTab">🌐 Translate</button>
-    </div>
+    <div class="flex border-b border-slate-200 dark:border-slate-700 shrink-0" id="settingsTabs"></div>
     <div class="flex-1 overflow-y-auto p-4 space-y-4" id="settingsContent"></div>
     <div class="p-3 border-t border-slate-200 dark:border-slate-700 shrink-0 flex gap-2">
       <button onclick="resetDefaults()" class="flex-1 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors" data-i18n="web.preview.settings.resetDefaults">Reset defaults</button>

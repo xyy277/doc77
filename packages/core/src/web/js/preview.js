@@ -720,19 +720,19 @@ function renderTabBar() {
   var tabs = tabStore.list();
   if (!tabs.length) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
   bar.classList.remove('hidden'); bar.classList.add('flex');
-  bar.innerHTML = tabs.map(function(t) {
-    var active = t.path === activeTabPath;
-    var isTemp = TempPreview.isTempPath(t.path);
+  bar.innerHTML = tabs.map(function(tab) {
+    var active = tab.path === activeTabPath;
+    var isTemp = TempPreview.isTempPath(tab.path);
     var cls = 'group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 my-1 rounded-md cursor-pointer text-xs whitespace-nowrap border transition-colors ' +
       (active ? 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 font-medium shadow-sm'
               : 'bg-transparent border-transparent text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60');
     var badge = isTemp ? '<span class="temp-badge">📎</span>' : '';
-    var tooltip = isTemp ? t('web.preview.tempPreviewTooltip') : escAttr(t.path);
-    return '<div class="' + cls + '" title="' + tooltip + '" onclick="onTabClick(event, \'' + escAttr(t.path) + '\')" onmousedown="onTabMouseDown(event, \'' + escAttr(t.path) + '\')">' +
-      '<span class="shrink-0">' + iconFor(t.title) + '</span>' +
+    var tooltip = isTemp ? t('web.preview.tempPreviewTooltip') : escAttr(tab.path);
+    return '<div class="' + cls + '" title="' + tooltip + '" onclick="onTabClick(event, \'' + escAttr(tab.path) + '\')" onmousedown="onTabMouseDown(event, \'' + escAttr(tab.path) + '\')">' +
+      '<span class="shrink-0">' + iconFor(tab.title) + '</span>' +
       badge +
-      '<span class="truncate max-w-[160px]">' + esc(t.title) + '</span>' +
-      '<button class="shrink-0 w-4 h-4 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-red-500" onclick="event.stopPropagation();closeTab(\'' + escAttr(t.path) + '\')" title="' + t('web.preview.close') + '">✕</button>' +
+      '<span class="truncate max-w-[160px]">' + esc(tab.title) + '</span>' +
+      '<button class="shrink-0 w-4 h-4 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-red-500" onclick="event.stopPropagation();closeTab(\'' + escAttr(tab.path) + '\')" title="' + t('web.preview.close') + '">✕</button>' +
       '</div>';
   }).join('');
 }
@@ -786,7 +786,7 @@ function syncTreeActive(path) {
 /** localStorage 持久化 tab 列表 + 活动 tab（排除临时 tab）。 */
 function saveTabsState() {
   try {
-    var allTabs = tabStore.list().map(function(t){ return t.path; });
+    var allTabs = tabStore.list().map(function(tab){ return tab.path; });
     var diskTabs = allTabs.filter(function(p){ return !TempPreview.isTempPath(p); });
     var diskActive = TempPreview.isTempPath(activeTabPath) ? null : activeTabPath;
     localStorage.setItem(tabsStorageKey(), JSON.stringify({ tabs: diskTabs, active: diskActive }));
@@ -1430,7 +1430,7 @@ function enterEditMode() {
   // Load editor with raw file content (cache-bust to avoid stale browser cache)
   fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile) + '&t=' + Date.now())
     .then(function(r) { return r.text(); })
-    .then(function(t) { if (editMode) initEditorInstance(t); })
+    .then(function(txt) { if (editMode) initEditorInstance(txt); })
     .catch(function() { if (editMode) initEditorInstance(''); });
 }
 
@@ -1801,18 +1801,18 @@ async function loadTasks() {
   var list = document.getElementById('queueList');
   try {
     var r = await fetch('/api/queue/status?project_id=' + pid); var tasks = await r.json();
-    var pending = tasks.filter(function(t){ return t.status === 'pending'; });
+    var pending = tasks.filter(function(task){ return task.status === 'pending'; });
     document.getElementById('pendingCount').textContent = pending.length;
     var b = document.getElementById('pendingBadge'); b.textContent = pending.length; b.classList.toggle('hidden', pending.length === 0);
     if (!tasks.length) { list.innerHTML = '<div class="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-2">✅<br>' + t('web.preview.queue.empty') + '</div>'; return; }
     var tl = {write_file:t('web.preview.queue.type.writeFile'),create_folder:t('web.preview.queue.type.createFolder'),move_file:t('web.preview.queue.type.moveFile'),delete_file:t('web.preview.queue.type.deleteFile'),batch_operations:t('web.preview.queue.type.batchOperations')};
     var tc = {write_file:'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',create_folder:'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',move_file:'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',delete_file:'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',batch_operations:'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'};
-    list.innerHTML = tasks.map(function(t){
-      var label = tl[t.operation_type]||t.operation_type, tcl = tc[t.operation_type]||'bg-slate-100 text-slate-700';
-      var isP = t.status==='pending', isX = t.status==='executing', isE = t.status==='executed', isR = t.status==='rejected';
+    list.innerHTML = tasks.map(function(task){
+      var label = tl[task.operation_type]||task.operation_type, tcl = tc[task.operation_type]||'bg-slate-100 text-slate-700';
+      var isP = task.status==='pending', isX = task.status==='executing', isE = task.status==='executed', isR = task.status==='rejected';
       var borderCls = isE?'border-emerald-200 bg-emerald-50/50':isR?'border-slate-200 bg-slate-50 opacity-60':isX?'border-blue-300 ring-2 ring-blue-100':'border-slate-200 hover:border-blue-300';
-      var stHtml = isP?'<div class="flex gap-1"><button onclick="approveTask(\''+t.id+'\')" class="p-1 text-green-600 hover:bg-green-100 rounded">✅</button><button onclick="rejectTask(\''+t.id+'\')" class="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded">✕</button></div>':isX?'<span class="text-xs font-bold text-blue-600">' + t('web.preview.task.executing') + '</span>':isE?'<span class="text-xs font-bold text-emerald-600">' + t('web.preview.task.executed') + '</span>':'<span class="text-xs font-bold text-slate-400">' + t('web.preview.task.rejected') + '</span>';
-      var d = typeof t.operation_data==='string'?JSON.parse(t.operation_data):t.operation_data;
+      var stHtml = isP?'<div class="flex gap-1"><button onclick="approveTask(\''+task.id+'\')" class="p-1 text-green-600 hover:bg-green-100 rounded">✅</button><button onclick="rejectTask(\''+task.id+'\')" class="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded">✕</button></div>':isX?'<span class="text-xs font-bold text-blue-600">' + t('web.preview.task.executing') + '</span>':isE?'<span class="text-xs font-bold text-emerald-600">' + t('web.preview.task.executed') + '</span>':'<span class="text-xs font-bold text-slate-400">' + t('web.preview.task.rejected') + '</span>';
+      var d = typeof task.operation_data==='string'?JSON.parse(task.operation_data):task.operation_data;
       var pi = ''; if (d.file_path) pi+='<div>📄 '+esc(d.file_path)+'</div>'; if (d.folder_path) pi+='<div>📁 '+esc(d.folder_path)+'</div>'; if (d.source) pi+='<div class="opacity-70 line-through">'+esc(d.source)+'</div>'; if (d.target) pi+='<div class="text-blue-700">→ '+esc(d.target)+'</div>';
       return '<div class="bg-white dark:bg-slate-800 border rounded-lg p-3 shadow-sm relative overflow-hidden '+borderCls+' '+(isX?'dark:border-blue-700':'dark:border-slate-700')+'">'+(isX?'<div class="absolute top-0 left-0 h-1 bg-blue-500 w-full" style="animation:pulse 1s infinite"></div>':'')+'<div class="flex items-start justify-between mb-2"><div class="flex items-center gap-1.5 text-xs font-semibold"><span class="'+tcl+' px-1.5 py-0.5 rounded text-[10px] font-bold">'+label+'</span></div>'+stHtml+'</div><div class="text-[11px] text-slate-600 dark:text-slate-400 space-y-1 font-mono bg-slate-50 dark:bg-slate-900 p-2 rounded border">'+ (pi||JSON.stringify(d)) +'</div></div>';
     }).join('');

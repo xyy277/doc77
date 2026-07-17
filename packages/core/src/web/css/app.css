@@ -504,6 +504,54 @@ body {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* Mobile companion QR — hero right side */
+.hero-qr-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  max-width: 340px;
+}
+.hero-qr-box {
+  width: 100px;
+  height: 100px;
+  background: var(--bg-body);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hero-qr-text {
+  flex: 1;
+  min-width: 0;
+}
+.hero-qr-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+.hero-qr-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.hero-qr-url {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: monospace;
+  word-break: break-all;
+}
+@media (max-width: 860px) {
+  #mobileCompanion {
+    display: none !important;
+  }
+}
 .hero-btn {
   display: inline-flex;
   align-items: center;

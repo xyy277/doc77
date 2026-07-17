@@ -158,10 +158,10 @@ function renderCompactCard(p, inFavorites) {
     var visible = tags.slice(0, 3);
     var extra = tags.length - 3;
     tagsHtml = '<div class="card-tags">' +
-      visible.map(function(t) {
-        var icon = TAG_ICONS[t] || '';
-        var label = TAG_LABELS[t] || t;
-        return '<span class="tag-badge tag-' + t + '">' + icon + ' ' + label + '</span>';
+      visible.map(function(tag) {
+        var icon = TAG_ICONS[tag] || '';
+        var label = TAG_LABELS[tag] || tag;
+        return '<span class="tag-badge tag-' + tag + '">' + icon + ' ' + label + '</span>';
       }).join('') +
       (extra > 0 ? '<span class="tag-badge tag-more">+' + extra + '</span>' : '') +
       '</div>';

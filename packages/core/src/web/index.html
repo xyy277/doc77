@@ -51,6 +51,20 @@
           <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="hero-btn hero-btn-outline">GitHub</a>
         </div>
       </div>
+      <!-- Mobile Companion QR (hero right side) -->
+      <div id="mobileCompanion" style="display:none">
+        <div class="hero-qr-card">
+          <div class="hero-qr-box" id="mobileQrContainer">
+            <div id="mobileQrCode" style="width:100px;height:100px"></div>
+          </div>
+          <div class="hero-qr-text">
+            <div class="hero-qr-title" data-i18n="web.index.mobileQr.viewOnPhone">📱 View on your phone</div>
+            <div class="hero-qr-desc" data-i18n="web.index.mobileQr.scanToAccess">Scan to access — no setup needed</div>
+            <div class="hero-qr-url" id="mobileUrlDisplay" data-i18n="web.index.status.loading">Loading...</div>
+          </div>
+          <button onclick="refreshMobileQR()" class="btn-icon" data-i18n-title="web.index.mobileQr.refresh" title="Refresh QR code" style="flex-shrink:0">🔄</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -100,22 +114,6 @@
     </div>
     <div class="project-grid" id="projGrid">
       <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text" data-i18n="web.dashboard.projectsEmpty">No projects yet. Click [+ Register project] to start</div><div class="empty-hint" data-i18n="web.dashboard.projectsEmptyHint">Or register via: doc77 register</div></div>
-    </div>
-  </div>
-
-  <!-- Mobile Companion QR -->
-  <div id="mobileCompanion" style="display:none">
-    <div class="section-title" style="margin-top:24px" data-i18n="web.index.mobileQr.title">📱 Mobile companion</div>
-    <div style="display:flex;gap:20px;align-items:center;background:var(--bg-card);border:1px solid var(--border-light);border-radius:12px;padding:16px 20px;margin-top:8px">
-      <div style="width:100px;height:100px;background:var(--bg-body);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="mobileQrContainer">
-        <div id="mobileQrCode" style="width:100px;height:100px"></div>
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;margin-bottom:4px" data-i18n="web.index.mobileQr.viewOnPhone">📱 View on your phone</div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px" data-i18n="web.index.mobileQr.scanToAccess">Scan to access — no setup needed</div>
-        <div style="font-size:11px;color:var(--text-muted);font-family:monospace" id="mobileUrlDisplay" data-i18n="web.index.status.loading">Loading...</div>
-      </div>
-      <button onclick="refreshMobileQR()" class="btn-icon" data-i18n-title="web.index.mobileQr.refresh" title="Refresh QR code" style="flex-shrink:0">🔄</button>
     </div>
   </div>
 

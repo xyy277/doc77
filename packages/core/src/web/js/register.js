@@ -97,11 +97,11 @@ window.doGitDiscover = async function () {
     candidates.innerHTML = d.repositories
       .map(function (repo) {
         var tagHtml = (repo.tags || [])
-          .map(function (t) {
+          .map(function (tag) {
             return (
               ' <span style="font-size:10px;opacity:0.7">' +
-              (TAG_ICONS[t] || '') +
-              (TAG_LABELS[t] || t) +
+              (TAG_ICONS[tag] || '') +
+              (TAG_LABELS[tag] || tag) +
               '</span>'
             );
           })
