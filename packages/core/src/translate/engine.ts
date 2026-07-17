@@ -73,7 +73,21 @@ async function getPipeline(modelRepoId: string): Promise<any> {
   configureEnvBase(tf);
   await configureEnvMirror(tf);
 
-  const pipe = await tf.pipeline('translation', modelRepoId, { quantized: true });
+  // transformers.js prints a known, benign warning when loading Marian
+  // (Opus-MT) tokenizers — no "fast" tokenizer implementation exists, so it
+  // falls back to its JS one. Suppress just that message while the pipeline
+  // is being constructed; everything else still reaches the console.
+  const origWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('MarianTokenizer')) return;
+    origWarn.apply(console, args);
+  };
+  let pipe;
+  try {
+    pipe = await tf.pipeline('translation', modelRepoId, { quantized: true });
+  } finally {
+    console.warn = origWarn;
+  }
   pipelineCache.set(modelRepoId, pipe);
   pipelineTimers.set(
     modelRepoId,
@@ -124,6 +138,19 @@ export async function isModelReady(pair: string): Promise<boolean> {
   return fs.existsSync(modelDir);
 }
 
+// ── Language detection ──────────────────────────────────────────────────
+
+/**
+ * Heuristic language detection for the supported zh/en pairs:
+ * CJK characters making up >20% of non-whitespace text → 'zh', else 'en'.
+ */
+export function detectLang(text: string): 'zh' | 'en' {
+  const nonSpace = text.replace(/\s/g, '');
+  if (!nonSpace) return 'en';
+  const cjk = (nonSpace.match(/[一-鿿㐀-䶿]/g) || []).length;
+  return cjk / nonSpace.length > 0.2 ? 'zh' : 'en';
+}
+
 export async function translate(
   text: string,
   sourceLang: string,
@@ -131,14 +158,29 @@ export async function translate(
 ): Promise<TranslationResult> {
   const { MODEL_PAIRS } = await import('./models.js');
 
-  let modelInfo = MODEL_PAIRS[`${sourceLang}-${targetLang}`];
+  // Resolve 'auto' via detection — Marian models produce degenerate output
+  // (token repetition) when fed the wrong source language.
+  const resolvedSource = sourceLang === 'auto' ? detectLang(text) : sourceLang;
+
+  // Same language → no translation needed; return the text unchanged.
+  if (resolvedSource === targetLang) {
+    return {
+      translated_text: text,
+      source_lang: resolvedSource,
+      target_lang: targetLang,
+      model: 'noop',
+      duration_ms: 0,
+    };
+  }
+
+  let modelInfo = MODEL_PAIRS[`${resolvedSource}-${targetLang}`];
   if (!modelInfo) {
     const candidates = Object.values(MODEL_PAIRS).filter(
-      (m) => m.sourceLang === sourceLang || sourceLang === 'auto',
+      (m) => m.targetLang === targetLang && m.sourceLang === resolvedSource,
     );
     if (candidates.length > 0) modelInfo = candidates[0];
   }
-  if (!modelInfo) throw new Error(`Unsupported language pair: ${sourceLang} → ${targetLang}`);
+  if (!modelInfo) throw new Error(`Unsupported language pair: ${resolvedSource} → ${targetLang}`);
 
   const startTime = Date.now();
 

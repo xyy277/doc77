@@ -1153,6 +1153,7 @@ function exitTranslateMode() {
     btn.textContent = t('web.preview.translateSelected');
     btn.style.cssText = 'padding:4px 10px;border:none;border-radius:6px;cursor:pointer;background:var(--accent);color:#fff;font-size:12px;white-space:nowrap';
     btn.onclick = async function() {
+      clearTimeout(autoRemove);
       btn.textContent = t('web.preview.translating'); btn.disabled = true;
       try {
         var r = await fetch('/api/translate', {
@@ -1169,7 +1170,9 @@ function exitTranslateMode() {
     };
     popup.appendChild(btn);
     document.body.appendChild(popup);
-    setTimeout(function() { if (document.getElementById('translatePopup')) popup.remove(); }, 8000);
+    // Auto-dismiss only while idle — cancelled once a translation starts,
+    // otherwise a slow (>8s) translation would render into a removed node.
+    var autoRemove = setTimeout(function() { if (document.getElementById('translatePopup')) popup.remove(); }, 8000);
     var dismiss = function(ev) { if (popup && !popup.contains(ev.target)) { popup.remove(); document.removeEventListener('click', dismiss); } };
     setTimeout(function() { document.addEventListener('click', dismiss); }, 100);
   });
