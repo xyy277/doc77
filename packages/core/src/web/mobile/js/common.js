@@ -224,3 +224,29 @@ document.cookie = 'doc77-desktop=;path=/;max-age=0';
     document.documentElement.classList.add('dark');
   }
 })();
+
+//══════════ Language Settings (for mobile settings page) ══════════
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function langSelect(id, defaultLabelKey) {
+  var opts = '<option value="">' + t(defaultLabelKey) + '</option>';
+  (window.__doc77_locales || []).forEach(function (l) {
+    opts += '<option value="' + escapeHtml(l.code) + '">' + escapeHtml(l.name) + '</option>';
+  });
+  return '<select id="' + id + '" onchange="onLangChange(this)" style="font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-card);color:var(--text-primary);max-width:200px">' + opts + '</select>';
+}
+function onLangChange(sel) {
+  if (sel.id === 'uiLangSelect') {
+    if (sel.value) localStorage.setItem('doc77_lang', sel.value);
+    else localStorage.removeItem('doc77_lang');
+    location.reload();
+  } else {
+    fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'locale.language', value: sel.value }),
+    }).then(function () { toast(t('common.settings.globalLangSaved')); })
+      .catch(function(){ toast(t('common.settings.globalLangSaveFailed')); });
+  }
+}

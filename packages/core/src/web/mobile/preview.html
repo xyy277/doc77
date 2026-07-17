@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <base href="/mobile/">
-<title>预览</title>
+<title data-i18n="web.mobile.preview.pageTitle">Preview</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <style>
   /* ══════════ Theme Tokens ══════════ */
@@ -273,10 +273,10 @@
 
     <!-- Header -->
     <div class="header">
-      <button class="btn-back" onclick="goBack()" title="返回">←</button>
+      <button class="btn-back" onclick="goBack()" data-i18n-title="web.mobile.preview.back">←</button>
       <img id="siteLogo" src="/assets/logo.svg" alt="Doc77" height="28" class="header-logo" onclick="location.href='/'" style="cursor:pointer">
-      <div class="proj-title" id="titleBar">加载中…</div>
-      <button class="btn-icon" onclick="toggleTheme()" title="主题" id="themeIcon">🌙</button>
+      <div class="proj-title" id="titleBar" data-i18n="web.preview.loading">Loading...</div>
+      <button class="btn-icon" onclick="toggleTheme()" data-i18n-title="web.index.theme.toggle" id="themeIcon">🌙</button>
     </div>
 
     <!-- Breadcrumb -->
@@ -284,7 +284,7 @@
 
     <!-- File list -->
     <div class="file-list" id="fileList">
-      <div class="loading">加载中…</div>
+      <div class="loading" data-i18n="web.preview.loading">Loading...</div>
     </div>
 
     <!-- Content viewer -->
@@ -293,16 +293,16 @@
     <!-- Reader Bottom Toolbar -->
     <div class="reader-toolbar" id="readerToolbar">
       <button class="toolbar-btn" id="btnToc" onclick="toggleToc()">
-        <span class="tb-icon">📑</span><span>大纲</span>
+        <span class="tb-icon">📑</span><span data-i18n="web.mobile.preview.outline">Outline</span>
       </button>
       <button class="toolbar-btn" id="btnFontSize" onclick="cycleFontSize()">
-        <span class="tb-icon">🔤</span><span id="fontSizeLabel">标准</span>
+        <span class="tb-icon">🔤</span><span id="fontSizeLabel" data-i18n="web.mobile.preview.fontSizeNormal">Normal</span>
       </button>
       <button class="toolbar-btn" id="btnAutoScroll" onclick="toggleAutoScroll()">
-        <span class="tb-icon" id="autoScrollIcon">▶</span><span id="autoScrollLabel">阅读</span>
+        <span class="tb-icon" id="autoScrollIcon">▶</span><span id="autoScrollLabel" data-i18n="web.mobile.preview.autoScroll">Read</span>
       </button>
       <button class="toolbar-btn" onclick="toggleTheme()">
-        <span class="tb-icon" id="readerThemeIcon">🌙</span><span>深色</span>
+        <span class="tb-icon" id="readerThemeIcon">🌙</span><span data-i18n="web.mobile.preview.darkTheme">Dark</span>
       </button>
     </div>
     <!-- Auto-scroll speed slider -->
@@ -310,12 +310,12 @@
       <span style="font-size:12px">🐢</span>
       <input type="range" id="scrollSpeed" min="1" max="5" value="3" oninput="onSpeedChange(this.value)">
       <span style="font-size:12px">🐇</span>
-      <span class="speed-label" id="speedLabel">标准</span>
+      <span class="speed-label" id="speedLabel" data-i18n="web.mobile.preview.speedNormal">Normal</span>
     </div>
 
     <!-- TOC Drawer -->
     <div class="toc-drawer" id="tocDrawer">
-      <div class="toc-drawer-title">文档大纲</div>
+      <div class="toc-drawer-title" data-i18n="web.preview.outline.title">Document Outline</div>
       <div id="tocContent"></div>
     </div>
   </div>
@@ -331,6 +331,12 @@
     var proj = null;
     var currentPath = '';
     var currentFile = null;
+    var fontSizeIdx = 1; // 0=small, 1=medium, 2=large
+    var fontSizeLabels = [];
+    var fontSizeClasses = ['font-sm', 'font-md', 'font-lg'];
+    var autoScrollRAF = null, autoScrollActive = false, autoScrollSpeed = 60;
+    var speedLabels = [];
+    var speedValues = [20, 40, 60, 90, 130]; // px/s
 
     function boot() {
       if (!sessionStorage.getItem('doc77-auth')) {
@@ -350,18 +356,17 @@
         var r = await fetch('/api/projects');
         var projects = await r.json();
         proj = projects.find(function (p) { return p.id === parseInt(pid); });
-        if (!proj) { document.getElementById('fileList').innerHTML = '<div class="empty">项目未找到</div>'; return; }
+        if (!proj) { document.getElementById('fileList').innerHTML = '<div class="empty">' + t('web.preview.projectNotFound') + '</div>'; return; }
         document.getElementById('titleBar').textContent = proj.name;
         document.title = proj.name;
         if (directPath) {
-          // Open specific file from recent/docs link
           var fileName = directPath.split('/').pop();
           openFile(directPath, fileName);
         } else {
           loadTree('');
         }
       } catch (e) {
-        document.getElementById('fileList').innerHTML = '<div class="empty">⚠️ 加载失败</div>';
+        document.getElementById('fileList').innerHTML = '<div class="empty">⚠️ ' + t('web.preview.loadFailed') + '</div>';
       }
     }
 
@@ -373,11 +378,11 @@
       renderBreadcrumb();
 
       var list = document.getElementById('fileList');
-      list.innerHTML = '<div class="loading">加载中…</div>';
+      list.innerHTML = '<div class="loading">' + t('web.preview.loading') + '</div>';
       try {
         var r = await fetch('/api/tree/' + pid + '?path=' + encodeURIComponent(dirPath));
         var data = await r.json();
-        if (!data || !data.entries) { list.innerHTML = '<div class="empty">📭 空目录</div>'; return; }
+        if (!data || !data.entries) { list.innerHTML = '<div class="empty">📭 ' + t('web.preview.emptyDir') + '</div>'; return; }
 
         var children = data.entries.slice();
         children.sort(function (a, b) {
@@ -404,15 +409,14 @@
         });
         list.innerHTML = html;
       } catch (e) {
-        list.innerHTML = '<div class="empty">⚠️ 加载失败</div>';
+        list.innerHTML = '<div class="empty">⚠️ ' + t('web.preview.loadFailed') + '</div>';
       }
     }
 
     async function openFile(filePath, fileName) {
       currentFile = { path: filePath, name: fileName };
-      // Derive currentPath from filePath for breadcrumb
       var parts = filePath.split('/');
-      parts.pop(); // remove filename
+      parts.pop();
       currentPath = parts.join('/');
       document.getElementById('fileList').style.display = 'none';
       document.getElementById('contentViewer').style.display = 'block';
@@ -420,10 +424,9 @@
       renderBreadcrumb();
 
       var cv = document.getElementById('contentViewer');
-      cv.innerHTML = '<div class="loading">加载中…</div>';
+      cv.innerHTML = '<div class="loading">' + t('web.preview.loading') + '</div>';
       trackRecent(fileName, filePath);
 
-      // Server-side tracking via POST /api/recent-files (fire-and-forget)
       try {
         fetch('/api/recent-files', {
           method: 'POST',
@@ -434,11 +437,11 @@
 
       try {
         var r = await fetch('/api/content/' + pid + '?path=' + encodeURIComponent(filePath));
-        if (!r.ok) { cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">⚠️</div><p>无法加载文件</p></div>'; return; }
+        if (!r.ok) { cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">⚠️</div><p>' + t('web.preview.fileLoadFailed') + '</p></div>'; return; }
         var d = await r.json();
         if (d.type === 'pdf') {
           cv.innerHTML = '<div class="pdf-wrapper" id="pdfContainer">' +
-            '<button class="pdf-fullscreen-btn" onclick="togglePdfFullscreen()" title="全屏">⛶</button>' +
+            '<button class="pdf-fullscreen-btn" onclick="togglePdfFullscreen()" title="' + t('web.preview.htmlToggle.fullscreen') + '">⛶</button>' +
             '<iframe src="' + escAttr(d.rawUrl) + '"></iframe></div>';
         } else if (d.type === 'image') {
           cv.innerHTML = '<div class="img-preview"><img src="' + escAttr(d.rawUrl) + '" alt="' + escAttr(fileName) + '"></div>';
@@ -446,23 +449,22 @@
           var isHtml = /\.html?$/i.test(fileName);
           if (isHtml && d.rawUrl) {
             cv.innerHTML = '<div style="position:relative"><div id="htmlCodeView">' + d.content + '</div>' +
-              '<button id="htmlToggleBtn" onclick="toggleHtmlView()" style="position:absolute;top:8px;right:8px;z-index:5;padding:6px 14px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-card);color:var(--text-primary);font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1)">👁 预览</button></div>' +
+              '<button id="htmlToggleBtn" onclick="toggleHtmlView()" style="position:absolute;top:8px;right:8px;z-index:5;padding:6px 14px;border:1px solid var(--border-light);border-radius:8px;background:var(--bg-card);color:var(--text-primary);font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1)">' + t('web.preview.htmlToggle.preview') + '</button></div>' +
               '<div id="htmlPreview" style="display:none"><div class="pdf-wrapper" id="htmlPreviewContainer">' +
-              '<button class="pdf-fullscreen-btn" onclick="toggleHtmlFullscreen()" title="全屏">⛶</button>' +
+              '<button class="pdf-fullscreen-btn" onclick="toggleHtmlFullscreen()" title="' + t('web.preview.htmlToggle.fullscreen') + '">⛶</button>' +
               '<iframe src="' + escAttr(d.rawUrl) + '"></iframe></div></div>';
           } else {
             cv.innerHTML = d.content;
           }
         } else {
-          cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">📄</div><p>暂不支持预览此文件类型</p></div>';
+          cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">📄</div><p>' + t('web.preview.unsupportedFormat') + '</p></div>';
         }
         fixMermaidTheme();
       } catch (e) {
-        cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">⚠️</div><p>加载失败</p></div>';
+        cv.innerHTML = '<div class="renderer-placeholder"><div class="icon">⚠️</div><p>' + t('web.preview.loadFailed') + '</p></div>';
       }
     }
 
-    // ── Breadcrumb (B2/B6 fixed: CSS classes instead of inline styles) ──
     function renderBreadcrumb() {
       var bc = document.getElementById('breadcrumb');
       var parts = currentPath ? currentPath.split('/') : [];
@@ -526,7 +528,7 @@
       origToggle();
       var isDark = document.documentElement.classList.contains('dark');
       var icon = isDark ? '☀️' : '🌙';
-      var label = isDark ? '浅色' : '深色';
+      var label = isDark ? t('web.mobile.themeLabel.light') : t('web.mobile.themeLabel.dark');
       var logo = document.getElementById('siteLogo');
       if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
       document.getElementById('themeIcon').textContent = icon;
@@ -536,20 +538,8 @@
       if (toolbarBtn) toolbarBtn.textContent = label;
       if (currentFile) fixMermaidTheme();
     };
-    (function(){
-      var isDark = document.documentElement.classList.contains('dark');
-      var icon = isDark ? '☀️' : '🌙';
-      var logo = document.getElementById('siteLogo');
-      if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
-      document.getElementById('themeIcon').textContent = icon;
-      var readerIcon = document.getElementById('readerThemeIcon');
-      if (readerIcon) readerIcon.textContent = icon;
-    })();
 
     // ── Reader Toolbar ──
-    var fontSizeIdx = 1; // 0=small, 1=medium, 2=large
-    var fontSizeLabels = ['小', '标准', '大'];
-    var fontSizeClasses = ['font-sm', 'font-md', 'font-lg'];
 
     function getSafeAreaBottom() {
       var val = getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)');
@@ -561,7 +551,6 @@
       document.getElementById('contentViewer').style.paddingBottom = (80 + getSafeAreaBottom()) + 'px';
     }
     function hideReaderToolbar() {
-      // Stop auto-scroll if active
       if (autoScrollActive) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; autoScrollActive = false; }
       document.getElementById('readerToolbar').classList.remove('visible');
       document.getElementById('tocDrawer').classList.remove('visible');
@@ -594,18 +583,17 @@
     function buildToc() {
       var toc = document.getElementById('tocContent');
       var headings = document.querySelectorAll('#contentViewer h1, #contentViewer h2, #contentViewer h3');
-      if (!headings.length) { toc.innerHTML = '<div class="toc-item" style="color:var(--text-muted)">无标题</div>'; return; }
+      if (!headings.length) { toc.innerHTML = '<div class="toc-item" style="color:var(--text-muted)">' + t('web.mobile.preview.noHeadings') + '</div>'; return; }
       var html = '';
       headings.forEach(function (h, i) {
         var level = h.tagName.toLowerCase();
         var text = h.textContent.trim();
         if (!text) return;
-        // Add id to heading for scroll-to
         var id = 'heading-' + i;
         h.id = id;
         html += '<button class="toc-item ' + level + '" onclick="scrollToHeading(\'' + id + '\')">' + esc(text) + '</button>';
       });
-      toc.innerHTML = html || '<div class="toc-item" style="color:var(--text-muted)">无标题</div>';
+      toc.innerHTML = html || '<div class="toc-item" style="color:var(--text-muted)">' + t('web.mobile.preview.noHeadings') + '</div>';
     }
 
     window.scrollToHeading = function (id) {
@@ -616,9 +604,6 @@
     };
 
     // ── Auto-scroll ──
-    var autoScrollRAF = null, autoScrollActive = false, autoScrollSpeed = 60;
-    var speedLabels = ['慢', '较慢', '标准', '较快', '快'];
-    var speedValues = [20, 40, 60, 90, 130]; // px/s
 
     window.toggleAutoScroll = function () {
       if (autoScrollActive) {
@@ -626,24 +611,22 @@
         autoScrollRAF = null;
         autoScrollActive = false;
         document.getElementById('autoScrollIcon').textContent = '▶';
-        document.getElementById('autoScrollLabel').textContent = '阅读';
+        document.getElementById('autoScrollLabel').textContent = t('web.mobile.preview.autoScroll');
         document.getElementById('btnAutoScroll').classList.remove('active');
         document.getElementById('speedSliderWrap').classList.remove('visible');
-        // Restore toolbar-only padding
         document.getElementById('contentViewer').style.paddingBottom = (80 + getSafeAreaBottom()) + 'px';
         return;
       }
       var cv = document.getElementById('contentViewer');
       if (cv.scrollHeight <= cv.clientHeight + 50) {
-        toast('内容太短，无需滚动', 'info');
+        toast(t('web.mobile.preview.tooShort'), 'info');
         return;
       }
       autoScrollActive = true;
       document.getElementById('autoScrollIcon').textContent = '⏸';
-      document.getElementById('autoScrollLabel').textContent = '暂停';
+      document.getElementById('autoScrollLabel').textContent = t('web.mobile.preview.autoScrollPause');
       document.getElementById('btnAutoScroll').classList.add('active');
       document.getElementById('speedSliderWrap').classList.add('visible');
-      // Make room for toolbar + speed slider + safe area
       document.getElementById('contentViewer').style.paddingBottom = (124 + getSafeAreaBottom()) + 'px';
 
       var lastTime = performance.now();
@@ -666,10 +649,10 @@
       if (!codeView || !preview) return;
       if (preview.style.display === 'none') {
         codeView.style.display = 'none'; preview.style.display = 'block';
-        if (btn) btn.textContent = '💻 代码';
+        if (btn) btn.textContent = t('web.preview.htmlToggle.code');
       } else {
         codeView.style.display = 'block'; preview.style.display = 'none';
-        if (btn) btn.textContent = '👁 预览';
+        if (btn) btn.textContent = t('web.preview.htmlToggle.preview');
       }
     };
     window.toggleHtmlFullscreen = function () {
@@ -706,14 +689,6 @@
       document.getElementById('speedLabel').textContent = speedLabels[parseInt(val) - 1];
     };
 
-    // Init reader font size from localStorage
-    (function () {
-      var saved = localStorage.getItem('doc77-reader-font-size');
-      if (saved) { fontSizeIdx = parseInt(saved) || 1; }
-      document.getElementById('contentViewer').classList.add(fontSizeClasses[fontSizeIdx]);
-      document.getElementById('fontSizeLabel').textContent = fontSizeLabels[fontSizeIdx];
-    })();
-
     function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function escAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
     function formatSize(bytes) {
@@ -733,7 +708,36 @@
       return '📄';
     }
 
-    boot();
+    // ── Gate on i18n ready ──
+    window.__doc77_i18n_ready.then(function () {
+      // Init theme icons
+      (function(){
+        var isDark = document.documentElement.classList.contains('dark');
+        var icon = isDark ? '☀️' : '🌙';
+        var logo = document.getElementById('siteLogo');
+        if (logo) logo.src = isDark ? '/assets/logo-dark.svg' : '/assets/logo.svg';
+        document.getElementById('themeIcon').textContent = icon;
+        var readerIcon = document.getElementById('readerThemeIcon');
+        if (readerIcon) readerIcon.textContent = icon;
+      })();
+
+      // Init i18n labels arrays
+      fontSizeLabels = [t('web.mobile.preview.fontSizeSmall'), t('web.mobile.preview.fontSizeNormal'), t('web.mobile.preview.fontSizeLarge')];
+      speedLabels = [t('web.mobile.preview.speedSlow'), t('web.mobile.preview.speedSlower'), t('web.mobile.preview.speedNormal'), t('web.mobile.preview.speedFaster'), t('web.mobile.preview.speedFast')];
+
+      // Init reader font size from localStorage
+      (function () {
+        var saved = localStorage.getItem('doc77-reader-font-size');
+        if (saved) { fontSizeIdx = parseInt(saved) || 1; }
+        document.getElementById('contentViewer').classList.add(fontSizeClasses[fontSizeIdx]);
+        document.getElementById('fontSizeLabel').textContent = fontSizeLabels[fontSizeIdx];
+      })();
+
+      // Init speed label (default value=3 → normal)
+      document.getElementById('speedLabel').textContent = speedLabels[2];
+
+      boot();
+    });
   </script>
 </body>
 </html>
