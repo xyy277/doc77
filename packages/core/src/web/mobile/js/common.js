@@ -1,7 +1,46 @@
 /**
- * Doc77 Mobile — Shared utilities (auth gate, theme, toast, settings, loading).
+ * Doc77 Mobile — Shared utilities (auth gate, theme, toast, settings, loading, i18n runtime).
  * Loaded by both mobile/index.html and mobile/preview.html.
  */
+
+//══════════ i18n ══════════
+window.__doc77_dict = {};
+window.t = function (key, params) {
+  var v = window.__doc77_dict[key] || key;
+  return v.replace(/\{(\w+)\}/g, function (m, name) {
+    return params && name in params ? String(params[name]) : m;
+  });
+};
+window.applyI18n = function (root) {
+  root = root || document;
+  root.querySelectorAll('[data-i18n]').forEach(function (el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  root.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  root.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+};
+window.__doc77_i18n_ready = fetch('/api/i18n?' + (function () {
+  var o = localStorage.getItem('doc77_lang');
+  return o ? 'lang=' + encodeURIComponent(o)
+           : 'hint=' + encodeURIComponent(navigator.language || '');
+})()).then(function (r) { return r.json(); }).then(function (d) {
+  window.__doc77_dict = d.dict;
+  window.__doc77_lang = d.lang;
+  window.__doc77_locales = d.available;
+  window.__doc77_lang_global = d.global;
+  document.documentElement.lang = d.lang;
+}).catch(function () {}).then(function () {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { applyI18n(); });
+  } else {
+    applyI18n();
+  }
+  document.documentElement.classList.remove('i18n-loading');
+});
 
 //══════════ Global Loading Overlay ══════════
 var _loadingOverlay = null;

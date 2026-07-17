@@ -1,0 +1,10 @@
+{
+  "_meta": { "code": "en-US", "name": "English" },
+  "test.hello": "Hello",
+  "test.sized": "Limit {maxSizeMB}MB",
+  "common.settings.uiLang": "Interface language (this browser)",
+  "common.settings.globalLang": "Global language (server / AI / CLI)",
+  "common.settings.followGlobal": "Follow global",
+  "common.settings.autoDetect": "Auto-detect",
+  "common.settings.globalLangSaved": "Saved. Restart the service for MCP tool descriptions to take effect"
+}

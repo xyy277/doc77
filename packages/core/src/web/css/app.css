@@ -1354,3 +1354,6 @@ mark { background: #fde68a; color: #1e293b; padding: 0 2px; border-radius: 2px; 
   #editBtn { display: none !important; }
 }
 
+/* ── Share Card ── */
+#shareCard { z-index: 9999 !important; }
+#shareCard button:active { transform: scale(0.96); }

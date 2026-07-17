@@ -1,7 +1,46 @@
 /**
  * Doc77 Common JS — 被 index.html 和 preview.html 共享
- * 包含: Theme, Toast/Confirm, Settings, Login Gate, Helpers
+ * 包含: Theme, Toast/Confirm, Settings, Login Gate, Helpers, i18n Runtime
  */
+
+//══════════ i18n ══════════
+window.__doc77_dict = {};
+window.t = function (key, params) {
+  var v = window.__doc77_dict[key] || key;
+  return v.replace(/\{(\w+)\}/g, function (m, name) {
+    return params && name in params ? String(params[name]) : m;
+  });
+};
+window.applyI18n = function (root) {
+  root = root || document;
+  root.querySelectorAll('[data-i18n]').forEach(function (el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  root.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  root.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+};
+window.__doc77_i18n_ready = fetch('/api/i18n?' + (function () {
+  var o = localStorage.getItem('doc77_lang');
+  return o ? 'lang=' + encodeURIComponent(o)
+           : 'hint=' + encodeURIComponent(navigator.language || '');
+})()).then(function (r) { return r.json(); }).then(function (d) {
+  window.__doc77_dict = d.dict;
+  window.__doc77_lang = d.lang;
+  window.__doc77_locales = d.available;
+  window.__doc77_lang_global = d.global;
+  document.documentElement.lang = d.lang;
+}).catch(function () {}).then(function () {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { applyI18n(); });
+  } else {
+    applyI18n();
+  }
+  document.documentElement.classList.remove('i18n-loading');
+});
 
 // Module capabilities
 window.__doc77_caps_ai = false;
@@ -245,6 +284,11 @@ function switchSettingsTab(tab) {
   if (!c) return;
   if (tab === 'system') {
     c.innerHTML =
+      '<div class="section-title">语言</div>' +
+      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.uiLang">界面语言（本浏览器）</span>' +
+        langSelect('uiLangSelect') + '</div>' +
+      '<div class="settings-row"><span class="settings-label" data-i18n="common.settings.globalLang">全局语言（服务器/AI/CLI）</span>' +
+        langSelect('globalLangSelect') + '</div>' +
       '<div class="section-title">编辑器</div>' +
       settingRow('默认编辑器','editor.default','text','vscode') +
       '<div class="section-title" style="margin-top:16px">事务</div>' +
@@ -326,8 +370,16 @@ function switchSettingsTab(tab) {
       '<div id="translateModelStatus" style="font-size:11px;color:var(--text-muted);margin-bottom:8px">检查中...</div>' +
       '<button onclick="downloadTranslateModels()" id="btnDownloadModels" class="btn" style="width:100%;margin-top:4px;font-size:12px">📥 下载翻译模型 (~160MB)</button>';
     checkTranslateStatus();
+  } else if (tab === 'share') {
+    loadActiveShares(c);
   }
   loadSettingsValues();
+  // 回填语言下拉选值 + 翻译设置面板内的 data-i18n
+  var uiSel = document.getElementById('uiLangSelect');
+  if (uiSel) uiSel.value = window.__doc77_lang || '';
+  var gSel = document.getElementById('globalLangSelect');
+  if (gSel) gSel.value = window.__doc77_lang_global || '';
+  applyI18n(c);
 }
 
 async function loadServerInfo() {
@@ -376,6 +428,28 @@ function toggleSwitch(btn) {
   btn.querySelector('span').classList.toggle('on', btn.dataset.value === 'true');
 }
 function togglePasswordView(btn) { var i = btn.previousElementSibling; i.type = i.type === 'password' ? 'text' : 'password'; }
+
+function langSelect(id) {
+  var opts = '<option value="">' + t('common.settings.followGlobal') + '</option>';
+  (window.__doc77_locales || []).forEach(function (l) {
+    opts += '<option value="' + l.code + '">' + l.name + '</option>';
+  });
+  return '<select id="' + id + '" onchange="onLangChange(this)" class="settings-select">' + opts + '</select>';
+}
+function onLangChange(sel) {
+  if (sel.id === 'uiLangSelect') {
+    if (sel.value) localStorage.setItem('doc77_lang', sel.value);
+    else localStorage.removeItem('doc77_lang');
+    location.reload();
+  } else {
+    // 全局语言写 config
+    fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'locale.language', value: sel.value }),
+    }).then(function () { showToast(t('common.settings.globalLangSaved')); });
+  }
+}
 
 // AI Providers
 var AI_PROVIDERS = {deepseek:{url:'https://api.deepseek.com',models:['deepseek-v4-pro','deepseek-v4-flash']},openai:{url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-5']},qwen:{url:'https://dashscope.aliyuncs.com/compatible-mode/v1',models:['qwen3-max','qwen-plus','qwen-turbo']},kimi:{url:'https://api.moonshot.cn/v1',models:['kimi-k2.7-code']},doubao:{url:'https://ark.cn-beijing.volces.com/api/v3',models:['doubao-seed-2-1-pro']},glm:{url:'https://open.bigmodel.cn/api/paas/v4',models:['glm-5.2']},custom:{url:'',models:[]}};
@@ -857,4 +931,70 @@ async function copyRC(){
   } catch(e) {
     toast('复制失败，请手动记录','error');
   }
+}
+
+//══════════ Share: Active Shares Tab ══════════
+
+/** Load and render the active shares list in settings. */
+function loadActiveShares(container) {
+  if (!container) container = document.getElementById('settingsContent');
+  container.innerHTML =
+    '<div class="section-title">活跃分享</div>' +
+    '<div id="shareList" style="font-size:12px;color:var(--text-muted)">加载中...</div>';
+
+  fetch('/api/shares').then(function(r){ return r.json(); }).then(function(shares){
+    var list = document.getElementById('shareList');
+    if (!list) return;
+    if (!shares || shares.length === 0) {
+      list.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--text-muted)">暂无活跃分享</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < shares.length; i++) {
+      var s = shares[i];
+      var expiresAt = new Date(s.expiresAt);
+      var expiresStr = expiresAt.toLocaleString('zh-CN');
+      // Reconstruct host URL (use the current page origin)
+      var shareUrl = window.location.origin + '/s/' + s.token;
+      html +=
+        '<div style="padding:10px;border:1px solid var(--border-light);border-radius:8px;margin-bottom:8px;font-size:12px">' +
+        '<div style="font-weight:600;margin-bottom:4px">📄 ' + escHtml(s.documentTitle) + '</div>' +
+        '<div style="font-family:monospace;font-size:11px;color:var(--text-secondary);word-break:break-all;margin-bottom:6px">' + escHtml(shareUrl) + '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="color:var(--text-muted);font-size:11px">有效期至 ' + expiresStr + '</span>' +
+        '<button onclick="revokeShare(\'' + s.token + '\', this)" style="padding:3px 10px;font-size:11px;color:#ef4444;border:1px solid #ef4444;background:transparent;border-radius:4px;cursor:pointer">撤销</button>' +
+        '</div></div>';
+    }
+    list.innerHTML = html;
+  }).catch(function(){
+    var list = document.getElementById('shareList');
+    if (list) list.innerHTML = '<div style="padding:16px 0;text-align:center;color:#ef4444">加载失败</div>';
+  });
+}
+
+/** Revoke a share token. */
+function revokeShare(token, btn) {
+  if (!confirm('确定要撤销此分享链接？撤销后已打开的页面将无法访问。')) return;
+  btn.disabled = true;
+  btn.textContent = '撤销中...';
+  fetch('/api/share/' + token, { method: 'DELETE' }).then(function(r){
+    if (r.ok) {
+      toast('✅ 分享链接已撤销', 'success');
+      // Reload the share list
+      loadActiveShares();
+    } else {
+      toast('撤销失败', 'error');
+      btn.disabled = false;
+      btn.textContent = '撤销';
+    }
+  }).catch(function(){
+    toast('撤销失败', 'error');
+    btn.disabled = false;
+    btn.textContent = '撤销';
+  });
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
