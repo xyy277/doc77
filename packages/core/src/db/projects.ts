@@ -43,9 +43,10 @@ export function registerProject(name: string, projectPath: string, obsidianMode?
  */
 export function listProjects(): Project[] {
   const db = getConnection();
-  return db
+  const rows = db
     .prepare('SELECT id, name, path, obsidian_mode, created_at, last_opened FROM projects ORDER BY name')
-    .all() as Project[];
+    .all() as Array<Project & { obsidian_mode: number }>;
+  return rows.map(r => ({ ...r, obsidian_mode: !!r.obsidian_mode }));
 }
 
 /**
