@@ -128,9 +128,9 @@ function renderCompactCard(p, inFavorites) {
 
   return '<div class="card card-compact animate-in" data-id="' + p.id + '" onclick="openProject(' + p.id + ')">' +
     '<button class="' + starClass + '" data-id="' + p.id + '" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')">' + starIcon + '</button>' +
-    '<div class="card-icon">📂</div>' +
+    '<div class="card-icon">' + (p.obsidian_mode ? '🗃️' : '📂') + '</div>' +
     '<div class="card-body">' +
-      '<div class="card-name">' + esc(p.name) + '</div>' +
+      '<div class="card-name">' + esc(p.name) + (p.obsidian_mode ? ' <span class="badge-obsidian">[[=]]</span>' : '') + '</div>' +
       '<div class="card-path" title="' + escAttr(p.path) + '">' + esc(shortPath(p.path)) + '</div>' +
       '<div class="card-date">' + dateLabel + '</div>' +
     '</div>' +
@@ -275,7 +275,8 @@ window.doRegister = async function() {
   if (!name || !pth) { err.textContent = '请填写项目名称和路径'; err.style.display = 'block'; return; }
   if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
-    var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth}) });
+    var isObsidian = document.getElementById('regObsidian').checked;
+    var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth, obsidian_mode: isObsidian}) });
     if (!r.ok) { var d = await r.json(); err.textContent = d.error || '注册失败'; err.style.display = 'block'; return; }
     document.getElementById('regName').value = '';
     document.getElementById('regPath').value = '';
