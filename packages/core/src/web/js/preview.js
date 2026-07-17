@@ -565,7 +565,7 @@ function mountPane(pane, path) {
 /** 激活后统一刷新工具栏/大纲/阅读时长/高亮/面包屑。 */
 function afterActivate(path, d) {
   var isTemp = TempPreview.isTempPath(path);
-  var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'];
+  var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn','exportBtn','shareBtn'];
   btns.forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = false; });
   // Disable specific buttons for temp (disk-less) files
   if (isTemp) {
@@ -2233,6 +2233,265 @@ function initDropZone() {
       }
     })();
   });
+}
+
+//══════════ Export: self-contained HTML ══════════
+
+/** Collect rendered DOM + CSS, POST to server, trigger download. */
+async function exportHTML() {
+  var contentEl = document.getElementById('docContent');
+  if (!contentEl) {
+    toast('没有可导出的内容', 'warning');
+    return;
+  }
+
+  var btn = document.getElementById('exportBtn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ <span class="hidden sm:inline">打包中...</span>';
+
+  try {
+    // 1. Wait for any ongoing rendering to finish
+    await Promise.race([
+      new Promise(function(resolve) {
+        // Check if mermaid is still rendering — if so, wait a tick
+        setTimeout(resolve, 500);
+      }),
+    ]);
+
+    // 2. Collect rendered content
+    var content = contentEl.innerHTML;
+
+    // 3. Collect CSS from the document
+    var styles = [];
+    // Linked stylesheets — fetch their text content
+    var links = document.querySelectorAll('link[rel="stylesheet"]');
+    for (var i = 0; i < links.length; i++) {
+      var href = links[i].href;
+      if (href && href !== 'about:blank' && !href.startsWith('data:')) {
+        try {
+          var resp = await fetch(href);
+          styles.push(await resp.text());
+        } catch (e) {
+          /* skip unreachable stylesheets */
+        }
+      }
+    }
+    // Inline <style> blocks
+    var styleEls = document.querySelectorAll('style');
+    for (var i = 0; i < styleEls.length; i++) {
+      styles.push(styleEls[i].textContent);
+    }
+
+    // 4. Collect local images already in the content area
+    var images = [];
+    var imgs = contentEl.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i++) {
+      var src = imgs[i].src;
+      // Only collect local API-based images (not external or data URIs)
+      if (src && src.indexOf('/api/raw/') >= 0) {
+        // Try to resolve the physical path — fetch the raw endpoint to get base64
+        try {
+          var imgResp = await fetch(src);
+          var blob = await imgResp.blob();
+          var reader = new FileReader();
+          var base64 = await new Promise(function(resolve) {
+            reader.onloadend = function() {
+              resolve(reader.result);
+            };
+            reader.readAsDataURL(blob);
+          });
+          images.push({ url: src, base64: base64 });
+        } catch (e) {
+          /* skip */
+        }
+      } else if (src && src.startsWith('http') && src.indexOf(window.location.host) === -1) {
+        // External image — skip (we don't download external resources)
+        continue;
+      }
+    }
+
+    // 5. Get document title from the current tab
+    var title = currentFile
+      ? currentFile.split('/').pop().replace(/\.[^.]+$/, '')
+      : 'document';
+    var theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+
+    // 6. POST to server
+    var resp = await fetch('/api/export/html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: title,
+        content: content,
+        styles: styles,
+        images: images,
+        theme: theme,
+        projectId: parseInt(pid, 10),
+      }),
+    });
+
+    if (!resp.ok) {
+      var err = await resp.json().catch(function() {
+        return { error: '导出失败' };
+      });
+      toast(err.error || '导出失败 (' + resp.status + ')', 'error');
+      return;
+    }
+
+    // 7. Trigger download
+    var blob = await resp.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = title + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast('✅ 导出完成：' + title + '.html', 'success');
+  } catch (e) {
+    toast('导出失败：' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📥 <span class="hidden sm:inline">导出</span>';
+  }
+}
+
+//══════════ Share: create LAN share link ══════════
+
+/** Create a share link for the current document. */
+async function shareDocument() {
+  var btn = document.getElementById('shareBtn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ <span class="hidden sm:inline">创建中...</span>';
+
+  try {
+    var theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    var title = currentFile
+      ? currentFile.split('/').pop().replace(/\.[^.]+$/, '')
+      : 'document';
+    // Resolve project-relative path from currentFile
+    var relativePath = currentFile || '';
+    // If currentFile starts with the project root, strip it
+    if (proj && proj.path && relativePath.startsWith(proj.path)) {
+      relativePath = relativePath.slice(proj.path.length).replace(/^[/\\]/, '');
+    }
+
+    var resp = await fetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: parseInt(pid, 10),
+        filePath: relativePath,
+        title: title,
+        theme: theme,
+      }),
+    });
+
+    var data = await resp.json();
+    if (!resp.ok) {
+      toast(data.error || '创建分享失败', 'error');
+      return;
+    }
+
+    // Show share card UI
+    showShareCard(data.url, data.expiresAt, title);
+  } catch (e) {
+    toast('创建分享失败：' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔗 <span class="hidden sm:inline">分享</span>';
+  }
+}
+
+/** Display a floating share card with copy-link and QR code. */
+function showShareCard(url, expiresAt, title) {
+  // Remove existing share card if any
+  var existing = document.getElementById('shareCard');
+  if (existing) existing.remove();
+
+  var expiresDate = new Date(expiresAt);
+  var expiresStr = expiresDate.toLocaleString('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  var token = url.split('/').pop();
+
+  var card = document.createElement('div');
+  card.id = 'shareCard';
+  card.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm';
+  card.onclick = function(e) {
+    if (e.target === card) card.remove();
+  };
+
+  card.innerHTML =
+    '<div style="background:var(--bg-card,#fff);border-radius:12px;padding:24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.15);text-align:center;position:relative;color:var(--text-primary,#1e293b)">' +
+    '<button onclick="this.closest(\'#shareCard\').remove()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted,#94a3b8)">✕</button>' +
+    '<div style="font-size:14px;font-weight:600;margin-bottom:4px">🔗 分享链接已创建</div>' +
+    '<div style="font-size:11px;color:var(--text-muted,#94a3b8);margin-bottom:16px">' +
+    title +
+    ' · 有效期至 ' +
+    expiresStr +
+    '</div>' +
+    '<div style="background:var(--bg-body,#f8fafc);border:1px solid var(--border-light,#e2e8f0);border-radius:8px;padding:12px;font-size:12px;font-family:monospace;word-break:break-all;margin-bottom:16px;text-align:left">' +
+    url +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:center">' +
+    '<button onclick="copyShareLink(\'' +
+    url.replace(/'/g, "\\'") +
+    '\')" style="flex:1;padding:8px 0;font-size:13px;font-weight:500;background:var(--accent,#6366f1);color:#fff;border:none;border-radius:8px;cursor:pointer">📋 复制链接</button>' +
+    '<button onclick="showQRCode(this,\'' +
+    token +
+    '\')" style="flex:1;padding:8px 0;font-size:13px;font-weight:500;background:var(--bg-card,#fff);color:var(--text-primary,#1e293b);border:1px solid var(--border-light,#e2e8f0);border-radius:8px;cursor:pointer">📱 二维码</button>' +
+    '</div>' +
+    '<div id="qrcodeContainer" style="display:none;margin-top:16px;text-align:center"><img id="qrcodeImg" src="" alt="QR Code" style="width:180px;height:180px;border-radius:8px;border:1px solid var(--border-light,#e2e8f0)"></div>' +
+    '<div style="margin-top:14px;font-size:10px;color:#ef4444">⚠️ 请确保接收设备在同一 Wi-Fi 网络</div>' +
+    '</div>';
+
+  document.body.appendChild(card);
+}
+
+/** Copy share link to clipboard. */
+function copyShareLink(url) {
+  if (navigator.clipboard) {
+    navigator.clipboard
+      .writeText(url)
+      .then(function() {
+        toast('✅ 链接已复制', 'success');
+      })
+      .catch(function() {
+        fallbackCopy(url);
+      });
+  } else {
+    fallbackCopy(url);
+  }
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  toast('✅ 链接已复制', 'success');
+}
+
+/** Show QR code image in the share card. */
+function showQRCode(btn, token) {
+  var container = document.getElementById('qrcodeContainer');
+  var img = document.getElementById('qrcodeImg');
+  if (container.style.display !== 'none') {
+    container.style.display = 'none';
+    return;
+  }
+  img.src = '/api/share/' + token + '/qrcode';
+  container.style.display = 'block';
 }
 
 // Boot drop zone

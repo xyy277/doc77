@@ -167,6 +167,42 @@
 
 ---
 
+## v0.9 扩展功能（2026-07-14 ~ 2026-07-17）
+
+> 4 个 Feature 分支全部完成并集成到 main。
+
+### Export & Share（feat/export-share）
+- [x] 自包含 HTML 导出（mermaid SVG + KaTeX + 代码高亮内联）
+- [x] 分享链接（24h TTL，UUID token，读取只读）
+- [x] 分享 QR 码
+- [x] i18n 国际化支持（zh-CN / en-US）
+- [x] 导出安全审查（路径验证、XSS 防护、文件大小限制）
+
+### Obsidian Vault Import（feat/obsidian-import）
+- [x] `[[wikilink]]` 渲染（marked 扩展 + Markdown 后处理）
+- [x] 别名文件 `.doc77links` 支持
+- [x] 项目数据库中添加 `obsidian_mode` 列
+- [x] Dashboard 卡片显示 Obsidian badge（🗃️ + [[=]]标签）
+- [x] 注册/编辑表单支持 Obsidian 模式开关
+
+### VS Code / Git 项目导入（feat/vscode-git-import）
+- [x] Git 仓库自动发现（递归扫描 `.git` 目录，跳过 node_modules 等）
+- [x] VS Code `.code-workspace` 文件解析与批量导入
+- [x] 项目语言自动检测（package.json、go.mod、Cargo.toml、requirements.txt 等）
+- [x] Dashboard 卡片显示语言标签（Node.js / TypeScript / Python / Go 等）
+- [x] 8 种标签颜色 CSS
+- [x] `tags` JSON 数组字段 + migration v4
+
+### Mobile Companion（feat/mobile-companion）
+- [x] mDNS 服务发布（`_doc77._tcp`，multicast-dns 纯 JS）
+- [x] `/api/mobile/info` 端点（hostname、version、port）
+- [x] Dashboard QR 码连接卡片
+- [x] 移动端连接持久化（localStorage）
+- [x] 移动端连接失败提示 + 重试
+- [x] 7 个文件变更，141 行新增
+
+---
+
 ## 阻塞记录
 
 > 暂无

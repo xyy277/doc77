@@ -272,8 +272,32 @@ function toggleSettings() {
   var opening = !ov.classList.contains('visible');
   ov.classList.toggle('visible');
   if (opening) {
+    renderSettingsTabs();
     switchSettingsTab('system');
   }
+}
+
+// ═══ Unified Settings Tabs ═══
+
+var SETTINGS_TABS = [
+  { id: 'system', label: '💾 系统' },
+  { id: 'ai', label: '🤖 AI' },
+  { id: 'account', label: '👤 账户' },
+  { id: 'translate', label: '🌐 翻译' },
+  { id: 'share', label: '🔗 分享' },
+];
+
+function renderSettingsTabs() {
+  var container = document.getElementById('settingsTabs');
+  if (!container || container.querySelector('button')) return; // already rendered
+  container.innerHTML = SETTINGS_TABS
+    .map(function(tb, i) {
+      return '<button onclick="switchSettingsTab(\'' + tb.id + '\')" class="modal-tab' +
+        (i === 0 ? ' active' : '') +
+        '" data-tab="' + tb.id + '" style="border-bottom:none">' +
+        tb.label + '</button>';
+    })
+    .join('');
 }
 function switchSettingsTab(tab) {
   document.querySelectorAll('#settingsTabs button').forEach(function(b) {
@@ -327,9 +351,8 @@ function switchSettingsTab(tab) {
       '<option value="qwen">' + t('common.settings.qwenAlibaba') + '</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">' + t('common.settings.glmZhipu') + '</option></select></div>' +
       settingRow('Base URL','ai.base_url','text','https://api.deepseek.com') +
       '<div class="settings-row"><span class="settings-label">' + t('common.settings.model') + '</span>' +
-      '<select id="aiModelSelect" onchange="onModelSelect(this.value)" class="settings-select">' +
-      '<option value="deepseek-v4-pro">deepseek-v4-pro</option><option value="deepseek-v4-flash">deepseek-v4-flash</option></select></div>' +
-      '<input data-key="ai.model" type="hidden" value="deepseek-v4-pro">' +
+      '<input id="aiModelInput" data-key="ai.model" list="aiModelSuggestions" class="settings-input" placeholder="选择或输入模型名称" style="flex:1;min-width:0">' +
+      '<datalist id="aiModelSuggestions"></datalist></div>' +
       settingRow(t('common.settings.apiToken'),'ai.token','password','sk-...') +
       '<div class="settings-tip" style="margin-left:4px">' + t('common.settings.tokenSavedLocally') + '</div>' +
       '<button onclick="testConnection()" style="width:100%;padding:6px 0;font-size:13px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;background:transparent;cursor:pointer;margin-top:8px" onmouseover="this.style.background=\'var(--accent-light-bg)\'" onmouseout="this.style.background=\'transparent\'">' + t('common.settings.testConnection') + '</button>' +
@@ -373,6 +396,8 @@ function switchSettingsTab(tab) {
       '<div id="translateModelStatus" style="font-size:11px;color:var(--text-muted);margin-bottom:8px">' + t('common.auth.checking') + '</div>' +
       '<button onclick="downloadTranslateModels()" id="btnDownloadModels" class="btn" style="width:100%;margin-top:4px;font-size:12px">' + t('common.settings.downloadTranslateModels') + '</button>';
     checkTranslateStatus();
+  } else if (tab === 'share') {
+    loadActiveShares(c);
   }
   loadSettingsValues();
   // 回填语言下拉选值 + 翻译设置面板内的 data-i18n
@@ -455,33 +480,30 @@ function onLangChange(sel) {
 
 // AI Providers
 var AI_PROVIDERS = {deepseek:{url:'https://api.deepseek.com',models:['deepseek-v4-pro','deepseek-v4-flash']},openai:{url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-5']},qwen:{url:'https://dashscope.aliyuncs.com/compatible-mode/v1',models:['qwen3-max','qwen-plus','qwen-turbo']},kimi:{url:'https://api.moonshot.cn/v1',models:['kimi-k2.7-code']},doubao:{url:'https://ark.cn-beijing.volces.com/api/v3',models:['doubao-seed-2-1-pro']},glm:{url:'https://open.bigmodel.cn/api/paas/v4',models:['glm-5.2']},custom:{url:'',models:[]}};
+
+// All known models flattened — used as suggestions when provider is 'custom'
+var ALL_KNOWN_MODELS = Object.values(AI_PROVIDERS)
+  .reduce(function(acc, p) { return acc.concat(p.models); }, [])
+  .filter(function(m, i, a) { return a.indexOf(m) === i; });
 function onModelSelect(v) {
   var modelEl = document.querySelector('[data-key="ai.model"]');
-  if (!modelEl) return;
-  if (v === '_custom') {
-    var m = prompt(t('common.settings.promptModelName'));
-    if (m) {
-      var sel = document.getElementById('aiModelSelect');
-      var o = document.createElement('option');
-      o.value = m; o.textContent = m; o.selected = true;
-      sel.insertBefore(o, sel.lastChild);
-      modelEl.value = m;
-    }
-  } else {
-    modelEl.value = v;
-  }
+  if (modelEl) modelEl.value = v;
 }
 function onProviderChange() {
   var p = document.getElementById('aiProvider').value;
   var info = AI_PROVIDERS[p];
   var urlEl = document.querySelector('[data-key="ai.base_url"]');
-  var sel = document.getElementById('aiModelSelect');
-  var modelEl = document.querySelector('[data-key="ai.model"]');
+  var modelInput = document.getElementById('aiModelInput');
+  var datalist = document.getElementById('aiModelSuggestions');
   if (info.url) urlEl.value = info.url;
-  sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">' + t('common.settings.manualInput') + '</option>') +
-    (p !== 'custom' ? '<option value="_custom">' + t('common.settings.other') + '</option>' : '');
-  if (info.models.length) { modelEl.value = info.models[0]; sel.value = info.models[0]; }
-  sel.onchange = function() { onModelSelect(this.value); };
+  // Populate datalist: for custom, show ALL known models; otherwise show provider's models
+  var suggestions = p === 'custom' ? ALL_KNOWN_MODELS : info.models;
+  datalist.innerHTML = suggestions
+    .map(function(m) { return '<option value="' + m + '">' + m + '</option>'; })
+    .join('');
+  if (info.models.length && modelInput && !modelInput.value) {
+    modelInput.value = info.models[0];
+  }
 }
 async function testConnection() {
   var r = document.getElementById('testResult');
@@ -508,21 +530,21 @@ async function loadSettingsValues() {
         el.value = v;
       }
     });
-    // Refresh model dropdown to match the persisted provider
+    // Refresh model datalist to match the persisted provider
     var pv = d['ai.provider'];
     if (pv && AI_PROVIDERS[pv]) {
       var info = AI_PROVIDERS[pv];
-      var sel = document.getElementById('aiModelSelect');
-      var modelEl = document.querySelector('[data-key="ai.model"]');
-      var savedModel = modelEl ? modelEl.value : '';
-      sel.innerHTML = (info.models.length ? info.models.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') : '<option value="">' + t('common.settings.manualInput') + '</option>') +
-        (pv !== 'custom' ? '<option value="_custom">' + t('common.settings.other') + '</option>' : '');
-      if (info.models.length) {
-        var opt = sel.querySelector('option[value="'+savedModel+'"]');
-        if (opt) opt.selected = true;
-        else { modelEl.value = info.models[0]; sel.value = info.models[0]; }
+      var modelInput = document.getElementById('aiModelInput');
+      var datalist = document.getElementById('aiModelSuggestions');
+      if (modelInput && datalist) {
+        var savedModel = modelInput.value || d['ai.model'] || '';
+        var suggestions = pv === 'custom' ? ALL_KNOWN_MODELS : info.models;
+        datalist.innerHTML = suggestions
+          .map(function(m) { return '<option value="' + m + '">' + m + '</option>'; })
+          .join('');
+        if (savedModel) modelInput.value = savedModel;
+        else if (info.models.length) modelInput.value = info.models[0];
       }
-      sel.onchange = function() { onModelSelect(this.value); };
     }
   } catch(e) {}
 }
@@ -937,4 +959,79 @@ async function copyRC(){
   } catch(e) {
     toast(t('common.toast.copyFailed'),'error');
   }
+}
+
+//══════════ Share: Active Shares Tab ══════════
+
+/** Load and render the active shares list in settings. */
+function loadActiveShares(container) {
+  if (!container) container = document.getElementById('settingsContent');
+  container.innerHTML =
+    '<div class="section-title">活跃分享</div>' +
+    '<div id="shareList" style="font-size:12px;color:var(--text-muted)">加载中...</div>';
+
+  fetch('/api/shares')
+    .then(function(r) { return r.json(); })
+    .then(function(shares) {
+      var list = document.getElementById('shareList');
+      if (!list) return;
+      if (!shares || shares.length === 0) {
+        list.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--text-muted)">暂无活跃分享</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < shares.length; i++) {
+        var s = shares[i];
+        var expiresAt = new Date(s.expiresAt);
+        var expiresStr = expiresAt.toLocaleString('zh-CN');
+        // Reconstruct host URL (use the current page origin)
+        var shareUrl = window.location.origin + '/s/' + s.token;
+        html +=
+          '<div style="padding:10px;border:1px solid var(--border-light);border-radius:8px;margin-bottom:8px;font-size:12px">' +
+          '<div style="font-weight:600;margin-bottom:4px">📄 ' + escHtml(s.documentTitle) + '</div>' +
+          '<div style="font-family:monospace;font-size:11px;color:var(--text-secondary);word-break:break-all;margin-bottom:6px">' + escHtml(shareUrl) + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="color:var(--text-muted);font-size:11px">有效期至 ' + expiresStr + '</span>' +
+          '<button onclick="revokeShare(\'' + s.token + '\', this)" style="padding:3px 10px;font-size:11px;color:#ef4444;border:1px solid #ef4444;background:transparent;border-radius:4px;cursor:pointer">撤销</button>' +
+          '</div></div>';
+      }
+      list.innerHTML = html;
+    })
+    .catch(function() {
+      var list = document.getElementById('shareList');
+      if (list) list.innerHTML = '<div style="padding:16px 0;text-align:center;color:#ef4444">加载失败</div>';
+    });
+}
+
+/** Revoke a share token. */
+function revokeShare(token, btn) {
+  if (!confirm('确定要撤销此分享链接？撤销后已打开的页面将无法访问。')) return;
+  btn.disabled = true;
+  btn.textContent = '撤销中...';
+  fetch('/api/share/' + token, { method: 'DELETE' })
+    .then(function(r) {
+      if (r.ok) {
+        toast('✅ 分享链接已撤销', 'success');
+        // Reload the share list
+        loadActiveShares();
+      } else {
+        toast('撤销失败', 'error');
+        btn.disabled = false;
+        btn.textContent = '撤销';
+      }
+    })
+    .catch(function() {
+      toast('撤销失败', 'error');
+      btn.disabled = false;
+      btn.textContent = '撤销';
+    });
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

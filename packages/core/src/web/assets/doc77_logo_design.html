@@ -1,184 +1,337 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doc77 Logo Design Guide</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; }
-    .checkerboard {
-      background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%), 
-                        linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), 
-                        linear-gradient(45deg, transparent 75%, #e5e7eb 75%), 
-                        linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
-      background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-    }
-  </style>
-</head>
-<body class="bg-slate-50 text-slate-800 p-8 min-h-screen">
-
-  <div class="max-w-5xl mx-auto space-y-12">
-    
-    <!-- Header -->
-    <div class="text-center space-y-4">
-      <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Doc77 品牌标志设计</h1>
-      <p class="text-slate-500 text-lg">纯净、智能、安全的本地文档管家</p>
-    </div>
-
-    <!-- 1. Favicon 区域 -->
-    <section class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-      <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-        <span class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">1</span>
-        Favicon (应用图标)
-      </h2>
-      <p class="text-slate-500 mb-8">适用于 App 图标、浏览器标签页、文件夹标识。采用纯 SVG 矢量设计，在 16x16 的微小尺寸下依然清晰可辨。</p>
-      
-      <div class="flex flex-wrap items-end gap-12 bg-slate-50 p-8 rounded-2xl border border-slate-100">
-        
-        <!-- 128x128 -->
-        <div class="flex flex-col items-center gap-3">
-          <div class="w-32 h-32 rounded-3xl shadow-xl flex items-center justify-center bg-white p-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-full h-full">
-              <!-- Document Base -->
-              <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#2563EB"/>
-              <!-- Folded Corner -->
-              <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA"/>
-              <!-- 77 Marks -->
-              <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              <!-- AI Sparkle -->
-              <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FCD34D"/>
-            </svg>
-          </div>
-          <span class="text-sm font-mono text-slate-400">128 x 128 (App Icon)</span>
-        </div>
-
-        <!-- 64x64 -->
-        <div class="flex flex-col items-center gap-3">
-          <div class="w-16 h-16 rounded-xl shadow-lg flex items-center justify-center bg-white p-1">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-full h-full">
-              <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#2563EB"/>
-              <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA"/>
-              <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FCD34D"/>
-            </svg>
-          </div>
-          <span class="text-sm font-mono text-slate-400">64 x 64</span>
-        </div>
-
-        <!-- 32x32 -->
-        <div class="flex flex-col items-center gap-3">
-          <div class="w-8 h-8 shadow-sm flex items-center justify-center bg-transparent">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-full h-full drop-shadow-md">
-              <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#2563EB"/>
-              <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA"/>
-              <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FCD34D"/>
-            </svg>
-          </div>
-          <span class="text-sm font-mono text-slate-400">32 x 32</span>
-        </div>
-
-        <!-- 16x16 -->
-        <div class="flex flex-col items-center gap-3">
-          <div class="w-4 h-4 flex items-center justify-center bg-transparent">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-full h-full">
-              <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#2563EB"/>
-              <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA"/>
-              <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FCD34D"/>
-            </svg>
-          </div>
-          <span class="text-sm font-mono text-slate-400">16x16 (Tab)</span>
-        </div>
-
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Doc77 Logo Design Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .checkerboard {
+        background-image:
+          linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+          linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+          linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+        background-size: 20px 20px;
+        background-position:
+          0 0,
+          0 10px,
+          10px -10px,
+          -10px 0px;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-800 p-8 min-h-screen">
+    <div class="max-w-5xl mx-auto space-y-12">
+      <!-- Header -->
+      <div class="text-center space-y-4">
+        <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Doc77 品牌标志设计</h1>
+        <p class="text-slate-500 text-lg">纯净、智能、安全的本地文档管家</p>
       </div>
-    </section>
 
-    <!-- 2. Title Logo 区域 -->
-    <section class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-      <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-        <span class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">2</span>
-        Title Logo (标题组合)
-      </h2>
-      <p class="text-slate-500 mb-8">适用于 App 顶部导航栏、Web Dashboard 左上角。包含浅色模式与深色模式适配。</p>
+      <!-- 1. Favicon 区域 -->
+      <section class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+          <span
+            class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm"
+            >1</span
+          >
+          Favicon (应用图标)
+        </h2>
+        <p class="text-slate-500 mb-8">
+          适用于 App 图标、浏览器标签页、文件夹标识。采用纯 SVG 矢量设计，在 16x16
+          的微小尺寸下依然清晰可辨。
+        </p>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        <!-- Light Mode -->
-        <div class="flex flex-col gap-3">
-          <div class="h-32 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-center relative checkerboard">
-            <!-- Light Logo SVG -->
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 40" height="40" class="drop-shadow-sm">
-              <g transform="translate(0, 4)">
-                <svg viewBox="0 0 32 32" width="32" height="32">
-                  <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#2563EB"/>
-                  <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA"/>
-                  <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                  <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FCD34D"/>
-                </svg>
-              </g>
-              <text x="42" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="800" letter-spacing="-0.5">
-                <tspan fill="#0F172A">Doc</tspan><tspan fill="#2563EB">77</tspan>
-              </text>
-            </svg>
+        <div
+          class="flex flex-wrap items-end gap-12 bg-slate-50 p-8 rounded-2xl border border-slate-100"
+        >
+          <!-- 128x128 -->
+          <div class="flex flex-col items-center gap-3">
+            <div
+              class="w-32 h-32 rounded-3xl shadow-xl flex items-center justify-center bg-white p-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-full h-full">
+                <!-- Document Base -->
+                <path
+                  d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z"
+                  fill="#2563EB"
+                />
+                <!-- Folded Corner -->
+                <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA" />
+                <!-- 77 Marks -->
+                <path
+                  d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24"
+                  stroke="white"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <!-- AI Sparkle -->
+                <path
+                  d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z"
+                  fill="#FCD34D"
+                />
+              </svg>
+            </div>
+            <span class="text-sm font-mono text-slate-400">128 x 128 (App Icon)</span>
           </div>
-          <span class="text-sm font-medium text-slate-500 text-center">浅色背景适用 (Light Theme)</span>
+
+          <!-- 64x64 -->
+          <div class="flex flex-col items-center gap-3">
+            <div
+              class="w-16 h-16 rounded-xl shadow-lg flex items-center justify-center bg-white p-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-full h-full">
+                <path
+                  d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z"
+                  fill="#2563EB"
+                />
+                <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA" />
+                <path
+                  d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24"
+                  stroke="white"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z"
+                  fill="#FCD34D"
+                />
+              </svg>
+            </div>
+            <span class="text-sm font-mono text-slate-400">64 x 64</span>
+          </div>
+
+          <!-- 32x32 -->
+          <div class="flex flex-col items-center gap-3">
+            <div class="w-8 h-8 shadow-sm flex items-center justify-center bg-transparent">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 32 32"
+                class="w-full h-full drop-shadow-md"
+              >
+                <path
+                  d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z"
+                  fill="#2563EB"
+                />
+                <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA" />
+                <path
+                  d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24"
+                  stroke="white"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z"
+                  fill="#FCD34D"
+                />
+              </svg>
+            </div>
+            <span class="text-sm font-mono text-slate-400">32 x 32</span>
+          </div>
+
+          <!-- 16x16 -->
+          <div class="flex flex-col items-center gap-3">
+            <div class="w-4 h-4 flex items-center justify-center bg-transparent">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-full h-full">
+                <path
+                  d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z"
+                  fill="#2563EB"
+                />
+                <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA" />
+                <path
+                  d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24"
+                  stroke="white"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z"
+                  fill="#FCD34D"
+                />
+              </svg>
+            </div>
+            <span class="text-sm font-mono text-slate-400">16x16 (Tab)</span>
+          </div>
         </div>
+      </section>
 
-        <!-- Dark Mode -->
-        <div class="flex flex-col gap-3">
-          <div class="h-32 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-center relative">
-            <!-- Dark Logo SVG -->
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 40" height="40">
-              <g transform="translate(0, 4)">
-                <svg viewBox="0 0 32 32" width="32" height="32">
-                  <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#3B82F6"/>
-                  <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#93C5FD"/>
-                  <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                  <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FDE68A"/>
-                </svg>
-              </g>
-              <text x="42" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="800" letter-spacing="-0.5">
-                <tspan fill="#F8FAFC">Doc</tspan><tspan fill="#3B82F6">77</tspan>
-              </text>
-            </svg>
+      <!-- 2. Title Logo 区域 -->
+      <section class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+          <span
+            class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm"
+            >2</span
+          >
+          Title Logo (标题组合)
+        </h2>
+        <p class="text-slate-500 mb-8">
+          适用于 App 顶部导航栏、Web Dashboard 左上角。包含浅色模式与深色模式适配。
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Light Mode -->
+          <div class="flex flex-col gap-3">
+            <div
+              class="h-32 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-center relative checkerboard"
+            >
+              <!-- Light Logo SVG -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 150 40"
+                height="40"
+                class="drop-shadow-sm"
+              >
+                <g transform="translate(0, 4)">
+                  <svg viewBox="0 0 32 32" width="32" height="32">
+                    <path
+                      d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z"
+                      fill="#2563EB"
+                    />
+                    <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA" />
+                    <path
+                      d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24"
+                      stroke="white"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      fill="none"
+                    />
+                    <path
+                      d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z"
+                      fill="#FCD34D"
+                    />
+                  </svg>
+                </g>
+                <text
+                  x="42"
+                  y="28"
+                  font-family="system-ui, -apple-system, sans-serif"
+                  font-size="24"
+                  font-weight="800"
+                  letter-spacing="-0.5"
+                >
+                  <tspan fill="#0F172A">Doc</tspan>
+                  <tspan fill="#2563EB">77</tspan>
+                </text>
+              </svg>
+            </div>
+            <span class="text-sm font-medium text-slate-500 text-center"
+              >浅色背景适用 (Light Theme)</span
+            >
           </div>
-          <span class="text-sm font-medium text-slate-500 text-center">深色背景适用 (Dark Theme)</span>
+
+          <!-- Dark Mode -->
+          <div class="flex flex-col gap-3">
+            <div
+              class="h-32 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-center relative"
+            >
+              <!-- Dark Logo SVG -->
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 40" height="40">
+                <g transform="translate(0, 4)">
+                  <svg viewBox="0 0 32 32" width="32" height="32">
+                    <path
+                      d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z"
+                      fill="#3B82F6"
+                    />
+                    <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#93C5FD" />
+                    <path
+                      d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24"
+                      stroke="white"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      fill="none"
+                    />
+                    <path
+                      d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z"
+                      fill="#FDE68A"
+                    />
+                  </svg>
+                </g>
+                <text
+                  x="42"
+                  y="28"
+                  font-family="system-ui, -apple-system, sans-serif"
+                  font-size="24"
+                  font-weight="800"
+                  letter-spacing="-0.5"
+                >
+                  <tspan fill="#F8FAFC">Doc</tspan>
+                  <tspan fill="#3B82F6">77</tspan>
+                </text>
+              </svg>
+            </div>
+            <span class="text-sm font-medium text-slate-500 text-center"
+              >深色背景适用 (Dark Theme)</span
+            >
+          </div>
         </div>
+      </section>
 
-      </div>
-    </section>
+      <!-- 3. SVG 源码提取 -->
+      <section class="bg-slate-900 p-8 rounded-3xl shadow-xl text-slate-300">
+        <h2 class="text-2xl font-bold mb-6 text-white flex items-center gap-2">
+          <span
+            class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-sm border border-slate-700"
+            >3</span
+          >
+          SVG 源码提取
+        </h2>
 
-    <!-- 3. SVG 源码提取 -->
-    <section class="bg-slate-900 p-8 rounded-3xl shadow-xl text-slate-300">
-      <h2 class="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-        <span class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-sm border border-slate-700">3</span>
-        SVG 源码提取
-      </h2>
-      
-      <div class="space-y-6">
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <label class="text-sm font-semibold text-blue-400">Favicon (32x32)</label>
-            <button onclick="copyToClipboard('code-fav')" class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1 rounded transition">复制代码</button>
-          </div>
-          <textarea id="code-fav" class="w-full h-32 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-blue-500" readonly>
+        <div class="space-y-6">
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-semibold text-blue-400">Favicon (32x32)</label>
+              <button
+                onclick="copyToClipboard('code-fav')"
+                class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1 rounded transition"
+              >
+                复制代码
+              </button>
+            </div>
+            <textarea
+              id="code-fav"
+              class="w-full h-32 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-blue-500"
+              readonly
+            >
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <path d="M6 4 C6 2.895 6.895 2 8 2 H19.172 C19.702 2 20.211 2.211 20.586 2.586 L27.414 9.414 C27.789 9.789 28 10.298 28 10.828 V28 C28 29.105 27.105 30 26 30 H8 C6.895 30 6 29.105 6 28 V4 Z" fill="#2563EB"/>
   <path d="M19 2 V9 C19 10.105 19.895 11 21 11 H28 L19 2 Z" fill="#60A5FA"/>
   <path d="M11 15 H16.5 L13.5 24 M17 15 H22.5 L19.5 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <path d="M9 10 L10 7.5 L12.5 6.5 L10 5.5 L9 3 L8 5.5 L5.5 6.5 L8 7.5 Z" fill="#FCD34D"/>
 </svg></textarea>
-        </div>
-
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <label class="text-sm font-semibold text-blue-400">Title Logo (Header 使用)</label>
-            <button onclick="copyToClipboard('code-title')" class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1 rounded transition">复制代码</button>
           </div>
-          <textarea id="code-title" class="w-full h-40 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-blue-500" readonly>
+
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-semibold text-blue-400">Title Logo (Header 使用)</label>
+              <button
+                onclick="copyToClipboard('code-title')"
+                class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1 rounded transition"
+              >
+                复制代码
+              </button>
+            </div>
+            <textarea
+              id="code-title"
+              class="w-full h-40 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-blue-500"
+              readonly
+            >
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 40" height="40">
   <g transform="translate(0, 4)">
     <svg viewBox="0 0 32 32" width="32" height="32">
@@ -192,30 +345,29 @@
     <tspan fill="#0F172A">Doc</tspan><tspan fill="#2563EB">77</tspan>
   </text>
 </svg></textarea>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-  </div>
+    <script>
+      function copyToClipboard(elementId) {
+        const copyText = document.getElementById(elementId);
+        copyText.select();
+        document.execCommand('copy');
 
-  <script>
-    function copyToClipboard(elementId) {
-      const copyText = document.getElementById(elementId);
-      copyText.select();
-      document.execCommand("copy");
-      
-      const btn = event.target;
-      const originalText = btn.innerText;
-      btn.innerText = "已复制！";
-      btn.classList.add("bg-emerald-600", "text-white");
-      btn.classList.remove("bg-slate-800", "hover:bg-slate-700");
-      
-      setTimeout(() => {
-        btn.innerText = originalText;
-        btn.classList.remove("bg-emerald-600");
-        btn.classList.add("bg-slate-800", "hover:bg-slate-700");
-      }, 2000);
-    }
-  </script>
-</body>
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = '已复制！';
+        btn.classList.add('bg-emerald-600', 'text-white');
+        btn.classList.remove('bg-slate-800', 'hover:bg-slate-700');
+
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.classList.remove('bg-emerald-600');
+          btn.classList.add('bg-slate-800', 'hover:bg-slate-700');
+        }, 2000);
+      }
+    </script>
+  </body>
 </html>

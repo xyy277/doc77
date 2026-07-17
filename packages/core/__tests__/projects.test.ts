@@ -119,4 +119,41 @@ describe('Project CRUD', () => {
       expect(projects[0].path).toBe(newDir);
     });
   });
+
+  describe('obsidian_mode', () => {
+    it('should default obsidian_mode to false', () => {
+      const p = registerProject('Normal', projectDir);
+      expect(p.obsidian_mode).toBe(false);
+    });
+
+    it('should register project with obsidianMode enabled', () => {
+      const p = registerProject('Vault', projectDir, true);
+      expect(p.obsidian_mode).toBe(true);
+    });
+
+    it('should update obsidian_mode', () => {
+      const p = registerProject('Toggle', projectDir);
+      updateProject(p.id, { obsidian_mode: true });
+      const projects = listProjects();
+      const updated = projects.find((pr) => pr.id === p.id);
+      expect(updated?.obsidian_mode).toBe(true);
+    });
+  });
+
+  describe('tags', () => {
+    it('should default to empty array', () => {
+      const p = registerProject('NoTags', projectDir);
+      expect(p.tags).toEqual([]);
+    });
+    it('should register with tags', () => {
+      const p = registerProject('Tagged', projectDir, false, ['nodejs', 'git']);
+      expect(p.tags).toEqual(['nodejs', 'git']);
+    });
+    it('should update tags', () => {
+      const p = registerProject('TagUpdate', projectDir);
+      updateProject(p.id, { tags: ['python'] });
+      const updated = listProjects().find((pr) => pr.id === p.id);
+      expect(updated?.tags).toEqual(['python']);
+    });
+  });
 });

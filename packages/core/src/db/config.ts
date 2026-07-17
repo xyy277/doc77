@@ -40,6 +40,9 @@ const DEFAULTS: Record<string, string> = {
   'translate.default_target': 'zh',
   'translate.max_segment_length': '500',
   'locale.language': '', // empty = auto-detect (system LANG / browser Accept-Language)
+  'export.html.maxFileSizeMB': '10',
+  'export.share.ttl_hours': '24',
+  'export.share.enabled': 'true',
 };
 
 /**

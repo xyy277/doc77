@@ -16,13 +16,13 @@
         var [cm, langMarkdown, themeOneDark] = await Promise.all([
           import('https://esm.sh/codemirror@6.0.1'),
           import('https://esm.sh/@codemirror/lang-markdown@6.3.2'),
-          import('https://esm.sh/@codemirror/theme-one-dark@6.1.2')
+          import('https://esm.sh/@codemirror/theme-one-dark@6.1.2'),
         ]);
         cmModules = {
           EditorView: cm.EditorView,
           basicSetup: cm.basicSetup,
           markdown: langMarkdown.markdown,
-          oneDark: themeOneDark.oneDark
+          oneDark: themeOneDark.oneDark,
         };
         EDITOR_AVAILABLE = true;
         return true;
@@ -42,7 +42,8 @@
       extensions.push(cmModules.markdown());
     }
     try {
-      var isDark = document.documentElement.classList.contains('dark') ||
+      var isDark =
+        document.documentElement.classList.contains('dark') ||
         (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (isDark) extensions.push(cmModules.oneDark);
     } catch (e) {}
@@ -61,11 +62,19 @@
     });
 
     return {
-      getValue: function () { return view.state.doc.toString(); },
-      setValue: function (v) { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: v } }); },
+      getValue: function () {
+        return view.state.doc.toString();
+      },
+      setValue: function (v) {
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: v } });
+      },
       onChange: function () {},
-      destroy: function () { view.destroy(); },
-      focus: function () { view.focus(); }
+      destroy: function () {
+        view.destroy();
+      },
+      focus: function () {
+        view.focus();
+      },
     };
   }
 
@@ -76,14 +85,25 @@
     ta.spellcheck = false;
     parentEl.appendChild(ta);
     ta.addEventListener('keydown', function (e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (opts.onSave) opts.onSave(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (opts.onSave) opts.onSave();
+      }
     });
     return {
-      getValue: function () { return ta.value; },
-      setValue: function (v) { ta.value = v; },
+      getValue: function () {
+        return ta.value;
+      },
+      setValue: function (v) {
+        ta.value = v;
+      },
       onChange: function () {},
-      destroy: function () { if (ta.parentNode) ta.parentNode.removeChild(ta); },
-      focus: function () { ta.focus(); }
+      destroy: function () {
+        if (ta.parentNode) ta.parentNode.removeChild(ta);
+      },
+      focus: function () {
+        ta.focus();
+      },
     };
   }
 
@@ -91,6 +111,8 @@
     load: loadCodeMirror,
     createEditor: createEditor,
     createTextareaEditor: createTextareaEditor,
-    isAvailable: function () { return EDITOR_AVAILABLE; }
+    isAvailable: function () {
+      return EDITOR_AVAILABLE;
+    },
   };
 })();

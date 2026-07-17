@@ -120,6 +120,27 @@ function shortPath(fullPath) {
 }
 
 // ═══ Shared: Render a compact card (used by dashboard.js and favorites.js) ═══
+var TAG_ICONS = {
+  nodejs: '🟢',
+  typescript: '🔷',
+  python: '🐍',
+  go: '🔵',
+  rust: '🦀',
+  java: '☕',
+  dotnet: '💠',
+  git: '📦',
+};
+var TAG_LABELS = {
+  nodejs: 'Node',
+  typescript: 'TS',
+  python: 'Py',
+  go: 'Go',
+  rust: 'Rust',
+  java: 'Java',
+  dotnet: '.NET',
+  git: 'Git',
+};
+
 function renderCompactCard(p, inFavorites) {
   var lang = window.__doc77_lang || 'zh-CN';
   var starClass = p.favorited ? 'fav-star favorited' : 'fav-star';
@@ -127,14 +148,33 @@ function renderCompactCard(p, inFavorites) {
   var dateLabel = sortBy === 'last_opened' && p.last_opened
     ? t('web.dashboard.dateRecent') + ' ' + new Date(p.last_opened).toLocaleDateString(lang, {month:'short',day:'numeric'})
     : t('web.dashboard.dateCreated') + ' ' + new Date(p.created_at).toLocaleDateString(lang, {month:'short',day:'numeric'});
+  var obsidianIcon = p.obsidian_mode ? '🗃️' : '📂';
+  var obsidianBadge = p.obsidian_mode ? ' <span class="badge-obsidian">[[=]]</span>' : '';
+
+  // Build tag badges
+  var tags = Array.isArray(p.tags) ? p.tags.slice() : [];
+  var tagsHtml = '';
+  if (tags.length > 0) {
+    var visible = tags.slice(0, 3);
+    var extra = tags.length - 3;
+    tagsHtml = '<div class="card-tags">' +
+      visible.map(function(t) {
+        var icon = TAG_ICONS[t] || '';
+        var label = TAG_LABELS[t] || t;
+        return '<span class="tag-badge tag-' + t + '">' + icon + ' ' + label + '</span>';
+      }).join('') +
+      (extra > 0 ? '<span class="tag-badge tag-more">+' + extra + '</span>' : '') +
+      '</div>';
+  }
 
   return '<div class="card card-compact animate-in" data-id="' + p.id + '" onclick="openProject(' + p.id + ')">' +
     '<button class="' + starClass + '" data-id="' + p.id + '" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')">' + starIcon + '</button>' +
-    '<div class="card-icon">📂</div>' +
+    '<div class="card-icon">' + obsidianIcon + '</div>' +
     '<div class="card-body">' +
-      '<div class="card-name">' + esc(p.name) + '</div>' +
+      '<div class="card-name">' + esc(p.name) + obsidianBadge + '</div>' +
       '<div class="card-path" title="' + escAttr(p.path) + '">' + esc(shortPath(p.path)) + '</div>' +
       '<div class="card-date">' + dateLabel + '</div>' +
+      tagsHtml +
     '</div>' +
     '<div class="card-actions">' +
       '<button class="btn-icon" onclick="event.stopPropagation();startEdit(' + p.id + ')" title="' + t('web.dashboard.edit') + '">✏️</button>' +
@@ -147,6 +187,9 @@ function renderCompactCard(p, inFavorites) {
         '<input id="editPath-' + p.id + '" value="' + escAttr(p.path) + '" placeholder="' + t('web.dashboard.projectPath') + '" class="input">' +
         '<button onclick="openDirDialog(' + p.id + ')" class="btn">📂</button>' +
       '</div>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:8px">' +
+        '<input type="checkbox" id="editObsidian-' + p.id + '" ' + (p.obsidian_mode ? 'checked' : '') + '>' +
+        ' Obsidian vault</label>' +
       '<div style="display:flex;gap:8px">' +
         '<button onclick="doUpdate(' + p.id + ')" class="btn btn-primary" style="font-size:12px">💾 ' + t('web.dashboard.save') + '</button>' +
         '<button onclick="cancelEdit(' + p.id + ')" class="btn" style="font-size:12px">✕ ' + t('common.confirm.cancel') + '</button>' +
@@ -242,6 +285,8 @@ window.cancelEdit = function(id) {
 window.doUpdate = async function(id) {
   var name = document.getElementById('editName-' + id).value.trim();
   var pth = document.getElementById('editPath-' + id).value.trim();
+  var obsidianEl = document.getElementById('editObsidian-' + id);
+  var newObsidian = obsidianEl ? obsidianEl.checked : undefined;
   var errEl = document.getElementById('editError-' + id);
   var btn = document.querySelector('#editForm-' + id + ' .btn-primary');
   errEl.style.display = 'none';
@@ -250,6 +295,7 @@ window.doUpdate = async function(id) {
   var body = {};
   if (name) body.name = name;
   if (pth) body.path = pth;
+  if (newObsidian !== undefined) body.obsidian_mode = newObsidian;
   try {
     var r = await fetch('/api/projects/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) { var d = await r.json(); errEl.textContent = d.error || t('web.dashboard.updateFailed'); errEl.style.display = 'block'; return; }
@@ -277,7 +323,8 @@ window.doRegister = async function() {
   if (!name || !pth) { err.textContent = t('web.dashboard.nameAndPathRequired'); err.style.display = 'block'; return; }
   if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
-    var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth}) });
+    var isObsidian = document.getElementById('regObsidian').checked;
+    var r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, path:pth, obsidian_mode:isObsidian}) });
     if (!r.ok) { var d = await r.json(); err.textContent = d.error || t('web.dashboard.registerFailed'); err.style.display = 'block'; return; }
     document.getElementById('regName').value = '';
     document.getElementById('regPath').value = '';
@@ -408,6 +455,43 @@ function syncHeaderCounts() {
   var hpc = document.getElementById('headerProjCount');
   if (hpc) hpc.textContent = projects.length;
 }
+
+// ═══ Mobile Companion QR Code ═══
+window.initMobileQR = async function () {
+  try {
+    var r = await fetch('/api/server-info');
+    var info = await r.json();
+    if (info.bindAddress === '0.0.0.0' || info.isLocal) {
+      var el = document.getElementById('mobileCompanion');
+      if (el) el.style.display = 'block';
+    }
+    var hostname = window.location.hostname || '127.0.0.1';
+    var url = 'http://' + hostname + ':' + (info.port || 2777) + '/mobile/';
+    document.getElementById('mobileUrlDisplay').textContent = url;
+    renderQR(url);
+  } catch (e) {}
+};
+
+function renderQR(url) {
+  var container = document.getElementById('mobileQrCode');
+  if (!container) return;
+  // Use external API as fallback since QRCode lib isn't loaded client-side
+  container.innerHTML =
+    '<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=' +
+    encodeURIComponent(url) +
+    '" alt="QR" style="width:100px;height:100px;border-radius:4px" onerror="this.innerHTML=\'' +
+    url.replace(/^https?:\/\//, '') +
+    '" style="font-size:10px;color:var(--text-muted);word-break:break-all">';
+}
+
+window.refreshMobileQR = function () {
+  var c = document.getElementById('mobileQrCode');
+  if (c) c.innerHTML = '<span style="font-size:10px;color:var(--text-muted)">⟳</span>';
+  window.initMobileQR();
+};
+
+// Init QR after page loads
+setTimeout(window.initMobileQR, 2000);
 
 // ═══ Init ═══
 __doc77_i18n_ready.then(load);
