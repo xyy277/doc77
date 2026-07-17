@@ -119,20 +119,50 @@ function shortPath(fullPath) {
 }
 
 // ═══ Shared: Render a compact card (used by dashboard.js and favorites.js) ═══
+var TAG_ICONS = {
+  'nodejs': '🟢', 'typescript': '🔷', 'python': '🐍',
+  'go': '🔵', 'rust': '🦀', 'java': '☕',
+  'dotnet': '💠', 'git': '📦',
+};
+var TAG_LABELS = {
+  'nodejs': 'Node', 'typescript': 'TS', 'python': 'Py',
+  'go': 'Go', 'rust': 'Rust', 'java': 'Java',
+  'dotnet': '.NET', 'git': 'Git',
+};
+
 function renderCompactCard(p, inFavorites) {
   var starClass = p.favorited ? 'fav-star favorited' : 'fav-star';
   var starIcon = p.favorited ? '★' : '☆';
   var dateLabel = sortBy === 'last_opened' && p.last_opened
     ? '最近: ' + new Date(p.last_opened).toLocaleDateString('zh-CN', {month:'short',day:'numeric'})
     : '创建: ' + new Date(p.created_at).toLocaleDateString('zh-CN', {month:'short',day:'numeric'});
+  var obsidianIcon = p.obsidian_mode ? '🗃️' : '📂';
+  var obsidianBadge = p.obsidian_mode ? ' <span class="badge-obsidian">[[=]]</span>' : '';
+
+  // Build tag badges
+  var tags = Array.isArray(p.tags) ? p.tags.slice() : [];
+  var tagsHtml = '';
+  if (tags.length > 0) {
+    var visible = tags.slice(0, 3);
+    var extra = tags.length - 3;
+    tagsHtml = '<div class="card-tags">' +
+      visible.map(function(t) {
+        var icon = TAG_ICONS[t] || '';
+        var label = TAG_LABELS[t] || t;
+        return '<span class="tag-badge tag-' + t + '">' + icon + ' ' + label + '</span>';
+      }).join('') +
+      (extra > 0 ? '<span class="tag-badge tag-more">+' + extra + '</span>' : '') +
+      '</div>';
+  }
 
   return '<div class="card card-compact animate-in" data-id="' + p.id + '" onclick="openProject(' + p.id + ')">' +
     '<button class="' + starClass + '" data-id="' + p.id + '" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')">' + starIcon + '</button>' +
-    '<div class="card-icon">📂</div>' +
+    '<div class="card-icon">' + obsidianIcon + '</div>' +
     '<div class="card-body">' +
-      '<div class="card-name">' + esc(p.name) + '</div>' +
+      '<div class="card-name">' + esc(p.name) + obsidianBadge + '</div>' +
       '<div class="card-path" title="' + escAttr(p.path) + '">' + esc(shortPath(p.path)) + '</div>' +
       '<div class="card-date">' + dateLabel + '</div>' +
+      tagsHtml +
     '</div>' +
     '<div class="card-actions">' +
       '<button class="btn-icon" onclick="event.stopPropagation();startEdit(' + p.id + ')" title="编辑">✏️</button>' +

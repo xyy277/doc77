@@ -113,6 +113,7 @@
     <div class="modal-tabs">
       <button class="modal-tab active" data-tab="manual" onclick="switchRegisterTab('manual')">✏️ 手动输入</button>
       <button class="modal-tab" data-tab="discover" onclick="switchRegisterTab('discover')">🔍 扫描发现</button>
+      <button class="modal-tab" data-tab="import" onclick="switchRegisterTab('import')">📦 导入</button>
     </div>
     <div class="modal-body">
       <!-- Tab: Manual -->
@@ -150,6 +151,42 @@
         <div id="discoverActions" style="margin-top:12px;display:none">
           <button class="btn btn-primary" onclick="batchRegister()" style="width:100%">📋 批量注册选中</button>
         </div>
+      </div>
+      <!-- Tab: Import -->
+      <div class="tab-panel" id="tab-import">
+        <div class="section-title" style="font-size:13px;margin-bottom:8px">🔍 Git 项目扫描</div>
+        <div class="form-group">
+          <label>扫描目录</label>
+          <div class="form-row">
+            <input class="input" id="gitDiscoverPath" value="~" placeholder="~/projects">
+            <button class="btn btn-primary" id="btnGitDiscover" onclick="doGitDiscover()">🔍 扫描</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>扫描深度</label>
+          <select id="gitDepth" class="input" style="width:auto">
+            <option value="2">2 (浅)</option>
+            <option value="3" selected>3 (默认)</option>
+            <option value="4">4 (深)</option>
+            <option value="5">5 (最深)</option>
+          </select>
+        </div>
+        <div id="gitDiscoverStatus" class="discover-status"></div>
+        <div id="gitDiscoverCandidates"></div>
+        <div id="gitDiscoverActions" style="margin-top:12px;display:none">
+          <button class="btn btn-primary" onclick="batchRegisterGit()" style="width:100%">📋 批量注册选中</button>
+        </div>
+        <hr style="margin:16px 0;border-color:var(--border-light)">
+        <div class="section-title" style="font-size:13px;margin-bottom:8px">📂 导入 VS Code workspace</div>
+        <div class="form-group">
+          <label>选择 .code-workspace 文件路径</label>
+          <div class="form-row">
+            <input class="input" id="workspacePath" placeholder="~/my.code-workspace">
+            <button class="btn btn-primary" onclick="importWorkspace()">📂 导入</button>
+          </div>
+          <div class="settings-tip">解析 workspace 中的文件夹引用并批量注册项目</div>
+        </div>
+        <div id="workspaceStatus" style="font-size:12px;margin-top:8px"></div>
       </div>
     </div>
   </div>
