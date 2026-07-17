@@ -271,7 +271,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         fs.rmSync(target, { recursive: true, force: true });
         fs.renameSync(src, target);
         fs.unlinkSync(path.join(dest, `${mod}.tgz`));
-        res.json({ ok: true, message: t('api.electron.installDone', { mod: `@doc77/${mod}`, version: info.version }) });
+        res.json({
+          ok: true,
+          message: t('api.electron.installDone', { mod: `@doc77/${mod}`, version: info.version }),
+        });
       } catch (e: unknown) {
         res.status(500).json({ error: (e as Error).message });
       }
@@ -718,7 +721,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         parent: null,
         roots: ['/home', '/tmp'],
         entries: [],
-        error: t('api.fs.mntNotAllowed'), code: 'FS_MNT_NOT_ALLOWED',
+        error: t('api.fs.mntNotAllowed'),
+        code: 'FS_MNT_NOT_ALLOWED',
       });
       return;
     }
@@ -761,7 +765,14 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       return blocked.some((r) => p === r || p.startsWith(r + path.sep));
     }
     if (isPathBlocked(dirPath)) {
-      res.json({ path: dirPath, parent: null, roots: [], entries: [], error: t('api.fs.dirNotAllowed'), code: 'FS_DIR_NOT_ALLOWED' });
+      res.json({
+        path: dirPath,
+        parent: null,
+        roots: [],
+        entries: [],
+        error: t('api.fs.dirNotAllowed'),
+        code: 'FS_DIR_NOT_ALLOWED',
+      });
       return;
     }
 
@@ -1296,13 +1307,17 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       ];
       var isEditable = editableExts.includes(ext) || editableDotfiles.includes(baseName);
       if (!isEditable) {
-        res.status(403).json({ error: t('api.file.typeNotEditable'), code: 'EDIT_TYPE_NOT_ALLOWED' });
+        res
+          .status(403)
+          .json({ error: t('api.file.typeNotEditable'), code: 'EDIT_TYPE_NOT_ALLOWED' });
         return;
       }
 
       // 3. Sensitive file check
       if (isSensitiveFile(path.basename(filePath))) {
-        res.status(403).json({ error: t('api.file.sensitiveNotEditable'), code: 'EDIT_SENSITIVE_NOT_ALLOWED' });
+        res
+          .status(403)
+          .json({ error: t('api.file.sensitiveNotEditable'), code: 'EDIT_SENSITIVE_NOT_ALLOWED' });
         return;
       }
 
@@ -1319,7 +1334,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       })();
       const maxSizeBytes = maxSizeMB * 1024 * 1024;
       if (Buffer.byteLength(content, 'utf-8') > maxSizeBytes) {
-        res.status(413).json({ error: t('api.file.tooLarge', { maxSizeMB }), code: 'FILE_TOO_LARGE' });
+        res
+          .status(413)
+          .json({ error: t('api.file.tooLarge', { maxSizeMB }), code: 'FILE_TOO_LARGE' });
         return;
       }
 
@@ -1334,7 +1351,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       // 6. External change detection
       if (fileExists && expectedModified && !forceOverwrite) {
         if (Math.abs(existingStats!.mtimeMs - new Date(expectedModified).getTime()) > 1000) {
-          res.status(409).json({ error: t('api.file.externalModified'), code: 'FILE_EXTERNAL_MODIFIED' });
+          res
+            .status(409)
+            .json({ error: t('api.file.externalModified'), code: 'FILE_EXTERNAL_MODIFIED' });
           return;
         }
       }
@@ -1673,7 +1692,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Unknown error';
-      res.json({ ok: false, error: t('api.ai.networkError', { message }), code: 'AI_NETWORK_ERROR' });
+      res.json({
+        ok: false,
+        error: t('api.ai.networkError', { message }),
+        code: 'AI_NETWORK_ERROR',
+      });
     }
   });
 
@@ -1700,7 +1723,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     try {
       const { isEngineAvailable, translate, segmentText } = await import('../translate/index.js');
       if (!(await isEngineAvailable())) {
-        res.status(503).json({ error: t('api.translate.notInstalled'), code: 'ENGINE_UNAVAILABLE' });
+        res
+          .status(503)
+          .json({ error: t('api.translate.notInstalled'), code: 'ENGINE_UNAVAILABLE' });
         return;
       }
       const src = source_lang || 'auto';
@@ -1732,7 +1757,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
       if (msg === 'ENGINE_UNAVAILABLE') {
-        res.status(503).json({ error: t('api.translate.engineUnavailable'), code: 'ENGINE_UNAVAILABLE' });
+        res
+          .status(503)
+          .json({ error: t('api.translate.engineUnavailable'), code: 'ENGINE_UNAVAILABLE' });
       } else if (
         msg === 'MODEL_NOT_READY' ||
         msg.includes('fetch failed') ||
@@ -1950,7 +1977,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         ? auth.setupPasswordLegacy(password)
         : auth.setupPasswordWithDEK(password);
       if (!codes) {
-        res.status(409).json({ error: t('api.auth.passwordAlreadySet'), code: 'PASSWORD_ALREADY_SET' });
+        res
+          .status(409)
+          .json({ error: t('api.auth.passwordAlreadySet'), code: 'PASSWORD_ALREADY_SET' });
         return;
       }
       res.json({ ok: true, recovery_codes: codes.formatted });
@@ -2101,13 +2130,18 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         { password_hash: string } | undefined;
       if (authRow?.password_hash) {
         if (!password) {
-          res.status(400).json({ error: t('api.auth.passwordRequiredForReset'), code: 'PASSWORD_REQUIRED_FOR_RESET' });
+          res.status(400).json({
+            error: t('api.auth.passwordRequiredForReset'),
+            code: 'PASSWORD_REQUIRED_FOR_RESET',
+          });
           return;
         }
         if (!crypto.verifyPassword(password, authRow.password_hash)) {
           // Also try legacy params before rejecting
           if (!crypto.verifyPasswordLegacy(password, authRow.password_hash)) {
-            res.status(401).json({ error: t('api.auth.incorrectPassword'), code: 'INCORRECT_PASSWORD' });
+            res
+              .status(401)
+              .json({ error: t('api.auth.incorrectPassword'), code: 'INCORRECT_PASSWORD' });
             return;
           }
         }
@@ -2402,9 +2436,7 @@ export function createAIChatHandler(deps: {
 
     const cfg = getDecryptedAiConfig();
     if (!cfg) {
-      res
-        .status(400)
-        .json({ error: t('api.ai.notConfiguredMessage'), code: 'AI_NOT_CONFIGURED' });
+      res.status(400).json({ error: t('api.ai.notConfiguredMessage'), code: 'AI_NOT_CONFIGURED' });
       return;
     }
 
@@ -2524,8 +2556,8 @@ export function createAIChatHandler(deps: {
             model: cfg.model,
             // Expose write tools only when MCP write functions were injected.
             tools: (deps.writeFns
-              ? [...(getReadTools()), ...((deps.getWriteTools?.() || []))]
-              : (getReadTools())) as any[],
+              ? [...getReadTools(), ...(deps.getWriteTools?.() || [])]
+              : getReadTools()) as any[],
             executeTool,
             maxSteps: 5,
           }) as any,
@@ -2577,7 +2609,11 @@ export function createAIChatHandler(deps: {
           })();
           const fileListDisplay = fileList || t('ai.context.emptyDir');
           (agent as any).addContext(
-            t('ai.context.projectInfo', { name: proj?.name || 'Unknown', path: proj?.path || 'N/A', fileList: fileListDisplay }),
+            t('ai.context.projectInfo', {
+              name: proj?.name || 'Unknown',
+              path: proj?.path || 'N/A',
+              fileList: fileListDisplay,
+            }),
           );
         } catch {
           /* non-fatal */

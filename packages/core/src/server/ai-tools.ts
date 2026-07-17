@@ -121,7 +121,10 @@ export async function executeAiWriteTool(
   switch (name) {
     case 'move_file':
       task = await deps.writeFns.moveFile(pid, sid, args.source as string, args.target as string);
-      desc = t('ai.runtime.descMove', { source: args.source as string, target: args.target as string });
+      desc = t('ai.runtime.descMove', {
+        source: args.source as string,
+        target: args.target as string,
+      });
       break;
     case 'create_folder':
       task = await deps.writeFns.createFolder(pid, sid, args.folder_path as string);

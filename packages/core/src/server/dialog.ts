@@ -174,8 +174,7 @@ function linuxDialog(): Promise<string | null> {
 
 function tryTkDialog(): Promise<string | null> {
   return new Promise((resolve) => {
-    const pyScript =
-      `import tkinter.filedialog as fd, tkinter as tk; root=tk.Tk(); root.withdraw(); print(fd.askdirectory(title="${t('api.dialog.selectProjectDir')}") or "")`;
+    const pyScript = `import tkinter.filedialog as fd, tkinter as tk; root=tk.Tk(); root.withdraw(); print(fd.askdirectory(title="${t('api.dialog.selectProjectDir')}") or "")`;
     execFile('python3', ['-c', pyScript], { timeout: 120000 }, (err, stdout) => {
       if (err || !stdout) {
         resolve(null);

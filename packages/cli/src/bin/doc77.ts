@@ -347,7 +347,10 @@ async function main() {
         console.log(t('cli.start.bindWarning', { addr: bindAddr }));
       }
       server.listen(port, bindAddr, () => {
-        const displayAddr = bindAddr === '127.0.0.1' || bindAddr === '::1' || bindAddr === 'localhost' ? 'localhost' : bindAddr;
+        const displayAddr =
+          bindAddr === '127.0.0.1' || bindAddr === '::1' || bindAddr === 'localhost'
+            ? 'localhost'
+            : bindAddr;
         console.log(t('cli.start.dashboardUrl', { addr: displayAddr, port }));
         console.log(t('cli.start.desktopLink'));
       });
@@ -470,20 +473,17 @@ async function main() {
         if (force) {
           const readline = await import('node:readline');
           const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-          rl.question(
-            t('cli.config.resetPwd.forceConfirm'),
-            async (answer: string) => {
-              rl.close();
-              if (answer.trim() !== 'yes-i-know') {
-                console.error(t('cli.config.resetPwd.cancelled'));
-                process.exit(1);
-              }
-              const { forceResetPassword } = await import('@doc77/core');
-              forceResetPassword();
-              console.log(t('cli.config.resetPwd.ok'));
-              process.exit(0);
-            },
-          );
+          rl.question(t('cli.config.resetPwd.forceConfirm'), async (answer: string) => {
+            rl.close();
+            if (answer.trim() !== 'yes-i-know') {
+              console.error(t('cli.config.resetPwd.cancelled'));
+              process.exit(1);
+            }
+            const { forceResetPassword } = await import('@doc77/core');
+            forceResetPassword();
+            console.log(t('cli.config.resetPwd.ok'));
+            process.exit(0);
+          });
           return;
         }
         const readline = await import('node:readline');
@@ -652,13 +652,18 @@ async function main() {
         }
         for (const pair of pairs) {
           const mi = MODEL_PAIRS[pair];
-          console.log(t('cli.translate.downloading', { displayName: mi.displayName, size: mi.size }));
+          console.log(
+            t('cli.translate.downloading', { displayName: mi.displayName, size: mi.size }),
+          );
           try {
             await translate('Hello', mi.sourceLang, mi.targetLang);
             console.log(t('cli.translate.modelReady', { displayName: mi.displayName }));
           } catch (e: unknown) {
             console.error(
-              t('cli.translate.downloadFailed', { displayName: mi.displayName, error: e instanceof Error ? e.message : 'Unknown' }),
+              t('cli.translate.downloadFailed', {
+                displayName: mi.displayName,
+                error: e instanceof Error ? e.message : 'Unknown',
+              }),
             );
           }
         }
@@ -783,7 +788,10 @@ async function main() {
         for (const r of results) {
           console.log(`  📂 ${r.name}`);
           console.log(t('cli.discover.pathLabel', { path: r.path }));
-          console.log(t('cli.discover.markdownLabel', { count: r.mdCount }) + (r.hasReadme ? t('cli.discover.hasReadme') : ''));
+          console.log(
+            t('cli.discover.markdownLabel', { count: r.mdCount }) +
+              (r.hasReadme ? t('cli.discover.hasReadme') : ''),
+          );
           console.log('');
         }
         console.log(t('cli.discover.registerUsage'));

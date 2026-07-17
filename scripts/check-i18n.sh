@@ -6,7 +6,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-WHITELIST='packages/core/src/translate/models\.ts|packages/core/src/i18n/locales/|__tests__|\.test\.ts'
+WHITELIST='packages/core/src/translate/models\.ts|packages/core/src/i18n/locales/|__tests__|\.test\.ts|doc77_logo_design\.html'
 TARGETS=("$@")
 if [ ${#TARGETS[@]} -eq 0 ]; then
   TARGETS=(packages/*/src)

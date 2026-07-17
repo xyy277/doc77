@@ -3,7 +3,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
-  initI18n, t, setLocale, getLocale, listLocales, resolveLocale, getDict,
+  initI18n,
+  t,
+  setLocale,
+  getLocale,
+  listLocales,
+  resolveLocale,
+  getDict,
 } from '../src/i18n/index.js';
 
 describe('i18n', () => {
@@ -57,10 +63,14 @@ describe('i18n', () => {
 
   it('merges external pack: same-code overrides builtin, new code registers', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doc77-loc-'));
-    fs.writeFileSync(path.join(dir, 'zh-CN.json'),
-      JSON.stringify({ _meta: { code: 'zh-CN', name: '简体中文' }, 'test.hello': '您好' }));
-    fs.writeFileSync(path.join(dir, 'ja-JP.json'),
-      JSON.stringify({ _meta: { code: 'ja-JP', name: '日本語' }, 'test.hello': 'こんにちは' }));
+    fs.writeFileSync(
+      path.join(dir, 'zh-CN.json'),
+      JSON.stringify({ _meta: { code: 'zh-CN', name: '简体中文' }, 'test.hello': '您好' }),
+    );
+    fs.writeFileSync(
+      path.join(dir, 'ja-JP.json'),
+      JSON.stringify({ _meta: { code: 'ja-JP', name: '日本語' }, 'test.hello': 'こんにちは' }),
+    );
     initI18n('zh-CN', { externalDir: dir });
     expect(t('test.hello')).toBe('您好'); // 外部覆盖内置
     setLocale('ja-JP');

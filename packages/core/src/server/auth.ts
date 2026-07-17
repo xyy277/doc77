@@ -368,10 +368,20 @@ export function verifyLogin(password: string): {
       db.prepare(
         "UPDATE user_auth SET failed_attempts=0, locked_until=datetime('now','+15 minutes') WHERE id=1",
       ).run();
-      return { ok: false, error: t('api.auth.tooManyAttempts'), code: 'TOO_MANY_ATTEMPTS', status: 423 };
+      return {
+        ok: false,
+        error: t('api.auth.tooManyAttempts'),
+        code: 'TOO_MANY_ATTEMPTS',
+        status: 423,
+      };
     }
     db.prepare('UPDATE user_auth SET failed_attempts=? WHERE id=1').run(fails);
-    return { ok: false, error: t('api.auth.wrongPassword', { fails, max: 5 }), code: 'WRONG_PASSWORD', status: 401 };
+    return {
+      ok: false,
+      error: t('api.auth.wrongPassword', { fails, max: 5 }),
+      code: 'WRONG_PASSWORD',
+      status: 401,
+    };
   }
 
   db.prepare('UPDATE user_auth SET failed_attempts=0, locked_until=NULL WHERE id=1').run();
@@ -394,14 +404,24 @@ export function verifyRecoveryCode(rcInput: string): {
   const row = getAuthRow();
 
   if (!row?.recovery_code_hashes) {
-    return { ok: false, error: t('api.auth.noRecoveryCode'), code: 'NO_RECOVERY_CODE', status: 404 };
+    return {
+      ok: false,
+      error: t('api.auth.noRecoveryCode'),
+      code: 'NO_RECOVERY_CODE',
+      status: 404,
+    };
   }
 
   if (row.recovery_locked_until && new Date(row.recovery_locked_until as string) > new Date()) {
     const mins = Math.ceil(
       (new Date(row.recovery_locked_until as string).getTime() - Date.now()) / 60000,
     );
-    return { ok: false, error: `recovery_locked (${mins} min)`, code: 'RECOVERY_LOCKED', status: 423 };
+    return {
+      ok: false,
+      error: `recovery_locked (${mins} min)`,
+      code: 'RECOVERY_LOCKED',
+      status: 423,
+    };
   }
 
   // Normalize: remove dashes
@@ -452,7 +472,12 @@ export function verifyRecoveryCode(rcInput: string): {
   }
 
   if (used[matchIdx]) {
-    return { ok: false, error: 'recovery_code_already_used', code: 'RECOVERY_CODE_USED', status: 401 };
+    return {
+      ok: false,
+      error: 'recovery_code_already_used',
+      code: 'RECOVERY_CODE_USED',
+      status: 401,
+    };
   }
 
   // Unwrap DEK with recovery code
@@ -565,7 +590,12 @@ export function changePassword(
     !crypto.verifyPassword(oldPassword, row.password_hash as string) &&
     !crypto.verifyPasswordLegacy(oldPassword, row.password_hash as string)
   ) {
-    return { ok: false, error: 'current_password_wrong', code: 'CURRENT_PASSWORD_WRONG', status: 401 };
+    return {
+      ok: false,
+      error: 'current_password_wrong',
+      code: 'CURRENT_PASSWORD_WRONG',
+      status: 401,
+    };
   }
 
   // Check if legacy mode — migrate to envelope encryption
@@ -715,7 +745,12 @@ export function regenerateRecoveryCodes(
     !crypto.verifyPassword(password, row.password_hash as string) &&
     !crypto.verifyPasswordLegacy(password, row.password_hash as string)
   ) {
-    return { ok: false, error: 'current_password_wrong', code: 'CURRENT_PASSWORD_WRONG', status: 401 };
+    return {
+      ok: false,
+      error: 'current_password_wrong',
+      code: 'CURRENT_PASSWORD_WRONG',
+      status: 401,
+    };
   }
 
   // Unwrap DEK with password using helper

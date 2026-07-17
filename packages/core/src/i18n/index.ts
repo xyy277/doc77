@@ -66,7 +66,7 @@ export function initI18n(lang?: string, opts?: { externalDir?: string }): void {
         const { meta, dict } = splitPack(raw);
         if (!meta) continue;
         if (dicts[meta.code]) {
-          Object.assign(dicts[meta.code], dict); // 外部覆盖内置同名 key
+          Object.assign(dicts[meta.code], dict); // external dict overrides built-in key
         } else {
           dicts[meta.code] = dict;
           locales.push(meta);
@@ -104,9 +104,7 @@ export function resolveLocale(explicit?: string, hint?: string): string {
 export function t(key: string, params?: Record<string, string | number>): string {
   const v = dicts[current]?.[key] ?? dicts[FALLBACK]?.[key] ?? key;
   if (!params) return v;
-  return v.replace(/\{(\w+)\}/g, (m, name: string) =>
-    name in params ? String(params[name]) : m,
-  );
+  return v.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? String(params[name]) : m));
 }
 
 export function setLocale(lang: string): void {

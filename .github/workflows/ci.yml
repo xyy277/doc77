@@ -25,6 +25,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm format:check
+      - name: Check i18n coverage
+        run: pnpm check:i18n
 
   build:
     name: Build

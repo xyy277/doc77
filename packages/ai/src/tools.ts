@@ -144,7 +144,10 @@ export function getWriteTools(): ToolDefinition[] {
                   },
                   source: { type: 'string', description: t('ai.tool.batchOperations.source') },
                   target: { type: 'string', description: t('ai.tool.batchOperations.target') },
-                  folder_path: { type: 'string', description: t('ai.tool.batchOperations.folderPath') },
+                  folder_path: {
+                    type: 'string',
+                    description: t('ai.tool.batchOperations.folderPath'),
+                  },
                   file_path: { type: 'string', description: t('ai.tool.batchOperations.filePath') },
                 },
                 required: ['type'],
