@@ -456,8 +456,32 @@ function toggleSettings() {
   var opening = !ov.classList.contains('visible');
   ov.classList.toggle('visible');
   if (opening) {
+    renderSettingsTabs();
     switchSettingsTab('system');
   }
+}
+
+// ═══ Unified Settings Tabs ═══
+
+var SETTINGS_TABS = [
+  { id: 'system', label: '💾 系统' },
+  { id: 'ai', label: '🤖 AI' },
+  { id: 'account', label: '👤 账户' },
+  { id: 'translate', label: '🌐 翻译' },
+  { id: 'share', label: '🔗 分享' },
+];
+
+function renderSettingsTabs() {
+  var container = document.getElementById('settingsTabs');
+  if (!container || container.querySelector('button')) return; // already rendered
+  container.innerHTML = SETTINGS_TABS
+    .map(function (t, i) {
+      return '<button onclick="switchSettingsTab(\'' + t.id + '\')" class="modal-tab' +
+        (i === 0 ? ' active' : '') +
+        '" data-tab="' + t.id + '" style="border-bottom:none">' +
+        t.label + '</button>';
+    })
+    .join('');
 }
 function switchSettingsTab(tab) {
   document.querySelectorAll('#settingsTabs button').forEach(function (b) {
@@ -518,9 +542,8 @@ function switchSettingsTab(tab) {
       '<option value="qwen">Qwen (阿里)</option><option value="kimi">Kimi</option><option value="doubao">Doubao</option><option value="glm">GLM (智谱)</option></select></div>' +
       settingRow('Base URL', 'ai.base_url', 'text', 'https://api.deepseek.com') +
       '<div class="settings-row"><span class="settings-label">模型</span>' +
-      '<select id="aiModelSelect" onchange="onModelSelect(this.value)" class="settings-select">' +
-      '<option value="deepseek-v4-pro">deepseek-v4-pro</option><option value="deepseek-v4-flash">deepseek-v4-flash</option></select></div>' +
-      '<input data-key="ai.model" type="hidden" value="deepseek-v4-pro">' +
+      '<input id="aiModelInput" data-key="ai.model" list="aiModelSuggestions" class="settings-input" placeholder="选择或输入模型名称" style="flex:1;min-width:0">' +
+      '<datalist id="aiModelSuggestions"></datalist></div>' +
       settingRow('API Token', 'ai.token', 'password', 'sk-...') +
       '<div class="settings-tip" style="margin-left:4px">🔒 Token 仅保存在本地 SQLite 数据库</div>' +
       '<button onclick="testConnection()" style="width:100%;padding:6px 0;font-size:13px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;background:transparent;cursor:pointer;margin-top:8px" onmouseover="this.style.background=\'var(--accent-light-bg)\'" onmouseout="this.style.background=\'transparent\'">🔗 测试连接</button>' +
@@ -711,47 +734,30 @@ var AI_PROVIDERS = {
   glm: { url: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-5.2'] },
   custom: { url: '', models: [] },
 };
+
+// All known models flattened — used as suggestions when provider is 'custom'
+var ALL_KNOWN_MODELS = Object.values(AI_PROVIDERS)
+  .reduce(function (acc, p) { return acc.concat(p.models); }, [])
+  .filter(function (m, i, a) { return a.indexOf(m) === i; });
 function onModelSelect(v) {
   var modelEl = document.querySelector('[data-key="ai.model"]');
-  if (!modelEl) return;
-  if (v === '_custom') {
-    var m = prompt('输入模型名称:');
-    if (m) {
-      var sel = document.getElementById('aiModelSelect');
-      var o = document.createElement('option');
-      o.value = m;
-      o.textContent = m;
-      o.selected = true;
-      sel.insertBefore(o, sel.lastChild);
-      modelEl.value = m;
-    }
-  } else {
-    modelEl.value = v;
-  }
+  if (modelEl) modelEl.value = v;
 }
 function onProviderChange() {
   var p = document.getElementById('aiProvider').value;
   var info = AI_PROVIDERS[p];
   var urlEl = document.querySelector('[data-key="ai.base_url"]');
-  var sel = document.getElementById('aiModelSelect');
-  var modelEl = document.querySelector('[data-key="ai.model"]');
+  var modelInput = document.getElementById('aiModelInput');
+  var datalist = document.getElementById('aiModelSuggestions');
   if (info.url) urlEl.value = info.url;
-  sel.innerHTML =
-    (info.models.length
-      ? info.models
-          .map(function (m) {
-            return '<option value="' + m + '">' + m + '</option>';
-          })
-          .join('')
-      : '<option value="">(手动输入)</option>') +
-    (p !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
-  if (info.models.length) {
-    modelEl.value = info.models[0];
-    sel.value = info.models[0];
+  // Populate datalist: for custom, show ALL known models; otherwise show provider's models
+  var suggestions = p === 'custom' ? ALL_KNOWN_MODELS : info.models;
+  datalist.innerHTML = suggestions
+    .map(function (m) { return '<option value="' + m + '">' + m + '</option>'; })
+    .join('');
+  if (info.models.length && modelInput && !modelInput.value) {
+    modelInput.value = info.models[0];
   }
-  sel.onchange = function () {
-    onModelSelect(this.value);
-  };
 }
 async function testConnection() {
   var r = document.getElementById('testResult');
@@ -797,33 +803,21 @@ async function loadSettingsValues() {
         el.value = v;
       }
     });
-    // Refresh model dropdown to match the persisted provider
+    // Refresh model datalist to match the persisted provider
     var pv = d['ai.provider'];
     if (pv && AI_PROVIDERS[pv]) {
       var info = AI_PROVIDERS[pv];
-      var sel = document.getElementById('aiModelSelect');
-      var modelEl = document.querySelector('[data-key="ai.model"]');
-      var savedModel = modelEl ? modelEl.value : '';
-      sel.innerHTML =
-        (info.models.length
-          ? info.models
-              .map(function (m) {
-                return '<option value="' + m + '">' + m + '</option>';
-              })
-              .join('')
-          : '<option value="">(手动输入)</option>') +
-        (pv !== 'custom' ? '<option value="_custom">(其他...)</option>' : '');
-      if (info.models.length) {
-        var opt = sel.querySelector('option[value="' + savedModel + '"]');
-        if (opt) opt.selected = true;
-        else {
-          modelEl.value = info.models[0];
-          sel.value = info.models[0];
-        }
+      var modelInput = document.getElementById('aiModelInput');
+      var datalist = document.getElementById('aiModelSuggestions');
+      if (modelInput && datalist) {
+        var savedModel = modelInput.value || d['ai.model'] || '';
+        var suggestions = pv === 'custom' ? ALL_KNOWN_MODELS : info.models;
+        datalist.innerHTML = suggestions
+          .map(function (m) { return '<option value="' + m + '">' + m + '</option>'; })
+          .join('');
+        if (savedModel) modelInput.value = savedModel;
+        else if (info.models.length) modelInput.value = info.models[0];
       }
-      sel.onchange = function () {
-        onModelSelect(this.value);
-      };
     }
   } catch (e) {}
 }

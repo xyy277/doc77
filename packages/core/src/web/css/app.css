@@ -1653,6 +1653,20 @@ body {
 .settings-select:focus {
   border-color: var(--accent);
 }
+.settings-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  outline: none;
+}
+.settings-input:focus {
+  border-color: var(--accent);
+}
 .settings-hint {
   font-size: 10px;
   color: var(--text-muted);
