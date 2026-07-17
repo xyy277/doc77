@@ -3684,6 +3684,7 @@ async function exportHTML() {
         styles: styles,
         images: images,
         theme: theme,
+        projectId: parseInt(pid, 10),
       }),
     });
 
