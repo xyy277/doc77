@@ -59,14 +59,14 @@ body{margin:0;background:var(--bg-body);color:var(--text-primary);font-family:-a
 <body>
 <div class="doc77-share-page">
   <header class="doc77-share-header">
-    <a href="https://doc77.dev" class="brand" target="_blank" rel="noopener">Doc77</a>
+    <a href="/" class="brand">Doc77</a>
     <span class="info">${escapeHtml(t('web.sharePage.readonlyBadge'))}</span>
   </header>
   <div class="doc77-content" id="content">
     <div class="loading">${escapeHtml(t('web.sharePage.loading'))}</div>
   </div>
   <footer class="doc77-share-footer">
-    Powered by <a href="https://doc77.dev" target="_blank" rel="noopener">Doc77</a>
+    Powered by <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener">Doc77</a>
   </footer>
 </div>
 <script>
