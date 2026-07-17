@@ -234,7 +234,7 @@ function langSelect(id, defaultLabelKey) {
   (window.__doc77_locales || []).forEach(function (l) {
     opts += '<option value="' + escapeHtml(l.code) + '">' + escapeHtml(l.name) + '</option>';
   });
-  return '<select id="' + id + '" onchange="onLangChange(this)" style="font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-card);color:var(--text-primary);max-width:200px">' + opts + '</select>';
+  return '<select id="' + id + '" onchange="onLangChange(this)" class="settings-select">' + opts + '</select>';
 }
 function onLangChange(sel) {
   if (sel.id === 'uiLangSelect') {

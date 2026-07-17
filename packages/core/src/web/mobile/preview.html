@@ -387,7 +387,7 @@
         var children = data.entries.slice();
         children.sort(function (a, b) {
           if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-          return a.name.localeCompare(b.name, 'zh-CN');
+          return a.name.localeCompare(b.name, window.__doc77_lang || 'zh-CN');
         });
 
         var html = '';
