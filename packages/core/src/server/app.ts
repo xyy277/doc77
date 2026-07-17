@@ -7,6 +7,7 @@ import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
 import { discoverProjects } from '../scanner/discover.js';
+import { detectProjectTags, discoverGitProjects, parseCodeWorkspace } from '../scanner/project-detector.js';
 import {
   registerProject,
   listProjects,
@@ -479,35 +480,96 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     }
   });
 
+  // Git project discovery
+  app.get('/api/discover/git', (req: Request, res: Response) => {
+    const dirPath = (req.query.path as string) || os.homedir();
+    const depth = Math.min(5, Math.max(2, parseInt(req.query.depth as string, 10) || 3));
+
+    try {
+      const repos = discoverGitProjects(dirPath, depth);
+      // Filter out already-registered paths
+      const existingPaths = new Set(listProjects().map(p => path.resolve(p.path)));
+      const filtered = repos.filter(r => !existingPaths.has(r.path));
+
+      res.json({ root: dirPath, repositories: filtered, count: filtered.length });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  // Import VS Code workspace
+  app.post('/api/projects/import-workspace', (req: Request, res: Response) => {
+    const { workspacePath } = req.body;
+    if (!workspacePath) {
+      res.status(400).json({ error: 'workspacePath is required' });
+      return;
+    }
+
+    try {
+      const folders = parseCodeWorkspace(workspacePath);
+      if (!folders.length) {
+        res.status(400).json({ error: '无效的 workspace 文件或无文件夹引用' });
+        return;
+      }
+
+      const existingPaths = new Set(listProjects().map(p => p.path));
+      const imported: Array<{ path: string; name: string; tags: string[]; id?: number }> = [];
+      const skipped: string[] = [];
+
+      for (const folder of folders) {
+        if (existingPaths.has(folder.path)) {
+          skipped.push(folder.name);
+          continue;
+        }
+        try {
+          const tags = detectProjectTags(folder.path);
+          const project = registerProject(folder.name, folder.path, false, tags);
+          imported.push({ path: folder.path, name: folder.name, tags, id: project.id });
+          existingPaths.add(folder.path);
+        } catch {
+          // skip individual failures
+        }
+      }
+
+      res.json({ workspacePath, imported, skipped, count: imported.length });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(400).json({ error: message });
+    }
+  });
+
   // Project CRUD
   app.get('/api/projects', (_req: Request, res: Response) => {
     const db = getConnection();
-    const projects = db
+    const rows = db
       .prepare(
-        `SELECT p.id, p.name, p.path, p.obsidian_mode, p.created_at, p.last_opened,
+        `SELECT p.id, p.name, p.path, p.created_at, p.last_opened,
+              p.obsidian_mode, p.tags,
               CASE WHEN f.project_id IS NOT NULL THEN 1 ELSE 0 END as favorited
        FROM projects p
        LEFT JOIN favorites f ON f.project_id = p.id
        ORDER BY p.name`,
       )
-      .all() as Array<Record<string, unknown>>;
-    res.json(
-      projects.map((p) => ({
-        ...p,
-        obsidian_mode: p.obsidian_mode === 1,
-      })),
-    );
+      .all() as any[];
+    const projects = rows.map(r => ({
+      ...r,
+      obsidian_mode: !!r.obsidian_mode,
+      tags: (() => { try { return JSON.parse(r.tags || '[]'); } catch { return []; } })(),
+    }));
+    res.json(projects);
   });
 
   app.post('/api/projects', (req: Request, res: Response) => {
-    const { name, path: projectPath, obsidian_mode } = req.body;
+    const { name, path: projectPath, obsidian_mode, tags } = req.body;
     if (!name || !projectPath) {
       res.status(400).json({ error: 'name and path are required' });
       return;
     }
     try {
       const resolved = resolveProjectPath(projectPath);
-      const project = registerProject(name, resolved, Boolean(obsidian_mode));
+      const finalTags = tags || detectProjectTags(resolved);
+      const project = registerProject(name, resolved, Boolean(obsidian_mode), finalTags);
       res.status(201).json(project);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -532,18 +594,18 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   // Update project
   app.put('/api/projects/:id', (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
-    const { name, path: newPath, obsidian_mode } = req.body;
+    const { name, path: newPath, obsidian_mode, tags } = req.body;
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid project id' });
       return;
     }
-    if (!name && !newPath && obsidian_mode === undefined) {
-      res.status(400).json({ error: 'name, path, or obsidian_mode required' });
+    if (!name && !newPath && obsidian_mode === undefined && tags === undefined) {
+      res.status(400).json({ error: 'name, path, obsidian_mode, or tags required' });
       return;
     }
     try {
       const resolved = newPath ? resolveProjectPath(newPath) : undefined;
-      updateProject(id, { name, path: resolved, obsidian_mode });
+      updateProject(id, { name, path: resolved, obsidian_mode, tags });
       res.json({ ok: true });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Unknown error';

@@ -1380,3 +1380,17 @@ a.wikilink:hover { border-bottom-style: solid; }
 /* ── Registration form checkbox ── */
 .checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+/* ── Tag Badges ── */
+.card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tag-badge { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+.tag-nodejs { background: #dcfce7; color: #166534; }
+.tag-typescript { background: #dbeafe; color: #1e40af; }
+.tag-python { background: #fef9c3; color: #854d0e; }
+.tag-go { background: #cffafe; color: #155e75; }
+.tag-rust { background: #ffedd5; color: #9a3412; }
+.tag-java { background: #fee2e2; color: #991b1b; }
+.tag-dotnet { background: #e0e7ff; color: #3730a3; }
+.tag-git { background: #f3f4f6; color: #4b5563; }
+.tag-obsidian { background: #f3e8ff; color: #6b21a8; }
+.tag-more { background: var(--bg-code); color: var(--text-muted); }

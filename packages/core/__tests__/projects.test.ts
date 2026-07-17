@@ -139,4 +139,21 @@ describe('Project CRUD', () => {
       expect(updated?.obsidian_mode).toBe(true);
     });
   });
+
+  describe('tags', () => {
+    it('should default to empty array', () => {
+      const p = registerProject('NoTags', projectDir);
+      expect(p.tags).toEqual([]);
+    });
+    it('should register with tags', () => {
+      const p = registerProject('Tagged', projectDir, false, ['nodejs', 'git']);
+      expect(p.tags).toEqual(['nodejs', 'git']);
+    });
+    it('should update tags', () => {
+      const p = registerProject('TagUpdate', projectDir);
+      updateProject(p.id, { tags: ['python'] });
+      const updated = listProjects().find(pr => pr.id === p.id);
+      expect(updated?.tags).toEqual(['python']);
+    });
+  });
 });

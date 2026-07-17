@@ -47,8 +47,11 @@ export function runMigrations(db?: DatabaseCompat): void {
     addColumnIfNotExists(conn, 'user_auth', col, def);
   }
 
-  // v3: Obsidian vault mode
+  // v3: Obsidian mode support
   addColumnIfNotExists(conn, 'projects', 'obsidian_mode', 'INTEGER NOT NULL DEFAULT 0');
+
+  // v4: Project tags (JSON array)
+  addColumnIfNotExists(conn, 'projects', 'tags', "TEXT NOT NULL DEFAULT '[]'");
 }
 
 const SCHEMA_SQL = `
@@ -58,6 +61,7 @@ CREATE TABLE IF NOT EXISTS projects (
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
     obsidian_mode INTEGER NOT NULL DEFAULT 0,
+    tags TEXT NOT NULL DEFAULT '[]',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_opened DATETIME
 );
