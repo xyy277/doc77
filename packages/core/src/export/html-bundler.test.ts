@@ -53,6 +53,33 @@ describe('bundleHTML', () => {
     expect(result).toContain('--bg-body:#0f172a');
   });
 
+  it('should add class="dark" on <html> for dark exports (Tailwind dark: variants)', () => {
+    const dark = bundleHTML({ ...minimalParams, theme: 'dark' });
+    expect(dark).toMatch(/<html [^>]*class="dark"/);
+    const light = bundleHTML(minimalParams);
+    expect(light).not.toContain('class="dark"');
+  });
+
+  it('should force themed background after collected CSS (export chrome wins)', () => {
+    // Simulate collected app CSS that would otherwise repaint the page white
+    const result = bundleHTML({
+      ...minimalParams,
+      theme: 'dark',
+      styles: ['html{background:#f8fafc}html.dark{background:#0f172a}body{padding:0}'],
+    });
+    const chromeIdx = result.indexOf('Doc77 export chrome');
+    const collectedIdx = result.indexOf('html{background:#f8fafc}');
+    expect(collectedIdx).toBeGreaterThan(-1);
+    expect(chromeIdx).toBeGreaterThan(collectedIdx); // chrome block comes after collected CSS
+    expect(result).toContain('html{background:var(--bg-body)!important}');
+    expect(result).toContain('background:var(--bg-body)!important;');
+  });
+
+  it('should give the export body comfortable padding', () => {
+    const result = bundleHTML(minimalParams);
+    expect(result).toContain('padding:3rem 3.5rem!important');
+  });
+
   it('should escape HTML in title', () => {
     const result = bundleHTML({ ...minimalParams, title: 'test <script>alert("xss")</script>' });
     expect(result).toContain('&lt;script&gt;alert');
