@@ -39,6 +39,7 @@ import { createRateLimiter } from './rate-limit.js';
 import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
+import { getMobileInfo, publishMdns } from './mobile-mdns.js';
 
 import { VERSION } from '../version.gen.js';
 
@@ -189,6 +190,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     next();
   });
 
+  // --- mDNS publisher for mobile companion discovery ---
+  let mdnsService: { destroy: () => void } | null = null;
+  if (port) {
+    publishMdns(port).then((s) => { mdnsService = s; });
+  }
+
   // --- API Routes ---
 
   // Server info — runtime state (actual bind address, not config)
@@ -220,6 +227,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       /* non-critical */
     }
     res.json(info);
+  });
+
+  // Mobile info — device info for companion app discovery
+  app.get('/api/mobile/info', (_req: Request, res: Response) => {
+    res.json(getMobileInfo(port || 2777));
   });
 
   // Module capabilities
@@ -2171,6 +2183,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     res.status(500).json({
       error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
     });
+  });
+
+  // Cleanup on app close — stop mDNS publisher
+  app.on('close', () => {
+    mdnsService?.destroy();
   });
 
   return app;
