@@ -524,7 +524,7 @@
   "web.index.status.loading": "加载中...",
   "web.index.theme.toggle": "切换主题",
   "web.index.mobile.switch": "移动版",
-  "web.index.hero.headline": "Doc77 &mdash; 本地文档预览与管理 Agent",
+  "web.index.hero.headline": "Doc77 — 本地文档预览与管理 Agent",
   "web.index.hero.tagline": "默认安全、对话驱动的智能文档工作台。支持 Markdown、PDF、Office、代码文件等多种格式，集成 AI 助手、TTS 朗读、全局搜索、MCP 协议。",
   "web.index.hero.quickstart": "📖 快速入门",
   "web.index.settings": "设置",
