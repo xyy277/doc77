@@ -183,3 +183,13 @@
 | 2026-07-07 | ✅ Phase 4 完成：MCP Server + 8 Tools + Security + Session（116 tests） |
 | 2026-07-07 | ✅ Phase 5 完成：Queue + Approval + Shadow/Rollback + Lock + GC（138 tests） |
 | 2026-07-07 | ✅ Phase 6-8 完成：AI Module + CLI + Polish（138 tests, 40/40 Tasks） |
+
+## 附加改造记录
+
+### i18n 多语言化（2026-07-17 完成，不在原 40-task 计划内）
+
+- 自研零依赖 i18n 模块（packages/core/src/i18n/），753 个词条 key，zh-CN / en-US 内置
+- 覆盖六层：Web UI、CLI、API 错误（含 code 字段）、MCP/AI tool descriptions、AI system prompt、Electron 托盘
+- 外部语言包目录 ~/.doc77/locales/*.json（下载命令留待未来）
+- `pnpm check:i18n` 覆盖率门禁已纳入 CI
+- Spec: docs/superpowers/specs/2026-07-16-i18n-design.md / Plan: docs/superpowers/plans/2026-07-16-i18n.md

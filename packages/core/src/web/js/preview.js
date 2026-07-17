@@ -1046,7 +1046,7 @@ function toggleTTS() {
   document.getElementById('ttsRate').classList.remove('hidden');
   var rate = parseFloat(document.getElementById('ttsRate').value) || 1;
   var u = new SpeechSynthesisUtterance(text.substring(0, 5000));
-  u.lang = 'zh-CN'; u.rate = rate;
+  u.lang = window.__doc77_lang || 'zh-CN'; u.rate = rate;
   u.onend = function() { ttsActive = false; document.getElementById('ttsBtn').textContent = '🔊'; document.getElementById('ttsRate').classList.add('hidden'); };
   window.speechSynthesis.speak(u);
 }
@@ -1225,7 +1225,7 @@ function readSummary() {
   var txt = document.getElementById('summaryText').textContent;
   if (!txt || txt === t('web.preview.generating')) return;
   var u = new SpeechSynthesisUtterance(txt);
-  u.lang = 'zh-CN'; u.rate = 1;
+  u.lang = window.__doc77_lang || 'zh-CN'; u.rate = 1;
   window.speechSynthesis.speak(u);
 }
 

@@ -459,7 +459,7 @@ function onModelSelect(v) {
   var modelEl = document.querySelector('[data-key="ai.model"]');
   if (!modelEl) return;
   if (v === '_custom') {
-    var m = prompt(t('common.settings.manualInput').replace(/[()]/g, '').trim());
+    var m = prompt(t('common.settings.promptModelName'));
     if (m) {
       var sel = document.getElementById('aiModelSelect');
       var o = document.createElement('option');

@@ -141,7 +141,7 @@ export async function executeAiWriteTool(
       break;
     }
     default:
-      return `Error: Unknown write tool "${name}"`;
+      return t('ai.runtime.unknownTool', { name });
   }
 
   return t('ai.runtime.queuedForApproval', { taskId: task.task_id, desc });
