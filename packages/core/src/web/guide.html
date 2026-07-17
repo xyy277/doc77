@@ -5,7 +5,7 @@
 <style>.i18n-loading body{visibility:hidden}</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doc77 — 功能引导</title>
+<title data-i18n="web.guide.pageTitle">Doc77 — Guide</title>
 <script>
 (function(){
   var s = document.createElement('script');
@@ -245,7 +245,7 @@
 <div class="scroll-progress" id="scrollProgress"></div>
 
 <!-- Back to Top -->
-<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到顶部">
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" data-i18n-title="web.preview.backToTop" title="Back to top">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
 </button>
 
@@ -256,14 +256,14 @@
       <img src="/assets/logo-dark.svg" alt="Doc77" height="32">
     </a>
     <div class="guide-header-actions">
-      <button onclick="toggleTheme()" class="guide-header-link" id="themeBtn" title="切换主题">
+      <button onclick="toggleTheme()" class="guide-header-link" id="themeBtn" data-i18n-title="web.preview.sidebar.themeToggle" title="Toggle theme">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
       </button>
       <a href="/" class="guide-header-link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        首页
+        <span data-i18n="web.guide.home">Home</span>
       </a>
     </div>
   </div>
@@ -274,22 +274,22 @@
   <div class="guide-hero-inner">
     <div class="guide-hero-label">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      GETTING STARTED
+      <span data-i18n="web.guide.hero.label">GETTING STARTED</span>
     </div>
-    <h1>5 分钟掌握 Doc77</h1>
+    <h1 data-i18n="web.guide.hero.title">Master Doc77 in 5 Minutes</h1>
     <p>
-      Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。
+      <span data-i18n="web.guide.hero.desc1">Doc77 is a secure-by-default, conversation-driven local document management Agent.</span>
       <br class="hidden sm:block">
-      从目录树到 AI 助手，了解每个功能的用法。
+      <span data-i18n="web.guide.hero.desc2">From the file tree to the AI assistant, learn how each feature works.</span>
     </p>
     <div class="intro-actions">
       <a href="#quickstart" class="intro-btn intro-btn-primary" style="background:#2563eb;color:#fff;border:none;padding:10px 22px;font-size:14px;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        开始上手
+        <span data-i18n="web.guide.hero.startBtn">Get Started</span>
       </a>
       <a href="/" class="intro-btn intro-btn-secondary" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);padding:10px 22px;font-size:14px;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        注册项目
+        <span data-i18n="web.guide.hero.registerBtn">Register Project</span>
       </a>
     </div>
   </div>
@@ -300,42 +300,24 @@
 
   <!-- Sidebar Nav -->
   <nav class="guide-sidebar" id="guideSidebar">
-    <div class="guide-sidebar-title">目录</div>
+    <div class="guide-sidebar-title" data-i18n="web.guide.sidebar.title">Contents</div>
     <a href="#quickstart" class="guide-nav-link" data-section="quickstart">
-      <span style="display:flex;align-items:center;gap:6px">
-        ▶
-        快速开始
-      </span>
+      <span style="display:flex;align-items:center;gap:6px"><span>▶</span><span data-i18n="web.guide.sidebar.quickstart">Quick Start</span></span>
     </a>
     <a href="#sidebar" class="guide-nav-link" data-section="sidebar">
-      <span style="display:flex;align-items:center;gap:6px">
-        ◀
-        侧边栏
-      </span>
+      <span style="display:flex;align-items:center;gap:6px"><span>◀</span><span data-i18n="web.guide.sidebar.sidebar">Sidebar</span></span>
     </a>
     <a href="#toolbar" class="guide-nav-link" data-section="toolbar">
-      <span style="display:flex;align-items:center;gap:6px">
-        ▶
-        阅读工具栏
-      </span>
+      <span style="display:flex;align-items:center;gap:6px"><span>▶</span><span data-i18n="web.guide.sidebar.toolbar">Reading Toolbar</span></span>
     </a>
     <a href="#right-panel" class="guide-nav-link" data-section="right-panel">
-      <span style="display:flex;align-items:center;gap:6px">
-        📑
-        右侧面板
-      </span>
+      <span style="display:flex;align-items:center;gap:6px"><span>📑</span><span data-i18n="web.guide.sidebar.rightPanel">Right Panel</span></span>
     </a>
     <a href="#dashboard" class="guide-nav-link" data-section="dashboard">
-      <span style="display:flex;align-items:center;gap:6px">
-        📊
-        仪表盘
-      </span>
+      <span style="display:flex;align-items:center;gap:6px"><span>📊</span><span data-i18n="web.guide.sidebar.dashboard">Dashboard</span></span>
     </a>
     <a href="#formats" class="guide-nav-link" data-section="formats">
-      <span style="display:flex;align-items:center;gap:6px">
-        📝
-        支持格式
-      </span>
+      <span style="display:flex;align-items:center;gap:6px"><span>📝</span><span data-i18n="web.guide.sidebar.formats">Supported Formats</span></span>
     </a>
   </nav>
 
@@ -348,28 +330,28 @@
         <div class="guide-section-badge" style="background:var(--accent-light-bg);color:var(--accent)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         </div>
-        <h2>快速开始</h2>
+        <h2 data-i18n="web.guide.quickstart.title">Quick Start</h2>
       </div>
-      <p class="guide-section-desc">三步完成环境配置，开始使用 Doc77 管理你的文档。</p>
+      <p class="guide-section-desc" data-i18n="web.guide.quickstart.desc">Set up your environment in three steps and start managing documents with Doc77.</p>
 
       <div class="steps-grid">
         <div class="step-card">
           <div class="step-number">1</div>
           📂
-          <h3>注册项目</h3>
-          <p>在首页添加本地文档目录，Doc77 会记住每个项目并自动索引文件结构。</p>
+          <h3 data-i18n="web.guide.quickstart.step1Title">Register a Project</h3>
+          <p data-i18n="web.guide.quickstart.step1Desc">Add a local document directory on the homepage. Doc77 remembers each project and automatically indexes its file structure.</p>
         </div>
         <div class="step-card">
           <div class="step-number">2</div>
           📂
-          <h3>选择文件</h3>
-          <p>在左侧目录树中浏览并点击文件，即刻预览。支持收藏夹和近期文件快速访问。</p>
+          <h3 data-i18n="web.guide.quickstart.step2Title">Select a File</h3>
+          <p data-i18n="web.guide.quickstart.step2Desc">Browse and click files in the left file tree for instant preview. Supports favorites and quick access to recent files.</p>
         </div>
         <div class="step-card">
           <div class="step-number">3</div>
           ✨
-          <h3>开始阅读</h3>
-          <p>阅读、搜索、听读、AI 总结 &mdash; 一站式文档工作台，提升你的阅读效率。</p>
+          <h3 data-i18n="web.guide.quickstart.step3Title">Start Reading</h3>
+          <p data-i18n="web.guide.quickstart.step3Desc">Read, search, listen, AI summarize &mdash; an all-in-one document workspace that boosts your reading efficiency.</p>
         </div>
       </div>
 
@@ -377,27 +359,27 @@
         <div style="padding:16px 20px;border-bottom:1px solid var(--border-light);background:var(--bg-hover)">
           <div style="display:flex;align-items:center;gap:8px">
             <div style="width:6px;height:6px;border-radius:50%;background:#22c55e"></div>
-            <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">系统状态</span>
+            <span style="font-size:12px;font-weight:600;color:var(--text-secondary)" data-i18n="web.guide.quickstart.systemStatus">System Status</span>
           </div>
         </div>
         <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">运行状态</div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusRunningLabel">Running Status</div>
             <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-primary);font-weight:500">
               <span style="width:8px;height:8px;border-radius:50%;background:#22c55e"></span>
-              运行中
+              <span data-i18n="web.guide.quickstart.statusRunningValue">Running</span>
             </div>
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">服务端口</div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusPortLabel">Service Port</div>
             <div style="font-size:13px;color:var(--text-primary);font-weight:500;font-family:'SF Mono','Fira Code',monospace">2777</div>
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">版本</div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusVersionLabel">Version</div>
             <div style="font-size:13px;color:var(--text-primary);font-weight:500">0.7.0</div>
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px">绑定地址</div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px" data-i18n="web.guide.quickstart.statusBindLabel">Bind Address</div>
             <div style="font-size:13px;color:var(--text-primary);font-weight:500;font-family:'SF Mono','Fira Code',monospace" id="guideBindAddr">0.0.0.0</div>
           </div>
         </div>
@@ -410,56 +392,56 @@
         <div class="guide-section-badge" style="background:color-mix(in srgb, #8b5cf6 12%, transparent);color:#8b5cf6;font-size:16px">
           ◀
         </div>
-        <h2>侧边栏</h2>
+        <h2 data-i18n="web.guide.sidebarSection.title">Sidebar</h2>
       </div>
-      <p class="guide-section-desc">左侧面板集中了项目切换、文件导航、搜索等核心操作。</p>
+      <p class="guide-section-desc" data-i18n="web.guide.sidebarSection.desc">The left panel centralizes project switching, file navigation, search, and other core operations.</p>
       <div class="feature-table-wrap">
         <table class="feature-table">
           <tbody>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">💼</div></td>
-              <td class="feature-name">项目切换</td>
-              <td class="feature-desc">点击顶部按钮切换已注册的项目目录，每个项目独立管理其文件结构。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.switchProject">Switch Project</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.switchProjectDesc">Click the top button to switch between registered project directories. Each project manages its own file structure.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⭐</div></td>
-              <td class="feature-name">收藏夹</td>
-              <td class="feature-desc">右键文件选择收藏，常用文档快速访问。点击即打开，无需重复翻目录。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.favorites">Favorites</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.favoritesDesc">Right-click a file to add it to favorites for quick access to frequently used documents. Click to open without navigating directories.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🕐</div></td>
-              <td class="feature-name">近期文件</td>
-              <td class="feature-desc">自动记录最近打开的文件，方便快速回溯。不必每次都翻目录树查找。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.recent">Recent Files</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.recentDesc">Automatically tracks recently opened files for quick backtracking. No need to browse the tree every time.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
-              <td class="feature-name">目录树</td>
-              <td class="feature-desc">浏览项目文件夹结构，点击目录展开或收起，点击文件即时预览内容。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.fileTree">File Tree</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.fileTreeDesc">Browse project folder structure. Click directories to expand or collapse, click files to preview content instantly.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔍</div></td>
-              <td class="feature-name">文件过滤</td>
-              <td class="feature-desc">在目录树上方输入关键字，快速定位目标文件，支持模糊匹配。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.fileFilter">Filter Files</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.fileFilterDesc">Type keywords above the file tree to quickly locate target files. Supports fuzzy matching.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔎</div></td>
-              <td class="feature-name">全局搜索</td>
-              <td class="feature-desc">搜索项目内所有文件内容（文件名 + 全文），回车触发，结果高亮显示。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.globalSearch">Global Search</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.globalSearchDesc">Search all file content within the project (file names + full text). Press Enter to trigger, results are highlighted.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">◀</div></td>
-              <td class="feature-name">折叠侧栏</td>
-              <td class="feature-desc">收起侧栏为窄条（仅显示 Logo），获得更大的文档阅读空间。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.collapse">Collapse Sidebar</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.collapseDesc">Collapse the sidebar into a narrow strip (logo only) for more document reading space.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🌙</div></td>
-              <td class="feature-name">主题切换</td>
-              <td class="feature-desc">一键切换深色或浅色模式，匹配你的阅读环境，保护眼睛。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.themeToggle">Theme</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.themeToggleDesc">Toggle between dark and light modes to match your reading environment and protect your eyes.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⚙</div></td>
-              <td class="feature-name">设置</td>
-              <td class="feature-desc">配置 AI Token 与模型、网络绑定地址、访问密码、编辑器等全局选项。</td>
+              <td class="feature-name" data-i18n="web.guide.sidebarSection.settings">Settings</td>
+              <td class="feature-desc" data-i18n="web.guide.sidebarSection.settingsDesc">Configure AI Token and model, network bind address, access password, editor, and other global options.</td>
             </tr>
           </tbody>
         </table>
@@ -472,46 +454,57 @@
         <div class="guide-section-badge" style="background:color-mix(in srgb, #059669 12%, transparent);color:#059669;font-size:16px">
           ▶
         </div>
-        <h2>阅读工具栏</h2>
+        <h2 data-i18n="web.guide.toolbar.title">Reading Toolbar</h2>
       </div>
-      <p class="guide-section-desc">顶部工具栏提供了丰富的阅读辅助功能，让文档浏览更高效。</p>
+      <p class="guide-section-desc" data-i18n="web.guide.toolbar.desc">The top toolbar provides rich reading aids for more efficient document browsing.</p>
       <div class="feature-table-wrap">
         <table class="feature-table">
           <tbody>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔍</div></td>
-              <td class="feature-name">文档内搜索</td>
-              <td class="feature-desc">在当前文档中搜索关键词，支持 <kbd>&uarr;</kbd> <kbd>&darr;</kbd> 跳转匹配项。快捷键 <kbd>Ctrl+F</kbd></td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.docSearch">Find in Document</td>
+              <td class="feature-desc">
+                <span data-i18n="web.guide.toolbar.docSearch.desc1">Search for keywords in the current document, supports </span>
+                <kbd>&uarr;</kbd> <kbd>&darr;</kbd>
+                <span data-i18n="web.guide.toolbar.docSearch.desc2"> to jump between matches. Shortcut </span>
+                <kbd>Ctrl+F</kbd>
+              </td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">▶</div></td>
-              <td class="feature-name">自动滚动</td>
-              <td class="feature-desc">自动向下滚屏阅读，四档速度可调（慢/中/快/极速），解放双手。</td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.autoScroll">Auto Scroll</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.autoScrollDesc">Automatically scrolls down for hands-free reading with four speed settings (Slow / Medium / Fast / Instant).</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🔊</div></td>
-              <td class="feature-name">TTS 朗读</td>
-              <td class="feature-desc">语音朗读文档，五档语速调节（0.5x &mdash; 2x）。眼睛累了就用听的。</td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.tts">TTS Read Aloud</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.ttsDesc">Reads documents aloud with five speed settings (0.5x &mdash; 2x). Listen when your eyes are tired.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">✨</div></td>
-              <td class="feature-name">AI 总结</td>
-              <td class="feature-desc">一键生成文档摘要，支持朗读摘要。快速了解长篇文档核心内容。需配置 AI Token。</td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.aiSummary">AI Summary</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.aiSummaryDesc">Generate a document summary with one click, with read-aloud support. Quickly understand the core content of long documents. Requires AI Token configuration.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">▶</div></td>
-              <td class="feature-name">运行代码</td>
-              <td class="feature-desc">打开 <kbd>.js</kbd> 或 <kbd>.py</kbd> 文件时，可在浏览器 Sandbox 或 Pyodide (WASM) 中直接执行。</td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.runCode">Run Code</td>
+              <td class="feature-desc">
+                <span data-i18n="web.guide.toolbar.runCode.desc1">Open </span>
+                <kbd>.js</kbd>
+                <span data-i18n="web.guide.toolbar.runCode.desc2"> or </span>
+                <kbd>.py</kbd>
+                <span data-i18n="web.guide.toolbar.runCode.desc3"> files to run directly in the browser Sandbox or Pyodide (WASM).</span>
+              </td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📝</div></td>
-              <td class="feature-name">编辑器打开</td>
-              <td class="feature-desc">一键在 VS Code 或系统默认编辑器中打开当前文件进行编辑修改。</td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.editor">Open in Editor</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.editorDesc">Open the current file in VS Code or your system default editor for editing with one click.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
-              <td class="feature-name">文件夹中显示</td>
-              <td class="feature-desc">在系统文件管理器（Finder / 资源管理器）中定位并高亮当前文件位置。</td>
+              <td class="feature-name" data-i18n="web.guide.toolbar.showInFolder">Show in Folder</td>
+              <td class="feature-desc" data-i18n="web.guide.toolbar.showInFolderDesc">Locate and highlight the current file in the system file manager (Finder / File Explorer).</td>
             </tr>
           </tbody>
         </table>
@@ -524,26 +517,26 @@
         <div class="guide-section-badge" style="background:color-mix(in srgb, #d97706 12%, transparent);color:#d97706;font-size:16px">
           📑
         </div>
-        <h2>右侧面板</h2>
+        <h2 data-i18n="web.guide.rightPanel.title">Right Panel</h2>
       </div>
-      <p class="guide-section-desc">右侧面板集成了 AI 助手、文档大纲和审批队列，是 Doc77 的智能核心。</p>
+      <p class="guide-section-desc" data-i18n="web.guide.rightPanel.desc">The right panel integrates the AI assistant, document outline, and approval queue — the intelligent core of Doc77.</p>
       <div class="feature-table-wrap">
         <table class="feature-table">
           <tbody>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📑</div></td>
-              <td class="feature-name">文档大纲</td>
-              <td class="feature-desc">根据 Markdown 标题自动生成文档结构导航，点击标题快速跳转至对应章节。</td>
+              <td class="feature-name" data-i18n="web.guide.rightPanel.outline">Document Outline</td>
+              <td class="feature-desc" data-i18n="web.guide.rightPanel.outlineDesc">Automatically generates a document structure navigation from Markdown headings. Click headings to quickly jump to the corresponding section.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">💬</div></td>
-              <td class="feature-name">AI 助手</td>
-              <td class="feature-desc">对话式 AI，可针对当前文档提问、请求总结、规划批量文件操作。基于 MCP 协议集成，AI 可安全读写文件。</td>
+              <td class="feature-name" data-i18n="web.guide.rightPanel.aiAssistant">AI Assistant</td>
+              <td class="feature-desc" data-i18n="web.guide.rightPanel.aiAssistantDesc">A conversational AI that can answer questions about the current document, request summaries, and plan batch file operations. Built on the MCP protocol, the AI can safely read and write files.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📋</div></td>
-              <td class="feature-name">审批队列</td>
-              <td class="feature-desc">MCP 写操作（创建/修改/删除文件）默认进入审批队列，确认后才执行。支持 CLI 与 Web 双通道审批，事务回滚。</td>
+              <td class="feature-name" data-i18n="web.guide.rightPanel.approval">Approval Queue</td>
+              <td class="feature-desc" data-i18n="web.guide.rightPanel.approvalDesc">MCP write operations (create/modify/delete files) enter the approval queue by default and are executed only after confirmation. Supports CLI and Web dual-channel approval with transaction rollback.</td>
             </tr>
           </tbody>
         </table>
@@ -556,36 +549,36 @@
         <div class="guide-section-badge" style="background:color-mix(in srgb, #2563eb 12%, transparent);color:#2563eb;font-size:16px">
           📊
         </div>
-        <h2>仪表盘</h2>
+        <h2 data-i18n="web.guide.dashboard.title">Dashboard</h2>
       </div>
-      <p class="guide-section-desc">首页仪表盘提供项目总览、统计数据和快捷操作入口。</p>
+      <p class="guide-section-desc" data-i18n="web.guide.dashboard.desc">The home dashboard provides project overview, statistics, and quick action shortcuts.</p>
       <div class="feature-table-wrap">
         <table class="feature-table">
           <tbody>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">🕐</div></td>
-              <td class="feature-name">最近浏览</td>
-              <td class="feature-desc">查看最近打开的项目和文件，一键跳转。支持项目粒度和文件粒度的历史记录。</td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.recent">Recent Browsing</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.recentDesc">View recently opened projects and files, jump with one click. Supports project-level and file-level history.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📊</div></td>
-              <td class="feature-name">统计概览</td>
-              <td class="feature-desc">显示项目总数、收藏数、最近活跃时间等关键指标，一目了然。</td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.stats">Statistics</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.statsDesc">Displays key metrics at a glance: total projects, favorites count, last active time, and more.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">⭐</div></td>
-              <td class="feature-name">收藏项目</td>
-              <td class="feature-desc">星标收藏的项目集中展示，支持快速取消收藏。</td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.favorites">Favorite Projects</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.favoritesDesc">Starred favorite projects are showcased together, with quick unfollow support.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">📂</div></td>
-              <td class="feature-name">项目列表</td>
-              <td class="feature-desc">全部项目以网格或列表视图展示。支持搜索、排序（最近打开/名称/创建日期）、视图切换。</td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.projectList">Project List</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.projectListDesc">All projects displayed in grid or list view. Supports search, sorting (recent / name / created date), and view switching.</td>
             </tr>
             <tr>
               <td class="feature-icon-cell"><div class="feature-icon-wrap" style="font-size:16px">➕</div></td>
-              <td class="feature-name">注册项目</td>
-              <td class="feature-desc">支持两种方式添加项目：手动输入路径，或自动扫描目录发现可注册的项目目录。</td>
+              <td class="feature-name" data-i18n="web.guide.dashboard.register">Register Project</td>
+              <td class="feature-desc" data-i18n="web.guide.dashboard.registerDesc">Two ways to add a project: manually enter a path, or auto-scan directories to discover registerable project directories.</td>
             </tr>
           </tbody>
         </table>
@@ -598,61 +591,61 @@
         <div class="guide-section-badge" style="background:color-mix(in srgb, #2563eb 12%, transparent);color:#2563eb;font-size:16px">
           📝
         </div>
-        <h2>支持的文件格式</h2>
+        <h2 data-i18n="web.guide.formats.title">Supported File Formats</h2>
       </div>
-      <p class="guide-section-desc">Doc77 支持多种文档格式的预览与编辑。</p>
+      <p class="guide-section-desc" data-i18n="web.guide.formats.desc">Doc77 supports previewing and editing a variety of document formats.</p>
       <div class="format-grid">
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">📝</div>
-          <div class="format-card-name">Markdown</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.markdown">Markdown</div>
           <div class="format-card-ext">.md .mdx</div>
         </div>
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">📄</div>
-          <div class="format-card-name">PDF 文档</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.pdf">PDF Document</div>
           <div class="format-card-ext">.pdf</div>
         </div>
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">📊</div>
-          <div class="format-card-name">Office 文档</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.office">Office Document</div>
           <div class="format-card-ext">.docx .xlsx .xls</div>
         </div>
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">🖼️</div>
-          <div class="format-card-name">图片</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.image">Image</div>
           <div class="format-card-ext">.png .jpg .gif .svg .webp .avif</div>
         </div>
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">🔀</div>
-          <div class="format-card-name">Mermaid 图表</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.mermaid">Mermaid Diagram</div>
           <div class="format-card-ext">.mermaid .mmd</div>
         </div>
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">💻</div>
-          <div class="format-card-name">代码文件</div>
-          <div class="format-card-ext">44 种编程语言</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.code">Code File</div>
+          <div class="format-card-ext" data-i18n="web.guide.formats.codeExt">44 programming languages</div>
         </div>
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">▶️</div>
-          <div class="format-card-name">可执行代码</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.executable">Executable Code</div>
           <div class="format-card-ext">.js (Sandbox) .py (Pyodide)</div>
         </div>
         <div class="format-card">
           <div class="format-card-icon" style="font-size:22px;line-height:1">📦</div>
-          <div class="format-card-name">未支持格式</div>
-          <div class="format-card-ext">显示文件信息卡</div>
+          <div class="format-card-name" data-i18n="web.guide.formats.unsupported">Unsupported Format</div>
+          <div class="format-card-ext" data-i18n="web.guide.formats.unsupportedExt">Shows file info card</div>
         </div>
       </div>
     </div>
 
     <!-- CTA -->
     <div class="guide-cta">
-      <h2>准备开始了吗？</h2>
-      <p>注册一个本地文档目录，体验本地预览 + AI 驱动管理的全新工作流。</p>
+      <h2 data-i18n="web.guide.cta.title">Ready to get started?</h2>
+      <p data-i18n="web.guide.cta.desc">Register a local document directory and experience a new workflow with local preview and AI-driven management.</p>
       <div class="intro-actions" style="justify-content:center">
         <a href="/" class="intro-btn intro-btn-primary" style="padding:10px 24px;font-size:14px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          注册你的第一个项目
+          <span data-i18n="web.guide.cta.registerBtn">Register Your First Project</span>
         </a>
         <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener" class="intro-btn intro-btn-secondary" style="padding:10px 24px;font-size:14px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
@@ -667,9 +660,9 @@
 <!-- GitHub Star -->
 <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener"
    class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm font-medium no-underline hover:text-white"
-   title="给 Doc77 点个 Star">
+   data-i18n-title="web.guide.starLink" title="Star Doc77 on GitHub">
   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-  Star
+  <span data-i18n="web.guide.starText">Star</span>
 </a>
 
 <script src="js/common.js"></script>
