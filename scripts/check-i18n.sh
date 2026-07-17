@@ -26,6 +26,15 @@ fi
 
 if [ $# -eq 0 ]; then
   node scripts/check-i18n-keys.mjs || FAIL=1
+
+  # 3) data-i18n 元素内不得直接嵌套子元素（applyI18n 用 textContent 替换会摧毁子节点）
+  NESTED=$(grep -rnP 'data-i18n="[^"]+"[^>]*>[^<]*<(span|b|i|em|strong|code|a|button|div)\b' \
+            packages/core/src/web --include='*.html' 2>/dev/null || true)
+  if [ -n "$NESTED" ]; then
+    echo "❌ data-i18n 元素内嵌套了子元素（textContent 替换会摧毁它们，请把 data-i18n 移到内层纯文本节点）:"
+    echo "$NESTED"
+    FAIL=1
+  fi
 fi
 
 if [ $FAIL -eq 0 ]; then
