@@ -443,5 +443,37 @@ function syncHeaderCounts() {
   if (hpc) hpc.textContent = projects.length;
 }
 
+// ═══ Mobile Companion QR Code ═══
+window.initMobileQR = async function() {
+  try {
+    var r = await fetch('/api/server-info');
+    var info = await r.json();
+    if (info.bindAddress === '0.0.0.0' || info.isLocal) {
+      var el = document.getElementById('mobileCompanion');
+      if (el) el.style.display = 'block';
+    }
+    var hostname = window.location.hostname || '127.0.0.1';
+    var url = 'http://' + hostname + ':' + (info.port || 2777) + '/mobile/';
+    document.getElementById('mobileUrlDisplay').textContent = url;
+    renderQR(url);
+  } catch(e) {}
+};
+
+function renderQR(url) {
+  var container = document.getElementById('mobileQrCode');
+  if (!container) return;
+  // Use external API as fallback since QRCode lib isn't loaded client-side
+  container.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=' + encodeURIComponent(url) + '" alt="QR" style="width:100px;height:100px;border-radius:4px" onerror="this.innerHTML=\'' + url.replace(/^https?:\/\//, '') + '" style="font-size:10px;color:var(--text-muted);word-break:break-all">';
+}
+
+window.refreshMobileQR = function() {
+  var c = document.getElementById('mobileQrCode');
+  if (c) c.innerHTML = '<span style="font-size:10px;color:var(--text-muted)">⟳</span>';
+  window.initMobileQR();
+};
+
+// Init QR after page loads
+setTimeout(window.initMobileQR, 2000);
+
 // ═══ Init ═══
 load();

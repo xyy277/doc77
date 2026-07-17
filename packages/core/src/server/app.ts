@@ -40,6 +40,7 @@ import { createRateLimiter } from './rate-limit.js';
 import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
+import { getMobileInfo, publishMdns } from './mobile-mdns.js';
 
 import { VERSION } from '../version.gen.js';
 import { getConfig } from '../db/config.js';
@@ -211,6 +212,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     next();
   });
 
+  // --- mDNS publisher for mobile companion discovery ---
+  let mdnsService: { destroy: () => void } | null = null;
+  if (port) {
+    publishMdns(port).then((s) => { mdnsService = s; });
+  }
+
   // --- API Routes ---
 
   // i18n 词条表下发（带 ETag 缓存）
@@ -257,6 +264,11 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       /* non-critical */
     }
     res.json(info);
+  });
+
+  // Mobile info — device info for companion app discovery
+  app.get('/api/mobile/info', (_req: Request, res: Response) => {
+    res.json(getMobileInfo(port || 2777));
   });
 
   // Module capabilities
@@ -2541,9 +2553,10 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     });
   });
 
-  // Cleanup ShareManager on server close
+  // Cleanup on app close — share manager + mDNS publisher
   app.on('close', () => {
     shareManager.destroy();
+    mdnsService?.destroy();
   });
 
   return app;

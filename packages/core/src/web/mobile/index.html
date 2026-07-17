@@ -358,6 +358,15 @@
     async function loadProjects() {
       var container = document.getElementById('projectList');
       try {
+        // Verify server reachable + save connection
+        var infoR = await fetch('/api/mobile/info');
+        if (infoR.ok) {
+          var info = await infoR.json();
+          var su = window.location.protocol + '//' + window.location.host;
+          localStorage.setItem('doc77_last_server', JSON.stringify({url: su, hostname: info.hostname, version: info.version}));
+        }
+      } catch(e) { /* offline — errors handled below */ }
+      try {
         var r = await fetch('/api/projects');
         var projects = await r.json();
         if (!projects.length) {
