@@ -530,7 +530,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     try {
       const folders = parseCodeWorkspace(workspacePath);
       if (!folders.length) {
-        res.status(400).json({ error: t('api.import.invalidWorkspace'), code: 'INVALID_WORKSPACE' });
+        res
+          .status(400)
+          .json({ error: t('api.import.invalidWorkspace'), code: 'INVALID_WORKSPACE' });
         return;
       }
 
@@ -1292,12 +1294,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
           1024,
       );
       if (htmlSizeKB > maxSize * 1024) {
-        res
-          .status(413)
-          .json({
-            error: t('api.export.tooLarge', { sizeMB: Math.round(htmlSizeKB / 1024), maxMB: maxSize }),
-            code: 'EXPORT_TOO_LARGE',
-          });
+        res.status(413).json({
+          error: t('api.export.tooLarge', {
+            sizeMB: Math.round(htmlSizeKB / 1024),
+            maxMB: maxSize,
+          }),
+          code: 'EXPORT_TOO_LARGE',
+        });
         return;
       }
 
@@ -1354,7 +1357,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       const projectRoot = resolveProjectPath(project.path);
       const resolvedPath = validatePath(projectRoot, filePath);
       if (!resolvedPath) {
-        res.status(404).json({ error: t('api.share.pathOutsideProject'), code: 'PATH_OUTSIDE_PROJECT' });
+        res
+          .status(404)
+          .json({ error: t('api.share.pathOutsideProject'), code: 'PATH_OUTSIDE_PROJECT' });
         return;
       }
       if (isSensitiveFile(resolvedPath)) {
@@ -1392,7 +1397,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         documentTitle: token.documentTitle,
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || t('api.share.createFailed'), code: 'SHARE_CREATE_FAILED' });
+      res
+        .status(500)
+        .json({ error: err.message || t('api.share.createFailed'), code: 'SHARE_CREATE_FAILED' });
     }
   });
 
