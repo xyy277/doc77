@@ -255,8 +255,13 @@ async function downloadTranslateModels() {
   var btn = document.getElementById('btnDownloadModels');
   if (btn) { btn.disabled = true; btn.textContent = t('common.install.downloading'); }
   try {
-    var mirrorCB = document.querySelector('[data-key="translate.mirror"]');
-    if (mirrorCB && mirrorCB.checked) { await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'translate.mirror', value: 'true' }) }); }
+    // 镜像开关是 settingToggle 渲染的 <button data-value="true|false">，不是 checkbox —
+    // 旧代码读 .checked 恒为 undefined，镜像配置从未随下载保存，导致直连 huggingface.co 失败
+    var mirrorBtn = document.querySelector('[data-key="translate.mirror"]');
+    if (mirrorBtn) {
+      var mirrorOn = mirrorBtn.dataset.value === 'true' ? 'true' : 'false';
+      await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'translate.mirror', value: mirrorOn }) });
+    }
     var r = await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Hello', source_lang: 'en', target_lang: 'zh', mode: 'sentence' }) });
     if (r.ok) { toast(t('common.translate.enZhDownloaded'), 'success'); }
     else { var d = await r.json(); toast(t('common.translate.downloadFailed'), 'error'); if (btn) { btn.disabled = false; btn.textContent = t('common.settings.downloadTranslateModels'); } checkTranslateStatus(); return; }

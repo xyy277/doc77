@@ -49,7 +49,10 @@ function createWindow(port: number): void {
 
 async function boot(): Promise<void> {
   const port = await findAvailablePort(28888);
-  server = await startServer(port);
+  // Windows has no LANG/LC_ALL, so core's backend language auto-detection fell
+  // back to en-US (English toasts in a Chinese UI). Chromium knows the real
+  // OS locale — hand it to the server for i18n detection.
+  server = await startServer(port, app.getLocale());
 
   // The server may have moved (explicit server.port override, or busy-port
   // fallback) — the window must load whatever port it actually listens on.

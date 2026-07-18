@@ -148,8 +148,15 @@ export interface ServerProcess {
   kill: () => void;
 }
 
-export async function startServer(port: number): Promise<ServerProcess> {
+export async function startServer(port: number, uiLocale?: string): Promise<ServerProcess> {
   process.env.DOC77_ELECTRON = '1';
+  // core's i18n auto-detection reads LANG/LC_ALL — absent on Windows. Inject
+  // the Chromium-reported OS locale (e.g. "zh-CN") so backend messages
+  // (install toasts, API errors) match the user's language. An explicit
+  // locale.language config still takes precedence inside initI18n.
+  if (uiLocale && !process.env.LANG && !process.env.LC_ALL) {
+    process.env.LANG = uiLocale.replace('-', '_') + '.UTF-8';
+  }
   // Local dev fallback: use ~/.doc77/vendor/ (process.resourcesPath points
   // to Electron binary dir in dev, not our project). In production packaging,
   // extraResources puts vendor at resources/vendor/ which is correct.

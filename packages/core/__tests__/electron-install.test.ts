@@ -85,11 +85,11 @@ describe('Electron module install', () => {
   });
 
   describe('buildInstallPlan', () => {
-    it('installs ai via npm-free tarballs including its @doc77/core runtime dep', () => {
-      expect(buildInstallPlan('ai')).toEqual({
-        method: 'tarball',
-        packages: ['@doc77/ai', '@doc77/core'],
-      });
+    it('installs ai via system npm — its @doc77/core dep needs the full third-party tree', () => {
+      // Regression: the old tarball closure (@doc77/ai + @doc77/core only)
+      // could not satisfy core's express/sql.js/marked imports, so the module
+      // failed to load after restart and kept showing "not installed".
+      expect(buildInstallPlan('ai')).toEqual({ method: 'npm', spec: '@doc77/ai' });
     });
 
     it('installs translate via system npm as @huggingface/transformers (@doc77/translate does not exist)', () => {

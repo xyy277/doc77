@@ -3,11 +3,13 @@
  *
  * Two install strategies:
  * - tarball: npm-free download+extract from the registry. Only viable for packages
- *   whose runtime deps are all @doc77-scoped (we install the closure ourselves).
- *   Used for `ai` (deps: @doc77/core only at runtime).
- * - npm: `npm install --prefix <modulesDir>` using the system npm. Required for
- *   packages with third-party/native dependency trees (`translate` →
- *   @huggingface/transformers, `mcp` → @modelcontextprotocol/sdk + zod).
+ *   whose FULL runtime closure is @doc77-scoped. Currently unused: `ai` looked
+ *   eligible (imports only @doc77/core), but core's own entry imports express/
+ *   sql.js/marked/... — a tarball closure can never satisfy it, and the module
+ *   silently failed to load after restart (import error swallowed → "not
+ *   installed"). Kept for potential future self-contained packages.
+ * - npm: `npm install --prefix <modulesDir>` using the system npm — installs the
+ *   complete dependency tree. Used for ALL modules (`ai`, `mcp`, `translate`).
  */
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -31,7 +33,9 @@ export type InstallPlan =
   { method: 'tarball'; packages: string[] } | { method: 'npm'; spec: string };
 
 export function buildInstallPlan(mod: string): InstallPlan {
-  if (mod === 'ai') return { method: 'tarball', packages: ['@doc77/ai', '@doc77/core'] };
+  // ai must npm-install: its @doc77/core dependency pulls third-party runtime
+  // deps (express, sql.js, marked, ...) that a tarball closure cannot provide.
+  if (mod === 'ai') return { method: 'npm', spec: '@doc77/ai' };
   if (mod === 'mcp') return { method: 'npm', spec: '@doc77/mcp' };
   // No @doc77/translate package exists — the translation engine is transformers.js.
   return { method: 'npm', spec: '@huggingface/transformers@latest' };
