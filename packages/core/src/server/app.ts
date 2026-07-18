@@ -2594,6 +2594,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         return;
       }
 
+      // Guard: reject empty bind_address — 空字符串重启时被判 falsy 导致 --bind 被丢弃
+      if (key === 'security.bind_address' && typeof value === 'string' && value.trim() === '') {
+        res.json({ ok: true, key, skipped: true });
+        return;
+      }
+
       let storeValue = value;
       // Encrypt sensitive fields
       if (crypto.isSensitiveKey(key)) {

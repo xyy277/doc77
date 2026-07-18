@@ -239,11 +239,13 @@ async function main() {
           }
           filtered.push(argv[i]);
         }
-        // Re-apply DB-persisted values if set
-        const dbBind = getConfig('security.bind_address');
-        if (dbBind) filtered.push('--bind', dbBind);
-        const dbPort = getConfig('server.port');
-        if (dbPort) filtered.push('--port', dbPort);
+        // Re-apply DB-persisted values. Always pass --bind and --port so the
+        // child process gets explicit values; treat empty string the same as
+        // missing (both are falsy) → fall back to safe defaults.
+        const dbBind = getConfig('security.bind_address') || '127.0.0.1';
+        filtered.push('--bind', dbBind);
+        const dbPort = getConfig('server.port') || String(port);
+        filtered.push('--port', dbPort);
 
         // Persist in-memory DB to disk before spawning replacement process
         closeConnection();

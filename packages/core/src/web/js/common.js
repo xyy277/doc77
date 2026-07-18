@@ -561,13 +561,12 @@ async function saveSettings() {
     if (el.tagName === 'BUTTON') v = el.dataset.value === 'true' ? 'true' : 'false';
     else if (el.tagName === 'SELECT') v = el.value;
     else v = el.value;
-    // Skip empty or still-masked sensitive fields to avoid overwriting stored values
+    // Skip empty or still-masked values — 不覆盖已存储的配置
     if (v === '' || (typeof v === 'string' && v.indexOf('•') !== -1)) {
-      if (['token','secret','password','apikey','api_key','authorization'].some(function(part){ return k.toLowerCase().indexOf(part) !== -1; })) {
-        continue;
-      }
+      continue;
     }
-    await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+    var res = await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+    if (!res.ok) throw new Error('保存失败: ' + k + ' ' + res.status);
   }
   toast(t('common.toast.saved'),'success');
 }

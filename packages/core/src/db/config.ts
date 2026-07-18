@@ -26,6 +26,7 @@ const DEFAULTS: Record<string, string> = {
   'concurrency.lock_timeout_minutes': '10',
   'concurrency.lock_heartbeat_seconds': '30',
   'security.bind_address': '127.0.0.1',
+  'server.port': '27777',
   'security.shared_secret': '',
   'session.idle_timeout_minutes': '120',
   'session.cleanup_interval_minutes': '60',
