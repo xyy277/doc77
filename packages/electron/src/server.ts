@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as net from 'net';
 import * as http from 'http';
+import { pathToFileURL } from 'url';
 import { bindCoreT, TFn } from './i18n';
 
 const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
@@ -21,13 +22,106 @@ interface CoreModule {
   loadDefaults: () => void;
   runMigrations: () => void;
   t: TFn;
+  // Optional-module wiring (one-click installs from the settings page)
+  modulesDir: () => string;
+  resolveModuleEntry: (pkgDir: string) => string | null;
+  createAIChatHandler: (deps: Record<string, unknown>) => unknown;
+  createQueueApproveHandler: (executeApprovedTasks: unknown) => unknown;
+  createEventsHandler: (eventBus: unknown) => unknown;
+  setCapabilities: (caps: { ai: boolean; mcp: boolean; translate: boolean }) => void;
+  isEngineAvailable: () => Promise<boolean>;
 }
 
+/** Minimal express-app surface we need for post-createApp route registration. */
+interface ExpressLike {
+  post: (route: string, handler: unknown) => void;
+  get: (route: string, handler: unknown) => void;
+}
+
+const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+  specifier: string,
+) => Promise<any>;
+
 async function loadCore(): Promise<CoreModule> {
-  const dynamicImport = new Function('specifier', 'return import(specifier)') as (
-    specifier: string,
-  ) => Promise<CoreModule>;
   return dynamicImport('@doc77/core');
+}
+
+/**
+ * Import a module installed by the one-click installer. Those packages live
+ * under ~/.doc77/electron-modules — outside the app bundle — so bare
+ * specifiers cannot resolve them; import their entry file by absolute URL.
+ */
+async function loadInstalledModule(core: CoreModule, pkgName: string): Promise<any | null> {
+  try {
+    const pkgDir = path.join(core.modulesDir(), 'node_modules', ...pkgName.split('/'));
+    const entry = core.resolveModuleEntry(pkgDir);
+    if (!entry) return null;
+    return await dynamicImport(pathToFileURL(entry).href);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mirror of the CLI's optional-module registration (cli/src/bin/doc77.ts):
+ * register MCP/AI routes for installed modules and publish capabilities so
+ * the settings page stops offering the install button after a restart.
+ */
+async function registerInstalledModules(core: CoreModule, app: ExpressLike): Promise<void> {
+  const mcp = await loadInstalledModule(core, '@doc77/mcp');
+  const ai = await loadInstalledModule(core, '@doc77/ai');
+
+  // @doc77/ai pulls `t` from its own sibling copy of @doc77/core — give that
+  // copy its locale dictionaries (best-effort; falls back to en-US keys).
+  if (ai) {
+    const siblingCore = await loadInstalledModule(core, '@doc77/core');
+    try {
+      siblingCore?.initI18n?.('');
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  if (mcp) {
+    try {
+      app.post('/api/queue/approve', core.createQueueApproveHandler(mcp.executeApprovedTasks));
+      app.get('/api/events', core.createEventsHandler(mcp.getEventBus()));
+    } catch {
+      /* keep booting without MCP routes */
+    }
+  }
+
+  if (ai) {
+    try {
+      const aiDeps: Record<string, unknown> = {
+        AiProvider: ai.AiProvider,
+        DocAgent: ai.DocAgent,
+        getReadTools: ai.getReadTools,
+      };
+      // When MCP is installed, let the AI propose writes through the approval
+      // queue by injecting its write functions + tool schemas.
+      if (mcp) {
+        aiDeps.getWriteTools = ai.getWriteTools;
+        aiDeps.writeFns = {
+          createFolder: mcp.createFolder,
+          moveFile: mcp.moveFile,
+          deleteFile: mcp.deleteFile,
+          batchOperations: mcp.batchOperations,
+        };
+      }
+      app.post('/api/ai/chat', core.createAIChatHandler(aiDeps));
+    } catch {
+      /* keep booting without AI routes */
+    }
+  }
+
+  let translate = false;
+  try {
+    translate = await core.isEngineAvailable();
+  } catch {
+    /* engine probe failed — report unavailable */
+  }
+  core.setCapabilities({ ai: !!ai, mcp: !!mcp, translate });
 }
 
 /** Find an available port starting from `start`, up to `start + 99`. */
@@ -61,6 +155,11 @@ export async function startServer(port: number): Promise<ServerProcess> {
   if (!process.env.DOC77_VENDOR_DIR) {
     process.env.DOC77_VENDOR_DIR = path.join(os.homedir(), '.doc77', 'vendor');
   }
+  // One-click-installed modules live outside the app bundle; core's translate
+  // engine falls back to this directory when its bare import fails.
+  if (!process.env.DOC77_MODULES_DIR) {
+    process.env.DOC77_MODULES_DIR = path.join(os.homedir(), '.doc77', 'electron-modules');
+  }
 
   const core = await loadCore();
   const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } = core;
@@ -72,6 +171,7 @@ export async function startServer(port: number): Promise<ServerProcess> {
   loadDefaults();
 
   const app = createApp(undefined, '127.0.0.1', port);
+  await registerInstalledModules(core, app as unknown as ExpressLike);
   const server = http.createServer(app);
 
   return new Promise((resolve, reject) => {

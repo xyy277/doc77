@@ -225,7 +225,8 @@ function escapeHtml(s) {
 }
 
 async function installElectronModule(mod) {
-  var btn = document.getElementById('btnInstallAi');
+  var btn = document.getElementById(mod === 'translate' ? 'btnInstallTranslate' : 'btnInstallAi');
+  var idleLabel = t(mod === 'translate' ? 'common.settings.oneClickInstallTranslate' : 'common.settings.oneClickInstall');
   if (btn) { btn.disabled = true; btn.textContent = t('common.install.installing'); }
   try {
     var r = await fetch('/api/electron/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: mod }) });
@@ -233,7 +234,7 @@ async function installElectronModule(mod) {
     if (d.ok) { toast(d.message, 'success'); setTimeout(function(){ location.reload(); }, 2000); }
     else { toast(t('common.auth.opFailed2') + ': ' + (d.error || t('common.auth.unknownError')), 'error'); }
   } catch(e) { toast(t('common.auth.opFailed2') + ': ' + e.message, 'error'); }
-  if (btn) { btn.disabled = false; btn.textContent = t('common.settings.oneClickInstall'); }
+  if (btn) { btn.disabled = false; btn.textContent = idleLabel; }
 }
 
 async function checkTranslateStatus() {

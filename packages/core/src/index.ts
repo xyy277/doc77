@@ -111,6 +111,9 @@ export {
 } from './server/vendor.js';
 export type { VendorAsset } from './server/vendor.js';
 
+// Electron module install/loading
+export { modulesDir, resolveModuleEntry } from './server/electron-install.js';
+
 // Translate
 export {
   isEngineAvailable,

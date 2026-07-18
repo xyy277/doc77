@@ -189,6 +189,8 @@
   "api.auth.wrongPassword": "Incorrect password ({fails}/{max})",
   "api.auth.noRecoveryCode": "No recovery codes are set",
   "api.electron.installDone": "{mod}@{version} installed. Restart to take effect",
+  "api.electron.registryError": "Failed to fetch {pkg} from the npm registry: {detail}",
+  "api.electron.npmRequired": "Installing {pkg} requires Node.js/npm on this machine. Install Node.js (https://nodejs.org) and retry, or use the CLI: doc77 i translate",
   "api.scan.dirNotAllowed": "This directory is not allowed to be scanned",
   "api.fs.mntNotAllowed": "Browsing /mnt (Windows drives) is not allowed in remote access mode",
   "api.fs.dirNotAllowed": "This directory is not allowed to be accessed",
