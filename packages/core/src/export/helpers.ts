@@ -44,6 +44,37 @@ export function getLocalIP(): string {
 }
 
 /**
+ * Returns a Set of all IP addresses belonging to this machine,
+ * including loopback (127.0.0.1, ::1) and all non-internal IPv4/v6
+ * addresses from every network interface. Used by LAN access control
+ * to determine if a request originates from the same machine.
+ */
+export function getLocalIPs(): Set<string> {
+  const ips = new Set<string>();
+  // Loopback aliases
+  ips.add('127.0.0.1');
+  ips.add('::1');
+  ips.add('::ffff:127.0.0.1');
+  ips.add('localhost');
+  ips.add('::ffff:0:127.0.0.1');
+
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.address) {
+        ips.add(iface.address);
+        // IPv4-mapped IPv6 form (Express may normalise to this on dual-stack)
+        if (iface.family === 'IPv4') {
+          ips.add('::ffff:' + iface.address);
+        }
+      }
+    }
+  }
+
+  return ips;
+}
+
+/**
  * Render a share error page (expired/invalid token).
  */
 export function renderShareError(message: string): string {

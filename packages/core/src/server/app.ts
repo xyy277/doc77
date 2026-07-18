@@ -52,7 +52,7 @@ import { getConfig } from '../db/config.js';
 import { initI18n, t } from '../i18n/index.js';
 import { buildI18nResponse } from './i18n-route.js';
 import { bundleHTML, ShareManager } from '../export/index.js';
-import { getLocalIP, renderSharePage, renderShareError } from '../export/helpers.js';
+import { getLocalIP, getLocalIPs, renderSharePage, renderShareError } from '../export/helpers.js';
 import QRCode from 'qrcode';
 
 /** Lazy import from @doc77/mcp — optional peer dep, may not be installed */
@@ -102,6 +102,22 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
   // Parse JSON bodies
   app.use(express.json({ limit: '5mb' }));
+
+  // LAN access control — collect local IPs at startup
+  const _localIPs: Set<string> = getLocalIPs();
+  function lanRestrict(req: Request, res: Response, next: NextFunction): void {
+    let enabled: string | undefined;
+    try {
+      enabled = getConfig('security.lan_restrict');
+    } catch {
+      // DB not ready — allow access
+      return next();
+    }
+    if (enabled !== 'true') return next();
+    const remoteIp = req.socket.remoteAddress || '';
+    if (_localIPs.has(remoteIp)) return next();
+    res.status(403).json({ error: t('api.lanRestricted'), code: 'LAN_RESTRICTED' });
+  }
 
   // Share manager — manages share token lifecycle and cleanup
   const shareManager = new ShareManager();
@@ -249,7 +265,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // Server info — runtime state (actual bind address, not config)
-  app.get('/api/server-info', (_req: Request, res: Response) => {
+  app.get('/api/server-info', (req: Request, res: Response) => {
     const addr = bindAddr || '127.0.0.1';
     const isLocal = addr === '127.0.0.1' || addr === '::1' || addr === 'localhost';
     const isElectron = process.env.DOC77_ELECTRON === '1';
@@ -264,6 +280,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       nodeVersion: process.version,
       isWsl: !!process.env.WSL_DISTRO_NAME,
       hostOverride: getConfig('share.host_override') || '',
+      lanRestrict: getConfig('security.lan_restrict') === 'true',
+      isLocalRequest: _localIPs.has(req.socket.remoteAddress || ''),
     };
     if (isElectron) (info as any).electronVersion = process.versions.electron || null;
     try {
@@ -450,7 +468,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // Project auto-discovery
-  app.get('/api/discover', (req: Request, res: Response) => {
+  app.get('/api/discover', lanRestrict, (req: Request, res: Response) => {
     const dirPath = (req.query.path as string) || '~';
     const depth = parseInt(req.query.depth as string, 10) || 2;
 
@@ -495,7 +513,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // Git project discovery
-  app.get('/api/discover/git', (req: Request, res: Response) => {
+  app.get('/api/discover/git', lanRestrict, (req: Request, res: Response) => {
     const dirPath = (req.query.path as string) || os.homedir();
     const depth = Math.min(5, Math.max(2, parseInt(req.query.depth as string, 10) || 3));
 
@@ -513,7 +531,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // Import VS Code workspace
-  app.post('/api/projects/import-workspace', (req: Request, res: Response) => {
+  app.post('/api/projects/import-workspace', lanRestrict, (req: Request, res: Response) => {
     const { workspacePath } = req.body;
     if (!workspacePath) {
       res.status(400).json({ error: 'workspacePath is required' });
@@ -582,7 +600,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     res.json(projects);
   });
 
-  app.post('/api/projects', (req: Request, res: Response) => {
+  app.post('/api/projects', lanRestrict, (req: Request, res: Response) => {
     const { name, path: projectPath, obsidian_mode, tags } = req.body;
     if (!name || !projectPath) {
       res.status(400).json({ error: 'name and path are required' });
@@ -797,7 +815,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // Server-side file browser — for remote access or when native dialog unavailable
-  app.get('/api/browse-fs', (req: Request, res: Response) => {
+  app.get('/api/browse-fs', lanRestrict, (req: Request, res: Response) => {
     let dirPath = (req.query.path as string) || '/';
     // Expand ~ and resolve
     if (dirPath.startsWith('~')) {
@@ -1004,7 +1022,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // Native directory picker dialog
-  app.post('/api/dialog/open-directory', async (_req: Request, res: Response) => {
+  app.post('/api/dialog/open-directory', lanRestrict, async (_req: Request, res: Response) => {
     try {
       const dirPath = await openDirectoryDialog();
       res.json({ path: dirPath });

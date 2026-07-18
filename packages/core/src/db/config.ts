@@ -17,6 +17,7 @@ const DEFAULTS: Record<string, string> = {
   'editor.maxFileSizeMB': '2',
   'editor.autoSave': 'true',
   'security.follow_symlinks': 'false',
+  'security.lan_restrict': 'true',
   'transaction.shadow_dir': '~/.doc77/shadow',
   'transaction.file_size_threshold_mb': '50',
   'transaction.rollback_enabled': 'true',

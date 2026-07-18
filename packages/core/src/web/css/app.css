@@ -645,6 +645,12 @@ body {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
 }
+.register-cta-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(0.6);
+}
 
 /* ═══ Recent Strip ═══ */
 .recent-strip {

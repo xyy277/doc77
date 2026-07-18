@@ -383,6 +383,8 @@ function switchSettingsTab(tab) {
       '<div class="section-title" style="margin-top:16px">' + t('common.settings.otherSecurity') + '</div>' +
       settingRow(t('common.settings.sharedSecret'),'security.shared_secret','password','') +
       settingToggle(t('common.settings.followSymlinks'),'security.follow_symlinks') +
+      settingToggle(t('common.settings.lanRestrict'),'security.lan_restrict') +
+      '<div style="font-size:11px;color:var(--text-muted);margin:-4px 0 8px 4px">' + t('common.settings.lanRestrictDesc') + '</div>' +
       '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)"><button onclick="restartServer()" style="width:100%;padding:8px 0;font-size:13px;font-weight:500;color:var(--danger);border:1px solid var(--danger);border-radius:6px;background:transparent;cursor:pointer" onmouseover="this.style.background=\'var(--danger-light-bg)\'" onmouseout="this.style.background=\'transparent\'">' + t('common.settings.restartService') + '</button></div>';
     renderAccountSection();
     loadServerInfo();
@@ -442,6 +444,11 @@ async function loadServerInfo() {
         mismatchEl.style.display = 'block';
       }
     }, 500);
+    // LAN restriction: disable register button for non-local users
+    if (d.lanRestrict && !d.isLocalRequest) {
+      var regBtn = document.getElementById('registerCtaBtn');
+      if (regBtn) { regBtn.disabled = true; regBtn.classList.add('disabled'); }
+    }
   } catch(e) {}
 }
 function settingRow(label, key, type, placeholder, opts) {
