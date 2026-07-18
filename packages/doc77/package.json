@@ -1,7 +1,7 @@
 {
   "name": "idoc77",
   "version": "1.0.0-beta.2",
-  "description": "本地文档预览器 · 开源免费 — 一行命令开启文档工作台",
+  "description": "Doc77 — One command to start your document workbench. Open-source & free.",
   "license": "MIT",
   "repository": {
     "type": "git",

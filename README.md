@@ -7,299 +7,301 @@
   <a href="https://www.npmjs.com/package/idoc77"><img src="https://img.shields.io/npm/v/idoc77" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node"></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/lang-en-red.svg" alt="English"></a>
+  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/lang-zh--CN-green.svg" alt="简体中文"></a>
 </p>
 
-# Doc77 — 本地文档预览与管理 · Markdown · PDF · MCP Server · 局域网共享
+# Doc77 — Local Document Preview & Management · Markdown · PDF · MCP Server · LAN Sharing
 
-> 文档预览器 | 文档管理器 | Markdown 阅读器 | PDF 查看器 | Code Viewer | 知识库 | 局域网文档服务器
+> Document viewer | Document manager | Markdown reader | PDF viewer | Code viewer | Knowledge base | Local document server
 >
-> 开源 · 免费 · 跨平台 · 移动端适配 · 零配置 · 📦 桌面版
+> Open-source · Free · Cross-platform · Mobile-ready · Zero-config · 📦 Desktop app
 
-**Doc77** 是轻量级本地文档预览器 + MCP 文件操作桥梁 + AI 对话驱动管理 Agent。浏览器即文档工作台，支持 Windows / macOS / Linux / WSL。提供 Electron 桌面版，非技术用户双击即用。密码保护下可安全对外暴露。
+**Doc77** is a lightweight local document previewer, MCP file-operation bridge, and AI conversation-driven document management agent. Your browser is the workbench — supports Windows / macOS / Linux / WSL. Also available as an Electron desktop app for non-technical users, double-click to use. Can be safely exposed to the internet with password protection.
 
-只读时是多项目陈列馆，写入时是需你审批的智能管家——所有文件操作经你确认后才执行，内置安全审批、原子化事务回滚与跨盘容错。
+In read-only mode it's a multi-project showcase; in write mode it's an intelligent steward that asks for your approval — every file operation is confirmed by you before execution, backed by built-in security review, atomic transaction rollback, and cross-drive fault tolerance.
 
-## 预览
+## Preview
 
-| Dashboard | 文档预览 |
+| Dashboard | Document Preview |
 |---|---|
 | ![Dashboard](docs/images/dashboard.png) | ![Preview](docs/images/preview.png) |
 
-| 密码登录 | 移动端 |
+| Login | Mobile |
 |---|---|
 | ![Login](docs/images/login.png) | ![Mobile](docs/images/mobile.png) |
 
-## 适用场景
+## Use Cases
 
-| 场景 | 说明 |
+| Scenario | Description |
 |---|---|
-| **📚 个人知识库** | 本地文件夹即知识库，浏览器做前端。Obsidian / Notion 之外的轻量选择，文件永远在自己手里 |
-| **📝 技术写作** | 写 Markdown 即时预览效果，TTS 朗读检查语句通顺。支持 MDX、Mermaid 图表，文档工程师利器 |
-| **🎓 学术研究** | 管理论文 PDF + 笔记 MD + 实验代码，一个项目目录全搞定。AI 总结帮你快速浏览文献摘要 |
-| **🏠 NAS / 家庭服务器** | NAS 上跑 doc77，全家设备浏览器访问文档库。密码保护，照片、文档、电子书统一入口 |
-| **💼 远程办公** | VPN 连回公司电脑看文档，不用远程桌面，浏览器就够。省带宽，省内存 |
-| **🔧 运维排查** | 服务器上看日志、配置文件，结合 MCP 让 AI 辅助诊断。审批机制确保不会误操作 |
-| **🎤 技术面试** | 面试官一键分享代码 / 设计文档链接，候选人浏览器直接看。讨论方便，无需屏幕共享 |
-| **🐳 Docker 部署** | 挂载文档卷，容器内启动。CI/CD 产物文档即时预览，开发环境文档统一入口 |
-| **📡 局域网会议共享** | 一人 `doc77 start --bind 0.0.0.0`，全屋设备浏览器直接看。会议讨论需求文档、设计方案，各自设备同步浏览 |
-| **📱 移动端随时查阅** | 手机 / 平板自适应 UI，通勤路上、客户现场也能浏览项目文档。响应式设计，桌面端和移动端一致体验 |
-| **🔄 Win+WSL 混合开发** | WSL 里写代码，Windows 里办公。以前看 MD 要 SSH 下载或用黑终端 less 翻页；现在 `doc77 start --bind 0.0.0.0` 一行命令，Windows 浏览器直接预览，手机平板也能看。效率提升一个量级 |
-| **🤖 Agent / MCP 开发** | 内置 MCP Server（stdio + HTTP），8 个 Tool 暴露文件系统能力。调试 Agent 时直接在 Web 端查看文件变动、审批写操作 |
-| **🪟 纯 Windows 办公** | 完全免费开源的文档预览工具。Markdown、PDF、Office、代码高亮一站搞定，不像某些 GUI 软件读个 MD 还要付费 |
-| **🗄️ 多项目文档管理** | 一次注册永久记住，Dashboard 统一切换。收藏夹、近期文件、全局搜索、目录树，像 IDE 一样浏览本地文档 |
-| **🔒 安全团队共享** | 内网一键分享 + 密码保护。文档留在你的设备上，不落地到任何人那里。审批工作流确保写入操作可控 |
-| **⚡ 零配置文档门户** | `npm install -g` → `doc77 register` → 浏览器打开。不用配 nginx，不用装 Apache，三分钟拥有私人文档门户 |
+| **📚 Personal Knowledge Base** | Point to a local folder and browse it like a knowledge base. A lightweight alternative to Obsidian / Notion, with your files always under your control |
+| **📝 Technical Writing** | Write Markdown with instant preview. TTS read-back for proofing. MDX and Mermaid diagram support — a documentation engineer's tool |
+| **🎓 Academic Research** | Manage papers (PDF) + notes (MD) + experimental code in one project directory. AI summarization for quick literature scanning |
+| **🏠 NAS / Home Server** | Run doc77 on your NAS, access your document library from any device in the house. Password-protected. Unified entry for photos, docs, e-books |
+| **💼 Remote Work** | VPN into your office computer and browse documents from a browser — no remote desktop needed. Bandwidth-efficient, memory-light |
+| **🔧 Ops Troubleshooting** | View logs and config files on a server. With MCP, let AI assist in diagnostics. The approval mechanism ensures no accidental damage |
+| **🎤 Technical Interviews** | Share a code or design doc link with candidates in one click. Their browser renders it directly — no screen sharing required |
+| **🐳 Docker Deployment** | Mount a document volume and start the container. CI/CD artifact docs become instantly previewable |
+| **📡 LAN Meeting Sharing** | One person runs `doc77 start --bind 0.0.0.0`, everyone on the LAN opens it in their browser. Review requirements docs or design proposals on your own device |
+| **📱 Mobile Access** | Phone/tablet adaptive UI — browse project docs during commutes or at client sites. Responsive design, consistent experience across desktop and mobile |
+| **🔄 Win+WSL Hybrid** | Write code in WSL, work in Windows. Skip SSH or terminal `less` — `doc77 start --bind 0.0.0.0` and preview from your Windows browser or phone |
+| **🤖 Agent / MCP Development** | Built-in MCP Server (stdio + HTTP) with 8 tools exposing filesystem capabilities. Debug agents while watching file changes and approving write operations from the Web UI |
+| **🪟 Windows Productivity** | Completely free document preview tool. Markdown, PDF, Office, code highlighting all in one place |
+| **🗄️ Multi-project Management** | Register once, remember forever. Dashboard for unified switching. Favorites, recent files, global search, directory tree — browse local docs like an IDE |
+| **🔒 Secure Team Sharing** | One-click LAN sharing + password protection. Documents stay on your device, never land on anyone else's. Approval workflow keeps write operations under control |
+| **⚡ Zero-config Document Portal** | `npm install -g` → `doc77 register` → open browser. No nginx, no Apache, three minutes to your own private document portal |
 
-## 当前定位
+## Current Focus
 
-**Doc77 以预览体验为核心，辅以轻量编辑。** 文本类文件可直接在页面内快速修改保存（含外部修改冲突检测），重度编辑一键唤起 VS Code 或系统编辑器。目前聚焦：
+**Doc77 prioritizes preview experience, complemented by lightweight editing.** Text files can be quickly edited and saved in-page (with external change conflict detection); heavy editing launches VS Code or your system editor with one click. Current focus:
 
-- 🚀 **性能** — 即开即用，大文件不卡顿
-- 🐛 **稳定性** — 多平台兼容，消灭体验 bug
-- ✨ **预览质量** — 格式支持、阅读工具、AI 辅助做到极致
+- 🚀 **Performance** — Instant startup, smooth with large files
+- 🐛 **Stability** — Multi-platform compatibility, eliminate experience bugs
+- ✨ **Preview Quality** — Format support, reading tools, AI assistance pushed to the limit
 
-## 能力总览
+## Capabilities
 
-| 模块 | 内容 |
+| Module | Details |
 |---|---|
-| **多格式预览** | Markdown（GFM/KaTeX/Mermaid/PlantUML/脚注/警告框）、PDF、Word/Excel、44+ 种代码高亮、图片 Lightbox、JS/Python 沙箱执行 |
-| **阅读工具** | TTS 朗读、自动滚动、阅读进度、文档内搜索 (Ctrl+F)、全局搜索、大纲面板、书签、近期文件 |
-| **多 tab 与编辑** | 多文档标签页（LRU 渲染缓存）、临时文件拖放预览、轻量文本编辑（外部修改冲突检测）、一键唤起 VS Code |
-| **AI 助手** | 自然语言对话（SSE 流式）、文档总结、智能归类建议、批量操作规划，支持 DeepSeek/OpenAI/Qwen/Kimi/Doubao/GLM 及自定义端点 |
-| **MCP 与审批** | MCP Server（stdio + HTTP）8 个 Tool 暴露文件系统能力；所有写操作入队等待审批，CLI 与 Web 双通道 |
-| **事务回滚** | Pre-flight 检查 + Shadow 备份 + 逆序回滚，批量操作失败自动恢复，孤儿备份 GC |
-| **导出与分享** | 自包含 HTML 导出（内联样式与图片、保留深浅主题）、局域网只读分享链接（有效期 + 二维码 + 一键撤销） |
-| **离线翻译** | Opus-MT ONNX 模型完全本地运行（en↔zh），自动语言检测，划词即译 + 长文档分段翻译，内容不出本机 |
-| **多语言 UI** | 简体中文 / English 内置，自动检测浏览器与系统语言，`~/.doc77/locales/<lang>.json` 语言包可扩展任意语言 |
-| **项目导入** | Obsidian vault（`[[wikilink]]` 解析）、Git 项目批量扫描注册、VS Code workspace 导入、技术栈标签识别 |
-| **移动伴侣** | Dashboard 扫码直达手机版、mDNS 局域网发现、移动端自适应 UI |
-| **Electron 桌面版** | Windows / macOS / Linux 一键安装，原生文件对话框，系统托盘，vendor 资源内置（默认端口 28888） |
-| **模块插件化** | AI / MCP / 翻译可选安装（`doc77 i ai` / `doc77 i translate`），默认轻量，按需扩展 |
-| **安全** | 路径沙箱、敏感文件过滤、信封加密（DEK）、10 个一次性恢复码、暴力破解防护、Session 管理、审计日志、密码保护下可安全对外暴露 |
-| **离线可用** | `doc77 vendor-install` 缓存全部 CDN 依赖，无网环境完整可用 |
+| **Multi-format Preview** | Markdown (GFM/KaTeX/Mermaid/PlantUML/Footnotes/Admonitions), PDF, Word/Excel, 44+ code languages with syntax highlighting, image Lightbox, JS/Python sandbox execution |
+| **Reading Tools** | TTS read-aloud, auto-scroll, reading progress, in-doc search (Ctrl+F), global search, outline panel, bookmarks, recent files |
+| **Multi-tab & Editing** | Multiple document tabs (LRU render cache), drag-and-drop temp file preview, lightweight text editing (external change conflict detection), one-click VS Code launch |
+| **AI Assistant** | Natural language conversation (SSE streaming), doc summarization, smart categorization, batch operation planning. Supports DeepSeek/OpenAI/Qwen/Kimi/Doubao/GLM and custom endpoints |
+| **MCP & Approval** | MCP Server (stdio + HTTP) with 8 tools exposing filesystem; all write operations queued for approval, CLI and Web dual-channel |
+| **Transaction Rollback** | Pre-flight check + Shadow backup + reverse-order rollback. Failed batch operations auto-recover, orphaned shadow GC |
+| **Export & Share** | Self-contained HTML export (inline styles and images, preserves light/dark theme), LAN read-only sharing links (with TTL, QR code, one-click revoke) |
+| **Offline Translation** | Opus-MT ONNX models fully local (en↔zh), auto-language detection, translate-on-select + long-doc segment translation, no data leaves your machine |
+| **Multilingual UI** | English / 简体中文 built-in, auto-detects browser and system language, extensible via `~/.doc77/locales/<lang>.json` — add any language |
+| **Project Import** | Obsidian vault (`[[wikilink]]` resolution), Git project batch scan, VS Code workspace import, tech-stack tag recognition |
+| **Mobile Companion** | Scan QR code from Dashboard to open mobile view, mDNS LAN discovery, adaptive mobile UI |
+| **Electron Desktop** | Windows / macOS / Linux one-click install, native file dialogs, system tray, vendor resources built-in (default port 28888) |
+| **Modular Plugins** | AI / MCP / Translation optional installation (`doc77 i ai` / `doc77 i translate`), lightweight by default, expand on demand |
+| **Security** | Path sandboxing, sensitive file filtering, envelope encryption (DEK), 10 one-time recovery codes, brute-force protection, session management, audit logging, password-protected external exposure |
+| **Offline-ready** | `doc77 vendor-install` caches all CDN dependencies locally, fully functional without internet |
 
-## 安装
+## Installation
 
-### 桌面版（推荐普通用户）
+### Desktop (Recommended for non-technical users)
 
-| 平台 | 下载 |
+| Platform | Download |
 |---|---|
 | Windows | [📦 Doc77-Setup.exe](https://github.com/xyy277/doc77/releases/latest) |
 | macOS | [📦 Doc77.dmg](https://github.com/xyy277/doc77/releases/latest) |
 | Linux | [📦 Doc77.AppImage](https://github.com/xyy277/doc77/releases/latest) |
 
-双击安装，桌面快捷方式启动。原生系统对话框选文件夹，开箱即用。
+Double-click to install, desktop shortcut launches the app. Native file dialog to select folders, ready out of the box.
 
-### 命令行版（推荐开发者）
+### CLI (Recommended for developers)
 
 ```bash
-npm install -g idoc77                # 安装
-doc77 register ./my-docs --name "我的文档"   # 注册项目
-doc77 start                          # 启动（127.0.0.1:27777）
-doc77 start --bind 0.0.0.0           # 或允许局域网访问
+npm install -g idoc77                # Install
+doc77 register ./my-docs --name "My Docs"   # Register a project
+doc77 start                          # Start (127.0.0.1:27777)
+doc77 start --bind 0.0.0.0           # Or allow LAN access
 ```
 
-## 命令参考
+## Command Reference
 
-### 核心命令
+### Core Commands
 
-| 命令 | 说明 |
+| Command | Description |
 |---|---|
-| `doc77 start [--port <n>] [--bind <addr>]` | 启动 Web Dashboard（默认端口 27777；桌面版默认 28888） |
-| `doc77 register <path> [--name <n>]` | 注册项目目录 |
-| `doc77 list [--json]` | 列出所有已注册项目 |
-| `doc77 remove <id>` | 按 ID 移除项目（不会删除源文件） |
-| `doc77 update <id> [--name <n>] [--path <p>]` | 更新项目名称或路径 |
-| `doc77 status` | 查看服务状态 |
+| `doc77 start [--port <n>] [--bind <addr>]` | Start Web Dashboard (default port 27777; desktop 28888) |
+| `doc77 register <path> [--name <n>]` | Register a project directory |
+| `doc77 list [--json]` | List all registered projects |
+| `doc77 remove <id>` | Remove a project by ID (does not delete source files) |
+| `doc77 update <id> [--name <n>] [--path <p>]` | Update project name or path |
+| `doc77 status` | Check service status |
 
-### 配置管理
+### Configuration
 
-| 命令 | 说明 |
+| Command | Description |
 |---|---|
-| `doc77 config set <key> <value>` | 设置配置项 |
-| `doc77 config get <key>` | 获取配置项 |
-| `doc77 config list` | 列出所有配置 |
-| `doc77 config set-password` | 设置访问密码（首次） |
-| `doc77 config change-password` | 修改访问密码 |
-| `doc77 config reset-password` | 使用恢复码重置密码 |
-| `doc77 config reset-password --force` | 强制重置（清空加密配置） |
-| `doc77 config recovery-codes` | 重新生成恢复码 |
+| `doc77 config set <key> <value>` | Set a config value |
+| `doc77 config get <key>` | Get a config value |
+| `doc77 config list` | List all config |
+| `doc77 config set-password` | Set an access password (first time) |
+| `doc77 config change-password` | Change access password |
+| `doc77 config reset-password` | Reset password using recovery code |
+| `doc77 config reset-password --force` | Force reset (clears encrypted config) |
+| `doc77 config recovery-codes` | Regenerate recovery codes |
 
-常用配置项：
+Common config keys:
 
-| Key | 说明 | 默认值 |
+| Key | Description | Default |
 |---|---|---|
-| `ai.enabled` | 启用 AI 助手 | `false` |
-| `ai.token` | AI API Token | — |
-| `ai.base_url` | AI API Base URL | `https://api.deepseek.com` |
-| `ai.model` | 模型名称 | `deepseek-v4-pro` |
-| `editor.default` | 默认编辑器 | `vscode` |
-| `locale.language` | 界面/AI/CLI 全局语言（空 = 自动检测） | — |
-| `translate.enabled` | 启用离线翻译 | `true` |
-| `translate.mirror` | 模型下载走国内镜像 (hf-mirror.com) | `false` |
-| `export.share.ttl_hours` | 分享链接有效期（小时） | `24` |
+| `ai.enabled` | Enable AI assistant | `false` |
+| `ai.token` | AI API token | — |
+| `ai.base_url` | AI API base URL | `https://api.deepseek.com` |
+| `ai.model` | Model name | `deepseek-v4-pro` |
+| `editor.default` | Default editor | `vscode` |
+| `locale.language` | UI/AI/CLI global language (empty = auto-detect) | — |
+| `translate.enabled` | Enable offline translation | `true` |
+| `translate.mirror` | Mirror download for models (hf-mirror.com) | `false` |
+| `export.share.ttl_hours` | Share link TTL (hours) | `24` |
 
-### MCP 服务
+### MCP Service
 
-| 命令 | 说明 |
+| Command | Description |
 |---|---|
-| `doc77 mcp serve [--http] [--port <n>]` | 启动 MCP 服务（stdio 或 HTTP 传输） |
+| `doc77 mcp serve [--http] [--port <n>]` | Start MCP service (stdio or HTTP transport) |
 
-### 任务审批
+### Task Approval
 
-| 命令 | 说明 |
+| Command | Description |
 |---|---|
-| `doc77 approve --list` | 列出待审批任务 |
-| `doc77 approve --accept <task_id>` | 批准指定任务 |
-| `doc77 approve --reject <task_id>` | 拒绝指定任务 |
-| `doc77 approve --accept --all` | 批量批准 |
-| `doc77 approve --reject --all` | 批量拒绝 |
+| `doc77 approve --list` | List pending approval tasks |
+| `doc77 approve --accept <task_id>` | Approve a task |
+| `doc77 approve --reject <task_id>` | Reject a task |
+| `doc77 approve --accept --all` | Batch approve all |
+| `doc77 approve --reject --all` | Batch reject all |
 
-### 锁管理
+### Lock Management
 
-| 命令 | 说明 |
+| Command | Description |
 |---|---|
-| `doc77 lock status` | 查看活跃的项目锁 |
-| `doc77 lock release <project_id>` | 手动释放项目锁 |
+| `doc77 lock status` | View active project locks |
+| `doc77 lock release <project_id>` | Manually release a project lock |
 
-### 离线支持
+### Offline Support
 
 ```bash
-# 下载所有 CDN 资源到本地（约 16MB）
+# Download all CDN resources locally (~16MB)
 doc77 vendor-install
 
-# 跳过 Pyodide（Python 运行时），节省 ~12MB
+# Skip Pyodide (Python runtime), save ~12MB
 doc77 vendor-install --no-pyodide
 
-# 下载离线翻译模型（en↔zh，各约 80MB，可加 --mirror 走国内镜像）
+# Download offline translation models (en↔zh, ~80MB each)
 doc77 vendor-install --translate en-zh
 doc77 vendor-install --translate zh-en
 ```
 
-资源缓存到 `~/.doc77/vendor/`，重启服务后自动生效。重复执行会跳过已下载的文件。
+Resources are cached in `~/.doc77/vendor/` and auto-detected on restart. Re-running skips already-downloaded files.
 
-## 支持的格式
+## Supported Formats
 
-| 格式 | 扩展名 | 阅读模式 |
+| Format | Extensions | Read Mode |
 |---|---|---|
-| **Markdown** | `.md` `.mdx` `.markdown` | ✅ TTS/搜索/大纲/进度 |
-| **Mermaid 图表** | `.mermaid` `.mmd` | ✅ |
-| **代码** (~44 种) | `.ts` `.js` `.py` `.go` `.rs` `.java` `.c` `.cpp` `.html` `.css` `.json` … | ✅ 语法高亮 |
-| **PDF** | `.pdf` | ✅ 浏览器原生预览 + 一键全屏 |
-| **图片** (9 种) | `.png` `.jpg` `.gif` `.svg` `.webp` `.avif` `.bmp` `.ico` | ✅ Lightbox 缩放/导航 |
-| **Word 文档** | `.docx` | ✅ mammoth.js 渲染 |
-| **Excel 表格** | `.xlsx` `.xls` | ✅ SheetJS 渲染 + Tab 切换 |
-| **JavaScript 执行** | `.js` | ✅ Sandbox 运行 |
-| **Python 执行** | `.py` | ✅ Pyodide WASM 运行 |
-| **不支持的格式** | `.mp4` `.zip` `.exe` `.shp` `.psd` … | ❌ 文件信息卡 + 文件夹中显示 |
+| **Markdown** | `.md` `.mdx` `.markdown` | ✅ TTS/Search/Outline/Progress |
+| **Mermaid** | `.mermaid` `.mmd` | ✅ |
+| **Code** (~44 langs) | `.ts` `.js` `.py` `.go` `.rs` `.java` `.c` `.cpp` `.html` `.css` `.json` … | ✅ Syntax highlighting |
+| **PDF** | `.pdf` | ✅ Browser-native + fullscreen |
+| **Images** (9 types) | `.png` `.jpg` `.gif` `.svg` `.webp` `.avif` `.bmp` `.ico` | ✅ Lightbox zoom/nav |
+| **Word** | `.docx` | ✅ mammoth.js rendering |
+| **Excel** | `.xlsx` `.xls` | ✅ SheetJS + tab switching |
+| **JavaScript** | `.js` | ✅ Sandbox execution |
+| **Python** | `.py` | ✅ Pyodide WASM execution |
+| **Unsupported** | `.mp4` `.zip` `.exe` `.shp` `.psd` … | ❌ File info card + show in folder |
 
-### Markdown 语法支持
+### Markdown Features
 
-| 功能 | 语法示例 | 状态 |
+| Feature | Example | Status |
 |---|---|---|
-| 标题 / 加粗 / 斜体 / 删除线 | `# H1`, `**b**`, `*i*`, `~~del~~` | ✅ GFM |
-| 列表（嵌套 / 有序 / 无序） | `1.`, `- `, 缩进 | ✅ GFM |
-| 任务列表 | `- [x]` `- [ ]` | ✅ GFM |
-| 表格（含对齐） | `|:---|:---:|---:|` | ✅ GFM |
-| 引用块 / 分割线 | `> quote`, `---` | ✅ GFM |
-| 图片 / 链接 / 图片链接 | `![alt](url)`, `[text](url)` | ✅ 本地路径自动重写为 API |
-| 代码块 + 语法高亮 | ` ```python ` | ✅ highlight.js (44+ 语言) |
-| 代码复制按钮 | hover 右上角 | ✅ |
-| 数学公式（行内 / 块） | `$E=mc^2$`, `$$\int$$` | ✅ KaTeX |
-| Mermaid 图表 | ` ```mermaid ` | ✅ 流程图 / 时序图 / 甘特图 / 类图 / 状态图 / 饼图 |
-| PlantUML 图表 | ` ```plantuml ` | ✅ kroki.io（离线降级源码） |
-| Emoji 短码 | `:smile:` `:rocket:` `:heart:` | ✅ |
-| 高亮标记 | `==highlight==` | ✅ `<mark>` |
-| 脚注 | `[^1]` `[^2]` | ✅ |
-| GitHub 警告框 | `> [!NOTE]` `> [!WARNING]` | ✅ |
-| 折叠块 | `<details><summary>` | ✅ HTML 原生 |
-| 标题锚点 | `## My Heading` → `#my-heading` | ✅ |
-| 原始 HTML | `<kbd>`, `<sup>`, `<audio>`, `<video>` | ✅ 浏览器原生 |
-| 定义列表 | `Term : definition` | ❌ |
-| 自动目录 | `[TOC]` | ⚠️ 前端已有大纲面板替代 |
+| Headers / Bold / Italic / Strikethrough | `# H1`, `**b**`, `*i*`, `~~del~~` | ✅ GFM |
+| Lists (nested / ordered / unordered) | `1.`, `- `, indent | ✅ GFM |
+| Task lists | `- [x]` `- [ ]` | ✅ GFM |
+| Tables (with alignment) | `|:---|:---:|---:|` | ✅ GFM |
+| Blockquotes / Horizontal rules | `> quote`, `---` | ✅ GFM |
+| Images / Links / Image links | `![alt](url)`, `[text](url)` | ✅ Local paths auto-rewrite to API |
+| Code blocks + syntax highlighting | ` ```python ` | ✅ highlight.js (44+ languages) |
+| Copy-to-clipboard button | hover top-right | ✅ |
+| Math (inline / block) | `$E=mc^2$`, `$$\int$$` | ✅ KaTeX |
+| Mermaid diagrams | ` ```mermaid ` | ✅ Flow / Sequence / Gantt / Class / State / Pie |
+| PlantUML diagrams | ` ```plantuml ` | ✅ kroki.io (offline falls back to source) |
+| Emoji shortcuts | `:smile:` `:rocket:` `:heart:` | ✅ |
+| Highlight marks | `==highlight==` | ✅ `<mark>` |
+| Footnotes | `[^1]` `[^2]` | ✅ |
+| GitHub admonitions | `> [!NOTE]` `> [!WARNING]` | ✅ |
+| Collapsible sections | `<details><summary>` | ✅ Native HTML |
+| Heading anchors | `## My Heading` → `#my-heading` | ✅ |
+| Raw HTML | `<kbd>`, `<sup>`, `<audio>`, `<video>` | ✅ Browser-native |
+| Definition lists | `Term : definition` | ❌ |
+| Auto TOC | `[TOC]` | ⚠️ Outline panel replaces this |
 
-## 离线可用性
+## Offline Availability
 
-Doc77 通过 vendor 系统提供 CDN → 本地回退。`doc77 vendor-install` 下载资源到 `~/.doc77/vendor/`。Electron 桌面版在构建时已将 vendor 资源打包内置（extraResources）。
+Doc77 uses a vendor system for CDN → local fallback. `doc77 vendor-install` downloads resources to `~/.doc77/vendor/`. The Electron desktop build bundles vendor resources at build time (extraResources).
 
-| 功能 | 依赖库 | CLI `vendor-install` | Electron 内置 | 离线不可用时 |
+| Feature | Library | CLI `vendor-install` | Electron Built-in | Offline Fallback |
 |---|---|---|---|---|
-| **Tailwind CSS** | `tailwind.js` | ✅ | ✅ | 3s 超时降级无样式 |
-| **highlight.js** | `highlight.min.js` | ✅ | ✅ | 代码块无语法高亮 |
-| **Mermaid 图表** | `mermaid.min.js` | ✅ | ✅ | 显示源码 |
-| **KaTeX 数学** | `katex.min.js` | ✅ | ✅ | 显示 LaTeX 原文 |
-| **XLSX 预览** | `xlsx.mini.min.js` | ✅ | ✅ | .xlsx 不可预览 |
-| **DOCX 预览** | `mammoth.browser.min.js` | ✅ | ✅ | .docx 不可预览 |
-| **Python 执行** | `pyodide.js` + wasm | ⚠️ 需额外 ~12MB | ❌ 未内置 | .py 不可执行 |
-| **PlantUML** | kroki.io | ❌ 需联网 | ❌ 需联网 | 显示源码 |
+| **Tailwind CSS** | `tailwind.js` | ✅ | ✅ | 3s timeout → unstyled |
+| **highlight.js** | `highlight.min.js` | ✅ | ✅ | Code blocks lose highlighting |
+| **Mermaid** | `mermaid.min.js` | ✅ | ✅ | Shows source |
+| **KaTeX** | `katex.min.js` | ✅ | ✅ | Shows LaTeX source |
+| **XLSX** | `xlsx.mini.min.js` | ✅ | ✅ | .xlsx not previewable |
+| **DOCX** | `mammoth.browser.min.js` | ✅ | ✅ | .docx not previewable |
+| **Python** | `pyodide.js` + wasm | ⚠️ ~12MB extra | ❌ Not bundled | .py not executable |
+| **PlantUML** | kroki.io | ❌ Needs internet | ❌ Needs internet | Shows source |
 
-## 一键重启
+## One-Command Restart
 
 ```bash
-./scripts/restart.sh              # 默认端口 27777
-./scripts/restart.sh --port 8080  # 自定义端口
+./scripts/restart.sh              # Default port 27777
+./scripts/restart.sh --port 8080  # Custom port
 ```
 
-> 如需绑定 `0.0.0.0` 允许外部访问，使用 `doc77 start --bind 0.0.0.0`（启用后需要设置访问密码）。
+> To bind `0.0.0.0` for external access, use `doc77 start --bind 0.0.0.0` (a password will be required).
 
-## 设计哲学
+## Design Philosophy
 
-1. **文档留在原地** — 绝不复制/上传用户文件，只读本地路径
-2. **预览 ≠ 编辑** — 编辑交给专业工具（VS Code / Typora），预览交给 Doc77
-3. **注册即管理** — 一次注册项目目录，永久记住，点开即用
-4. **轻量优先** — 单进程、SQLite、零配置、开箱即用
-5. **对话驱动** — 自然语言交互，AI 辅助规划，用户最终决策
+1. **Documents stay where they are** — never copy or upload user files, read-only access to local paths
+2. **Preview ≠ Edit** — let professional tools (VS Code / Typora) handle editing, let Doc77 handle preview
+3. **Register once, manage forever** — register a project directory once, it's remembered permanently
+4. **Lightweight first** — single process, SQLite, zero-config, out of the box
+5. **Conversation-driven** — natural language interaction, AI-assisted planning, human final decision
 
-## 文档
+## Documentation
 
-| 文档 | 说明 |
+| Document | Description |
 |---|---|
-| [系统架构设计](docs/design/system-architecture.md) | 完整设计方案 |
-| [架构分析报告](docs/analysis/system-architecture-analysis.md) | Technology Stack 验证与 Architecture 评审 |
-| [实施方案](docs/planning/implementation-plan.md) | 40 个 Task、9 个 Phase 详细计划 |
-| [实施进度](docs/planning/implementation-status.md) | 实时开发进度跟踪 |
-| [变更日志](CHANGELOG.md) | 版本变更记录 |
+| [System Architecture](docs/design/system-architecture.md) | Complete design document |
+| [Architecture Review](docs/analysis/system-architecture-analysis.md) | Tech stack verification & architecture review |
+| [Implementation Plan](docs/planning/implementation-plan.md) | 40 tasks, 9 phases detailed plan |
+| [Implementation Status](docs/planning/implementation-status.md) | Real-time development progress |
+| [Changelog](CHANGELOG.md) | Version history |
 
-## 技术栈
+## Tech Stack
 
-| 组件 | 选型 |
+| Component | Choice |
 |---|---|
 | Runtime | Node.js >= 22.x |
 | Language | TypeScript ^5.8 |
 | Web Framework | Express 5.x |
-| Database | SQLite（sql.js） |
+| Database | SQLite (sql.js) |
 | MCP Protocol | @modelcontextprotocol/sdk |
-| Frontend | 原生 HTML + CSS + JS（marked, Mermaid, highlight.js）+ 浏览器原生 PDF / HTML 预览 |
+| Frontend | Vanilla HTML + CSS + JS (marked, Mermaid, highlight.js) + browser-native PDF / HTML preview |
 | Build | tsup + pnpm workspaces |
 | Test | Vitest |
 
-## 项目结构
+## Project Structure
 
 ```
 doc77/
 ├── packages/
-│   ├── core/          # @doc77/core  预览引擎 + 文件系统抽象层 + Express Server
-│   ├── mcp/           # @doc77/mcp   MCP 服务层 + 安全校验 + 事务系统
-│   ├── ai/            # @doc77/ai    AI Provider + Agent 核心 + Chat API
-│   ├── cli/           # doc77 CLI    命令行入口
-│   ├── electron/      # 桌面版壳（托盘 / 原生对话框 / 端口 28888）
-│   └── doc77/         # idoc77 发布元包
+│   ├── core/          # @doc77/core  Preview engine + FS abstraction + Express Server
+│   ├── mcp/           # @doc77/mcp   MCP service layer + security guard + transaction system
+│   ├── ai/            # @doc77/ai    AI provider + Agent core + Chat API
+│   ├── cli/           # doc77 CLI    Command-line entry
+│   ├── electron/      # Desktop shell (tray / native dialogs / port 28888)
+│   └── doc77/         # idoc77 meta-package for npm publishing
 ├── docs/
-│   ├── design/        # 设计文档
-│   ├── analysis/      # 分析报告
-│   └── planning/      # 实施规划
-├── scripts/           # 工具脚本
-├── CLAUDE.md          # 项目规范
-└── README.md          # 本文件
+│   ├── design/        # Design docs
+│   ├── analysis/      # Analysis reports
+│   └── planning/      # Implementation planning
+├── scripts/           # Tool scripts
+├── CLAUDE.md          # Project conventions
+└── README.md          # This file
 ```
 
-## 隐私与安全
+## Privacy & Security
 
-- 所有数据存储在本地 `~/.doc77/`
-- AI Token 加密存储在 SQLite 数据库
-- 不向外部服务器发送任何文件内容（除非手动启用 AI 功能）
-- 支持访问密码保护
+- All data stored locally in `~/.doc77/`
+- AI tokens encrypted in SQLite
+- No file content sent to external servers (unless you manually enable AI features)
+- Password-protected access supported
 
-## 开源协议
+## License
 
 [MIT License](LICENSE)

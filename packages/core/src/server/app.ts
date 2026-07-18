@@ -89,6 +89,12 @@ function getServerInfo() {
 export function createApp(restartCallback?: () => void, bindAddr?: string, port?: number) {
   const app = express();
 
+  // Sync runtime bind/port to _serverInfo so share URL construction uses correct values
+  setServerInfo({
+    bind: bindAddr || '127.0.0.1',
+    port: port || 27777,
+  });
+
   // Initialize i18n from global config (empty config = auto-detect system language)
   initI18n(getConfig('locale.language') || '');
 
@@ -1365,7 +1371,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
       // Get the runtime bind address and port from server info
       const serverInfo = getServerInfo();
-      const shareUrl = `http://${getLocalIP()}:${serverInfo.port}/s/${token.token}`;
+      const shareHost = serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind;
+      const shareUrl = `http://${shareHost}:${serverInfo.port}/s/${token.token}`;
 
       // Audit log
       auditLog({
@@ -1467,7 +1474,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
     // Reconstruct the share URL (we don't store it, but we know the token)
     const serverInfo = getServerInfo();
-    const shareUrl = `http://${getLocalIP()}:${serverInfo.port}/s/${token.token}`;
+    const shareHost = serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind;
+    const shareUrl = `http://${shareHost}:${serverInfo.port}/s/${token.token}`;
 
     try {
       const svg = await QRCode.toString(shareUrl, {

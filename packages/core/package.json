@@ -1,7 +1,7 @@
 {
   "name": "@doc77/core",
   "version": "1.0.0-beta.2",
-  "description": "Doc77 核心引擎 — 数据库、文件系统抽象层、预览引擎、Express Server",
+  "description": "Doc77 Core — database, filesystem abstraction layer, preview engine, Express server",
   "license": "MIT",
   "repository": {
     "type": "git",

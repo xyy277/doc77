@@ -1,5 +1,6 @@
 import * as os from 'node:os';
 import { VERSION } from '../version.gen.js';
+import { getLocalIP } from '../export/helpers.js';
 
 export function getMobileInfo(port: number) {
   return { hostname: os.hostname(), version: VERSION, port, hasPassword: false };
@@ -44,14 +45,4 @@ export async function publishMdns(port: number): Promise<{ destroy: () => void }
   } catch {
     return null;
   }
-}
-
-function getLocalIP(): string {
-  const ifaces = os.networkInterfaces();
-  for (const name of Object.keys(ifaces)) {
-    for (const iface of ifaces[name] || []) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
-    }
-  }
-  return '127.0.0.1';
 }

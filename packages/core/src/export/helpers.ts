@@ -3,16 +3,43 @@ import { t, getLocale } from '../i18n/index.js';
 
 /**
  * Get the local LAN IP address (non-loopback IPv4).
+ *
+ * Prioritises RFC 1918 private addresses so that on machines with multiple
+ * network interfaces (VPN, Docker, carrier NAT, etc.) the most useful LAN
+ * address is returned rather than a virtual or public IP.
+ *
+ * Priority order: 192.168.x.x > 10.x.x.x > 172.16-31.x.x > any other non-internal IPv4.
  */
 export function getLocalIP(): string {
   const interfaces = os.networkInterfaces();
+  const candidates: string[] = [];
+
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name] || []) {
       if (iface.family === 'IPv4' && !iface.internal) {
-        return iface.address;
+        candidates.push(iface.address);
       }
     }
   }
+
+  // 1) 192.168.0.0/16  — most common home/office LAN
+  const c24 = candidates.filter(a => a.startsWith('192.168.'));
+  if (c24.length > 0) return c24[0];
+
+  // 2) 10.0.0.0/8      — large private networks
+  const c10 = candidates.filter(a => a.startsWith('10.'));
+  if (c10.length > 0) return c10[0];
+
+  // 3) 172.16.0.0/12   — less common private range
+  const c172 = candidates.filter(a => {
+    const seg = parseInt(a.split('.')[1], 10);
+    return a.startsWith('172.') && seg >= 16 && seg <= 31;
+  });
+  if (c172.length > 0) return c172[0];
+
+  // 4) Fallback: first non-internal address (could be a public IP)
+  if (candidates.length > 0) return candidates[0];
+
   return '127.0.0.1';
 }
 

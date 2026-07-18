@@ -30,6 +30,7 @@ interface CoreModule {
   createEventsHandler: (eventBus: unknown) => unknown;
   setCapabilities: (caps: { ai: boolean; mcp: boolean; translate: boolean }) => void;
   isEngineAvailable: () => Promise<boolean>;
+  getConfig: (key: string) => string | undefined;
 }
 
 /** Minimal express-app surface we need for post-createApp route registration. */
@@ -162,7 +163,7 @@ export async function startServer(port: number): Promise<ServerProcess> {
   }
 
   const core = await loadCore();
-  const { closeConnection, createApp, initDatabase, loadDefaults, runMigrations } = core;
+  const { closeConnection, createApp, getConfig, initDatabase, loadDefaults, runMigrations } = core;
   // Make core's t() available to tray/dialog (see ./i18n shim).
   bindCoreT(core.t);
 
@@ -170,13 +171,17 @@ export async function startServer(port: number): Promise<ServerProcess> {
   runMigrations();
   loadDefaults();
 
-  const app = createApp(undefined, '127.0.0.1', port);
+  // Read the persisted bind address — only allow 0.0.0.0 to open LAN access.
+  const dbBind = getConfig('security.bind_address') || '127.0.0.1';
+  const effectiveBind = dbBind === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1';
+
+  const app = createApp(undefined, effectiveBind, port);
   await registerInstalledModules(core, app as unknown as ExpressLike);
   const server = http.createServer(app);
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(port, effectiveBind, () => {
       server.off('error', reject);
       resolve({
         server,
