@@ -4,6 +4,8 @@
  */
 import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 import { t } from './i18n';
 import { findAvailablePort, startServer, ServerProcess } from './server';
 import { createTray } from './tray';
@@ -49,7 +51,9 @@ async function boot(): Promise<void> {
   const port = await findAvailablePort(28888);
   server = await startServer(port);
 
-  createWindow(port);
+  // The server may have moved (explicit server.port override, or busy-port
+  // fallback) — the window must load whatever port it actually listens on.
+  createWindow(server.port);
 
   const trayIconPath = path.join(__dirname, '..', 'assets', 'tray.png');
   tray = createTray(trayIconPath, () => {
@@ -60,6 +64,24 @@ async function boot(): Promise<void> {
       mainWindow?.focus();
     }
   });
+}
+
+/** Surface boot failures instead of leaving a windowless zombie process. */
+function reportBootFailure(err: Error): void {
+  const message = `${new Date().toISOString()} boot failed\n${err.stack || err.message}\n`;
+  try {
+    const logDir = path.join(os.homedir(), '.doc77');
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(path.join(logDir, 'electron-error.log'), message);
+  } catch {
+    /* logging must never mask the dialog */
+  }
+  dialog.showErrorBox(
+    'Doc77 failed to start',
+    `${err.message}\n\nDetails: ~/.doc77/electron-error.log`,
+  );
+  shuttingDown = true;
+  app.quit();
 }
 
 // IPC: native directory picker
@@ -88,7 +110,7 @@ if (!gotLock) {
     }
   });
 
-  app.whenReady().then(boot);
+  app.whenReady().then(() => boot().catch(reportBootFailure));
 }
 
 app.on('before-quit', () => {

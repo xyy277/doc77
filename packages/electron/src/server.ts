@@ -171,10 +171,18 @@ export async function startServer(port: number): Promise<ServerProcess> {
   runMigrations();
   loadDefaults();
 
-  // If the user configured a specific server port, use it; otherwise fall back
-  // to the port argument (which came from findAvailablePort in main.ts).
-  const cfgPort = getConfig('server.port');
-  const effectivePort = cfgPort ? parseInt(cfgPort, 10) || port : port;
+  // Port policy: loadDefaults() seeds server.port with the CLI default
+  // (27777), so its mere presence does NOT mean the user chose it — honouring
+  // it blindly made the desktop app fight a running CLI instance for 27777
+  // (listen → EADDRINUSE → boot rejected → windowless zombie process).
+  // Only an explicit non-CLI-default override wins, and only if it is
+  // actually free; otherwise keep the probed desktop port (28888+).
+  const CLI_DEFAULT_PORT = 27777;
+  const cfgPortNum = parseInt(getConfig('server.port') || '', 10);
+  let effectivePort = port;
+  if (Number.isFinite(cfgPortNum) && cfgPortNum > 0 && cfgPortNum !== CLI_DEFAULT_PORT) {
+    effectivePort = await isPortFree(cfgPortNum).then((free) => (free ? cfgPortNum : port));
+  }
 
   // Read the persisted bind address — only allow 0.0.0.0 to open LAN access.
   const dbBind = getConfig('security.bind_address') || '127.0.0.1';
@@ -196,6 +204,17 @@ export async function startServer(port: number): Promise<ServerProcess> {
           closeConnection();
         },
       });
+    });
+  });
+}
+
+/** True if `port` can be bound on localhost right now. */
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once('error', () => resolve(false));
+    probe.listen(port, '127.0.0.1', () => {
+      probe.close(() => resolve(true));
     });
   });
 }
