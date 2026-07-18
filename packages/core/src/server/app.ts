@@ -1342,8 +1342,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       }
 
       // Check bind_address — sharing only works when bound to 0.0.0.0
-      const bindAddr = getConfig('security.bind_address') || '127.0.0.1';
-      if (bindAddr === '127.0.0.1') {
+      const effectiveBindAddr = bindAddr || '127.0.0.1';
+      if (effectiveBindAddr === '127.0.0.1') {
         res.status(403).json({ error: t('api.share.bindRequired'), code: 'SHARE_BIND_REQUIRED' });
         return;
       }
