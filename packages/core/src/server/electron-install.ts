@@ -28,8 +28,7 @@ export function modulesDir(): string {
 }
 
 export type InstallPlan =
-  | { method: 'tarball'; packages: string[] }
-  | { method: 'npm'; spec: string };
+  { method: 'tarball'; packages: string[] } | { method: 'npm'; spec: string };
 
 export function buildInstallPlan(mod: string): InstallPlan {
   if (mod === 'ai') return { method: 'tarball', packages: ['@doc77/ai', '@doc77/core'] };
@@ -154,10 +153,13 @@ async function installViaNpm(dest: string, spec: string): Promise<string> {
     const info = await fetchPackageInfo(spec);
     fullSpec = `${spec}@${info.version}`;
   }
-  await execAsync(`npm install --prefix "${dest}" ${fullSpec} --no-audit --no-fund --loglevel=error`, {
-    cwd: dest,
-    maxBuffer: 16 * 1024 * 1024,
-  });
+  await execAsync(
+    `npm install --prefix "${dest}" ${fullSpec} --no-audit --no-fund --loglevel=error`,
+    {
+      cwd: dest,
+      maxBuffer: 16 * 1024 * 1024,
+    },
+  );
   const pkgName = fullSpec.slice(0, fullSpec.lastIndexOf('@'));
   try {
     const pkg = JSON.parse(
@@ -184,7 +186,9 @@ export async function installElectronModule(mod: string): Promise<{ message: str
     display = plan.packages[0];
   } else {
     version = await installViaNpm(dest, plan.spec);
-    display = plan.spec.includes('@', 1) ? plan.spec.slice(0, plan.spec.lastIndexOf('@')) : plan.spec;
+    display = plan.spec.includes('@', 1)
+      ? plan.spec.slice(0, plan.spec.lastIndexOf('@'))
+      : plan.spec;
   }
   return { message: t('api.electron.installDone', { mod: display, version }) };
 }

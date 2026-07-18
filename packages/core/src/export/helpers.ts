@@ -23,15 +23,15 @@ export function getLocalIP(): string {
   }
 
   // 1) 192.168.0.0/16  — most common home/office LAN
-  const c24 = candidates.filter(a => a.startsWith('192.168.'));
+  const c24 = candidates.filter((a) => a.startsWith('192.168.'));
   if (c24.length > 0) return c24[0];
 
   // 2) 10.0.0.0/8      — large private networks
-  const c10 = candidates.filter(a => a.startsWith('10.'));
+  const c10 = candidates.filter((a) => a.startsWith('10.'));
   if (c10.length > 0) return c10[0];
 
   // 3) 172.16.0.0/12   — less common private range
-  const c172 = candidates.filter(a => {
+  const c172 = candidates.filter((a) => {
     const seg = parseInt(a.split('.')[1], 10);
     return a.startsWith('172.') && seg >= 16 && seg <= 31;
   });

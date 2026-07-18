@@ -1393,7 +1393,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       const serverInfo = getServerInfo();
       // Host priority: share.host_override > LAN IP (when bind 0.0.0.0) > bind address
       const hostOverride = getConfig('share.host_override') || '';
-      const shareHost = hostOverride || (serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind);
+      const shareHost =
+        hostOverride || (serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind);
       const shareUrl = `http://${shareHost}:${serverInfo.port}/s/${token.token}`;
 
       // Audit log
@@ -1498,7 +1499,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     const serverInfo = getServerInfo();
     // Host priority: share.host_override > LAN IP (when bind 0.0.0.0) > bind address
     const hostOverride = getConfig('share.host_override') || '';
-    const shareHost = hostOverride || (serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind);
+    const shareHost =
+      hostOverride || (serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind);
     const shareUrl = `http://${shareHost}:${serverInfo.port}/s/${token.token}`;
 
     try {
