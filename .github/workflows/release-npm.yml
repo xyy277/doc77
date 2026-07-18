@@ -70,28 +70,21 @@ jobs:
           fi
           echo "dist-tag: $(cat "$GITHUB_OUTPUT")"
 
-      - name: Publish @doc77/core
-        run: pnpm --filter @doc77/core publish --access public --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Sync README for npm page
+        run: node scripts/sync-readme.cjs
 
-      - name: Publish @doc77/mcp
-        run: pnpm --filter @doc77/mcp publish --access public --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @doc77/ai
-        run: pnpm --filter @doc77/ai publish --access public --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @doc77/cli
-        run: pnpm --filter @doc77/cli publish --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish idoc77
-        run: pnpm --filter idoc77 publish --no-git-checks --tag ${{ steps.dist_tag.outputs.tag }}
+      # pnpm pack resolves workspace:^ like pnpm publish, while `npm publish
+      # <tarball>` also uploads the README into the registry metadata —
+      # pnpm publish does not, which left the npm package page blank.
+      - name: Pack and publish (topological order)
+        run: |
+          mkdir -p /tmp/tgz
+          for pkg in @doc77/core @doc77/mcp @doc77/ai @doc77/cli idoc77; do
+            pnpm --filter "$pkg" pack --pack-destination /tmp/tgz
+          done
+          for tgz in /tmp/tgz/doc77-core-*.tgz /tmp/tgz/doc77-mcp-*.tgz /tmp/tgz/doc77-ai-*.tgz /tmp/tgz/doc77-cli-*.tgz /tmp/tgz/idoc77-*.tgz; do
+            npm publish "$tgz" --access public --tag ${{ steps.dist_tag.outputs.tag }}
+          done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

@@ -841,5 +841,6 @@
   "web.sharePage.contactSharer": "请联系分享者重新获取链接",
   "web.sharePage.readonlyBadge": "只读分享 · 通过 Doc77 分享",
   "web.sharePage.loading": "加载中...",
-  "web.sharePage.expired": "此链接已过期或无效"
+  "web.sharePage.expired": "此链接已过期或无效",
+  "common.settings.saveKeyFailed": "保存失败: {key} {status}"
 }

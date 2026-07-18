@@ -4,6 +4,18 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-19] — `1.0.1`
+
+### 全包 (`1.0.1`)
+
+**Fixed**
+- Electron 桌面版启动无窗口（僵尸进程）：`loadDefaults` 默认写入的 `server.port=27777` 被桌面版盲目采用，与 CLI 实例抢端口 → listen 失败且 `boot()` 无 catch。现在仅显式非默认端口且空闲才采用，否则保持 28888+ 探测端口；窗口加载实际监听端口；boot 失败写 `~/.doc77/electron-error.log` 并弹错误框
+- npm 包页面空 README：`pnpm publish` 不上传 readme 元数据。发布流程改为 `pnpm pack`（保留 workspace 解析）+ `npm publish <tarball>`；新增 `scripts/sync-readme.cjs` 将根 README（相对链接转绝对 GitHub URL）同步到 idoc77 包
+
+**Changed**
+- npm 旧版本治理：idoc77 与 @doc77/ai 的 0.x/beta 版本已全部 unpublish；@doc77/core/mcp/cli 因被依赖不可删除，已全部标记 deprecated
+- 本版本为 1.0.0 的重新发布（npm 不允许复用已撤下的版本号）；1.0.0 将随本版本上线后从 npm 撤下
+
 ## [2026-07-17] — `1.0.0-beta.2`
 
 ### All Packages (`1.0.0-beta.2`)

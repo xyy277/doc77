@@ -1,6 +1,6 @@
 {
   "name": "@doc77/core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Doc77 Core — database, filesystem abstraction layer, preview engine, Express server",
   "license": "MIT",
   "repository": {

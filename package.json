@@ -1,6 +1,6 @@
 {
   "name": "doc77-monorepo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Doc77 — Secure-by-default, conversation-driven local document management agent",

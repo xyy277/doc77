@@ -587,7 +587,7 @@ async function saveSettings() {
       continue;
     }
     var res = await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
-    if (!res.ok) throw new Error('保存失败: ' + k + ' ' + res.status);
+    if (!res.ok) throw new Error(t('common.settings.saveKeyFailed', { key: k, status: res.status }));
   }
   toast(t('common.toast.saved'),'success');
 }

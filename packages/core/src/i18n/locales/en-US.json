@@ -842,5 +842,6 @@
   "web.sharePage.contactSharer": "Ask the sharer for a new link",
   "web.sharePage.readonlyBadge": "Read-only · Shared via Doc77",
   "web.sharePage.loading": "Loading...",
-  "web.sharePage.expired": "This link has expired or is invalid"
+  "web.sharePage.expired": "This link has expired or is invalid",
+  "common.settings.saveKeyFailed": "Save failed: {key} {status}"
 }
