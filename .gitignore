@@ -29,6 +29,8 @@ config.local.*
 
 # Claude Code working directory
 .claude/
+.agents/
+skills-lock.json
 
 # 常规忽略
 *.log
