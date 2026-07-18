@@ -44,6 +44,7 @@ const DEFAULTS: Record<string, string> = {
   'export.html.maxFileSizeMB': '10',
   'export.share.ttl_hours': '24',
   'export.share.enabled': 'true',
+  'share.host_override': '',
 };
 
 /**

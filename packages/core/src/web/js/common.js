@@ -374,6 +374,11 @@ function switchSettingsTab(tab) {
       settingRow('','security.bind_address','text','127.0.0.1') +
       '<input type="hidden" id="bindAddrInput" value="">' +
       '<div style="font-size:10px;color:var(--danger);margin-top:4px;display:none" id="bindMismatch">' + t('common.settings.bindMismatch') + '</div>' +
+      settingRow(t('common.settings.serverPort'),'server.port','number','27777') +
+      '<div style="font-size:11px;line-height:1.6;color:var(--text-muted);margin:-4px 0 8px 0">' + t('common.settings.serverPortDesc') + '</div>' +
+      settingRow(t('common.settings.hostOverride'),'share.host_override','text','') +
+      '<div style="font-size:11px;line-height:1.6;color:var(--text-muted);margin:-4px 0 8px 0">' + t('common.settings.hostOverrideDesc') + '</div>' +
+      '<div style="font-size:12px;padding:8px 12px;background:var(--bg-code);border-radius:6px;margin-bottom:8px;display:none;line-height:1.6" id="wslHint"></div>' +
       '<div class="settings-tip">' + t('common.settings.tipRestart') + '</div>' +
       '<div class="section-title" style="margin-top:16px">' + t('common.settings.otherSecurity') + '</div>' +
       settingRow(t('common.settings.sharedSecret'),'security.shared_secret','password','') +
@@ -419,6 +424,14 @@ async function loadServerInfo() {
     if (runtimeEl) {
       runtimeEl.textContent = d.bindAddress;
       runtimeEl.style.color = d.isLocal ? 'var(--accent)' : 'var(--danger)';
+    }
+    // Show WSL hint if applicable
+    var wslEl = document.getElementById('wslHint');
+    if (wslEl && d.isWsl) {
+      wslEl.textContent = t('common.settings.wslHint');
+      wslEl.style.display = 'block';
+    } else if (wslEl) {
+      wslEl.style.display = 'none';
     }
     // Update config display after a short delay (wait for loadSettingsValues to fill)
     setTimeout(function() {

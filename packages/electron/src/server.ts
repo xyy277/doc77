@@ -171,21 +171,26 @@ export async function startServer(port: number): Promise<ServerProcess> {
   runMigrations();
   loadDefaults();
 
+  // If the user configured a specific server port, use it; otherwise fall back
+  // to the port argument (which came from findAvailablePort in main.ts).
+  const cfgPort = getConfig('server.port');
+  const effectivePort = cfgPort ? parseInt(cfgPort, 10) || port : port;
+
   // Read the persisted bind address — only allow 0.0.0.0 to open LAN access.
   const dbBind = getConfig('security.bind_address') || '127.0.0.1';
   const effectiveBind = dbBind === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1';
 
-  const app = createApp(undefined, effectiveBind, port);
+  const app = createApp(undefined, effectiveBind, effectivePort);
   await registerInstalledModules(core, app as unknown as ExpressLike);
   const server = http.createServer(app);
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(port, effectiveBind, () => {
+    server.listen(effectivePort, effectiveBind, () => {
       server.off('error', reject);
       resolve({
         server,
-        port,
+        port: effectivePort,
         kill: () => {
           server.close();
           closeConnection();

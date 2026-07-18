@@ -262,6 +262,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       platform: process.platform,
       arch: process.arch,
       nodeVersion: process.version,
+      isWsl: !!process.env.WSL_DISTRO_NAME,
+      hostOverride: getConfig('share.host_override') || '',
     };
     if (isElectron) (info as any).electronVersion = process.versions.electron || null;
     try {
@@ -1371,7 +1373,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
       // Get the runtime bind address and port from server info
       const serverInfo = getServerInfo();
-      const shareHost = serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind;
+      // Host priority: share.host_override > LAN IP (when bind 0.0.0.0) > bind address
+      const hostOverride = getConfig('share.host_override') || '';
+      const shareHost = hostOverride || (serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind);
       const shareUrl = `http://${shareHost}:${serverInfo.port}/s/${token.token}`;
 
       // Audit log
@@ -1474,7 +1478,9 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
 
     // Reconstruct the share URL (we don't store it, but we know the token)
     const serverInfo = getServerInfo();
-    const shareHost = serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind;
+    // Host priority: share.host_override > LAN IP (when bind 0.0.0.0) > bind address
+    const hostOverride = getConfig('share.host_override') || '';
+    const shareHost = hostOverride || (serverInfo.bind === '0.0.0.0' ? getLocalIP() : serverInfo.bind);
     const shareUrl = `http://${shareHost}:${serverInfo.port}/s/${token.token}`;
 
     try {
