@@ -222,7 +222,10 @@ describe('Dashboard 2.0 API endpoints', () => {
   });
 
   it('GET /api/discover rejects system paths', async () => {
-    const res = await fetch(`${baseUrl}/api/discover?path=/etc&depth=1`);
+    // `/etc` is Unix-only; on Windows it resolves to `C:/etc` (not blocked). Use a
+    // platform-appropriate system path so the block-list is exercised on every OS.
+    const sysPath = process.platform === 'win32' ? 'C:\\Windows' : '/etc';
+    const res = await fetch(`${baseUrl}/api/discover?path=${encodeURIComponent(sysPath)}&depth=1`);
     expect(res.status).toBe(400);
   });
 });

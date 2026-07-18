@@ -128,5 +128,22 @@ describe('File system abstraction', () => {
       fs.symlinkSync('/etc', symlinkPath);
       expect(() => validatePath(testDir, 'escape-link/passwd')).toThrow();
     });
+
+    it('should accept paths when the project root itself is a symlink (macOS /var → /private/var)', () => {
+      // Reproduces the macOS os.tmpdir() symlink condition on any OS via an explicit symlink:
+      // the root is a symlink to a real dir; validatePath must canonicalize the root before comparing.
+      const realRoot = path.join(os.tmpdir(), `doc77-realroot-${Date.now()}`);
+      const linkRoot = path.join(os.tmpdir(), `doc77-linkroot-${Date.now()}`);
+      fs.mkdirSync(realRoot, { recursive: true });
+      fs.writeFileSync(path.join(realRoot, 'a.txt'), 'hi');
+      fs.symlinkSync(realRoot, linkRoot);
+      try {
+        expect(() => validatePath(linkRoot, 'a.txt')).not.toThrow();
+        expect(validatePath(linkRoot, 'a.txt')).toBe(path.resolve(linkRoot, 'a.txt'));
+      } finally {
+        fs.rmSync(linkRoot, { force: true });
+        fs.rmSync(realRoot, { recursive: true, force: true });
+      }
+    });
   });
 });
