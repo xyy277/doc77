@@ -188,6 +188,8 @@
   "api.auth.wrongPassword": "密码错误（{fails}/{max}）",
   "api.auth.noRecoveryCode": "未设置恢复码",
   "api.electron.installDone": "{mod}@{version} 安装完成，重启生效",
+  "api.electron.registryError": "从 npm registry 获取 {pkg} 失败：{detail}",
+  "api.electron.npmRequired": "安装 {pkg} 需要本机已安装 Node.js/npm。请先安装 Node.js（https://nodejs.org）后重试，或使用 CLI 执行 doc77 i translate",
   "api.scan.dirNotAllowed": "此目录不允许扫描",
   "api.fs.mntNotAllowed": "远程访问模式下不允许浏览 /mnt（Windows 驱动器）",
   "api.fs.dirNotAllowed": "此目录不允许访问",

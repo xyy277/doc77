@@ -45,6 +45,7 @@ import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 import { getMobileInfo, publishMdns } from './mobile-mdns.js';
+import { installElectronModule } from './electron-install.js';
 
 import { VERSION } from '../version.gen.js';
 import { getConfig } from '../db/config.js';
@@ -282,7 +283,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
     res.json(_capabilities);
   });
 
-  // Electron: one-click install for AI/MCP modules
+  // Electron: one-click install for AI/MCP/translate modules
   if (process.env.DOC77_ELECTRON) {
     app.post('/api/electron/install', async (req: Request, res: Response) => {
       const mod = (req.body.module as string) || '';
@@ -291,24 +292,8 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         return;
       }
       try {
-        const info = JSON.parse(
-          execSync(`curl -s https://registry.npmjs.org/@doc77/${mod}/latest`, {
-            encoding: 'utf-8',
-          }),
-        );
-        const dest = path.join(process.env.HOME || '/tmp', '.doc77', 'electron-modules');
-        fs.mkdirSync(dest, { recursive: true });
-        execSync(`curl -sL "${info.dist.tarball}" -o "${dest}/${mod}.tgz"`);
-        execSync(`tar -xzf "${dest}/${mod}.tgz" -C "${dest}"`);
-        const src = path.join(dest, 'package');
-        const target = path.join(dest, 'node_modules', '@doc77', mod);
-        fs.rmSync(target, { recursive: true, force: true });
-        fs.renameSync(src, target);
-        fs.unlinkSync(path.join(dest, `${mod}.tgz`));
-        res.json({
-          ok: true,
-          message: t('api.electron.installDone', { mod: `@doc77/${mod}`, version: info.version }),
-        });
+        const { message } = await installElectronModule(mod);
+        res.json({ ok: true, message });
       } catch (e: unknown) {
         res.status(500).json({ error: (e as Error).message });
       }

@@ -702,11 +702,13 @@ async function main() {
       for (const m of modules) {
         if (m === 'translate') {
           console.log(t('cli.install.installingTransformers'));
-          execSync('npm install @huggingface/transformers@latest', { stdio: 'inherit' });
+          execSync('npm install -g @huggingface/transformers@latest --legacy-peer-deps', {
+            stdio: 'inherit',
+          });
           console.log(t('cli.install.transformersOk'));
         } else {
           console.log(t('cli.install.installingModule', { mod: m }));
-          execSync(`npm install @doc77/${m}@latest`, { stdio: 'inherit' });
+          execSync(`npm install -g @doc77/${m}@latest --legacy-peer-deps`, { stdio: 'inherit' });
           console.log(t('cli.install.moduleOk', { mod: m }));
         }
       }
@@ -722,7 +724,7 @@ async function main() {
       const { execSync } = await import('node:child_process');
       for (const m of modules) {
         console.log(t('cli.install.uninstalling', { mod: m }));
-        execSync(`npm uninstall @doc77/${m}`, { stdio: 'inherit' });
+        execSync(`npm uninstall -g @doc77/${m}`, { stdio: 'inherit' });
         console.log(t('cli.install.uninstalled', { mod: m }));
       }
       console.log(t('cli.install.restart'));

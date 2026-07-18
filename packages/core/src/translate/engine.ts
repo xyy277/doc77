@@ -4,6 +4,8 @@
  */
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { pathToFileURL } from 'node:url';
+import { resolveModuleEntry } from '../server/electron-install.js';
 
 export interface TranslationResult {
   translated_text: string;
@@ -22,7 +24,19 @@ async function getTransformers() {
   try {
     _TransformersModule = await import('@huggingface/transformers');
   } catch {
-    return null;
+    // Electron: modules installed via the settings page live outside the app
+    // bundle (DOC77_MODULES_DIR) and are not resolvable as bare specifiers.
+    const dir = process.env.DOC77_MODULES_DIR;
+    if (!dir) return null;
+    const entry = resolveModuleEntry(
+      path.join(dir, 'node_modules', '@huggingface', 'transformers'),
+    );
+    if (!entry) return null;
+    try {
+      _TransformersModule = await import(pathToFileURL(entry).href);
+    } catch {
+      return null;
+    }
   }
   return _TransformersModule;
 }
