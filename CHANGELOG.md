@@ -4,6 +4,15 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-19] — `1.0.2`
+
+### 全包 (`1.0.2`)
+
+**Fixed**
+- Electron AI 模块一键安装：tarball 闭包方案（@doc77/ai + @doc77/core）无法满足 core 的第三方运行时依赖（express/sql.js/marked），重启后模块沉默加载失败 → 永远显示「未安装」。改为 npm 完整依赖树安装（与 translate/mcp 一致）
+- Electron 中文环境下后端提示为英文：Windows 无 LANG/LC_ALL，core 的 i18n 自动检测落到 en-US。boot() 将 Chromium `app.getLocale()` 注入为 LANG 供检测
+- 翻译模型下载未生效国内镜像：settingToggle 是 `<button data-value>`，下载代码误读 `.checked`（恒 undefined），导致始终直连 huggingface.co。改为读取 `dataset.value`
+
 ## [2026-07-19] — `1.0.1`
 
 ### 全包 (`1.0.1`)

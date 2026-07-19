@@ -1,6 +1,6 @@
 {
   "name": "@doc77/ai",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Doc77 AI — provider abstraction layer, agent core, chat API",
   "license": "MIT",
   "repository": {
