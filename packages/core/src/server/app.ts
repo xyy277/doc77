@@ -3048,6 +3048,9 @@ export function createAIChatHandler(deps: {
         project_id,
       );
       toolSessionId = sid;
+      // Track last context_file per session for dynamic context strategy:
+      // first reference → inject content + noTools; same file again → path hint + tools enabled.
+      const sessionLastFile = new Map<string, string>();
       // Rehydrate a persisted conversation when the client reconnects to a
       // session that isn't in the in-memory cache (e.g. after a server restart).
       if (isNew && session_id) {
@@ -3114,10 +3117,20 @@ export function createAIChatHandler(deps: {
       let outgoing = message;
       let noTools = false;
       if (context_file && project_id) {
+        const lastFile = sessionLastFile.get(sid);
         const content = readProjectFileContent(project_id, context_file as string);
         if (!content.startsWith('Error:')) {
-          outgoing = `${message}\n\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
-          noTools = true;
+          if (context_file !== lastFile) {
+            // First reference (or switched to a new file): inject content + disable tools for fast answer
+            outgoing = `${message}\n\n---\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
+            noTools = true;
+          } else {
+            // Same file again: inject path hint only + keep tools enabled so the agent can
+            // use read_file / search_files to actively explore the file
+            outgoing = `${message}\n\n---\n${t('ai.context.currentFileHint', { file: context_file as string })}`;
+            // noTools stays false
+          }
+          sessionLastFile.set(sid, context_file as string);
         }
       }
 

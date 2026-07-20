@@ -633,6 +633,12 @@ function activateTab(path, opts) {
   resetTransientDocState();
   tabStore.activate(path);
   activeTabPath = path; currentFile = path;
+  // 自动更新聊天面板上下文指示器
+  var rightPanel = document.getElementById('rightPanel');
+  if (rightPanel && !rightPanel.classList.contains('hidden')) {
+    var ctxB = document.getElementById('ctxBanner');
+    if (ctxB) { ctxB.classList.remove('hidden'); document.getElementById('ctxText').textContent = path; }
+  }
   renderTabBar(); syncTreeActive(path); saveTabsState();
   if (!opts.silent && !TempPreview.isTempPath(path)) addRecentFile(path);
 
@@ -1732,7 +1738,7 @@ document.getElementById('chatInput').addEventListener('input', function(){ docum
 async function sendMessage() {
   var input = document.getElementById('chatInput'), msg = input.value.trim();
   if (!msg) return;
-  var ctxFile = pendingContextFile; pendingContextFile = null;
+  var ctxFile = pendingContextFile || currentFile; pendingContextFile = null;
   var wc = document.getElementById('welcomeCard'); if (wc) wc.remove();
   appendChatMsg('user', msg);
   input.value = ''; document.getElementById('sendBtn').disabled = true;
