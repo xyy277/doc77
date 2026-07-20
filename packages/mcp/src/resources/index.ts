@@ -14,7 +14,7 @@ import { listFiles } from '../tools/readonly.js';
  */
 export function registerResources(server: McpServer): void {
   // -- doc77://projects — all registered projects
-  server.registerResource(
+  server.resource(
     'projects',
     'doc77://projects',
     {
@@ -32,7 +32,7 @@ export function registerResources(server: McpServer): void {
   );
 
   // -- doc77://projects/{id}/info — single project details
-  server.registerResource(
+  server.resource(
     'project-info',
     new ResourceTemplate('doc77://projects/{id}/info', { list: undefined }),
     {
@@ -40,6 +40,7 @@ export function registerResources(server: McpServer): void {
     },
     async (uri, variables) => {
       const id = parseInt(variables.id as string, 10);
+      if (Number.isNaN(id)) throw new Error('Invalid project ID');
       const info = getProjectInfo(id);
       if (!info) {
         throw new Error(`Project ${id} not found`);
@@ -57,7 +58,7 @@ export function registerResources(server: McpServer): void {
   );
 
   // -- doc77://projects/{id}/tree — project file tree (accepts ?path=)
-  server.registerResource(
+  server.resource(
     'project-tree',
     new ResourceTemplate('doc77://projects/{id}/tree', { list: undefined }),
     {
@@ -65,6 +66,7 @@ export function registerResources(server: McpServer): void {
     },
     async (uri, variables) => {
       const id = parseInt(variables.id as string, 10);
+      if (Number.isNaN(id)) throw new Error('Invalid project ID');
       const searchParams = new URLSearchParams(uri.search);
       const dirPath = searchParams.get('path') || '';
       const entries = await listFiles(id, dirPath, { depth: 1 });
