@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerReadonlyTools } from './readonly.js';
 import { registerWriteTools } from './write.js';
 import { registerDiscoveryTools } from './discovery.js';
+import { registerSearchTools } from './search.js';
 
 /**
  * Register all tools (discovery, read-only + write) on the given MCP server.
@@ -9,6 +10,7 @@ import { registerDiscoveryTools } from './discovery.js';
  */
 export function registerAllTools(server: McpServer): void {
   registerDiscoveryTools(server);
+  registerSearchTools(server);
   registerReadonlyTools(server);
   registerWriteTools(server);
 }
