@@ -7,9 +7,24 @@ import { acquireProjectLock, releaseProjectLock } from './lock.js';
 import { safeMove } from './safeMove.js';
 import { checkFileSize, writeAuditLog } from './audit.js';
 import { getEventBus } from '../event-bus.js';
+import { getSessionConfig } from '../tools/session.js';
+
+/** Operation types that auto-approve per risk level. delete_file is intentionally excluded. */
+const RISK_AUTO_OPS: Record<string, ReadonlySet<string>> = {
+  low: new Set(['create_folder']),
+  medium: new Set(['create_folder', 'move_file', 'copy_file']),
+  high: new Set(['create_folder', 'move_file', 'copy_file', 'write_file']),
+};
+
+function isOperationAutoApproved(riskLevel: string, opType: string): boolean {
+  return RISK_AUTO_OPS[riskLevel]?.has(opType) ?? false;
+}
 
 /**
  * Execute a batch of approved tasks for a project.
+ *
+ * Steps before execution:
+ * 0. Auto-approve pending tasks whose session has auto mode enabled and risk level permits.
  *
  * Three-phase pipeline:
  * 1. Preflight — validate all operations
@@ -30,6 +45,32 @@ export async function executeApprovedTasks(
   const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
     { path: string } | undefined;
   if (!project) return { success: false, errors: ['Project not found'] };
+
+  // Step 0: Auto-approve pending tasks based on session config (Task 4.3)
+  for (const id of taskIds) {
+    const pending = db
+      .prepare(
+        'SELECT id, session_id, operation_type FROM operation_queue WHERE id = ? AND status = ?',
+      )
+      .get(id, 'pending') as
+      | { id: number; session_id: string; operation_type: string }
+      | undefined;
+
+    if (!pending) continue;
+
+    const config = getSessionConfig(pending.session_id);
+    if (!config || config.mode !== 'auto') continue;
+
+    if (isOperationAutoApproved(config.riskLevel, pending.operation_type)) {
+      db.prepare(
+        "UPDATE operation_queue SET status = 'approved', updated_at = datetime('now') WHERE id = ?",
+      ).run(pending.id);
+      eventBus.emit('task:approved', {
+        task_id: String(pending.id),
+        approved_by: 'auto',
+      });
+    }
+  }
 
   // Load tasks
   const tasks = taskIds
@@ -211,6 +252,15 @@ async function executeSingleOperation(
       const destDir = path.dirname(dest);
       if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
       await safeMove(src, dest);
+      break;
+    }
+    case 'copy_file': {
+      if (!op.source || !op.target) throw new Error('source and target required');
+      const src = path.join(projectRoot, op.source);
+      const dest = path.join(projectRoot, op.target);
+      const destDir = path.dirname(dest);
+      if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+      fs.copyFileSync(src, dest);
       break;
     }
     case 'delete_file': {

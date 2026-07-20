@@ -28,6 +28,13 @@ export {
   getTaskStatus,
 } from './tools/write.js';
 export type { WriteTask } from './tools/write.js';
+export {
+  configureAgent,
+  sessionAuthorize,
+  getSessionConfig,
+  resetSessionStore,
+} from './tools/session.js';
+export type { SessionConfig, Authorization } from './tools/session.js';
 
 // Security
 export { checkPathAccess, checkSensitiveFile, checkDepthLimit } from './security/guard.js';

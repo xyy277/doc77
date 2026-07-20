@@ -97,6 +97,8 @@ export async function deleteFile(
 
 /**
  * batch_operations — execute multiple operations as a batch.
+ * Supports optional auto_approve flag: when true, non-delete operations execute
+ * immediately (skip approval). Delete operations always need approval.
  */
 /**
  * copy_file — copy a file or folder.
@@ -134,12 +136,21 @@ export async function batchOperations(
   projectId: number,
   sessionId: string,
   operations: Array<{ type: string } & Record<string, unknown>>,
+  autoApprove?: boolean,
 ): Promise<WriteTask> {
   for (const op of operations) {
     const opPath = (op.file_path || op.folder_path || op.source) as string;
     if (opPath) assertPathAllowed(projectId, opPath);
-    // move_file carries a second path (target) that must also be validated.
+    // move_file and copy_file carry a second path (target) that must also be validated.
     if (op.target) assertPathAllowed(projectId, op.target as string);
+  }
+
+  // If auto_approve is true and no delete operations, execute immediately
+  if (autoApprove) {
+    const hasDelete = operations.some((op) => op.type === 'delete_file');
+    if (!hasDelete) {
+      return executeAutoBatch(projectId, sessionId, operations);
+    }
   }
 
   return toWriteTask(
@@ -149,6 +160,46 @@ export async function batchOperations(
     }),
     'batch_operations',
   );
+}
+
+/**
+ * Execute a batch of operations immediately (auto-approve path).
+ * Enqueues each operation as 'approved' and runs the transactional executor.
+ */
+async function executeAutoBatch(
+  projectId: number,
+  sessionId: string,
+  operations: Array<{ type: string } & Record<string, unknown>>,
+): Promise<WriteTask> {
+  const { executeApprovedTasks } = await import('../transaction/executor.js');
+  const db = getConnection();
+
+  const taskIds: string[] = [];
+  for (const op of operations) {
+    const result = db
+      .prepare(
+        `INSERT INTO operation_queue (project_id, session_id, operation_type, operation_data, status)
+         VALUES (?, ?, ?, ?, 'approved')`,
+      )
+      .run(projectId, sessionId, op.type, JSON.stringify(op));
+    taskIds.push(String(result.lastInsertRowid));
+  }
+
+  const execResult = await executeApprovedTasks(projectId, taskIds);
+
+  return {
+    task_id: taskIds.join(','),
+    status: execResult.success ? 'executed' : 'failed',
+    message: execResult.success
+      ? `Batch of ${operations.length} operation(s) auto-approved and executed.`
+      : `Batch execution failed: ${execResult.errors.join('; ')}`,
+    details: {
+      project_id: projectId,
+      operation_type: 'batch_operations',
+      task_ids: taskIds,
+      count: operations.length,
+    },
+  };
 }
 
 /**
