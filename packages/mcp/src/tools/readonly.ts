@@ -217,6 +217,41 @@ export async function getFileInfo(
 }
 
 /**
+ * Batch get file metadata — individual failures don't block others.
+ */
+export async function getFileInfos(
+  projectId: number,
+  filePaths: string[],
+): Promise<
+  Array<
+    | { name: string; type: string; size: number; modified: string; error?: undefined }
+    | { name: string; type: string; size: number; modified: string; error: string }
+  >
+> {
+  const results: Array<
+    | { name: string; type: string; size: number; modified: string; error?: undefined }
+    | { name: string; type: string; size: number; modified: string; error: string }
+  > = [];
+
+  for (const fp of filePaths) {
+    try {
+      const info = await getFileInfo(projectId, fp);
+      results.push(info);
+    } catch (e: unknown) {
+      results.push({
+        name: path.basename(fp),
+        type: 'file',
+        size: 0,
+        modified: '',
+        error: e instanceof Error ? e.message : 'Unknown error',
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Result of a single file read in batch operation.
  */
 export interface ReadFilesResult {
@@ -357,11 +392,23 @@ export function registerReadonlyTools(server: McpServer): void {
       description: t('mcp.tool.getFileInfo.desc'),
       inputSchema: {
         project_id: z.number().describe(t('mcp.param.projectId')),
-        file_path: z.string().describe(t('mcp.param.filePath')),
+        file_path: z.string().optional().describe(t('mcp.param.filePath')),
+        file_paths: z.array(z.string()).optional().describe(t('mcp.param.filePaths')),
       },
     },
     async (args) => {
-      const info = await getFileInfo(args.project_id as number, args.file_path as string);
+      // Batch mode
+      if (args.file_paths && Array.isArray(args.file_paths) && args.file_paths.length > 0) {
+        const infos = await getFileInfos(args.project_id as number, args.file_paths as string[]);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(infos, null, 2) }],
+        };
+      }
+      // Single mode
+      const info = await getFileInfo(
+        args.project_id as number,
+        (args.file_path as string) || '',
+      );
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(info, null, 2) }],
       };
