@@ -108,6 +108,113 @@ describe('MCP Read-only Tools', () => {
     });
   });
 
+  describe('read_file enhanced', () => {
+    it('should read specific line range', async () => {
+      fs.writeFileSync(path.join(projectDir, 'multiline.txt'), 'line1\nline2\nline3\nline4\n');
+      const content = await readFileContentEnhanced(projectId, 'multiline.txt', { start_line: 2, end_line: 3 });
+      expect(content).toBe('line2\nline3');
+    });
+
+    it('should read from start_line to end of file when end_line omitted', async () => {
+      fs.writeFileSync(path.join(projectDir, 'lines.txt'), 'a\nb\nc\nd\ne\n');
+      const content = await readFileContentEnhanced(projectId, 'lines.txt', { start_line: 3 });
+      expect(content).toBe('c\nd\ne');
+    });
+
+    it('should handle single line range', async () => {
+      fs.writeFileSync(path.join(projectDir, 'single.txt'), 'only line\n');
+      const content = await readFileContentEnhanced(projectId, 'single.txt', { start_line: 1, end_line: 1 });
+      expect(content).toBe('only line');
+    });
+
+    it('should read full content with non-utf8 encoding (latin1)', async () => {
+      // Write a file with latin1-encodable bytes
+      const buf = Buffer.from([0xe9, 0xe8, 0xea, 0x0a]); // éèê\n
+      fs.writeFileSync(path.join(projectDir, 'latin1.txt'), buf);
+      const content = await readFileContentEnhanced(projectId, 'latin1.txt', { encoding: 'latin1' });
+      expect(content).toBe('éèê\n');
+    });
+
+    it('should truncate large file (>1MB) without start_line', async () => {
+      // Create a file >1MB
+      const bigFilePath = path.join(projectDir, 'bigfile.txt');
+      const line = 'x'.repeat(100) + '\n';
+      const fd = fs.openSync(bigFilePath, 'w');
+      for (let i = 0; i < 12000; i++) {
+        fs.writeSync(fd, line);
+      }
+      fs.closeSync(fd);
+      const stats = fs.statSync(bigFilePath);
+      expect(stats.size).toBeGreaterThan(1024 * 1024);
+
+      const content = await readFileContentEnhanced(projectId, 'bigfile.txt');
+      expect(content).toContain('[File is');
+      expect(content).toContain('MB. Use start_line/end_line for partial reads.]');
+      // Should have ~100 lines
+      const lines = content.split('\n');
+      expect(lines.length).toBeLessThan(200);
+    });
+
+    it('should allow reading large file with start_line specified', async () => {
+      const bigFilePath = path.join(projectDir, 'bigfile2.txt');
+      const line = 'data line\n';
+      const fd = fs.openSync(bigFilePath, 'w');
+      for (let i = 0; i < 12000; i++) {
+        fs.writeSync(fd, line);
+      }
+      fs.closeSync(fd);
+
+      const content = await readFileContentEnhanced(projectId, 'bigfile2.txt', { start_line: 1, end_line: 5 });
+      const lines = content.split('\n');
+      expect(lines.length).toBe(5);
+      expect(lines[0]).toBe('data line');
+    });
+  });
+
+  describe('read_files batch', () => {
+    it('should read multiple files', async () => {
+      fs.writeFileSync(path.join(projectDir, 'f1.txt'), 'file1');
+      fs.writeFileSync(path.join(projectDir, 'f2.txt'), 'file2');
+      const results = await readFiles(projectId, ['f1.txt', 'f2.txt']);
+      expect(results).toHaveLength(2);
+      expect(results[0].file_path).toBe('f1.txt');
+      expect(results[0].content).toBe('file1');
+      expect(results[1].file_path).toBe('f2.txt');
+      expect(results[1].content).toBe('file2');
+    });
+
+    it('should not fail on non-existent file — returns error entry', async () => {
+      const results = await readFiles(projectId, ['README.md', 'no-such-file.txt']);
+      expect(results).toHaveLength(2);
+      expect(results[0].file_path).toBe('README.md');
+      expect(results[0].content).toBeDefined();
+      expect(results[0].error).toBeUndefined();
+      expect(results[1].file_path).toBe('no-such-file.txt');
+      expect(results[1].content).toBeNull();
+      expect(results[1].error).toBeDefined();
+    });
+
+    it('should handle empty file list', async () => {
+      const results = await readFiles(projectId, []);
+      expect(results).toHaveLength(0);
+    });
+
+    it('should handle sensitive file reads without blocking others', async () => {
+      fs.writeFileSync(path.join(projectDir, 'good.txt'), 'good content');
+      fs.writeFileSync(path.join(projectDir, '.env'), 'SECRET=123');
+      fs.writeFileSync(path.join(projectDir, 'also_good.txt'), 'also good');
+      const results = await readFiles(projectId, ['good.txt', '.env', 'also_good.txt']);
+      expect(results).toHaveLength(3);
+      expect(results[0].file_path).toBe('good.txt');
+      expect(results[0].content).toBe('good content');
+      expect(results[1].file_path).toBe('.env');
+      expect(results[1].content).toBeNull();
+      expect(results[1].error).toContain('sensitive');
+      expect(results[2].file_path).toBe('also_good.txt');
+      expect(results[2].content).toBe('also good');
+    });
+  });
+
   describe('get_file_info', () => {
     it('should return file metadata', async () => {
       const info = await getFileInfoImpl(projectId, 'README.md');
@@ -201,7 +308,7 @@ describe('MCP Read-only Tools', () => {
 import { scanDirectory } from '@doc77/core';
 import { readFile, validatePath, isSensitiveFile } from '@doc77/core';
 import { getConnection, registerProject } from '@doc77/core';
-import { listFiles as listFilesEnhanced } from '../src/tools/readonly.js';
+import { listFiles as listFilesEnhanced, readFileContent as readFileContentEnhanced, readFiles } from '../src/tools/readonly.js';
 
 async function listFilesImpl(projectId: number, dirPath: string) {
   const result = scanDirectory(projectId, dirPath);

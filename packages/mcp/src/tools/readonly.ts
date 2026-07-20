@@ -2,7 +2,15 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { t, getConnection, isSensitiveFile, validatePath, readFile, scanDirectory } from '@doc77/core';
+import {
+  t,
+  getConnection,
+  isSensitiveFile,
+  validatePath,
+  readFile,
+  readFirstNLines,
+  scanDirectory,
+} from '@doc77/core';
 
 /**
  * Simple glob matching: * matches any sequence, ? matches any single char.
@@ -108,9 +116,24 @@ export async function listFiles(
 }
 
 /**
- * Read file content with security checks.
+ * Read file content with security checks and optional encoding/line range support.
+ *
+ * @param projectId - Project ID
+ * @param filePath - File path (relative to project root)
+ * @param opts - Optional settings
+ * @param opts.encoding - File encoding (default 'utf-8', supports gbk, latin1, etc.)
+ * @param opts.start_line - Start line number (1-indexed, optional)
+ * @param opts.end_line - End line number (1-indexed, optional)
  */
-export async function readFileContent(projectId: number, filePath: string): Promise<string> {
+export async function readFileContent(
+  projectId: number,
+  filePath: string,
+  opts?: {
+    encoding?: BufferEncoding;
+    start_line?: number;
+    end_line?: number;
+  },
+): Promise<string> {
   const db = getConnection();
   const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
     { path: string } | undefined;
@@ -130,6 +153,33 @@ export async function readFileContent(projectId: number, filePath: string): Prom
   const stats = fs.statSync(absPath);
   if (stats.isDirectory()) {
     throw new Error(`"${filePath}" is a directory, not a file`);
+  }
+
+  const encoding = opts?.encoding || 'utf-8';
+
+  // Large file warning — files > 1MB without start_line return first 100 lines + size hint
+  const ONE_MB = 1024 * 1024;
+  if (stats.size > ONE_MB && !opts?.start_line) {
+    const partial = readFirstNLines(absPath, 100);
+    return `${partial.content}\n\n[File is ${(stats.size / ONE_MB).toFixed(1)}MB. Use start_line/end_line for partial reads.]`;
+  }
+
+  // Line range read
+  if (opts?.start_line || opts?.end_line) {
+    const raw = readFile(absPath);
+    const lines = raw.split('\n');
+    // Remove trailing empty line from split if file ends with newline
+    if (lines.length > 0 && lines[lines.length - 1] === '') {
+      lines.pop();
+    }
+    const start = (opts.start_line || 1) - 1;
+    const end = opts.end_line ? opts.end_line : lines.length;
+    return lines.slice(start, end).join('\n');
+  }
+
+  // Full read with specified encoding
+  if (encoding !== 'utf-8') {
+    return fs.readFileSync(absPath, encoding);
   }
 
   return readFile(absPath);
@@ -167,8 +217,65 @@ export async function getFileInfo(
 }
 
 /**
+ * Result of a single file read in batch operation.
+ */
+export interface ReadFilesResult {
+  file_path: string;
+  content: string | null;
+  error?: string;
+}
+
+/**
+ * Read multiple files concurrently with a maximum of 10 concurrent reads.
+ * Individual file read failures do not block other files.
+ *
+ * @param projectId - Project ID
+ * @param filePaths - Array of file paths (relative to project root)
+ */
+export async function readFiles(
+  projectId: number,
+  filePaths: string[],
+): Promise<ReadFilesResult[]> {
+  const CONCURRENCY = 10;
+  const results: ReadFilesResult[] = [];
+
+  for (let i = 0; i < filePaths.length; i += CONCURRENCY) {
+    const batch = filePaths.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (fp) => {
+        try {
+          const content = await readFileContent(projectId, fp);
+          return { file_path: fp, content };
+        } catch (e: unknown) {
+          return {
+            file_path: fp,
+            content: null,
+            error: e instanceof Error ? e.message : 'Unknown error',
+          };
+        }
+      }),
+    );
+
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        // Should not happen since we catch errors inside the map
+        results.push({
+          file_path: 'unknown',
+          content: null,
+          error: result.reason instanceof Error ? result.reason.message : 'Unknown error',
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
  * Register read-only MCP tools on the given server.
- * -- list_files, read_file, get_file_info
+ * -- list_files, read_file, read_files, get_file_info
  */
 export function registerReadonlyTools(server: McpServer): void {
   // list_files
@@ -208,12 +315,37 @@ export function registerReadonlyTools(server: McpServer): void {
       inputSchema: {
         project_id: z.number().describe(t('mcp.param.projectId')),
         file_path: z.string().describe(t('mcp.param.filePath')),
+        encoding: z.string().optional().default('utf-8').describe(t('mcp.param.encoding')),
+        start_line: z.number().optional().describe(t('mcp.param.startLine')),
+        end_line: z.number().optional().describe(t('mcp.param.endLine')),
       },
     },
     async (args) => {
-      const content = await readFileContent(args.project_id as number, args.file_path as string);
+      const content = await readFileContent(args.project_id as number, args.file_path as string, {
+        encoding: args.encoding as BufferEncoding | undefined,
+        start_line: args.start_line as number | undefined,
+        end_line: args.end_line as number | undefined,
+      });
       return {
         content: [{ type: 'text' as const, text: content }],
+      };
+    },
+  );
+
+  // read_files
+  server.registerTool(
+    'read_files',
+    {
+      description: t('mcp.tool.readFiles.desc'),
+      inputSchema: {
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        file_paths: z.array(z.string()).describe(t('mcp.param.filePaths')),
+      },
+    },
+    async (args) => {
+      const results = await readFiles(args.project_id as number, args.file_paths as string[]);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
       };
     },
   );
