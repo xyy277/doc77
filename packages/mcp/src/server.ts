@@ -1,10 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
-import { t } from '@doc77/core';
 
 const SERVER_NAME = 'doc77';
 import { VERSION as SERVER_VERSION } from './version.gen.js';
 import { registerReadonlyTools } from './tools/readonly.js';
+import { registerWriteTools } from './tools/write.js';
 
 /**
  * Create and configure the Doc77 MCP server.
@@ -27,131 +26,4 @@ export function createMcpServer(): McpServer {
   registerWriteTools(server);
 
   return server;
-}
-
-function registerWriteTools(server: McpServer): void {
-  const writeTools: Array<{
-    name: string;
-    description: string;
-    inputSchema: Record<string, unknown>;
-  }> = [
-    {
-      name: 'write_file',
-      description: t('mcp.tool.writeFile.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        file_path: z.string().describe(t('mcp.param.filePath')),
-        content: z.string().describe(t('mcp.param.content')),
-      },
-    },
-    {
-      name: 'create_folder',
-      description: t('mcp.tool.createFolder.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        folder_path: z.string().describe(t('mcp.param.folderPath')),
-      },
-    },
-    {
-      name: 'move_file',
-      description: t('mcp.tool.moveFile.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        source: z.string().describe(t('mcp.param.sourcePath')),
-        target: z.string().describe(t('mcp.param.targetPath')),
-      },
-    },
-    {
-      name: 'delete_file',
-      description: t('mcp.tool.deleteFile.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        file_path: z.string().describe(t('mcp.param.filePathToDelete')),
-      },
-    },
-    {
-      name: 'batch_operations',
-      description: t('mcp.tool.batchOperations.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        operations: z.array(z.record(z.unknown())).describe(t('mcp.param.operations')),
-      },
-    },
-    {
-      name: 'get_task_status',
-      description: t('mcp.tool.getTaskStatus.desc'),
-      inputSchema: {
-        task_id: z.string().describe(t('mcp.param.taskId')),
-      },
-    },
-  ];
-
-  for (const tool of writeTools) {
-    server.registerTool(
-      tool.name,
-      {
-        description: tool.description,
-        inputSchema: tool.inputSchema as Record<string, z.ZodTypeAny>,
-      },
-      async (args) => {
-        const { writeFile, createFolder, moveFile, deleteFile, batchOperations, getTaskStatus } =
-          await import('./tools/write.js');
-
-        // Generate a session ID for this operation
-        const { createSession } = await import('./session.js');
-        const session = createSession();
-        const sessionId = session.id;
-
-        let result;
-        switch (tool.name) {
-          case 'write_file':
-            result = await writeFile(
-              args.project_id as number,
-              sessionId,
-              args.file_path as string,
-              args.content as string,
-            );
-            break;
-          case 'create_folder':
-            result = await createFolder(
-              args.project_id as number,
-              sessionId,
-              args.folder_path as string,
-            );
-            break;
-          case 'move_file':
-            result = await moveFile(
-              args.project_id as number,
-              sessionId,
-              args.source as string,
-              args.target as string,
-            );
-            break;
-          case 'delete_file':
-            result = await deleteFile(
-              args.project_id as number,
-              sessionId,
-              args.file_path as string,
-            );
-            break;
-          case 'batch_operations':
-            result = await batchOperations(
-              args.project_id as number,
-              sessionId,
-              args.operations as Array<{ type: string } & Record<string, unknown>>,
-            );
-            break;
-          case 'get_task_status':
-            result = await getTaskStatus(args.task_id as string);
-            break;
-          default:
-            throw new Error(`Unknown tool: ${tool.name}`);
-        }
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
-        };
-      },
-    );
-  }
 }
