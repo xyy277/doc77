@@ -9,6 +9,9 @@ export { VERSION } from './version.gen.js';
 // MCP Server
 export { createMcpServer } from './server.js';
 
+// Transport
+export { connectStdio } from './transport/index.js';
+
 // Tools
 export { listFiles, readFileContent, getFileInfo } from './tools/readonly.js';
 export {

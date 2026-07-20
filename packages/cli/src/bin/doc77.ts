@@ -750,15 +750,13 @@ async function main() {
 
     case 'mcp': {
       if (args[1] === 'serve') {
-        const mcp = await tryGetMcp(['createMcpServer']);
+        const mcp = await tryGetMcp(['createMcpServer', 'connectStdio']);
         if (!mcp) {
           console.error(t('cli.mcp.notInstalled'));
           break;
         }
-        const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
         const server = mcp.createMcpServer();
-        const transport = new StdioServerTransport();
-        await server.connect(transport);
+        await mcp.connectStdio(server);
         console.error('Doc77 MCP server running (stdio transport)');
         process.on('SIGINT', async () => {
           await server.close();
