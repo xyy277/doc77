@@ -392,3 +392,63 @@ describe('Shadow GC', () => {
     expect(fs.existsSync(regularFile)).toBe(true);
   });
 });
+
+describe('copy_file — Shadow Backup', () => {
+  let testDir: string;
+
+  beforeEach(async () => {
+    testDir = path.join(os.tmpdir(), `doc77-copy-shadow-${Date.now()}`);
+    fs.mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it('should backup target file before copy overwrite and rollback', () => {
+    const src = path.join(testDir, 'source.txt');
+    const dest = path.join(testDir, 'dest.txt');
+    fs.writeFileSync(src, 'source content');
+    fs.writeFileSync(dest, 'original target');
+
+    const shadowDir = path.join(testDir, '.shadow');
+    const undoLog: UndoLog = performShadowBackup(
+      [{ type: 'copy_file', source: 'source.txt', target: 'dest.txt' }],
+      testDir,
+      shadowDir,
+    );
+
+    expect(undoLog.length).toBe(1);
+    expect(undoLog[0].type).toBe('copy_file');
+
+    // Simulate the copy (overwrite target)
+    fs.copyFileSync(src, dest);
+
+    // Rollback
+    rollbackFromShadow(undoLog, testDir, shadowDir);
+    expect(fs.readFileSync(dest, 'utf-8')).toBe('original target');
+    expect(fs.existsSync(shadowDir)).toBe(false);
+  });
+
+  it('should handle copy_file to new target (no backup) and rollback deletes it', () => {
+    const src = path.join(testDir, 'source.txt');
+    fs.writeFileSync(src, 'source content');
+
+    const shadowDir = path.join(testDir, '.shadow');
+    const undoLog: UndoLog = performShadowBackup(
+      [{ type: 'copy_file', source: 'source.txt', target: 'new.txt' }],
+      testDir,
+      shadowDir,
+    );
+
+    expect(undoLog.length).toBe(1);
+    expect(undoLog[0].type).toBe('copy_file');
+
+    // Simulate the copy
+    fs.copyFileSync(src, path.join(testDir, 'new.txt'));
+
+    // Rollback — should delete new.txt
+    rollbackFromShadow(undoLog, testDir, shadowDir);
+    expect(fs.existsSync(path.join(testDir, 'new.txt'))).toBe(false);
+  });
+});

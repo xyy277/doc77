@@ -7,6 +7,7 @@ beforeAll(() => initI18n('zh-CN'));
 
 function makeDeps(riskLevel = 'high') {
   const writeFns = {
+    writeFile: vi.fn(async () => ({ task_id: '10' })),
     moveFile: vi.fn(async () => ({ task_id: '11' })),
     createFolder: vi.fn(async () => ({ task_id: '12' })),
     deleteFile: vi.fn(async () => ({ task_id: '13' })),
@@ -18,6 +19,7 @@ const ctx = { projectId: 1, sessionId: 's1' };
 
 describe('isAiWriteTool', () => {
   it('recognizes write tool names, rejects read/unknown', () => {
+    expect(isAiWriteTool('write_file')).toBe(true);
     expect(isAiWriteTool('move_file')).toBe(true);
     expect(isAiWriteTool('batch_operations')).toBe(true);
     expect(isAiWriteTool('read_file')).toBe(false);
@@ -72,7 +74,44 @@ describe('executeAiWriteTool', () => {
     expect(res).toContain('12');
   });
 
-  it('rejects a batch containing a delete op at medium risk', async () => {
+  it('enqueues write_file and returns a pending-approval message', async () => {
+    const deps = makeDeps('high');
+    const res = await executeAiWriteTool(
+      'write_file',
+      { file_path: 'new.md', content: '# Hello' },
+      ctx,
+      deps,
+    );
+    expect(deps.writeFns.writeFile).toHaveBeenCalledWith(1, 's1', 'new.md', '# Hello');
+    expect(res).toContain('10');
+    expect(res).toMatch(/审批/);
+  });
+
+  it('blocks write_file to a sensitive file before enqueue', async () => {
+    const deps = makeDeps('high');
+    const res = await executeAiWriteTool(
+      'write_file',
+      { file_path: '.env', content: 'x' },
+      ctx,
+      deps,
+    );
+    expect(deps.writeFns.writeFile).not.toHaveBeenCalled();
+    expect(res).toMatch(/敏感|sensitive/i);
+  });
+
+  it('gates write_file at medium risk level (no enqueue)', async () => {
+    const deps = makeDeps('medium');
+    const res = await executeAiWriteTool(
+      'write_file',
+      { file_path: 'notes.md', content: 'hi' },
+      ctx,
+      deps,
+    );
+    expect(deps.writeFns.writeFile).not.toHaveBeenCalled();
+    expect(res).toMatch(/风险|不允许|risk/i);
+  });
+
+  it('rejects a batch containing a write_file op at medium risk', async () => {
     const deps = makeDeps('medium');
     const res = await executeAiWriteTool(
       'batch_operations',

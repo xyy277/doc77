@@ -106,6 +106,21 @@ export function getWriteTools(): ToolDefinition[] {
     {
       type: 'function',
       function: {
+        name: 'write_file',
+        description: t('ai.tool.writeFile.desc'),
+        parameters: {
+          type: 'object',
+          properties: {
+            file_path: { type: 'string', description: t('ai.tool.writeFile.filePath') },
+            content: { type: 'string', description: t('ai.tool.writeFile.content') },
+          },
+          required: ['file_path', 'content'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'move_file',
         description: t('ai.tool.moveFile.desc'),
         parameters: {

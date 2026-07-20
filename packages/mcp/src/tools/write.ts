@@ -1,3 +1,5 @@
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { checkPathAccess, checkSensitiveFile } from '../security/guard.js';
@@ -96,6 +98,38 @@ export async function deleteFile(
 /**
  * batch_operations — execute multiple operations as a batch.
  */
+/**
+ * copy_file — copy a file or folder.
+ */
+export async function copyFile(
+  projectId: number,
+  sessionId: string,
+  source: string,
+  target: string,
+  overwrite = false,
+): Promise<WriteTask> {
+  assertPathAllowed(projectId, source);
+  assertPathAllowed(projectId, target);
+
+  const db = getConnection();
+  const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+    { path: string } | undefined;
+  if (!project) throw new Error('Project not found');
+
+  const srcAbs = path.join(project.path, source);
+  const tgtAbs = path.join(project.path, target);
+
+  // Pre-check: target existence
+  if (!overwrite && fs.existsSync(tgtAbs)) {
+    throw new Error(`Target already exists: "${target}". Set overwrite=true to replace.`);
+  }
+
+  return toWriteTask(
+    enqueue(projectId, sessionId, 'copy_file', { source, target, overwrite }),
+    'copy_file',
+  );
+}
+
 export async function batchOperations(
   projectId: number,
   sessionId: string,
@@ -194,6 +228,16 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     {
+      name: 'copy_file',
+      description: t('mcp.tool.copyFile.desc'),
+      inputSchema: {
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        source: z.string().describe(t('mcp.param.sourcePath')),
+        target: z.string().describe(t('mcp.param.targetPath')),
+        overwrite: z.boolean().optional().default(false).describe(t('mcp.param.overwrite')),
+      },
+    },
+    {
       name: 'batch_operations',
       description: t('mcp.tool.batchOperations.desc'),
       inputSchema: {
@@ -253,6 +297,15 @@ export function registerWriteTools(server: McpServer): void {
               args.project_id as number,
               sessionId,
               args.file_path as string,
+            );
+            break;
+          case 'copy_file':
+            result = await copyFile(
+              args.project_id as number,
+              sessionId,
+              args.source as string,
+              args.target as string,
+              args.overwrite as boolean,
             );
             break;
           case 'batch_operations':

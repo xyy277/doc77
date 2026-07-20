@@ -224,6 +224,20 @@ async function executeSingleOperation(
       }
       break;
     }
+    case 'copy_file': {
+      if (!op.source || !op.target) throw new Error('source and target required');
+      const srcAbs = path.join(projectRoot, op.source as string);
+      const tgtAbs = path.join(projectRoot, op.target as string);
+      const tgtDir = path.dirname(tgtAbs);
+      if (!fs.existsSync(tgtDir)) fs.mkdirSync(tgtDir, { recursive: true });
+      const srcStat = fs.statSync(srcAbs);
+      if (srcStat.isDirectory()) {
+        fs.cpSync(srcAbs, tgtAbs, { recursive: true });
+      } else {
+        fs.copyFileSync(srcAbs, tgtAbs);
+      }
+      break;
+    }
     default:
       throw new Error(`Unknown operation type: ${op.type}`);
   }

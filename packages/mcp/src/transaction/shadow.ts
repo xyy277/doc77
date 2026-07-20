@@ -68,6 +68,25 @@ export function performShadowBackup(
         }
         break;
       }
+      case 'copy_file': {
+        // Source is not modified; back up target if it exists
+        if (op.target) {
+          const absTarget = path.join(projectRoot, op.target);
+          if (fs.existsSync(absTarget)) {
+            const shadowName = `op${i}_${path.basename(op.target)}`;
+            const shadowPath = path.join(shadowDir, shadowName);
+            fs.copyFileSync(absTarget, shadowPath);
+            undoLog.push({
+              type: 'copy_file',
+              originalPath: op.target,
+              shadowPath,
+            });
+          } else {
+            undoLog.push({ type: 'copy_file', originalPath: op.target });
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -126,6 +145,21 @@ export function rollbackFromShadow(undoLog: UndoLog, projectRoot: string, shadow
           const dest = path.join(projectRoot, entry.source as string);
           try {
             fs.renameSync(src, dest);
+          } catch {
+            /* ignore */
+          }
+        }
+        break;
+      }
+      case 'copy_file': {
+        if (entry.shadowPath && entry.originalPath) {
+          const destPath = path.join(projectRoot, entry.originalPath);
+          fs.copyFileSync(entry.shadowPath, destPath);
+        } else if (entry.originalPath) {
+          // New file was created by copy — delete it
+          const destPath = path.join(projectRoot, entry.originalPath);
+          try {
+            fs.unlinkSync(destPath);
           } catch {
             /* ignore */
           }

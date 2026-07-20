@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { initDatabase, closeConnection, registerProject, runMigrations } from '@doc77/core';
 import { createSession } from '../src/session.js';
-import { writeFile, moveFile, deleteFile, batchOperations } from '../src/tools/write.js';
+import { writeFile, moveFile, deleteFile, copyFile, batchOperations } from '../src/tools/write.js';
 
 describe('MCP write tools — sensitive file guarding', () => {
   let testDir: string;
@@ -50,6 +50,26 @@ describe('MCP write tools — sensitive file guarding', () => {
 
   it('rejects moving TO a sensitive target path', async () => {
     await expect(moveFile(projectId, sessionId, 'notes.md', '.env')).rejects.toThrow(/sensitive/i);
+  });
+
+  it('copyFile enqueues a copy to new target as pending_approval', async () => {
+    const task = await copyFile(projectId, sessionId, 'notes.md', 'notes_copy.md');
+    expect(task.status).toBe('pending_approval');
+    expect(task.task_id).toBeDefined();
+  });
+
+  it('copyFile rejects copying FROM a sensitive file', async () => {
+    await expect(copyFile(projectId, sessionId, '.env', 'safe.env')).rejects.toThrow(/sensitive/i);
+  });
+
+  it('copyFile rejects copying TO a sensitive target', async () => {
+    await expect(copyFile(projectId, sessionId, 'notes.md', '.env')).rejects.toThrow(/sensitive/i);
+  });
+
+  it('copyFile throws when target exists and overwrite is false', async () => {
+    await expect(copyFile(projectId, sessionId, 'notes.md', 'notes.md', false)).rejects.toThrow(
+      /exists|already exists/i,
+    );
   });
 
   it('batch_operations enqueues valid ops and rejects a sensitive op', async () => {

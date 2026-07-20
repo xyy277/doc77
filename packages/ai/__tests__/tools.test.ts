@@ -7,10 +7,10 @@ beforeAll(() => {
 });
 
 describe('getWriteTools', () => {
-  it('exports the four write tools in a stable order', () => {
+  it('exports the write tools in a stable order', () => {
     const tools = getWriteTools();
     const names = tools.map((t) => t.function.name);
-    expect(names).toEqual(['move_file', 'create_folder', 'delete_file', 'batch_operations']);
+    expect(names).toEqual(['write_file', 'move_file', 'create_folder', 'delete_file', 'batch_operations']);
   });
 
   it('each tool is a valid OpenAI function-calling schema', () => {
