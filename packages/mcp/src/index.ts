@@ -14,6 +14,8 @@ export { connectStdio } from './transport/index.js';
 
 // Tools
 export { listFiles, readFileContent, getFileInfo } from './tools/readonly.js';
+export { listProjects } from './tools/discovery.js';
+export { searchFiles } from './tools/search.js';
 export {
   writeFile,
   createFolder,

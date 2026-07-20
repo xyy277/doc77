@@ -283,6 +283,12 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       lanRestrict: getConfig('security.lan_restrict') === 'true',
       isLocalRequest: _localIPs.has(req.socket.remoteAddress || ''),
     };
+    // When bound to all interfaces, expose the LAN IP so frontends
+    // (especially Electron's BrowserWindow, which loads localhost) can
+    // generate correct QR codes and URLs for other devices on the network.
+    if (addr === '0.0.0.0') {
+      info.lanIp = getLocalIP();
+    }
     if (isElectron) (info as any).electronVersion = process.versions.electron || null;
     try {
       const db = getConnection();
@@ -2998,6 +3004,19 @@ export function createAIChatHandler(deps: {
             } catch (e: unknown) {
               return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
             }
+          }
+          case 'list_projects': {
+            const { listProjects } = await import('@doc77/mcp');
+            const projects = listProjects();
+            return JSON.stringify(projects);
+          }
+          case 'search_files': {
+            const { searchFiles } = await import('@doc77/mcp');
+            const results = searchFiles(pid, args.query as string, {
+              searchPath: args.path as string | undefined,
+              glob: args.glob as string | undefined,
+            });
+            return JSON.stringify(results);
           }
           default:
             return `Error: Unknown tool "${name}"`;
