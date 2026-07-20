@@ -4,6 +4,7 @@ import { t } from '@doc77/core';
 
 const SERVER_NAME = 'doc77';
 import { VERSION as SERVER_VERSION } from './version.gen.js';
+import { registerReadonlyTools } from './tools/readonly.js';
 
 /**
  * Create and configure the Doc77 MCP server.
@@ -26,65 +27,6 @@ export function createMcpServer(): McpServer {
   registerWriteTools(server);
 
   return server;
-}
-
-function registerReadonlyTools(server: McpServer): void {
-  // list_files
-  server.registerTool(
-    'list_files',
-    {
-      description: t('mcp.tool.listFiles.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        path: z.string().optional().default('').describe(t('mcp.param.dirPath')),
-      },
-    },
-    async (args) => {
-      const { listFiles } = await import('./tools/readonly.js');
-      const entries = await listFiles(args.project_id as number, (args.path as string) || '');
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(entries, null, 2) }],
-      };
-    },
-  );
-
-  // read_file
-  server.registerTool(
-    'read_file',
-    {
-      description: t('mcp.tool.readFile.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        file_path: z.string().describe(t('mcp.param.filePath')),
-      },
-    },
-    async (args) => {
-      const { readFileContent } = await import('./tools/readonly.js');
-      const content = await readFileContent(args.project_id as number, args.file_path as string);
-      return {
-        content: [{ type: 'text' as const, text: content }],
-      };
-    },
-  );
-
-  // get_file_info
-  server.registerTool(
-    'get_file_info',
-    {
-      description: t('mcp.tool.getFileInfo.desc'),
-      inputSchema: {
-        project_id: z.number().describe(t('mcp.param.projectId')),
-        file_path: z.string().describe(t('mcp.param.filePath')),
-      },
-    },
-    async (args) => {
-      const { getFileInfo } = await import('./tools/readonly.js');
-      const info = await getFileInfo(args.project_id as number, args.file_path as string);
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(info, null, 2) }],
-      };
-    },
-  );
 }
 
 function registerWriteTools(server: McpServer): void {

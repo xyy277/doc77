@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { getConnection, isSensitiveFile, validatePath, readFile } from '@doc77/core';
-import { scanDirectory } from '@doc77/core';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { t, getConnection, isSensitiveFile, validatePath, readFile, scanDirectory } from '@doc77/core';
 
 /**
  * List files in a project directory.
@@ -71,4 +72,64 @@ export async function getFileInfo(
     size: stats.size,
     modified: stats.mtime.toISOString(),
   };
+}
+
+/**
+ * Register read-only MCP tools on the given server.
+ * -- list_files, read_file, get_file_info
+ */
+export function registerReadonlyTools(server: McpServer): void {
+  // list_files
+  server.registerTool(
+    'list_files',
+    {
+      description: t('mcp.tool.listFiles.desc'),
+      inputSchema: {
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        path: z.string().optional().default('').describe(t('mcp.param.dirPath')),
+      },
+    },
+    async (args) => {
+      const entries = await listFiles(args.project_id as number, (args.path as string) || '');
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(entries, null, 2) }],
+      };
+    },
+  );
+
+  // read_file
+  server.registerTool(
+    'read_file',
+    {
+      description: t('mcp.tool.readFile.desc'),
+      inputSchema: {
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        file_path: z.string().describe(t('mcp.param.filePath')),
+      },
+    },
+    async (args) => {
+      const content = await readFileContent(args.project_id as number, args.file_path as string);
+      return {
+        content: [{ type: 'text' as const, text: content }],
+      };
+    },
+  );
+
+  // get_file_info
+  server.registerTool(
+    'get_file_info',
+    {
+      description: t('mcp.tool.getFileInfo.desc'),
+      inputSchema: {
+        project_id: z.number().describe(t('mcp.param.projectId')),
+        file_path: z.string().describe(t('mcp.param.filePath')),
+      },
+    },
+    async (args) => {
+      const info = await getFileInfo(args.project_id as number, args.file_path as string);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(info, null, 2) }],
+      };
+    },
+  );
 }
