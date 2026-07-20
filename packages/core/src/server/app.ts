@@ -265,7 +265,7 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
   });
 
   // Server info — runtime state (actual bind address, not config)
-  app.get('/api/server-info', (req: Request, res: Response) => {
+  app.get('/api/server-info', async (req: Request, res: Response) => {
     const addr = bindAddr || '127.0.0.1';
     const isLocal = addr === '127.0.0.1' || addr === '::1' || addr === 'localhost';
     const isElectron = process.env.DOC77_ELECTRON === '1';
@@ -295,6 +295,18 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       info.capabilities = _capabilities;
     } catch {
       /* non-critical */
+    }
+    // Version update check — best-effort, cached for 5 min
+    try {
+      const { checkForUpdate } = await import('../update/index.js');
+      const u = await checkForUpdate();
+      if (u) {
+        info.latestVersion = u.latest;
+        info.hasUpdate = u.hasUpdate;
+        info.releaseUrl = u.htmlUrl;
+      }
+    } catch {
+      /* /api/server-info must never fail because of the update check */
     }
     res.json(info);
   });

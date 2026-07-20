@@ -184,6 +184,21 @@ async function main() {
   switch (command) {
     case 'start': {
       printBanner();
+      // Async version check — never blocks startup
+      setTimeout(async () => {
+        try {
+          const { checkForUpdate } = await import('@doc77/core');
+          const info = await checkForUpdate();
+          if (info?.hasUpdate) {
+            console.log(
+              `\x1b[33m⚠  Doc77 v${info.latest} is available (current: v${info.current})\x1b[0m`,
+            );
+            console.log(`\x1b[33m   ${info.htmlUrl}\x1b[0m`);
+          }
+        } catch {
+          /* silent */
+        }
+      }, 2000);
       const portIdx = args.indexOf('--port');
       const port = portIdx !== -1 ? parseInt(args[portIdx + 1]) : 27777;
       const bindIdx = args.indexOf('--bind');

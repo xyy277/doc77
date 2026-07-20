@@ -6,6 +6,10 @@
 
 export { VERSION } from './version.gen.js';
 
+// Update checker
+export { checkForUpdate, semverCompare, clearUpdateCache } from './update/index.js';
+export type { UpdateInfo } from './update/index.js';
+
 // Crypto
 export {
   encrypt,

@@ -843,5 +843,11 @@
   "web.sharePage.readonlyBadge": "Read-only · Shared via Doc77",
   "web.sharePage.loading": "Loading...",
   "web.sharePage.expired": "This link has expired or is invalid",
-  "common.settings.saveKeyFailed": "Save failed: {key} {status}"
+  "common.settings.saveKeyFailed": "Save failed: {key} {status}",
+  "common.update.available": "v{latest} available — click to view",
+  "common.update.upToDate": "Up to date",
+  "common.update.checkFailed": "Update check failed",
+  "common.update.downloading": "Downloading update ({percent}%)...",
+  "common.update.downloaded": "Update downloaded — restart to install",
+  "common.update.restart": "Restart & Install"
 }

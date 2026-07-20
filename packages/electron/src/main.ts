@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import { t } from './i18n';
 import { findAvailablePort, startServer, ServerProcess } from './server';
 import { createTray } from './tray';
+import { initAutoUpdater } from './updater';
 
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
@@ -57,6 +58,9 @@ async function boot(): Promise<void> {
   // The server may have moved (explicit server.port override, or busy-port
   // fallback) — the window must load whatever port it actually listens on.
   createWindow(server.port);
+
+  // Auto-update for packaged builds (no-op in dev)
+  initAutoUpdater(mainWindow);
 
   const trayIconPath = path.join(__dirname, '..', 'assets', 'tray.png');
   tray = createTray(trayIconPath, () => {

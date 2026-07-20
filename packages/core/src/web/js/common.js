@@ -52,18 +52,74 @@ fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c
   window.__doc77_caps_translate = c.translate;
 }).catch(function(){});
 
-// Version badge
-(function loadVersion() {
+//══════════ Version badge + Update check ══════════
+(function initVersionBadge() {
   var badge = document.getElementById('versionBadge');
   if (!badge) return;
-  fetch('/api/server-info').then(function(r){ return r.json(); }).then(function(d){
-    badge.textContent = 'v' + d.version;
-    badge.title = 'Doc77 v' + d.version + ' — ' + d.nodeVersion + ' / ' + d.platform;
-    badge.classList.add('loaded');
-  }).catch(function(){
+
+  /** Single writer — Web server-info or Electron updater feed this. */
+  function renderVersionBadge(state) {
+    // Electron: update event takes priority over Web server-info
+    if (state.updateStatus === 'available') {
+      badge.textContent = t('common.update.available', { latest: state.latestVersion || '' });
+      badge.style.cssText = 'cursor:pointer;color:var(--accent);text-decoration:underline';
+      badge.onclick = function () { window.doc77 && window.doc77.update && window.doc77.update.downloadUpdate(); };
+    } else if (state.updateStatus === 'downloading') {
+      badge.textContent = t('common.update.downloading', { percent: String(state.updatePercent || 0) });
+      badge.style.cssText = 'color:var(--accent)';
+      badge.onclick = null;
+    } else if (state.updateStatus === 'downloaded') {
+      badge.textContent = t('common.update.downloaded');
+      badge.style.cssText = 'cursor:pointer;color:var(--accent);text-decoration:underline';
+      badge.onclick = function () { window.doc77 && window.doc77.update && window.doc77.update.quitAndInstall(); };
+    } else if (state.hasUpdate) {
+      // Web: /api/server-info reported a newer version
+      badge.textContent = 'v' + state.version + ' 🔼 v' + state.latestVersion;
+      badge.style.cssText = 'cursor:pointer;color:var(--accent);text-decoration:underline';
+      badge.title = t('common.update.available', { latest: state.latestVersion || '' });
+      badge.classList.add('loaded');
+      badge.onclick = function () { window.open(state.releaseUrl || 'https://github.com/xyy277/doc77/releases', '_blank'); };
+    } else {
+      // Normal — just the version
+      badge.textContent = 'v' + state.version;
+      badge.style.cssText = '';
+      badge.onclick = null;
+      badge.title = state.nodeVersion ? 'Doc77 v' + state.version + ' — ' + state.nodeVersion + ' / ' + state.platform : '';
+      badge.classList.add('loaded');
+    }
+  }
+
+  // ── Web path: fetch /api/server-info ──
+  var serverState = {};
+  fetch('/api/server-info').then(function (r) { return r.json(); }).then(function (d) {
+    serverState = {
+      version: d.version,
+      nodeVersion: d.nodeVersion,
+      platform: d.platform,
+      hasUpdate: d.hasUpdate,
+      latestVersion: d.latestVersion,
+      releaseUrl: d.releaseUrl,
+    };
+    renderVersionBadge(serverState);
+  }).catch(function () {
     badge.textContent = '--';
-    window.__doc77_i18n_ready.then(function(){ badge.title = t('common.versionBadge.failed'); });
+    window.__doc77_i18n_ready.then(function () { badge.title = t('common.versionBadge.failed'); });
   });
+
+  // ── Electron path: listen for auto-updater events ──
+  if (window.doc77 && window.doc77.update && window.doc77.update.onEvent) {
+    var electronState = { version: serverState.version || '' };
+    window.doc77.update.onEvent(function (event) {
+      if (event.type === 'status') {
+        electronState.updateStatus = event.status;
+        if (event.version) electronState.latestVersion = event.version;
+      } else if (event.type === 'progress') {
+        electronState.updateStatus = 'downloading';
+        electronState.updatePercent = Math.round(event.percent || 0);
+      }
+      renderVersionBadge(electronState);
+    });
+  }
 })();
 
 //══════════ Theme ══════════

@@ -842,5 +842,11 @@
   "web.sharePage.readonlyBadge": "只读分享 · 通过 Doc77 分享",
   "web.sharePage.loading": "加载中...",
   "web.sharePage.expired": "此链接已过期或无效",
-  "common.settings.saveKeyFailed": "保存失败: {key} {status}"
+  "common.settings.saveKeyFailed": "保存失败: {key} {status}",
+  "common.update.available": "发现新版本 v{latest}，点击查看",
+  "common.update.upToDate": "已是最新版本",
+  "common.update.checkFailed": "检查更新失败",
+  "common.update.downloading": "正在下载更新 ({percent}%)...",
+  "common.update.downloaded": "更新已下载，重启后安装",
+  "common.update.restart": "重启并安装更新"
 }
