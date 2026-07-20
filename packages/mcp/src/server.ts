@@ -2,12 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 const SERVER_NAME = 'doc77';
 import { VERSION as SERVER_VERSION } from './version.gen.js';
-import { registerReadonlyTools } from './tools/readonly.js';
-import { registerWriteTools } from './tools/write.js';
+import { registerAllTools } from './tools/index.js';
 
 /**
  * Create and configure the Doc77 MCP server.
- * Registers all 8 tools: 3 read-only + 5 write.
+ * Registers all tools: read-only + write.
  */
 export function createMcpServer(): McpServer {
   const server = new McpServer(
@@ -22,8 +21,7 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  registerReadonlyTools(server);
-  registerWriteTools(server);
+  registerAllTools(server);
 
   return server;
 }
