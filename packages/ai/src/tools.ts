@@ -63,6 +63,30 @@ export function getReadTools(): ToolDefinition[] {
         },
       },
     },
+    {
+      type: 'function',
+      function: {
+        name: 'list_projects',
+        description: t('ai.tool.listProjects.desc'),
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'search_files',
+        description: t('ai.tool.searchFiles.desc'),
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: t('ai.tool.searchFiles.query') },
+            path: { type: 'string', description: t('ai.tool.searchFiles.path') },
+            glob: { type: 'string', description: t('ai.tool.searchFiles.glob') },
+          },
+          required: ['query'],
+        },
+      },
+    },
   ];
 }
 
