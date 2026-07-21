@@ -16,7 +16,12 @@ import { t } from '../i18n/index.js';
 
 /** MCP write functions (each enqueues a pending task and returns its id). */
 export interface AiWriteFns {
-  writeFile: (pid: number, sid: string, filePath: string, content: string) => Promise<{ task_id: string }>;
+  writeFile: (
+    pid: number,
+    sid: string,
+    filePath: string,
+    content: string,
+  ) => Promise<{ task_id: string }>;
   moveFile: (
     pid: number,
     sid: string,
@@ -44,7 +49,13 @@ export interface AiWriteCtx {
   sessionId: string;
 }
 
-const WRITE_TOOL_NAMES = ['write_file', 'move_file', 'create_folder', 'delete_file', 'batch_operations'] as const;
+const WRITE_TOOL_NAMES = [
+  'write_file',
+  'move_file',
+  'create_folder',
+  'delete_file',
+  'batch_operations',
+] as const;
 
 /**
  * Which operation *types* each risk level permits. Higher levels are supersets.
@@ -123,7 +134,12 @@ export async function executeAiWriteTool(
   let desc: string;
   switch (name) {
     case 'write_file':
-      task = await deps.writeFns.writeFile(pid, sid, args.file_path as string, args.content as string);
+      task = await deps.writeFns.writeFile(
+        pid,
+        sid,
+        args.file_path as string,
+        args.content as string,
+      );
       desc = t('ai.runtime.descWrite', { filePath: args.file_path as string });
       break;
     case 'move_file':

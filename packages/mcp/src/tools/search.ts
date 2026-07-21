@@ -2,7 +2,14 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { t, getConnection, validatePath, isSensitiveFile, isBinaryFile, readFile } from '@doc77/core';
+import {
+  t,
+  getConnection,
+  validatePath,
+  isSensitiveFile,
+  isBinaryFile,
+  readFile,
+} from '@doc77/core';
 
 export interface SearchMatch {
   file_path: string;
@@ -13,16 +20,63 @@ export interface SearchMatch {
 }
 
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.svn', '__pycache__', '.venv', 'venv',
-  'dist', '.cache', '.next', '.nuxt', 'build', 'target',
+  'node_modules',
+  '.git',
+  '.svn',
+  '__pycache__',
+  '.venv',
+  'venv',
+  'dist',
+  '.cache',
+  '.next',
+  '.nuxt',
+  'build',
+  'target',
 ]);
 
 const SKIP_EXT = new Set([
-  '.exe', '.dll', '.so', '.dylib', '.bin', '.class', '.jar', '.o', '.wasm',
-  '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.ico', '.bmp', '.avif',
-  '.mp4', '.mp3', '.wav', '.ogg', '.flac', '.aac', '.mov', '.avi', '.mkv',
-  '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz', '.zst',
-  '.pdf', '.docx', '.doc', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.class',
+  '.jar',
+  '.o',
+  '.wasm',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.svg',
+  '.webp',
+  '.ico',
+  '.bmp',
+  '.avif',
+  '.mp4',
+  '.mp3',
+  '.wav',
+  '.ogg',
+  '.flac',
+  '.aac',
+  '.mov',
+  '.avi',
+  '.mkv',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.7z',
+  '.rar',
+  '.bz2',
+  '.xz',
+  '.zst',
+  '.pdf',
+  '.docx',
+  '.doc',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
 ]);
 
 /**
@@ -46,9 +100,7 @@ export function searchFiles(
     { path: string } | undefined;
   if (!project) throw new Error(`Project not found: ${projectId}`);
 
-  const basePath = opts?.searchPath
-    ? validatePath(project.path, opts.searchPath)
-    : project.path;
+  const basePath = opts?.searchPath ? validatePath(project.path, opts.searchPath) : project.path;
   const maxResults = opts?.maxResults ?? 50;
 
   const results: SearchMatch[] = [];
@@ -125,10 +177,7 @@ function walkAndSearch(
 }
 
 function matchSimpleGlob(name: string, pattern: string): boolean {
-  const regexStr = pattern
-    .replace(/\./g, '\\.')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
+  const regexStr = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.');
   return new RegExp(`^${regexStr}$`).test(name);
 }
 

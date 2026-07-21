@@ -28,7 +28,11 @@ describe('search_files', () => {
   });
 
   afterEach(() => {
-    try { closeConnection(); } catch { /* ignore */ }
+    try {
+      closeConnection();
+    } catch {
+      /* ignore */
+    }
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 

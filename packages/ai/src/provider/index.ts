@@ -62,10 +62,7 @@ export function normalizeMessages(messages: AiMessage[]): AiMessage[] {
   if (systemMsgs.length <= 1) return messages;
 
   const mergedContent = systemMsgs.map((m) => m.content).join('\n\n');
-  return [
-    { role: 'system' as const, content: mergedContent },
-    ...nonSystemMsgs,
-  ];
+  return [{ role: 'system' as const, content: mergedContent }, ...nonSystemMsgs];
 }
 
 /** Unified chunk type for streaming responses */

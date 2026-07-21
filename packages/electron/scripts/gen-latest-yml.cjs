@@ -41,7 +41,7 @@ if (!ymlName) {
 const EXT_PRIORITY = {
   win: ['.exe'],
   mac: ['.dmg', '.zip'],
-  linux: ['.AppImage', '.deb', '.snap'],
+  linux: ['.appimage', '.deb', '.snap'],
 };
 const candidates = fs
   .readdirSync(RELEASE_DIR)

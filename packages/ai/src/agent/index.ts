@@ -81,12 +81,16 @@ export class DocAgent {
     this.messages.push({ role: 'user', content: userMessage });
 
     const useTools = !opts?.noTools && this.tools.length > 0;
-    console.error(`[ai] chatStream: start, tools=${this.tools.length}, useTools=${useTools}, maxSteps=${this.maxSteps}, history=${this.messages.length}msgs`);
+    console.error(
+      `[ai] chatStream: start, tools=${this.tools.length}, useTools=${useTools}, maxSteps=${this.maxSteps}, history=${this.messages.length}msgs`,
+    );
     let step = 0;
 
     while (step < this.maxSteps) {
       step++;
-      console.error(`[ai] chatStream: step ${step}/${this.maxSteps}, messages=${this.messages.length}`);
+      console.error(
+        `[ai] chatStream: step ${step}/${this.maxSteps}, messages=${this.messages.length}`,
+      );
 
       let hasContent = false;
       let hasToolCalls = false;
@@ -125,7 +129,9 @@ export class DocAgent {
         console.error(`[ai] chatStream: step ${step} done — no tool calls, loop end`);
         break;
       }
-      console.error(`[ai] chatStream: step ${step} — LLM requested ${toolCalls.length} tool(s): ${toolCalls.map(tc => `${tc.name}(${(tc.argsStr || '').slice(0, 120)})`).join(', ')}`);
+      console.error(
+        `[ai] chatStream: step ${step} — LLM requested ${toolCalls.length} tool(s): ${toolCalls.map((tc) => `${tc.name}(${(tc.argsStr || '').slice(0, 120)})`).join(', ')}`,
+      );
 
       // Add assistant message with tool_calls to history
       const assistantMsg: AiMessage = {
@@ -154,7 +160,9 @@ export class DocAgent {
           const result = await this.executeTool(tc.name, args);
           const elapsed = Date.now() - t0;
           const resultPreview = (result || '').slice(0, 100);
-          console.error(`[ai] chatStream: step ${step} ← tool "${tc.name}" OK (${elapsed}ms, ${result.length}chars): ${resultPreview}`);
+          console.error(
+            `[ai] chatStream: step ${step} ← tool "${tc.name}" OK (${elapsed}ms, ${result.length}chars): ${resultPreview}`,
+          );
           this.messages.push({
             role: 'tool',
             tool_call_id: tc.id,
@@ -163,7 +171,9 @@ export class DocAgent {
         } catch (e: unknown) {
           const elapsed = Date.now() - t0;
           const errMsg = e instanceof Error ? e.message : 'Unknown error';
-          console.error(`[ai] chatStream: step ${step} ← tool "${tc.name}" ERROR (${elapsed}ms): ${errMsg}`);
+          console.error(
+            `[ai] chatStream: step ${step} ← tool "${tc.name}" ERROR (${elapsed}ms): ${errMsg}`,
+          );
           this.messages.push({
             role: 'tool',
             tool_call_id: tc.id,

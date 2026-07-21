@@ -15,9 +15,9 @@ export interface ProjectSummary {
  */
 export function listProjects(): ProjectSummary[] {
   const db = getConnection();
-  const projects = db.prepare(
-    'SELECT id, name, path, created_at FROM projects ORDER BY id',
-  ).all() as Array<{ id: number; name: string; path: string; created_at: string }>;
+  const projects = db
+    .prepare('SELECT id, name, path, created_at FROM projects ORDER BY id')
+    .all() as Array<{ id: number; name: string; path: string; created_at: string }>;
 
   return projects.map((p) => {
     const scan = scanDirectory(p.id, '');
@@ -47,9 +47,9 @@ export interface ProjectInfo {
  */
 export function getProjectInfo(projectId: number): ProjectInfo | null {
   const db = getConnection();
-  const project = db.prepare(
-    'SELECT id, name, path, created_at, last_opened FROM projects WHERE id = ?',
-  ).get(projectId) as
+  const project = db
+    .prepare('SELECT id, name, path, created_at, last_opened FROM projects WHERE id = ?')
+    .get(projectId) as
     | { id: number; name: string; path: string; created_at: string; last_opened: string | null }
     | undefined;
 

@@ -14,7 +14,13 @@ export { connectStdio, connectHttp } from './transport/index.js';
 export type { HttpTransportResult } from './transport/index.js';
 
 // Tools
-export { listFiles, readFileContent, readFiles, getFileInfo, getFileInfos } from './tools/readonly.js';
+export {
+  listFiles,
+  readFileContent,
+  readFiles,
+  getFileInfo,
+  getFileInfos,
+} from './tools/readonly.js';
 export type { ReadFilesResult } from './tools/readonly.js';
 export { listProjects } from './tools/discovery.js';
 export { searchFiles } from './tools/search.js';

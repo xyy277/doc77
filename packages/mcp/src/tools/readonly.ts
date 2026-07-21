@@ -16,10 +16,7 @@ import {
  * Simple glob matching: * matches any sequence, ? matches any single char.
  */
 function matchGlob(name: string, pattern: string): boolean {
-  const regexStr = pattern
-    .replace(/\./g, '\\.')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
+  const regexStr = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.');
   return new RegExp(`^${regexStr}$`).test(name);
 }
 
@@ -405,10 +402,7 @@ export function registerReadonlyTools(server: McpServer): void {
         };
       }
       // Single mode
-      const info = await getFileInfo(
-        args.project_id as number,
-        (args.file_path as string) || '',
-      );
+      const info = await getFileInfo(args.project_id as number, (args.file_path as string) || '');
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(info, null, 2) }],
       };

@@ -111,7 +111,10 @@ describe('MCP Read-only Tools', () => {
   describe('read_file enhanced', () => {
     it('should read specific line range', async () => {
       fs.writeFileSync(path.join(projectDir, 'multiline.txt'), 'line1\nline2\nline3\nline4\n');
-      const content = await readFileContentEnhanced(projectId, 'multiline.txt', { start_line: 2, end_line: 3 });
+      const content = await readFileContentEnhanced(projectId, 'multiline.txt', {
+        start_line: 2,
+        end_line: 3,
+      });
       expect(content).toBe('line2\nline3');
     });
 
@@ -123,7 +126,10 @@ describe('MCP Read-only Tools', () => {
 
     it('should handle single line range', async () => {
       fs.writeFileSync(path.join(projectDir, 'single.txt'), 'only line\n');
-      const content = await readFileContentEnhanced(projectId, 'single.txt', { start_line: 1, end_line: 1 });
+      const content = await readFileContentEnhanced(projectId, 'single.txt', {
+        start_line: 1,
+        end_line: 1,
+      });
       expect(content).toBe('only line');
     });
 
@@ -131,7 +137,9 @@ describe('MCP Read-only Tools', () => {
       // Write a file with latin1-encodable bytes
       const buf = Buffer.from([0xe9, 0xe8, 0xea, 0x0a]); // éèê\n
       fs.writeFileSync(path.join(projectDir, 'latin1.txt'), buf);
-      const content = await readFileContentEnhanced(projectId, 'latin1.txt', { encoding: 'latin1' });
+      const content = await readFileContentEnhanced(projectId, 'latin1.txt', {
+        encoding: 'latin1',
+      });
       expect(content).toBe('éèê\n');
     });
 
@@ -164,7 +172,10 @@ describe('MCP Read-only Tools', () => {
       }
       fs.closeSync(fd);
 
-      const content = await readFileContentEnhanced(projectId, 'bigfile2.txt', { start_line: 1, end_line: 5 });
+      const content = await readFileContentEnhanced(projectId, 'bigfile2.txt', {
+        start_line: 1,
+        end_line: 5,
+      });
       const lines = content.split('\n');
       expect(lines.length).toBe(5);
       expect(lines[0]).toBe('data line');
@@ -308,7 +319,11 @@ describe('MCP Read-only Tools', () => {
 import { scanDirectory } from '@doc77/core';
 import { readFile, validatePath, isSensitiveFile } from '@doc77/core';
 import { getConnection, registerProject } from '@doc77/core';
-import { listFiles as listFilesEnhanced, readFileContent as readFileContentEnhanced, readFiles } from '../src/tools/readonly.js';
+import {
+  listFiles as listFilesEnhanced,
+  readFileContent as readFileContentEnhanced,
+  readFiles,
+} from '../src/tools/readonly.js';
 
 async function listFilesImpl(projectId: number, dirPath: string) {
   const result = scanDirectory(projectId, dirPath);

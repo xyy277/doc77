@@ -8,10 +8,7 @@ function msg(role: AiMessage['role'], content: string): AiMessage {
 
 describe('normalizeMessages', () => {
   it('returns the array unchanged when there is a single system message', () => {
-    const messages = [
-      msg('system', 'You are a helpful assistant.'),
-      msg('user', 'Hello'),
-    ];
+    const messages = [msg('system', 'You are a helpful assistant.'), msg('user', 'Hello')];
     const result = normalizeMessages(messages);
     // same reference — zero-allocation path
     expect(result).toBe(messages);
@@ -19,11 +16,7 @@ describe('normalizeMessages', () => {
   });
 
   it('merges two consecutive system messages into one', () => {
-    const messages = [
-      msg('system', 'Prompt A'),
-      msg('system', 'Prompt B'),
-      msg('user', 'Hello'),
-    ];
+    const messages = [msg('system', 'Prompt A'), msg('system', 'Prompt B'), msg('user', 'Hello')];
     const result = normalizeMessages(messages);
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
@@ -53,10 +46,7 @@ describe('normalizeMessages', () => {
   });
 
   it('returns the array unchanged when there are no system messages', () => {
-    const messages = [
-      msg('user', 'Hello'),
-      msg('assistant', 'Hi!'),
-    ];
+    const messages = [msg('user', 'Hello'), msg('assistant', 'Hi!')];
     const result = normalizeMessages(messages);
     expect(result).toBe(messages);
   });

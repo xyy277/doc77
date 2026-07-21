@@ -2869,7 +2869,9 @@ export function createAIChatHandler(deps: {
 
   return async (req: Request, res: Response) => {
     const { message, project_id, session_id, context_file } = req.body;
-    console.error(`[ai] chat request: session=${session_id || 'new'}, project=${project_id}, context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"`);
+    console.error(
+      `[ai] chat request: session=${session_id || 'new'}, project=${project_id}, context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"`,
+    );
     if (!message) {
       res.status(400).json({ error: 'message is required' });
       return;
@@ -3052,9 +3054,13 @@ export function createAIChatHandler(deps: {
             tools: (() => {
               const readTools = getReadTools();
               const writeFnsAvailable = !!deps.writeFns;
-              const writeTools = writeFnsAvailable ? (deps.getWriteTools?.() || []) : [];
-              console.error(`[ai] build tools: read=${readTools.length}, write=${writeTools.length}, writeFns=${writeFnsAvailable}, total=${readTools.length + writeTools.length}`);
-              console.error(`[ai] tool names: ${[...readTools, ...writeTools].map((t: any) => t?.function?.name || t?.name || '?').join(', ')}`);
+              const writeTools = writeFnsAvailable ? deps.getWriteTools?.() || [] : [];
+              console.error(
+                `[ai] build tools: read=${readTools.length}, write=${writeTools.length}, writeFns=${writeFnsAvailable}, total=${readTools.length + writeTools.length}`,
+              );
+              console.error(
+                `[ai] tool names: ${[...readTools, ...writeTools].map((t: any) => t?.function?.name || t?.name || '?').join(', ')}`,
+              );
               return [...readTools, ...writeTools] as any[];
             })(),
             executeTool,
@@ -3137,13 +3143,17 @@ export function createAIChatHandler(deps: {
         if (!content.startsWith('Error:')) {
           if (context_file !== lastFile) {
             // First reference (or switched to a new file): inject content + disable tools for fast answer
-            console.error(`[ai] context_file: first ref to "${context_file}" — inject content + noTools`);
+            console.error(
+              `[ai] context_file: first ref to "${context_file}" — inject content + noTools`,
+            );
             outgoing = `${message}\n\n---\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
             noTools = true;
           } else {
             // Same file again: inject path hint only + keep tools enabled so the agent can
             // use read_file / search_files to actively explore the file
-            console.error(`[ai] context_file: same file "${context_file}" — path hint only, tools ON`);
+            console.error(
+              `[ai] context_file: same file "${context_file}" — path hint only, tools ON`,
+            );
             outgoing = `${message}\n\n---\n${t('ai.context.currentFileHint', { file: context_file as string })}`;
             // noTools stays false
           }

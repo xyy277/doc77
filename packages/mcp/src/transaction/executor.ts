@@ -52,9 +52,7 @@ export async function executeApprovedTasks(
       .prepare(
         'SELECT id, session_id, operation_type FROM operation_queue WHERE id = ? AND status = ?',
       )
-      .get(id, 'pending') as
-      | { id: number; session_id: string; operation_type: string }
-      | undefined;
+      .get(id, 'pending') as { id: number; session_id: string; operation_type: string } | undefined;
 
     if (!pending) continue;
 
