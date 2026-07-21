@@ -75,14 +75,18 @@ describe('bundleHTML', () => {
     expect(result).toContain('background:var(--bg-body)!important;');
   });
 
-  it('should give the export body comfortable padding', () => {
+  it('should use two-column layout with comfortable padding', () => {
     const result = bundleHTML(minimalParams);
-    expect(result).toContain('padding:3rem 3.5rem!important');
+    // Layout container provides the spacing (not body padding as before)
+    expect(result).toContain('class="doc77-layout"');
+    expect(result).toContain('padding:2rem 1.5rem');
   });
 
   it('should escape HTML in title', () => {
     const result = bundleHTML({ ...minimalParams, title: 'test <script>alert("xss")</script>' });
+    // Title tag content is HTML-escaped
+    expect(result).toContain('<title>test &lt;script&gt;alert');
+    // Title text in the HTML body is also escaped (via escapeHTML)
     expect(result).toContain('&lt;script&gt;alert');
-    expect(result).not.toContain('<script>');
   });
 });

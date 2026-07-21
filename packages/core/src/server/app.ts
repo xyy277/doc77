@@ -2134,7 +2134,13 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
         res.json({ ok: false, error: errMsg });
       }
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Unknown error';
+      let message = e instanceof Error ? e.message : 'Unknown error';
+      // Include the underlying cause (DNS/connection refused/etc.) which Node.js
+      // native fetch stores in .cause but the default message loses.
+      if (e instanceof Error && (e as any).cause) {
+        const cause = (e as any).cause;
+        message += ` (${cause.message || cause.code || cause})`;
+      }
       res.json({
         ok: false,
         error: t('api.ai.networkError', { message }),
@@ -2863,6 +2869,7 @@ export function createAIChatHandler(deps: {
 
   return async (req: Request, res: Response) => {
     const { message, project_id, session_id, context_file } = req.body;
+    console.error(`[ai] chat request: session=${session_id || 'new'}, project=${project_id}, context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"`);
     if (!message) {
       res.status(400).json({ error: 'message is required' });
       return;
@@ -2964,6 +2971,7 @@ export function createAIChatHandler(deps: {
 
       const executeTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
         const pid = (args.project_id as number) || project_id;
+        console.error(`[ai] executeTool: "${name}" pid=${pid}`, args);
         if (!pid) return 'Error: project_id is required';
         // Write tools enqueue into the approval queue; they never execute here.
         if (isAiWriteTool(name)) {
@@ -2981,12 +2989,14 @@ export function createAIChatHandler(deps: {
             const result = scanDirectory(pid, dirPath);
             const entries = result.entries.slice(0, 50);
             if (entries.length === 0) return t('ai.context.dirEmpty', { dirPath: dirPath || '/' });
-            return entries
+            const output = entries
               .map(
                 (e) =>
                   `${e.type === 'directory' ? '📁' : '📄'} ${e.name} (${e.type}, ${e.size ?? 'N/A'} bytes)`,
               )
               .join('\n');
+            console.error(`[ai] executeTool: list_files "${dirPath}" → ${entries.length} entries`);
+            return output;
           }
           case 'read_file':
             return readProjectFileContent(pid, args.file_path as string);
@@ -3039,9 +3049,14 @@ export function createAIChatHandler(deps: {
             provider,
             model: cfg.model,
             // Expose write tools only when MCP write functions were injected.
-            tools: (deps.writeFns
-              ? [...getReadTools(), ...(deps.getWriteTools?.() || [])]
-              : getReadTools()) as any[],
+            tools: (() => {
+              const readTools = getReadTools();
+              const writeFnsAvailable = !!deps.writeFns;
+              const writeTools = writeFnsAvailable ? (deps.getWriteTools?.() || []) : [];
+              console.error(`[ai] build tools: read=${readTools.length}, write=${writeTools.length}, writeFns=${writeFnsAvailable}, total=${readTools.length + writeTools.length}`);
+              console.error(`[ai] tool names: ${[...readTools, ...writeTools].map((t: any) => t?.function?.name || t?.name || '?').join(', ')}`);
+              return [...readTools, ...writeTools] as any[];
+            })(),
             executeTool,
             maxSteps: 5,
           }) as any,
@@ -3122,11 +3137,13 @@ export function createAIChatHandler(deps: {
         if (!content.startsWith('Error:')) {
           if (context_file !== lastFile) {
             // First reference (or switched to a new file): inject content + disable tools for fast answer
+            console.error(`[ai] context_file: first ref to "${context_file}" — inject content + noTools`);
             outgoing = `${message}\n\n---\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
             noTools = true;
           } else {
             // Same file again: inject path hint only + keep tools enabled so the agent can
             // use read_file / search_files to actively explore the file
+            console.error(`[ai] context_file: same file "${context_file}" — path hint only, tools ON`);
             outgoing = `${message}\n\n---\n${t('ai.context.currentFileHint', { file: context_file as string })}`;
             // noTools stays false
           }

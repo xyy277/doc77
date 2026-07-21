@@ -878,6 +878,8 @@
   "web.sharePage.readonlyBadge": "Read-only · Shared via Doc77",
   "web.sharePage.loading": "Loading...",
   "web.sharePage.expired": "This link has expired or is invalid",
+  "web.sharePage.outline": "Document Outline",
+  "web.sharePage.outlineToggle": "Outline",
   "common.settings.saveKeyFailed": "Save failed: {key} {status}",
   "common.update.available": "v{latest} available — click to view",
   "common.update.upToDate": "Up to date",

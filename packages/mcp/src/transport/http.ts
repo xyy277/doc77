@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as http from 'node:http';
+import { VERSION } from '../version.gen.js';
 
 export interface HttpTransportResult {
   server: http.Server;
@@ -48,7 +49,7 @@ export async function connectHttp(
             jsonrpc: '2.0',
             result: {
               protocolVersion: '2024-11-05',
-              serverInfo: { name: 'doc77', version: '1.0.0' },
+              serverInfo: { name: 'doc77', version: VERSION },
               capabilities: { tools: {}, resources: {}, prompts: {} },
             },
           }),

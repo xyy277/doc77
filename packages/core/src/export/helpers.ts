@@ -75,6 +75,40 @@ export function getLocalIPs(): Set<string> {
 }
 
 /**
+ * Shared outline CSS used by both the share page and the export page.
+ * Provides a two-column layout with a sticky right sidebar on desktop,
+ * and a floating action button + bottom drawer on mobile.
+ */
+export const OUTLINE_CSS = `
+/* === Two-column layout === */
+.doc77-layout{display:flex;justify-content:center;max-width:calc(56rem + 256px);margin:0 auto;padding:2rem 1.5rem;gap:1rem}
+.doc77-main{flex:1;min-width:0;max-width:56rem}
+
+/* === Outline sidebar (desktop) === */
+.doc77-outline{width:240px;flex-shrink:0}
+.doc77-outline-inner{position:sticky;top:60px;max-height:calc(100vh - 80px);overflow-y:auto;padding:0.5rem 0}
+.doc77-outline-title{font-size:.75rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;padding:0.25rem 0.5rem;margin-bottom:0.25rem}
+.doc77-outline-item{display:flex;align-items:center;gap:0.375rem;padding:0.25rem 0.5rem;font-size:0.8125rem;color:var(--text-secondary);text-decoration:none;border-radius:0.25rem;transition:background .15s,color .15s;line-height:1.4}
+.doc77-outline-item:hover{background:var(--bg-code);color:var(--text-primary)}
+.doc77-outline-dot{width:0.25rem;height:1rem;border-radius:999px;flex-shrink:0}
+.doc77-outline-item span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* === Mobile FAB + bottom drawer === */
+.doc77-outline-toggle{display:none;position:fixed;bottom:1.5rem;right:1.5rem;z-index:100;width:3rem;height:3rem;border-radius:999px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:1.25rem;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.doc77-outline-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.3)}
+.doc77-outline-drawer{position:fixed;bottom:0;left:0;right:0;z-index:201;max-height:60vh;background:var(--bg-card);border-radius:1rem 1rem 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.1);padding:1rem 1.5rem 1.5rem;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease}
+.doc77-outline-drawer.open{transform:translateY(0)}
+.doc77-outline-drawer .doc77-outline-title{font-size:0.875rem;text-align:center;margin-bottom:0.5rem}
+.doc77-outline-drawer .doc77-outline-item{padding:0.5rem;font-size:0.875rem}
+
+@media (max-width:768px){
+  .doc77-layout{padding:1rem;max-width:100%}
+  .doc77-outline{display:none}
+  .doc77-outline-toggle{display:flex;align-items:center;justify-content:center}
+}
+`;
+
+/**
  * Render a share error page (expired/invalid token).
  */
 export function renderShareError(message: string): string {
@@ -86,9 +120,12 @@ export function renderShareError(message: string): string {
 }
 
 /**
- * Render the share page shell.
+ * Render the share page shell with outline sidebar.
  */
 export function renderSharePage(token: { documentTitle: string; theme: string }): string {
+  const outlineTitle = escapeHtml(t('web.sharePage.outline'));
+  const outlineToggleLabel = escapeHtml(t('web.sharePage.outlineToggle'));
+
   return `<!DOCTYPE html>
 <html lang="${getLocale()}" class="${token.theme === 'dark' ? 'dark' : ''}">
 <head>
@@ -96,14 +133,15 @@ export function renderSharePage(token: { documentTitle: string; theme: string })
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(token.documentTitle)} — Doc77</title>
 <style>
-:root{--bg-body:#f8fafc;--bg-code:#f1f5f9;--text-primary:#1e293b;--text-secondary:#64748b;--border-light:#e2e8f0;--accent:#6366f1}.dark{--bg-body:#0f172a;--bg-code:#1e293b;--text-primary:#e2e8f0;--text-secondary:#94a3b8;--border-light:#334155;--accent:#818cf8}
+:root{--bg-body:#f8fafc;--bg-code:#f1f5f9;--bg-card:#ffffff;--text-primary:#1e293b;--text-secondary:#64748b;--text-muted:#94a3b8;--border-light:#e2e8f0;--accent:#6366f1}.dark{--bg-body:#0f172a;--bg-code:#1e293b;--bg-card:#1e293b;--text-primary:#e2e8f0;--text-secondary:#94a3b8;--text-muted:#64748b;--border-light:#334155;--accent:#818cf8}
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;background:var(--bg-body);color:var(--text-primary);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.6}
+html{scroll-behavior:smooth}
 .doc77-share-page{min-height:100vh;display:flex;flex-direction:column}
 .doc77-share-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;border-bottom:1px solid var(--border-light);background:var(--bg-body);position:sticky;top:0;z-index:10}
 .doc77-share-header .brand{font-weight:700;font-size:.875rem;color:var(--accent);text-decoration:none}
 .doc77-share-header .info{font-size:.75rem;color:var(--text-secondary)}
-.doc77-content{padding:2rem;max-width:56rem;width:100%;margin:0 auto}
+.doc77-content{padding:0}
 .doc77-share-footer{text-align:center;padding:1rem;font-size:.75rem;color:var(--text-secondary);border-top:1px solid var(--border-light);margin-top:auto}
 .doc77-share-footer a{color:var(--accent);text-decoration:none}
 .loading{text-align:center;padding:4rem 0;color:var(--text-secondary)}
@@ -111,6 +149,7 @@ body{margin:0;background:var(--bg-body);color:var(--text-primary);font-family:-a
 .doc-content h2{font-size:1.25rem;font-weight:600;margin-top:2rem;margin-bottom:1rem}
 .doc-content p{margin-bottom:1rem;line-height:1.75}
 .doc-content code{background:var(--bg-code);padding:.125rem .375rem;border-radius:.25rem;font-size:.875em}
+${OUTLINE_CSS}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme" crossorigin="anonymous">
 </head>
@@ -120,14 +159,85 @@ body{margin:0;background:var(--bg-body);color:var(--text-primary);font-family:-a
     <a href="/" class="brand">Doc77</a>
     <span class="info">${escapeHtml(t('web.sharePage.readonlyBadge'))}</span>
   </header>
-  <div class="doc77-content" id="content">
-    <div class="loading">${escapeHtml(t('web.sharePage.loading'))}</div>
+  <div class="doc77-layout">
+    <div class="doc77-main">
+      <div class="doc77-content" id="content">
+        <div class="loading">${escapeHtml(t('web.sharePage.loading'))}</div>
+      </div>
+    </div>
+    <aside class="doc77-outline" id="outlineAside">
+      <div class="doc77-outline-inner">
+        <div class="doc77-outline-title">${outlineTitle}</div>
+        <nav class="doc77-outline-list" id="outlineList"></nav>
+      </div>
+    </aside>
   </div>
   <footer class="doc77-share-footer">
     Powered by <a href="https://github.com/xyy277/doc77" target="_blank" rel="noopener">Doc77</a>
   </footer>
 </div>
+<!-- Mobile outline FAB + drawer -->
+<button class="doc77-outline-toggle" id="outlineToggle" aria-label="${outlineToggleLabel}" title="${outlineToggleLabel}">📑</button>
+<div class="doc77-outline-overlay" id="outlineOverlay"></div>
+<div class="doc77-outline-drawer" id="outlineDrawer">
+  <div class="doc77-outline-title">${outlineTitle}</div>
+  <nav class="doc77-outline-list" id="outlineDrawerList"></nav>
+</div>
 <script>
+function escHtml(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function buildOutline(){
+  var container=document.getElementById('content');
+  var headings=container.querySelectorAll('h1, h2, h3');
+  var aside=document.getElementById('outlineAside');
+  var toggle=document.getElementById('outlineToggle');
+  if(!headings.length){
+    if(aside) aside.style.display='none';
+    if(toggle) toggle.style.display='none';
+    return;
+  }
+  var items=[];
+  headings.forEach(function(h,i){
+    if(!h.id) h.id='outline-'+i;
+    var level=parseInt(h.tagName[1]);
+    var indent=(level-1)*14;
+    var dotColor=level===1?'var(--accent)':level===2?'var(--text-secondary)':'var(--text-muted)';
+    var fw=level===1?'font-weight:600;':'';
+    items.push('<a class="doc77-outline-item" href="#'+h.id+'" data-level="'+level+'" style="padding-left:'+(indent+8)+'px;'+fw+'">'+
+      '<span class="doc77-outline-dot" style="background:'+dotColor+'"></span>'+
+      '<span>'+escHtml(h.textContent)+'</span></a>');
+  });
+  var html=items.join('');
+  var dl=document.getElementById('outlineList');
+  var dr=document.getElementById('outlineDrawerList');
+  if(dl) dl.innerHTML=html;
+  if(dr) dr.innerHTML=html;
+}
+function closeDrawer(){
+  document.getElementById('outlineDrawer').classList.remove('open');
+  document.getElementById('outlineOverlay').style.display='none';
+}
+function openDrawer(){
+  document.getElementById('outlineDrawer').classList.add('open');
+  document.getElementById('outlineOverlay').style.display='block';
+}
+// Mobile toggle
+document.getElementById('outlineToggle').addEventListener('click',openDrawer);
+document.getElementById('outlineOverlay').addEventListener('click',closeDrawer);
+// Click outline item → scroll + close drawer
+document.getElementById('outlineDrawer').addEventListener('click',function(e){
+  var a=e.target.closest('a');if(!a)return;
+  e.preventDefault();
+  var el=document.getElementById(a.getAttribute('href').slice(1));
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  closeDrawer();
+});
+document.getElementById('outlineList').addEventListener('click',function(e){
+  var a=e.target.closest('a');if(!a)return;
+  e.preventDefault();
+  var el=document.getElementById(a.getAttribute('href').slice(1));
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+});
+// Fetch content
 fetch('/api/share/' + window.location.pathname.split('/').pop() + '/data')
   .then(function(r){ if(!r.ok) throw new Error('not found'); return r.json(); })
   .then(function(d){
@@ -142,6 +252,8 @@ fetch('/api/share/' + window.location.pathname.split('/').pop() + '/data')
       c.innerHTML = '<article class="doc-content">' + d.content + '</article>';
     }
     document.title = d.title + ' — Doc77';
+    // Build outline after content is rendered
+    buildOutline();
     // Re-highlight code blocks
     if(typeof hljs !== 'undefined') { document.querySelectorAll('pre code').forEach(function(b){ hljs.highlightElement(b); }); }
   })
