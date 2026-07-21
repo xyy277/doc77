@@ -7,7 +7,7 @@
 export { VERSION } from './version.gen.js';
 
 // Provider
-export { AiProvider } from './provider/index.js';
+export { AiProvider, normalizeMessages } from './provider/index.js';
 export type {
   AiProviderConfig,
   AiMessage,

@@ -44,6 +44,30 @@ export interface AiCompletionResponse {
   usage?: { prompt_tokens: number; completion_tokens: number };
 }
 
+/**
+ * Normalize messages before sending to the LLM API.
+ *
+ * Some local models (e.g. Qwen ChatML) require system messages to appear
+ * only at the beginning of the conversation. This function merges all
+ * system-role messages into a single message at index 0, then appends the
+ * remaining non-system messages in their original order.
+ *
+ * When there is 0 or 1 system message the array is returned unchanged so
+ * the common case incurs no allocation overhead.
+ */
+export function normalizeMessages(messages: AiMessage[]): AiMessage[] {
+  const systemMsgs = messages.filter((m) => m.role === 'system');
+  const nonSystemMsgs = messages.filter((m) => m.role !== 'system');
+
+  if (systemMsgs.length <= 1) return messages;
+
+  const mergedContent = systemMsgs.map((m) => m.content).join('\n\n');
+  return [
+    { role: 'system' as const, content: mergedContent },
+    ...nonSystemMsgs,
+  ];
+}
+
 /** Unified chunk type for streaming responses */
 export type StreamChunk =
   | { type: 'token'; content: string }
@@ -67,6 +91,7 @@ export class AiProvider {
    * Non-streaming chat completion.
    */
   async chat(request: AiCompletionRequest): Promise<AiCompletionResponse> {
+    const normalized = normalizeMessages(request.messages);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -75,7 +100,7 @@ export class AiProvider {
       },
       body: JSON.stringify({
         model: request.model || this.model,
-        messages: request.messages,
+        messages: normalized,
         tools: request.tools,
         stream: false,
         max_tokens: request.max_tokens || 4096,
@@ -122,6 +147,7 @@ export class AiProvider {
    *  - Error propagation
    */
   async *chatStream(request: AiCompletionRequest): AsyncGenerator<StreamChunk> {
+    const normalized = normalizeMessages(request.messages);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -130,7 +156,7 @@ export class AiProvider {
       },
       body: JSON.stringify({
         model: request.model || this.model,
-        messages: request.messages,
+        messages: normalized,
         tools: request.tools,
         stream: true,
         max_tokens: request.max_tokens || 4096,
