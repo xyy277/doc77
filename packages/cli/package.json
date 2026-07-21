@@ -1,6 +1,6 @@
 {
   "name": "@doc77/cli",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Doc77 CLI — command-line interface for the document management agent",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@doc77/electron",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Doc77 Desktop — Electron desktop app for local document preview",
   "author": "xyy277 <907507646@qq.com>",
   "license": "MIT",
