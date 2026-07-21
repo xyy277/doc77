@@ -6,6 +6,10 @@
   "license": "MIT",
   "repository": "https://github.com/xyy277/doc77",
   "main": "dist/main.js",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build:main": "tsc -p tsconfig.main.json",
     "build:preload": "tsc -p tsconfig.preload.json",
