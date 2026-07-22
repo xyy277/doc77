@@ -4,6 +4,21 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-22] — `1.0.3`
+
+### 全包 (`1.0.3`)
+
+**Added**
+- 分享页和导出 HTML 新增文档大纲侧边栏，基于 h1-h3 标题自动生成（桌面端 sticky 右侧栏 + 移动端 FAB 底部抽屉）
+- `normalizeMessages` 函数：在 LLM 调用前合并多条 system-role message，兼容 ChatML 模型（如 Qwen）
+
+**Fixed**
+- MCP HTTP transport 的 `serverInfo.version` 从硬编码 `1.0.0` 改为读取 `VERSION`
+- Electron CI 构建：修复 `gen-latest-yml.cjs` 中文件扩展名大小写匹配问题
+
+**Changed**
+- 跨平台端口释放：`dev:start` / `dev:restart` 用 `kill-port.cjs` 替代 Linux 专用的 `fuser -k`
+
 ## [2026-07-19] — `1.0.2`
 
 ### 全包 (`1.0.2`)
