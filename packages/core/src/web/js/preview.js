@@ -634,7 +634,7 @@ function afterActivate(path, d) {
   var extEditBtnEl = document.getElementById('externalEditBtn');
   if (extEditBtnEl) {
     extEditBtnEl.style.display = isTemp ? 'none' : '';
-    extEditBtnEl.title = t('web.preview.toolbar.openExternalEditor');
+    extEditBtnEl.title = t('web.preview.toolbar.openExternalEditorTitle');
   }
   // Run 按钮：仅 js/py 显示
   var runBtn = document.getElementById('runBtn');
