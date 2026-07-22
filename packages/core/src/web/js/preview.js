@@ -1636,7 +1636,8 @@ function toggleEditMode() {
 }
 
 function enterEditMode() {
-  if (editMode || !proj || !proj.id) return;
+  if (editMode) return;
+  if (!proj || !proj.id) { return; }
   var cached = tabDataCache[currentFile];
   editModifiedTime = cached && cached.modified ? cached.modified : null;
 
