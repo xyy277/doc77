@@ -279,7 +279,13 @@ async function main() {
         });
       };
       // Try to load EventBus before creating the app so CRUD endpoints can emit events
-      let eventBus: { on(event: string, listener: (p: unknown) => void): void; off(event: string, listener: (p: unknown) => void): void; emit(event: string, payload: unknown): void } | undefined;
+      let eventBus:
+        | {
+            on(event: string, listener: (p: unknown) => void): void;
+            off(event: string, listener: (p: unknown) => void): void;
+            emit(event: string, payload: unknown): void;
+          }
+        | undefined;
       try {
         const mcpEvents = await import('@doc77/mcp');
         eventBus = mcpEvents.getEventBus();

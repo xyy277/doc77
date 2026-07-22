@@ -91,7 +91,11 @@ export function createApp(
   restartCallback?: () => void,
   bindAddr?: string,
   port?: number,
-  eventBus?: { on(event: string, listener: (p: unknown) => void): void; off(event: string, listener: (p: unknown) => void): void; emit(event: string, payload: unknown): void },
+  eventBus?: {
+    on(event: string, listener: (p: unknown) => void): void;
+    off(event: string, listener: (p: unknown) => void): void;
+    emit(event: string, payload: unknown): void;
+  },
 ) {
   const app = express();
 
@@ -1088,9 +1092,11 @@ export function createApp(
   function validateName(name: string): void {
     if (!name || name.trim().length === 0) throw new Error('Name cannot be empty');
     const trimmed = name.trim();
-    if (trimmed.includes('/') || trimmed.includes('\\')) throw new Error('Name cannot contain path separators');
+    if (trimmed.includes('/') || trimmed.includes('\\'))
+      throw new Error('Name cannot contain path separators');
     if (trimmed === '..' || trimmed === '.') throw new Error('Invalid name');
-    if (Buffer.byteLength(trimmed, 'utf8') > 255) throw new Error('Name is too long (max 255 bytes)');
+    if (Buffer.byteLength(trimmed, 'utf8') > 255)
+      throw new Error('Name is too long (max 255 bytes)');
   }
 
   // Emit file-tree:changed event if EventBus is available
@@ -1098,7 +1104,9 @@ export function createApp(
     if (!eventBus) return;
     try {
       eventBus.emit('file-tree:changed', { projectId, path: dirPath, opType });
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
   }
 
   // Create empty file
@@ -1107,25 +1115,40 @@ export function createApp(
     const dirPath = (req.query.path as string) || '';
     const { name } = req.body || {};
 
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!name) { res.status(400).json({ error: 'name is required' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!name) {
+      res.status(400).json({ error: 'name is required' });
+      return;
+    }
 
     try {
       validateName(name);
       if (isSensitiveFile(name)) throw new Error('Sensitive file name is not allowed');
       const absDir = resolveAndValidate(projectId, dirPath);
       const absPath = path.join(absDir, name);
-      if (fs.existsSync(absPath)) { res.status(409).json({ error: t('web.preview.error.nameConflict') }); return; }
+      if (fs.existsSync(absPath)) {
+        res.status(409).json({ error: t('web.preview.error.nameConflict') });
+        return;
+      }
       fs.writeFileSync(absPath, '', 'utf8');
       clearCache(projectId, dirPath);
       emitTreeChanged(projectId, dirPath, 'create_file');
       res.json({ path: dirPath ? dirPath + '/' + name : name, type: 'file', size: 0 });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      const status = message.includes('not found') ? 404
-        : message.includes('Sensitive') ? 403
-        : (message.includes('cannot be empty') || message.includes('Invalid name') || message.includes('too long') || message.includes('path separators')) ? 400
-        : 500;
+      const status = message.includes('not found')
+        ? 404
+        : message.includes('Sensitive')
+          ? 403
+          : message.includes('cannot be empty') ||
+              message.includes('Invalid name') ||
+              message.includes('too long') ||
+              message.includes('path separators')
+            ? 400
+            : 500;
       res.status(status).json({ error: message });
     }
   });
@@ -1136,25 +1159,40 @@ export function createApp(
     const dirPath = (req.query.path as string) || '';
     const { name } = req.body || {};
 
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!name) { res.status(400).json({ error: 'name is required' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!name) {
+      res.status(400).json({ error: 'name is required' });
+      return;
+    }
 
     try {
       validateName(name);
       if (isSensitiveFile(name)) throw new Error('Sensitive file name is not allowed');
       const absDir = resolveAndValidate(projectId, dirPath);
       const absPath = path.join(absDir, name);
-      if (fs.existsSync(absPath)) { res.status(409).json({ error: t('web.preview.error.nameConflict') }); return; }
+      if (fs.existsSync(absPath)) {
+        res.status(409).json({ error: t('web.preview.error.nameConflict') });
+        return;
+      }
       fs.mkdirSync(absPath, { recursive: true });
       clearCache(projectId, dirPath);
       emitTreeChanged(projectId, dirPath, 'create_folder');
       res.json({ path: dirPath ? dirPath + '/' + name : name, type: 'directory' });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      const status = message.includes('not found') ? 404
-        : message.includes('Sensitive') ? 403
-        : (message.includes('cannot be empty') || message.includes('Invalid name') || message.includes('too long') || message.includes('path separators')) ? 400
-        : 500;
+      const status = message.includes('not found')
+        ? 404
+        : message.includes('Sensitive')
+          ? 403
+          : message.includes('cannot be empty') ||
+              message.includes('Invalid name') ||
+              message.includes('too long') ||
+              message.includes('path separators')
+            ? 400
+            : 500;
       res.status(status).json({ error: message });
     }
   });
@@ -1165,21 +1203,39 @@ export function createApp(
     const oldPath = (req.query.path as string) || '';
     const { newName } = req.body || {};
 
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!oldPath) { res.status(400).json({ error: 'path query parameter is required' }); return; }
-    if (!newName) { res.status(400).json({ error: 'newName is required' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!oldPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    if (!newName) {
+      res.status(400).json({ error: 'newName is required' });
+      return;
+    }
 
     try {
       validateName(newName);
       const absOld = resolveAndValidate(projectId, oldPath);
-      if (!fs.existsSync(absOld)) { res.status(404).json({ error: 'File not found' }); return; }
+      if (!fs.existsSync(absOld)) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
       if (isSensitiveFile(path.basename(absOld))) throw new Error('Cannot rename sensitive files');
       const oldName = path.basename(absOld);
       if (isSensitiveFile(newName)) throw new Error('Sensitive file name is not allowed');
 
       const absNew = path.join(path.dirname(absOld), newName);
-      if (absOld === absNew) { res.json({ oldPath, newPath: oldPath }); return; }
-      if (fs.existsSync(absNew)) { res.status(409).json({ error: t('web.preview.error.nameConflict') }); return; }
+      if (absOld === absNew) {
+        res.json({ oldPath, newPath: oldPath });
+        return;
+      }
+      if (fs.existsSync(absNew)) {
+        res.status(409).json({ error: t('web.preview.error.nameConflict') });
+        return;
+      }
 
       fs.renameSync(absOld, absNew);
       const parentDir = path.dirname(oldPath);
@@ -1192,10 +1248,16 @@ export function createApp(
       res.json({ oldPath, newPath: newRelPath });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      const status = message.includes('not found') ? 404
-        : message.includes('Sensitive') || message.includes('Cannot rename') ? 403
-        : (message.includes('cannot be empty') || message.includes('Invalid name') || message.includes('too long') || message.includes('path separators')) ? 400
-        : 500;
+      const status = message.includes('not found')
+        ? 404
+        : message.includes('Sensitive') || message.includes('Cannot rename')
+          ? 403
+          : message.includes('cannot be empty') ||
+              message.includes('Invalid name') ||
+              message.includes('too long') ||
+              message.includes('path separators')
+            ? 400
+            : 500;
       res.status(status).json({ error: message });
     }
   });
@@ -1205,15 +1267,25 @@ export function createApp(
     const projectId = parseInt(req.params.id, 10);
     const targetPath = (req.query.path as string) || '';
 
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!targetPath) { res.status(400).json({ error: 'path query parameter is required' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!targetPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
 
     try {
       const absTarget = resolveAndValidate(projectId, targetPath);
-      if (!fs.existsSync(absTarget)) { res.status(404).json({ error: 'File not found' }); return; }
+      if (!fs.existsSync(absTarget)) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
       const stat = fs.statSync(absTarget);
       const isDir = stat.isDirectory();
-      if (isSensitiveFile(path.basename(absTarget))) throw new Error('Cannot delete sensitive files');
+      if (isSensitiveFile(path.basename(absTarget)))
+        throw new Error('Cannot delete sensitive files');
 
       // Safety: non-empty directories cannot be deleted
       if (isDir && fs.readdirSync(absTarget).length > 0) {
@@ -1222,8 +1294,9 @@ export function createApp(
       }
 
       // Trash-based deletion: move to .doc77-trash for recovery
-      const project = getConnection().prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
-        { path: string } | undefined;
+      const project = getConnection()
+        .prepare('SELECT path FROM projects WHERE id = ?')
+        .get(projectId) as { path: string } | undefined;
       const projectRoot = project!.path;
       const trashDir = path.join(projectRoot, '.doc77-trash');
       const timestamp = Date.now();
@@ -1250,9 +1323,11 @@ export function createApp(
       res.json({ path: targetPath, movedToTrash });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      const status = message.includes('not found') ? 404
-        : message.includes('Sensitive') || message.includes('Cannot delete') ? 403
-        : 500;
+      const status = message.includes('not found')
+        ? 404
+        : message.includes('Sensitive') || message.includes('Cannot delete')
+          ? 403
+          : 500;
       res.status(status).json({ error: message });
     }
   });
@@ -1262,12 +1337,17 @@ export function createApp(
   // Get bookmarks for a project
   app.get('/api/tree/:id/bookmarks', (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
     try {
       const db = getConnection();
-      const rows = db.prepare(
-        'SELECT file_path, created_at FROM file_bookmarks WHERE project_id = ? ORDER BY created_at DESC',
-      ).all(projectId) as Array<{ file_path: string; created_at: string }>;
+      const rows = db
+        .prepare(
+          'SELECT file_path, created_at FROM file_bookmarks WHERE project_id = ? ORDER BY created_at DESC',
+        )
+        .all(projectId) as Array<{ file_path: string; created_at: string }>;
       res.json({ bookmarks: rows.map((r) => ({ path: r.file_path, created_at: r.created_at })) });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -1280,9 +1360,18 @@ export function createApp(
     const projectId = parseInt(req.params.id, 10);
     const filePath = (req.query.path as string) || '';
     const { action } = req.body || {};
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!filePath) { res.status(400).json({ error: 'path query parameter is required' }); return; }
-    if (action !== 'add' && action !== 'remove') { res.status(400).json({ error: 'action must be "add" or "remove"' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!filePath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    if (action !== 'add' && action !== 'remove') {
+      res.status(400).json({ error: 'action must be "add" or "remove"' });
+      return;
+    }
     try {
       const db = getConnection();
       if (action === 'add') {
@@ -1290,9 +1379,10 @@ export function createApp(
           'INSERT OR IGNORE INTO file_bookmarks (project_id, file_path) VALUES (?, ?)',
         ).run(projectId, filePath);
       } else {
-        db.prepare(
-          'DELETE FROM file_bookmarks WHERE project_id = ? AND file_path = ?',
-        ).run(projectId, filePath);
+        db.prepare('DELETE FROM file_bookmarks WHERE project_id = ? AND file_path = ?').run(
+          projectId,
+          filePath,
+        );
       }
       res.json({ path: filePath, bookmarked: action === 'add' });
     } catch (err: unknown) {
@@ -1305,8 +1395,14 @@ export function createApp(
   app.post('/api/tree/:id/bookmarks/migrate', (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
     const { bookmarks } = req.body || {};
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!Array.isArray(bookmarks)) { res.status(400).json({ error: 'bookmarks must be an array' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!Array.isArray(bookmarks)) {
+      res.status(400).json({ error: 'bookmarks must be an array' });
+      return;
+    }
     try {
       const db = getConnection();
       let imported = 0;
@@ -1332,7 +1428,10 @@ export function createApp(
   (function cleanupTrash() {
     try {
       const db = getConnection();
-      const projects = db.prepare('SELECT id, path FROM projects').all() as Array<{ id: number; path: string }>;
+      const projects = db.prepare('SELECT id, path FROM projects').all() as Array<{
+        id: number;
+        path: string;
+      }>;
       const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days
       for (const proj of projects) {
         const trashDir = path.join(proj.path, '.doc77-trash');
@@ -1352,12 +1451,16 @@ export function createApp(
                 } else {
                   fs.unlinkSync(fullPath);
                 }
-              } catch { /* best-effort cleanup */ }
+              } catch {
+                /* best-effort cleanup */
+              }
             }
           }
         }
       }
-    } catch { /* best-effort cleanup on startup */ }
+    } catch {
+      /* best-effort cleanup on startup */
+    }
   })();
 
   // Directory tree
@@ -2247,9 +2350,15 @@ export function createApp(
 
       const absPath = validatePath(project.path, filePath);
       const platform = process.platform;
-      const isWSL = platform === 'linux' && ((): boolean => {
-        try { return fs.readFileSync('/proc/version', 'utf8').toLowerCase().includes('microsoft'); } catch { return false; }
-      })();
+      const isWSL =
+        platform === 'linux' &&
+        ((): boolean => {
+          try {
+            return fs.readFileSync('/proc/version', 'utf8').toLowerCase().includes('microsoft');
+          } catch {
+            return false;
+          }
+        })();
       let command: string;
 
       if (action === 'edit') {

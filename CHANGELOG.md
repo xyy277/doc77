@@ -4,6 +4,24 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-22] — `1.0.4`
+
+### 全包 (`1.0.4`)
+
+**Added**
+- 文件管理：tree 右键上下文菜单（重命名/复制/删除/移动）
+- 工具栏新增三按钮：✏️ 编辑 / ↗️ 外部编辑器 / 📂 打开文件夹
+- 增量树刷新：sse 事件驱动局部更新，避免整树重载
+
+**Fixed**
+- WSL 环境下外部编辑器调用适配
+- `enterEditMode` 守卫拆分：分离文件选择与编辑器打开逻辑
+- 文件管理 3 个边缘 case bug
+
+**Changed**
+- 工具栏图标重新设计，采用 icon-only 风格
+- `extract-changelog.cjs` 添加 `shell: bash` 以兼容 Windows CI runner
+
 ## [2026-07-22] — `1.0.3`
 
 ### 全包 (`1.0.3`)

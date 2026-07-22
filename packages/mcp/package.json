@@ -1,6 +1,6 @@
 {
   "name": "@doc77/mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Doc77 MCP — MCP protocol implementation, security guard, operation queue, transactions",
   "license": "MIT",
   "repository": {
