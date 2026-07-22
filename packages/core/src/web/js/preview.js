@@ -93,7 +93,7 @@ function initTaskEvents() {
     taskEventSrc.addEventListener('file-tree:changed', function(e){
       var d = {}; try { d = JSON.parse(e.data); } catch(_){}
       if (d.projectId == pid) {
-        refreshTree();
+        refreshSubtree(d.path || '');
       }
     });
     taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
@@ -293,6 +293,42 @@ async function loadTree(dirPath) {
   } catch(e) { tree.innerHTML = '' + t('web.preview.loadFailed') + ''; }
 }
 function refreshTree() { loadTree(''); }
+
+// Incremental tree refresh — only reload the affected directory subtree
+function refreshSubtree(dirPath) {
+  if (!dirPath || dirPath === '') {
+    // Root level: reload root entries into #tree
+    var tree = document.getElementById('tree');
+    fetch('/api/tree/' + pid + '?path=').then(function(r) { return r.json(); }).then(function(d) {
+      tree.innerHTML = '';
+      var fld = d.entries.filter(function(e) { return e.type === 'directory'; });
+      var fls = d.entries.filter(function(e) { return e.type === 'file'; });
+      fld.concat(fls).forEach(function(e) { tree.appendChild(makeNode(e, '')); });
+      if (!fld.length && !fls.length) tree.innerHTML = '' + t('web.preview.emptyDir') + '';
+    }).catch(function() {});
+    return;
+  }
+  // Find the expanded wrapper for this directory
+  var dirRow = document.querySelector('#tree [data-path="' + CSS.escape(dirPath) + '"]');
+  if (!dirRow) return;
+  var wrapper = dirRow.nextElementSibling;
+  if (!wrapper || !wrapper.classList.contains('ml-4') || wrapper.classList.contains('hidden')) return;
+  // Reload children into the wrapper
+  fetch('/api/tree/' + pid + '?path=' + encodeURIComponent(dirPath)).then(function(r) { return r.json(); }).then(function(d) {
+    // Clear existing children but keep collapse button
+    var collapseBtn = wrapper.querySelector('.tree-collapse-btn');
+    wrapper.innerHTML = '';
+    var fld = d.entries.filter(function(e) { return e.type === 'directory'; });
+    var fls = d.entries.filter(function(e) { return e.type === 'file'; });
+    if (!fld.length && !fls.length) {
+      wrapper.innerHTML = '<div class="text-slate-600 text-xs py-1 pl-2">' + t('web.preview.emptyDir') + '</div>';
+    } else {
+      fld.concat(fls).forEach(function(e) { wrapper.appendChild(makeNode(e, dirPath)); });
+    }
+    // Re-append collapse button
+    if (collapseBtn) wrapper.appendChild(collapseBtn);
+  }).catch(function() {});
+}
 function applyFilter() {
   var q = document.getElementById('fileFilter').value.toLowerCase();
   document.querySelectorAll('#tree [data-name]').forEach(function(el) { el.style.display = (q && !el.dataset.name.toLowerCase().includes(q)) ? 'none' : ''; });
@@ -573,11 +609,11 @@ function mountPane(pane, path) {
 /** 激活后统一刷新工具栏/大纲/阅读时长/高亮/面包屑。 */
 function afterActivate(path, d) {
   var isTemp = TempPreview.isTempPath(path);
-  var btns = ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn','exportBtn','shareBtn'];
+  var btns = ['aiBtn','editBtn','externalEditBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn','exportBtn','shareBtn'];
   btns.forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = false; });
   // Disable specific buttons for temp (disk-less) files
   if (isTemp) {
-    ['aiBtn','editBtn','revealBtn'].forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = true; });
+    ['aiBtn','editBtn','externalEditBtn','revealBtn'].forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = true; });
   }
   // Show edit button only for editable file types (not temp)
   var editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
@@ -594,6 +630,12 @@ function afterActivate(path, d) {
     editBtnEl.classList.toggle('editing-active', editMode);
     editBtnEl.title = editMode ? t('web.preview.exitEditMode') : t('web.preview.edit.editFile');
     editBtnEl.onclick = toggleEditMode;
+  }
+  // External editor button — always visible when a file is open
+  var extEditBtnEl = document.getElementById('externalEditBtn');
+  if (extEditBtnEl) {
+    extEditBtnEl.style.display = isTemp ? 'none' : '';
+    extEditBtnEl.title = t('web.preview.toolbar.openExternalEditor');
   }
   // Run 按钮：仅 js/py 显示
   var runBtn = document.getElementById('runBtn');
@@ -719,7 +761,7 @@ function showEmptyState() {
   document.getElementById('docPaneHost').innerHTML = '';
   var empty = document.getElementById('emptyState'); if (empty) empty.classList.remove('hidden');
   document.getElementById('tabBar').classList.add('hidden');
-  ['aiBtn','editBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'].forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = true; });
+  ['aiBtn','editBtn','externalEditBtn','revealBtn','ttsBtn','autoScrollBtn','docSearchBtn'].forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = true; });
   var runBtn = document.getElementById('runBtn'); if (runBtn) { runBtn.classList.add('hidden'); runBtn.disabled = true; }
   var rt = document.getElementById('readTime'); if (rt) rt.classList.add('hidden');
   document.getElementById('readingProgress').style.width = '0%';
@@ -1509,7 +1551,7 @@ function ctxCreateFile(dirPath) {
     }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
   }).then(function() {
     toast(t('web.preview.toast.fileCreated'), 'success');
-    refreshTree();
+    refreshSubtree(dirPath);
   }).catch(function(e) { toast(e.message || t('web.preview.toast.actionFailed'), 'error'); });
 }
 
@@ -1527,7 +1569,7 @@ function ctxCreateFolder(dirPath) {
     }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
   }).then(function() {
     toast(t('web.preview.toast.folderCreated'), 'success');
-    refreshTree();
+    refreshSubtree(dirPath);
   }).catch(function(e) { toast(e.message || t('web.preview.toast.actionFailed'), 'error'); });
 }
 
@@ -1547,9 +1589,12 @@ function ctxRenameFile(oldPath) {
   }).then(function(d) {
     if (!d) return;
     toast(t('web.preview.toast.renamed'), 'success');
-    // Update bookmark if renamed file was bookmarked
     if (d.oldPath && d.newPath && d.oldPath !== d.newPath) updateBookmarkPath(d.oldPath, d.newPath);
-    refreshTree();
+    // Refresh parent directories of both old and new paths
+    var oldDir = oldPath.split('/').slice(0, -1).join('/');
+    var newDir = d.newPath.split('/').slice(0, -1).join('/');
+    refreshSubtree(oldDir);
+    if (newDir !== oldDir) refreshSubtree(newDir);
   }).catch(function(e) { toast(e.message || t('web.preview.toast.renameFailed'), 'error'); });
 }
 
@@ -1564,9 +1609,9 @@ function ctxDeleteFile(targetPath, targetType) {
   }).then(function(d) {
     if (!d) return;
     toast(t('web.preview.toast.deleted'), 'success');
-    // Remove bookmark if deleted file was bookmarked
     removeBookmarkByPath(targetPath);
-    refreshTree();
+    var parentDir = targetPath.split('/').slice(0, -1).join('/');
+    refreshSubtree(parentDir);
   }).catch(function(e) { toast(e.message || t('web.preview.toast.deleteFailed'), 'error'); });
 }
 
