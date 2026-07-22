@@ -17,7 +17,7 @@ interface MinimalBus {
   off(event: string, listener: (payload: unknown) => void): void;
 }
 
-const FORWARDED_EVENTS = ['task:executed', 'task:failed'] as const;
+const FORWARDED_EVENTS = ['task:executed', 'task:failed', 'file-tree:changed'] as const;
 
 export function createEventsHandler(bus: MinimalBus) {
   return (req: Request, res: Response) => {

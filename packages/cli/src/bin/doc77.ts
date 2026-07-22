@@ -278,15 +278,23 @@ async function main() {
           if (!spawnFailed) process.exit(0);
         });
       };
-      const app = createApp(restartServer, bindAddr, port);
+      // Try to load EventBus before creating the app so CRUD endpoints can emit events
+      let eventBus: { on(event: string, listener: (p: unknown) => void): void; off(event: string, listener: (p: unknown) => void): void; emit(event: string, payload: unknown): void } | undefined;
+      try {
+        const mcpEvents = await import('@doc77/mcp');
+        eventBus = mcpEvents.getEventBus();
+      } catch {
+        /* MCP not installed — file-tree:changed events won't be emitted */
+      }
+      const app = createApp(restartServer, bindAddr, port, eventBus);
 
       // Register MCP-dependent routes (optional)
       try {
-        const { executeApprovedTasks, getEventBus } = await import('@doc77/mcp');
+        const { executeApprovedTasks } = await import('@doc77/mcp');
         const { createQueueApproveHandler, createEventsHandler } = await import('@doc77/core');
         app.post('/api/queue/approve', createQueueApproveHandler(executeApprovedTasks));
         // Push write-task lifecycle events (executed/failed) to the browser.
-        app.get('/api/events', createEventsHandler(getEventBus()));
+        if (eventBus) app.get('/api/events', createEventsHandler(eventBus));
       } catch {
         /* MCP not installed */
       }

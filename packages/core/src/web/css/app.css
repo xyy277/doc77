@@ -1891,6 +1891,29 @@ body {
 .dark .ctx-menu button:hover {
   background: var(--bg-hover);
 }
+.ctx-menu-item.ctx-menu-sep {
+  border-top: 1px solid var(--border-light);
+  margin-top: 2px;
+  padding-top: 6px;
+}
+.ctx-menu-item.ctx-menu-danger {
+  color: #dc2626;
+}
+.dark .ctx-menu-item.ctx-menu-danger {
+  color: #ef4444;
+}
+.ctx-menu-item.ctx-menu-danger:hover {
+  background: #fef2f2;
+}
+.dark .ctx-menu-item.ctx-menu-danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+.ctx-menu-icon {
+  display: inline-block;
+  width: 20px;
+  margin-right: 2px;
+  text-align: center;
+}
 
 /* Right panel drag handle */
 #rightPanel::before {

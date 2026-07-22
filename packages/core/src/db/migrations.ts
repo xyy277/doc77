@@ -163,11 +163,20 @@ CREATE INDEX IF NOT EXISTS idx_queue_session ON operation_queue(session_id);
 CREATE INDEX IF NOT EXISTS idx_audit_project_id ON audit_log(project_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_log(created_at);
 
--- 收藏表
+-- 项目收藏表
 CREATE TABLE IF NOT EXISTS favorites (
     project_id INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (project_id),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- 文件收藏表
+CREATE TABLE IF NOT EXISTS file_bookmarks (
+    project_id INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (project_id, file_path),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 

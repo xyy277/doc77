@@ -85,8 +85,14 @@ function getServerInfo() {
  * @param restartCallback — if provided, enables POST /api/restart endpoint
  * @param bindAddr — actual runtime bind address (for /api/server-info)
  * @param port — actual runtime port (for /api/server-info)
+ * @param eventBus — optional EventBus for file-tree:changed SSE events
  */
-export function createApp(restartCallback?: () => void, bindAddr?: string, port?: number) {
+export function createApp(
+  restartCallback?: () => void,
+  bindAddr?: string,
+  port?: number,
+  eventBus?: { on(event: string, listener: (p: unknown) => void): void; off(event: string, listener: (p: unknown) => void): void; emit(event: string, payload: unknown): void },
+) {
   const app = express();
 
   // Sync runtime bind/port to _serverInfo so share URL construction uses correct values
@@ -1065,6 +1071,295 @@ export function createApp(restartCallback?: () => void, bindAddr?: string, port?
       res.status(500).json({ error: message });
     }
   });
+
+  // ── File Management CRUD ──
+
+  // Helper: resolve project root and validate path
+  function resolveAndValidate(projectId: number, reqPath: string): string {
+    const db = getConnection();
+    const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+      { path: string } | undefined;
+    if (!project) throw new Error('Project not found');
+    const validation = validatePath(project.path, reqPath);
+    if (!validation.valid) throw new Error(validation.reason || 'Path validation failed');
+    return path.join(project.path, reqPath);
+  }
+
+  // Validate file/folder name (no path separators, no traversal, reasonable length)
+  function validateName(name: string): void {
+    if (!name || name.trim().length === 0) throw new Error('Name cannot be empty');
+    const trimmed = name.trim();
+    if (trimmed.includes('/') || trimmed.includes('\\')) throw new Error('Name cannot contain path separators');
+    if (trimmed === '..' || trimmed === '.') throw new Error('Invalid name');
+    if (Buffer.byteLength(trimmed, 'utf8') > 255) throw new Error('Name is too long (max 255 bytes)');
+  }
+
+  // Emit file-tree:changed event if EventBus is available
+  function emitTreeChanged(projectId: number, dirPath: string, opType: string): void {
+    if (!eventBus) return;
+    try {
+      eventBus.emit('file-tree:changed', { projectId, path: dirPath, opType });
+    } catch { /* best-effort */ }
+  }
+
+  // Create empty file
+  app.post('/api/tree/:id/file', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    const dirPath = (req.query.path as string) || '';
+    const { name } = req.body || {};
+
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!name) { res.status(400).json({ error: 'name is required' }); return; }
+
+    try {
+      validateName(name);
+      if (isSensitiveFile(name)) throw new Error('Sensitive file name is not allowed');
+      const absDir = resolveAndValidate(projectId, dirPath);
+      const absPath = path.join(absDir, name);
+      if (fs.existsSync(absPath)) { res.status(409).json({ error: t('web.preview.error.nameConflict') }); return; }
+      fs.writeFileSync(absPath, '', 'utf8');
+      clearCache(projectId, dirPath);
+      emitTreeChanged(projectId, dirPath, 'create_file');
+      res.json({ path: dirPath ? dirPath + '/' + name : name, type: 'file', size: 0 });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const status = message.includes('not found') ? 404
+        : message.includes('Sensitive') ? 403
+        : (message.includes('cannot be empty') || message.includes('Invalid name') || message.includes('too long') || message.includes('path separators')) ? 400
+        : 500;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Create folder
+  app.post('/api/tree/:id/folder', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    const dirPath = (req.query.path as string) || '';
+    const { name } = req.body || {};
+
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!name) { res.status(400).json({ error: 'name is required' }); return; }
+
+    try {
+      validateName(name);
+      if (isSensitiveFile(name)) throw new Error('Sensitive file name is not allowed');
+      const absDir = resolveAndValidate(projectId, dirPath);
+      const absPath = path.join(absDir, name);
+      if (fs.existsSync(absPath)) { res.status(409).json({ error: t('web.preview.error.nameConflict') }); return; }
+      fs.mkdirSync(absPath, { recursive: true });
+      clearCache(projectId, dirPath);
+      emitTreeChanged(projectId, dirPath, 'create_folder');
+      res.json({ path: dirPath ? dirPath + '/' + name : name, type: 'directory' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const status = message.includes('not found') ? 404
+        : message.includes('Sensitive') ? 403
+        : (message.includes('cannot be empty') || message.includes('Invalid name') || message.includes('too long') || message.includes('path separators')) ? 400
+        : 500;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Rename file or folder
+  app.put('/api/tree/:id/rename', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    const oldPath = (req.query.path as string) || '';
+    const { newName } = req.body || {};
+
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!oldPath) { res.status(400).json({ error: 'path query parameter is required' }); return; }
+    if (!newName) { res.status(400).json({ error: 'newName is required' }); return; }
+
+    try {
+      validateName(newName);
+      const absOld = resolveAndValidate(projectId, oldPath);
+      if (!fs.existsSync(absOld)) { res.status(404).json({ error: 'File not found' }); return; }
+      if (isSensitiveFile(path.basename(absOld))) throw new Error('Cannot rename sensitive files');
+      const oldName = path.basename(absOld);
+      if (isSensitiveFile(newName)) throw new Error('Sensitive file name is not allowed');
+
+      const absNew = path.join(path.dirname(absOld), newName);
+      if (absOld === absNew) { res.json({ oldPath, newPath: oldPath }); return; }
+      if (fs.existsSync(absNew)) { res.status(409).json({ error: t('web.preview.error.nameConflict') }); return; }
+
+      fs.renameSync(absOld, absNew);
+      const parentDir = path.dirname(oldPath);
+      clearCache(projectId, parentDir === '.' ? '' : parentDir);
+      // Also clear cache for the parent of the new path
+      const newRelPath = parentDir === '.' ? newName : parentDir + '/' + newName;
+      const newParent = path.dirname(newRelPath);
+      clearCache(projectId, newParent === '.' ? '' : newParent);
+      emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'rename');
+      res.json({ oldPath, newPath: newRelPath });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const status = message.includes('not found') ? 404
+        : message.includes('Sensitive') || message.includes('Cannot rename') ? 403
+        : (message.includes('cannot be empty') || message.includes('Invalid name') || message.includes('too long') || message.includes('path separators')) ? 400
+        : 500;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Delete file or folder
+  app.delete('/api/tree/:id', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    const targetPath = (req.query.path as string) || '';
+
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!targetPath) { res.status(400).json({ error: 'path query parameter is required' }); return; }
+
+    try {
+      const absTarget = resolveAndValidate(projectId, targetPath);
+      if (!fs.existsSync(absTarget)) { res.status(404).json({ error: 'File not found' }); return; }
+      const stat = fs.statSync(absTarget);
+      const isDir = stat.isDirectory();
+      if (isSensitiveFile(path.basename(absTarget))) throw new Error('Cannot delete sensitive files');
+
+      // Safety: non-empty directories cannot be deleted
+      if (isDir && fs.readdirSync(absTarget).length > 0) {
+        res.status(400).json({ error: t('web.preview.error.dirNotEmpty') });
+        return;
+      }
+
+      // Trash-based deletion: move to .doc77-trash for recovery
+      const project = getConnection().prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
+      const projectRoot = project!.path;
+      const trashDir = path.join(projectRoot, '.doc77-trash');
+      const timestamp = Date.now();
+      const trashName = `${timestamp}-${path.basename(absTarget)}`;
+      const trashPath = path.join(trashDir, trashName);
+
+      let movedToTrash = false;
+      try {
+        fs.mkdirSync(trashDir, { recursive: true });
+        fs.renameSync(absTarget, trashPath);
+        movedToTrash = true;
+      } catch {
+        // Cross-device or trash failed — fall back to direct delete
+        if (isDir) {
+          fs.rmdirSync(absTarget);
+        } else {
+          fs.unlinkSync(absTarget);
+        }
+      }
+
+      const parentDir = path.dirname(targetPath);
+      clearCache(projectId, parentDir === '.' ? '' : parentDir);
+      emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'delete');
+      res.json({ path: targetPath, movedToTrash });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const status = message.includes('not found') ? 404
+        : message.includes('Sensitive') || message.includes('Cannot delete') ? 403
+        : 500;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // ── File Bookmarks ──
+
+  // Get bookmarks for a project
+  app.get('/api/tree/:id/bookmarks', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    try {
+      const db = getConnection();
+      const rows = db.prepare(
+        'SELECT file_path, created_at FROM file_bookmarks WHERE project_id = ? ORDER BY created_at DESC',
+      ).all(projectId) as Array<{ file_path: string; created_at: string }>;
+      res.json({ bookmarks: rows.map((r) => ({ path: r.file_path, created_at: r.created_at })) });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Toggle bookmark
+  app.put('/api/tree/:id/bookmark', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    const filePath = (req.query.path as string) || '';
+    const { action } = req.body || {};
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!filePath) { res.status(400).json({ error: 'path query parameter is required' }); return; }
+    if (action !== 'add' && action !== 'remove') { res.status(400).json({ error: 'action must be "add" or "remove"' }); return; }
+    try {
+      const db = getConnection();
+      if (action === 'add') {
+        db.prepare(
+          'INSERT OR IGNORE INTO file_bookmarks (project_id, file_path) VALUES (?, ?)',
+        ).run(projectId, filePath);
+      } else {
+        db.prepare(
+          'DELETE FROM file_bookmarks WHERE project_id = ? AND file_path = ?',
+        ).run(projectId, filePath);
+      }
+      res.json({ path: filePath, bookmarked: action === 'add' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Migrate bookmarks from localStorage to SQLite (idempotent)
+  app.post('/api/tree/:id/bookmarks/migrate', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.id, 10);
+    const { bookmarks } = req.body || {};
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!Array.isArray(bookmarks)) { res.status(400).json({ error: 'bookmarks must be an array' }); return; }
+    try {
+      const db = getConnection();
+      let imported = 0;
+      const stmt = db.prepare(
+        'INSERT OR IGNORE INTO file_bookmarks (project_id, file_path, created_at) VALUES (?, ?, ?)',
+      );
+      for (const bm of bookmarks) {
+        if (bm.path && typeof bm.path === 'string') {
+          const createdAt = bm.time ? new Date(bm.time).toISOString() : new Date().toISOString();
+          const result = stmt.run(projectId, bm.path, createdAt);
+          if (result.changes > 0) imported++;
+        }
+      }
+      res.json({ imported });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // ── Trash GC ──
+  // Clean up .doc77-trash entries older than 30 days on server startup
+  (function cleanupTrash() {
+    try {
+      const db = getConnection();
+      const projects = db.prepare('SELECT id, path FROM projects').all() as Array<{ id: number; path: string }>;
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days
+      for (const proj of projects) {
+        const trashDir = path.join(proj.path, '.doc77-trash');
+        if (!fs.existsSync(trashDir)) continue;
+        const entries = fs.readdirSync(trashDir);
+        for (const entry of entries) {
+          // Entry format: <timestamp>-<originalName>
+          const match = entry.match(/^(\d{13})-/);
+          if (match) {
+            const ts = parseInt(match[1], 10);
+            if (ts < cutoff) {
+              const fullPath = path.join(trashDir, entry);
+              try {
+                const stat = fs.statSync(fullPath);
+                if (stat.isDirectory()) {
+                  fs.rmSync(fullPath, { recursive: true, force: true });
+                } else {
+                  fs.unlinkSync(fullPath);
+                }
+              } catch { /* best-effort cleanup */ }
+            }
+          }
+        }
+      }
+    } catch { /* best-effort cleanup on startup */ }
+  })();
 
   // Directory tree
   app.get('/api/tree/:id', (req: Request, res: Response) => {

@@ -90,6 +90,12 @@ function initTaskEvents() {
       toast(t('web.preview.task.toastFailed', {id: d.task_id||'?'}), 'error');
       loadTasks(); appendTaskReceipt(t('web.preview.task.taskFailed', {id: d.task_id||'?'}) + (d.error_message ? '：' + d.error_message : ''));
     });
+    taskEventSrc.addEventListener('file-tree:changed', function(e){
+      var d = {}; try { d = JSON.parse(e.data); } catch(_){}
+      if (d.projectId == pid) {
+        refreshTree();
+      }
+    });
     taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
   } catch(_){}
 }
@@ -135,6 +141,7 @@ function applyCapabilities() {
     document.title = 'Doc77 — ' + proj.name;
     renderProjMenu(); loadTree(''); loadTasks(); setActiveTab('outline');
     renderBookmarks(); renderRecentFiles();
+    migrateLegacyBookmarks();
     // 恢复上次打开的 tab 列表（仅活动 tab 立即加载，其余惰性）
     restoreTabs(directPath || null);
     // Navigate to specific file if path param provided (from recent-files link) — 展开左侧树
@@ -335,8 +342,9 @@ function makeNode(entry, parentPath) {
     row.addEventListener('click', function() {
       openTab(childPath);
     });
-    row.addEventListener('contextmenu', function(e) { e.preventDefault(); showCtxMenu(e.clientX, e.clientY, childPath); });
   }
+  // Right-click context menu for both files and directories
+  row.addEventListener('contextmenu', function(e) { e.preventDefault(); showCtxMenu(e.clientX, e.clientY, childPath, isDir ? 'directory' : 'file'); });
   return frag;
 }
 
@@ -1337,43 +1345,239 @@ function toggleRecentSection() {
   if (arrow) arrow.textContent = collapsed ? '▸' : '▾';
 }
 
-// Feature 10: Bookmarks
-function getBookmarks() { try { return JSON.parse(localStorage.getItem('doc77-bookmarks')||'[]'); } catch(e) { return []; } }
-function saveBookmarks(bm) { localStorage.setItem('doc77-bookmarks', JSON.stringify(bm)); }
+// Feature 10: Bookmarks (SQLite-backed with localStorage migration)
+var _bookmarksCache = null; // cache for current project
+
+function getBookmarksSync() {
+  // Synchronous helper for context menu — uses cache, falls back to localStorage
+  if (_bookmarksCache) return _bookmarksCache;
+  try { return JSON.parse(localStorage.getItem('doc77-bookmarks')||'[]').filter(function(b){ return b.pid == pid; }).map(function(b){ return { path: b.path, time: b.time }; }); } catch(e) { return []; }
+}
+
+function getBookmarks() {
+  return fetch('/api/tree/' + pid + '/bookmarks').then(function(r) { return r.json(); }).then(function(d) {
+    _bookmarksCache = d.bookmarks || [];
+    return _bookmarksCache;
+  }).catch(function() {
+    // Fallback to localStorage on error
+    try { return JSON.parse(localStorage.getItem('doc77-bookmarks')||'[]').filter(function(b){ return b.pid == pid; }).map(function(b){ return { path: b.path, time: b.time }; }); } catch(e) { return []; }
+  });
+}
+
 function addBookmark(filePath) {
-  var bm = getBookmarks();
-  if (bm.find(function(b){ return b.pid == pid && b.path === filePath; })) { toast(t('web.preview.alreadyBookmarked'),'info'); return; }
-  bm.unshift({ pid: parseInt(pid), path: filePath, time: Date.now() });
-  if (bm.length > 50) bm = bm.slice(0, 50);
-  saveBookmarks(bm);
-  renderBookmarks();
-  toast(t('web.preview.bookmarked'),'success');
+  fetch('/api/tree/' + pid + '/bookmark?path=' + encodeURIComponent(filePath), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'add' })
+  }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function() {
+    if (_bookmarksCache) _bookmarksCache.unshift({ path: filePath, created_at: new Date().toISOString() });
+    if (_bookmarksCache && _bookmarksCache.length > 50) _bookmarksCache = _bookmarksCache.slice(0, 50);
+    renderBookmarks();
+    toast(t('web.preview.bookmarked'), 'success');
+  }).catch(function(e) { toast(e.message || 'Failed', 'error'); });
 }
+
 function removeBookmark(filePath) {
-  var bm = getBookmarks().filter(function(b){ return !(b.pid == pid && b.path === filePath); });
-  saveBookmarks(bm); renderBookmarks();
+  fetch('/api/tree/' + pid + '/bookmark?path=' + encodeURIComponent(filePath), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'remove' })
+  }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function() {
+    if (_bookmarksCache) _bookmarksCache = _bookmarksCache.filter(function(b){ return b.path !== filePath; });
+    renderBookmarks();
+  }).catch(function(e) { toast(e.message || 'Failed', 'error'); });
 }
+
+function removeBookmarkByPath(filePath) {
+  // Synchronous removal from cache only (used by delete action)
+  if (_bookmarksCache) _bookmarksCache = _bookmarksCache.filter(function(b){ return b.path !== filePath; });
+  renderBookmarks();
+}
+
+function updateBookmarkPath(oldPath, newPath) {
+  if (_bookmarksCache) {
+    var entry = _bookmarksCache.find(function(b){ return b.path === oldPath; });
+    if (entry) { entry.path = newPath; }
+  }
+}
+
 function renderBookmarks() {
-  var bm = getBookmarks().filter(function(b){ return b.pid == pid; });
   var el = document.getElementById('bookmarkList');
   var cnt = document.getElementById('bookmarkCount');
-  if (cnt) cnt.textContent = bm.length;
-  if (!bm.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">' + t('web.preview.bookmark.empty') + '</div>'; return; }
-  el.innerHTML = bm.map(function(b) {
-    return '<div class="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-800 group cursor-pointer">' +
-      '<span class="truncate flex-1 text-slate-300" onclick="navigateToFile(\'' + escAttr(b.path) + '\')">⭐ ' + esc(b.path) + '</span>' +
-      '<button class="hidden group-hover:block text-slate-500 hover:text-red-400 text-xs" onclick="event.stopPropagation();removeBookmark(\'' + escAttr(b.path) + '\')">✕</button></div>';
-  }).join('');
+
+  // Kick off async migration + load
+  getBookmarks().then(function(bm) {
+    if (cnt) cnt.textContent = bm.length;
+    if (!bm.length) { el.innerHTML = '<div class="text-slate-600 text-xs px-1">' + t('web.preview.bookmark.empty') + '</div>'; return; }
+    el.innerHTML = bm.map(function(b) {
+      return '<div class="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-800 group cursor-pointer">' +
+        '<span class="truncate flex-1 text-slate-300" onclick="navigateToFile(\'' + escAttr(b.path) + '\')">⭐ ' + esc(b.path) + '</span>' +
+        '<button class="hidden group-hover:block text-slate-500 hover:text-red-400 text-xs" onclick="event.stopPropagation();removeBookmark(\'' + escAttr(b.path) + '\')">✕</button></div>';
+    }).join('');
+  });
+}
+
+// Migrate legacy localStorage bookmarks to SQLite (runs once on first load)
+function migrateLegacyBookmarks() {
+  try {
+    var raw = localStorage.getItem('doc77-bookmarks');
+    if (!raw) return;
+    var all = JSON.parse(raw);
+    if (!Array.isArray(all) || all.length === 0) return;
+    var mine = all.filter(function(b) { return b.pid == pid; });
+    if (mine.length === 0) return;
+    fetch('/api/tree/' + pid + '/bookmarks/migrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookmarks: mine })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.imported > 0) {
+        // Remove migrated items from localStorage
+        var remaining = all.filter(function(b) { return b.pid != pid; });
+        try { localStorage.setItem('doc77-bookmarks', JSON.stringify(remaining)); } catch(_) {}
+        _bookmarksCache = null;
+        renderBookmarks();
+      }
+    }).catch(function() { /* best-effort */ });
+  } catch(_) {}
 }
 // Right-click context menu
-function showCtxMenu(x, y, filePath) {
+var ctxTargetPath = null;
+var ctxTargetType = null;
+
+function showCtxMenu(x, y, nodePath, nodeType) {
+  ctxTargetPath = nodePath;
+  ctxTargetType = nodeType;
   var m = document.getElementById('ctxMenu');
-  m.innerHTML = '<button onclick="addBookmark(\'' + escAttr(filePath) + '\');hideCtxMenu()">' + t('web.preview.bookmark.add') + '</button>';
+  var isDir = nodeType === 'directory';
+  var items = [];
+
+  if (isDir) {
+    items.push({ label: t('web.preview.ctxMenu.newFile'), action: 'ctxNewFile', icon: '📄' });
+    items.push({ label: t('web.preview.ctxMenu.newFolder'), action: 'ctxNewFolder', icon: '📁' });
+    items.push({ label: t('web.preview.ctxMenu.rename'), action: 'ctxRename', icon: '✏️', sep: true });
+    items.push({ label: t('web.preview.ctxMenu.delete'), action: 'ctxDelete', icon: '🗑️', danger: true, sep: true });
+  } else {
+    var bm = getBookmarksSync();
+    var isBookmarked = bm.some(function(b) { return b.path === nodePath; });
+    items.push({ label: isBookmarked ? t('web.preview.ctxMenu.bookmarkRemove') : t('web.preview.ctxMenu.bookmarkAdd'), action: 'ctxBookmark', icon: isBookmarked ? '⭐' : '☆' });
+    items.push({ label: t('web.preview.ctxMenu.rename'), action: 'ctxRename', icon: '✏️', sep: true });
+    items.push({ label: t('web.preview.ctxMenu.delete'), action: 'ctxDelete', icon: '🗑️', danger: true, sep: true });
+  }
+
+  m.innerHTML = items.map(function(item) {
+    var cls = 'ctx-menu-item' + (item.danger ? ' ctx-menu-danger' : '') + (item.sep ? ' ctx-menu-sep' : '');
+    return '<button class="' + cls + '" data-action="' + item.action + '">' +
+      '<span class="ctx-menu-icon">' + (item.icon || '') + '</span>' + esc(item.label) + '</button>';
+  }).join('');
+
+  // Bind click handlers
+  m.querySelectorAll('[data-action]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var action = btn.dataset.action;
+      hideCtxMenu();
+      if (action === 'ctxNewFile') ctxCreateFile(ctxTargetPath);
+      else if (action === 'ctxNewFolder') ctxCreateFolder(ctxTargetPath);
+      else if (action === 'ctxRename') ctxRenameFile(ctxTargetPath);
+      else if (action === 'ctxDelete') ctxDeleteFile(ctxTargetPath, ctxTargetType);
+      else if (action === 'ctxBookmark') ctxToggleBookmark(ctxTargetPath);
+    });
+  });
+
   m.style.left = x + 'px'; m.style.top = y + 'px';
   m.classList.remove('hidden');
   setTimeout(function(){ document.addEventListener('click', hideCtxMenu, {once:true}); }, 0);
 }
-function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidden'); }
+function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidden'); ctxTargetPath = null; ctxTargetType = null; }
+
+// ── Context Menu Actions ──
+
+function ctxCreateFile(dirPath) {
+  promptDialog({
+    title: t('web.preview.ctxMenu.newFile'),
+    placeholder: t('web.preview.prompt.newFileName'),
+    defaultValue: ''
+  }).then(function(fname) {
+    if (!fname) return;
+    return fetch('/api/tree/' + pid + '/file?path=' + encodeURIComponent(dirPath), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: fname.trim() })
+    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
+  }).then(function() {
+    toast(t('web.preview.toast.fileCreated'), 'success');
+    refreshTree();
+  }).catch(function(e) { toast(e.message || t('web.preview.toast.actionFailed'), 'error'); });
+}
+
+function ctxCreateFolder(dirPath) {
+  promptDialog({
+    title: t('web.preview.ctxMenu.newFolder'),
+    placeholder: t('web.preview.prompt.newFolderName'),
+    defaultValue: ''
+  }).then(function(fname) {
+    if (!fname) return;
+    return fetch('/api/tree/' + pid + '/folder?path=' + encodeURIComponent(dirPath), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: fname.trim() })
+    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
+  }).then(function() {
+    toast(t('web.preview.toast.folderCreated'), 'success');
+    refreshTree();
+  }).catch(function(e) { toast(e.message || t('web.preview.toast.actionFailed'), 'error'); });
+}
+
+function ctxRenameFile(oldPath) {
+  var oldName = oldPath.split('/').pop();
+  promptDialog({
+    title: t('web.preview.ctxMenu.rename'),
+    placeholder: t('web.preview.prompt.renameTitle'),
+    defaultValue: oldName
+  }).then(function(newName) {
+    if (!newName || newName === oldName) return;
+    return fetch('/api/tree/' + pid + '/rename?path=' + encodeURIComponent(oldPath), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newName: newName.trim() })
+    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
+  }).then(function(d) {
+    if (!d) return;
+    toast(t('web.preview.toast.renamed'), 'success');
+    // Update bookmark if renamed file was bookmarked
+    if (d.oldPath && d.newPath && d.oldPath !== d.newPath) updateBookmarkPath(d.oldPath, d.newPath);
+    refreshTree();
+  }).catch(function(e) { toast(e.message || t('web.preview.toast.renameFailed'), 'error'); });
+}
+
+function ctxDeleteFile(targetPath, targetType) {
+  var isDir = targetType === 'directory';
+  var msg = isDir ? t('web.preview.confirm.deleteFolder') : t('web.preview.confirm.deleteFile');
+  confirmDialog(msg).then(function(ok) {
+    if (!ok) return;
+    return fetch('/api/tree/' + pid + '?path=' + encodeURIComponent(targetPath), {
+      method: 'DELETE'
+    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
+  }).then(function(d) {
+    if (!d) return;
+    toast(t('web.preview.toast.deleted'), 'success');
+    // Remove bookmark if deleted file was bookmarked
+    removeBookmarkByPath(targetPath);
+    refreshTree();
+  }).catch(function(e) { toast(e.message || t('web.preview.toast.deleteFailed'), 'error'); });
+}
+
+function ctxToggleBookmark(filePath) {
+  var bm = getBookmarksSync();
+  var existing = bm.find(function(b) { return b.path === filePath; });
+  if (existing) {
+    removeBookmark(filePath);
+  } else {
+    addBookmark(filePath);
+  }
+}
 
 // Toolbar
 function revealFile(action) { if (currentFile) fetch('/api/reveal/' + pid + '?path=' + encodeURIComponent(currentFile) + '&action=' + action).catch(function(){}); }
