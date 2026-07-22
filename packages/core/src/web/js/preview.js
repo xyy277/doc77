@@ -1455,34 +1455,35 @@ function showCtxMenu(x, y, nodePath, nodeType) {
   var items = [];
 
   if (isDir) {
-    items.push({ label: t('web.preview.ctxMenu.newFile'), action: 'ctxNewFile', icon: '📄' });
-    items.push({ label: t('web.preview.ctxMenu.newFolder'), action: 'ctxNewFolder', icon: '📁' });
-    items.push({ label: t('web.preview.ctxMenu.rename'), action: 'ctxRename', icon: '✏️', sep: true });
-    items.push({ label: t('web.preview.ctxMenu.delete'), action: 'ctxDelete', icon: '🗑️', danger: true, sep: true });
+    items.push({ label: t('web.preview.ctxMenu.newFile'), action: 'ctxNewFile' });
+    items.push({ label: t('web.preview.ctxMenu.newFolder'), action: 'ctxNewFolder' });
+    items.push({ label: t('web.preview.ctxMenu.rename'), action: 'ctxRename', sep: true });
+    items.push({ label: t('web.preview.ctxMenu.delete'), action: 'ctxDelete', danger: true, sep: true });
   } else {
     var bm = getBookmarksSync();
     var isBookmarked = bm.some(function(b) { return b.path === nodePath; });
-    items.push({ label: isBookmarked ? t('web.preview.ctxMenu.bookmarkRemove') : t('web.preview.ctxMenu.bookmarkAdd'), action: 'ctxBookmark', icon: isBookmarked ? '⭐' : '☆' });
-    items.push({ label: t('web.preview.ctxMenu.rename'), action: 'ctxRename', icon: '✏️', sep: true });
-    items.push({ label: t('web.preview.ctxMenu.delete'), action: 'ctxDelete', icon: '🗑️', danger: true, sep: true });
+    items.push({ label: isBookmarked ? t('web.preview.ctxMenu.bookmarkRemove') : t('web.preview.ctxMenu.bookmarkAdd'), action: 'ctxBookmark' });
+    items.push({ label: t('web.preview.ctxMenu.rename'), action: 'ctxRename', sep: true });
+    items.push({ label: t('web.preview.ctxMenu.delete'), action: 'ctxDelete', danger: true, sep: true });
   }
 
   m.innerHTML = items.map(function(item) {
     var cls = 'ctx-menu-item' + (item.danger ? ' ctx-menu-danger' : '') + (item.sep ? ' ctx-menu-sep' : '');
-    return '<button class="' + cls + '" data-action="' + item.action + '">' +
-      '<span class="ctx-menu-icon">' + (item.icon || '') + '</span>' + esc(item.label) + '</button>';
+    return '<button class="' + cls + '" data-action="' + item.action + '">' + esc(item.label) + '</button>';
   }).join('');
 
-  // Bind click handlers
+  // Bind click handlers — capture path/type BEFORE hideCtxMenu() clears them
   m.querySelectorAll('[data-action]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var action = btn.dataset.action;
+      var path = ctxTargetPath;
+      var type = ctxTargetType;
       hideCtxMenu();
-      if (action === 'ctxNewFile') ctxCreateFile(ctxTargetPath);
-      else if (action === 'ctxNewFolder') ctxCreateFolder(ctxTargetPath);
-      else if (action === 'ctxRename') ctxRenameFile(ctxTargetPath);
-      else if (action === 'ctxDelete') ctxDeleteFile(ctxTargetPath, ctxTargetType);
-      else if (action === 'ctxBookmark') ctxToggleBookmark(ctxTargetPath);
+      if (action === 'ctxNewFile') ctxCreateFile(path);
+      else if (action === 'ctxNewFolder') ctxCreateFolder(path);
+      else if (action === 'ctxRename') ctxRenameFile(path);
+      else if (action === 'ctxDelete') ctxDeleteFile(path, type);
+      else if (action === 'ctxBookmark') ctxToggleBookmark(path);
     });
   });
 

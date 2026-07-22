@@ -1080,9 +1080,8 @@ export function createApp(
     const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
       { path: string } | undefined;
     if (!project) throw new Error('Project not found');
-    const validation = validatePath(project.path, reqPath);
-    if (!validation.valid) throw new Error(validation.reason || 'Path validation failed');
-    return path.join(project.path, reqPath);
+    // validatePath returns the resolved absolute path, or throws on invalid
+    return validatePath(project.path, reqPath);
   }
 
   // Validate file/folder name (no path separators, no traversal, reasonable length)
