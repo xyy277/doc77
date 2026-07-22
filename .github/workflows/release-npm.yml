@@ -89,12 +89,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Extract release notes from CHANGELOG
-        run: node scripts/extract-changelog.cjs --version ${GITHUB_REF_NAME#v} > /tmp/release-notes.md
+        run: node scripts/extract-changelog.cjs --version ${GITHUB_REF_NAME#v} > release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: /tmp/release-notes.md
+          body_path: release-notes.md
           prerelease: ${{ steps.dist_tag.outputs.tag != 'latest' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

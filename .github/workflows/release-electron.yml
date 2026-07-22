@@ -82,7 +82,7 @@ jobs:
         run: node scripts/gen-latest-yml.cjs --platform ${{ matrix.target }}
 
       - name: Extract release notes from CHANGELOG
-        run: node scripts/extract-changelog.cjs --version ${GITHUB_REF_NAME#electron-v} > /tmp/release-notes.md
+        run: node scripts/extract-changelog.cjs --version ${GITHUB_REF_NAME#electron-v} > release-notes.md
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
@@ -90,7 +90,7 @@ jobs:
           files: |
             packages/electron/release/*.{exe,dmg,AppImage}
             packages/electron/release/*.yml
-          body_path: /tmp/release-notes.md
+          body_path: release-notes.md
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

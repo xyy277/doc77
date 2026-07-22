@@ -38,8 +38,54 @@
 | 21 | Electron CI `vendor-install` 崩溃 | `ERR_MODULE_NOT_FOUND: @doc77/mcp` | `@doc77/core` 静态 import `writeAuditLog` from `@doc77/mcp`，但 `@doc77/mcp` 是 optional peer dep，CI 仅 build core+cli 时未安装 | 静态 import 改为 `async import()` 懒加载，调用点已包 try/catch |
 | 22 | CI `pnpm install` 失败（锁文件污染） | `pnpm install --frozen-lockfile` exit 1，无明确错误信息 | release 分支从 origin/main 创建时，feature 分支的本地修改（`@huggingface/transformers` 等依赖）泄露到 `package.json` 和 `pnpm-lock.yaml`，锁文件引用不存在的包导致安装失败 | 创建 release 分支前 `git stash --all` 确保干净；生成锁文件后 `grep` 验证无意外依赖 |
 | 23 | CI `pnpm install` 失败（ERR_PNPM_IGNORED_BUILDS） | `[ERR_PNPM_IGNORED_BUILDS]` → exit 1 | pnpm 11.13+ `allowBuilds` 值需为 boolean；`pnpm-workspace.yaml` 中 `onnxruntime-node` / `protobufjs` / `sharp` 的值是占位字符串 `"set this to true or false"`，pnpm 无法识别为 true | 改为 boolean `true` |
+| 24 | `gen-latest-yml.cjs` 匹配不到 Linux 安装包 | `No installer found for platform linux` | `path.extname(f).toLowerCase()` 返回 `.appimage`，但 `EXT_PRIORITY.linux` 写的是 `.AppImage`（大写 A/I）。`Array.includes()` 大小写敏感 → 匹配失败 → `process.exit(1)` | `EXT_PRIORITY` 值全部用小写 |
+| 25 | `extract-changelog.cjs` 无匹配条目即 exit 1 | `No CHANGELOG entry found for version X.X.X` | 发布前未更新 CHANGELOG.md；脚本设计上有意要求每个版本都有对应条目 | 发布前必须补写 CHANGELOG.md 条目（见下方预检清单） |
+| 26 | Windows CI 写 `/tmp/release-notes.md` 失败 | `Could not find a part of the path 'D:\tmp\release-notes.md'` | `/tmp/` 是 Unix 路径，Windows 不存在。`release-electron.yml` 跨三平台构建，Windows/macOS 均无 `/tmp/` | 改为工作区相对路径 `release-notes.md`（同时修复 `release-npm.yml` 保持一致性） |
 
 > **发布脚本待改进**：`scripts/publish.sh` 应改为「bump root package.json → sync-version → 逐包 publish」，而非逐包 `npm version`，以免与 `sync-version.cjs` 的单一版本源冲突。
+
+---
+
+## 发布前强制预检清单
+
+**每次执行 `npm publish` 或打 tag 触发 CI 发布前，必须逐项确认：**
+
+| # | 检查项 | 命令/方法 | 失败则 |
+|---|---|---|---|
+| 1 | 无未提交改动 | `git status --short` | 先提交或 stash |
+| 2 | format:check 通过 | `pnpm format:check` | `pnpm format` 修复 |
+| 3 | lint 无 error | `pnpm lint`（warning 可忽略） | 修复 error |
+| 4 | build 全部成功 | `pnpm build` | 修复编译错误 |
+| 5 | test 全部通过 | `pnpm test` | 修复测试失败 |
+| 6 | CHANGELOG.md 有当前版本条目 | 搜索 `\`<version>\`` | 补写条目（参考已有格式） |
+| 7 | `gen-latest-yml.cjs` 扩展名全小写 | `grep -n 'AppImage\|DMG\|exe' packages/electron/scripts/gen-latest-yml.cjs` | 改为小写以匹配 `.toLowerCase()` |
+| 8 | CI workflow 中无 `/tmp/` 硬编码路径 | `grep -rn '/tmp/' .github/workflows/` | 改为工作区相对路径 |
+| 9 | 版本号一致（root = 所有子包） | `node -e "const r=require('./package.json');require('fs').readdirSync('packages').forEach(d=>{try{const p=require('./packages/'+d+'/package.json');if(p.version!==r.version)console.log(d+': '+p.version+' != '+r.version)}catch(e){}})"` | `node scripts/sync-version.cjs` |
+| 10 | 无隐私数据在 staged diff 中 | `git diff --staged \| grep -E 'sk-\|ghp_\|-----BEGIN.*PRIVATE'` | 移除敏感数据 |
+
+### 发布流程（推荐顺序）
+
+```bash
+# 1. 预检
+git status --short
+pnpm format:check && pnpm lint && pnpm build && pnpm test
+
+# 2. 确保 CHANGELOG 已更新
+
+# 3. Bump 版本
+npm version patch --no-git-tag-version   # 或 minor / major
+node scripts/sync-version.cjs
+git add -A && git commit -m "chore: bump version to X.X.X"
+
+# 4. npm 发布（手动，拓扑序）
+for pkg in core mcp ai cli doc77 electron; do
+  cd packages/$pkg && pnpm publish --access public --no-git-checks && cd ../..
+done
+
+# 5. 打 tag 触发 CI（electron 构建 + GitHub Release）
+git tag vX.X.X && git tag electron-vX.X.X
+git push origin main && git push origin vX.X.X electron-vX.X.X
+```
 
 
 ## 依赖安装策略
