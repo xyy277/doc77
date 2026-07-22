@@ -629,7 +629,6 @@ function afterActivate(path, d) {
     editBtnEl.style.display = isEditable ? '' : 'none';
     editBtnEl.classList.toggle('editing-active', editMode);
     editBtnEl.title = editMode ? t('web.preview.exitEditMode') : t('web.preview.edit.editFile');
-    editBtnEl.onclick = toggleEditMode;
   }
   // External editor button — always visible when a file is open
   var extEditBtnEl = document.getElementById('externalEditBtn');

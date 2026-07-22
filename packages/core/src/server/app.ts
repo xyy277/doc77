@@ -2247,21 +2247,27 @@ export function createApp(
 
       const absPath = validatePath(project.path, filePath);
       const platform = process.platform;
+      const isWSL = platform === 'linux' && ((): boolean => {
+        try { return fs.readFileSync('/proc/version', 'utf8').toLowerCase().includes('microsoft'); } catch { return false; }
+      })();
       let command: string;
 
       if (action === 'edit') {
-        // Try VS Code protocol first, fall back to system open
-        const vscodeUrl = `vscode://file/${absPath}`;
-        if (platform === 'darwin') {
-          command = `open "${vscodeUrl}" 2>/dev/null || open -R "${absPath}"`;
+        if (isWSL) {
+          // WSL: use 'code' command (installed by VS Code Remote) or cmd.exe for Windows VS Code
+          command = `code "${absPath}" 2>/dev/null || cmd.exe /c start "vscode://file/${absPath}" 2>/dev/null || explorer.exe /select,"${absPath.replace(/\//g, '\\')}"`;
+        } else if (platform === 'darwin') {
+          command = `open "vscode://file/${absPath}" 2>/dev/null || open -R "${absPath}"`;
         } else if (platform === 'win32') {
-          command = `start "" "${vscodeUrl}" 2>nul || explorer /select,"${absPath}"`;
+          command = `start "" "vscode://file/${absPath}" 2>nul || explorer /select,"${absPath}"`;
         } else {
-          command = `xdg-open "${vscodeUrl}" 2>/dev/null || xdg-open "${path.dirname(absPath)}"`;
+          command = `xdg-open "vscode://file/${absPath}" 2>/dev/null || xdg-open "${path.dirname(absPath)}"`;
         }
       } else {
         // Reveal in file manager
-        if (platform === 'darwin') {
+        if (isWSL) {
+          command = `explorer.exe /select,"${absPath.replace(/\//g, '\\')}"`;
+        } else if (platform === 'darwin') {
           command = `open -R "${absPath}"`;
         } else if (platform === 'win32') {
           command = `explorer /select,"${absPath}"`;
