@@ -49,15 +49,26 @@ export async function registerGalleryRoutes(app: Application, opts: GalleryOptio
   }
 
   if (webDir) {
-    // Dynamic import since express is not a direct dependency of @doc77/gallery
-    // and is expected to be available at runtime via the host application.
-    const { static: staticMiddleware } = await import('express');
-    app.use('/gallery', (req, _res, next) => {
-      // Rewrite /gallery, /gallery/, /gallery/index.html to /gallery/gallery.html
-      if (req.path === '/' || req.path === '/index.html' || req.path === '') {
-        req.url = '/gallery.html';
+    const galleryHtmlPath = path.join(webDir, 'gallery.html');
+
+    // Serve /gallery and /gallery.html as GET routes (reliable across Express versions)
+    app.get('/gallery', (_req, res) => {
+      if (fs.existsSync(galleryHtmlPath)) {
+        res.sendFile(galleryHtmlPath);
+      } else {
+        res.status(404).type('html').send('<h1>Gallery page not found</h1>');
       }
-      next();
-    }, staticMiddleware(webDir) as any);
+    });
+    app.get('/gallery.html', (_req, res) => {
+      if (fs.existsSync(galleryHtmlPath)) {
+        res.sendFile(galleryHtmlPath);
+      } else {
+        res.status(404).type('html').send('<h1>Gallery page not found</h1>');
+      }
+    });
+
+    // Serve static JS/CSS assets under /gallery/
+    const { static: staticMiddleware } = await import('express');
+    app.use('/gallery', staticMiddleware(webDir));
   }
 }
