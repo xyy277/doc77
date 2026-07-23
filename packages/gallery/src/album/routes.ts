@@ -36,7 +36,11 @@ export function createAlbumUpdateHandler() {
       return;
     }
     try {
-      updateAlbum(albumId, req.body);
+      const result = updateAlbum(albumId, req.body);
+      if (result.changes === 0) {
+        res.status(404).json({ error: 'Album not found' });
+        return;
+      }
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -52,7 +56,11 @@ export function createAlbumDeleteHandler() {
       return;
     }
     try {
-      deleteAlbum(albumId);
+      const result = deleteAlbum(albumId);
+      if (result.changes === 0) {
+        res.status(404).json({ error: 'Album not found' });
+        return;
+      }
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
