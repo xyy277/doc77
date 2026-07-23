@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type { Request, Response } from 'express';
 import { getConnection } from '@doc77/core';
 import type { GalleryOptions } from '../types.js';
@@ -28,9 +29,11 @@ export function createThumbnailHandler(opts: GalleryOptions) {
         project.path, filePath, projectId, size, opts.thumbnailsDir
       );
 
+      // Use readFileSync + send instead of sendFile for Express 5 compatibility
+      const buf = fs.readFileSync(result.cachePath);
       res.setHeader('Cache-Control', 'public, max-age=604800');
-      res.setHeader('Content-Type', 'image/webp');
-      res.sendFile(result.cachePath);
+      res.contentType('image/webp');
+      res.send(buf);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
