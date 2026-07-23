@@ -19,21 +19,22 @@ export function createAlbum(name: string, description?: string): Album {
 }
 
 /** Update an album */
-export function updateAlbum(id: number, fields: { name?: string; description?: string }): void {
+export function updateAlbum(id: number, fields: { name?: string; description?: string }): { changes: number } {
   const db = getConnection();
-  if (fields.name !== undefined) {
-    db.prepare('UPDATE gallery_albums SET name = ?, updated_at = datetime(\'now\') WHERE id = ?').run(fields.name, id);
-  }
-  if (fields.description !== undefined) {
-    db.prepare('UPDATE gallery_albums SET description = ?, updated_at = datetime(\'now\') WHERE id = ?').run(fields.description, id);
-  }
+  return db.prepare(`
+    UPDATE gallery_albums
+    SET name = COALESCE(?, name),
+        description = COALESCE(?, description),
+        updated_at = datetime('now')
+    WHERE id = ?
+  `).run(fields.name ?? null, fields.description ?? null, id);
 }
 
 /** Delete an album */
-export function deleteAlbum(id: number): void {
+export function deleteAlbum(id: number): { changes: number } {
   const db = getConnection();
   db.prepare('DELETE FROM gallery_album_items WHERE album_id = ?').run(id);
-  db.prepare('DELETE FROM gallery_albums WHERE id = ?').run(id);
+  return db.prepare('DELETE FROM gallery_albums WHERE id = ?').run(id);
 }
 
 /** Add an item to an album */
