@@ -29,13 +29,20 @@ export function createThumbnailHandler(opts: GalleryOptions) {
         project.path, filePath, projectId, size, opts.thumbnailsDir
       );
 
+      // Check if the generated file actually exists
+      if (!fs.existsSync(result.cachePath)) {
+        res.status(500).json({ error: 'Thumbnail file not found after generation: ' + result.cachePath });
+        return;
+      }
+
       // Use readFileSync + send instead of sendFile for Express 5 compatibility
       const buf = fs.readFileSync(result.cachePath);
       res.setHeader('Cache-Control', 'public, max-age=604800');
       res.contentType('image/webp');
       res.send(buf);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      console.error('[gallery] thumbnail error:', e.message || e);
+      res.status(500).json({ error: e.message || String(e) });
     }
   };
 }
