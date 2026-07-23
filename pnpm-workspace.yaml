@@ -4,6 +4,7 @@ packages:
   - "packages/core"
   - "packages/doc77"
   - "packages/electron"
+  - "packages/gallery"
   - "packages/mcp"
 linkWorkspacePackages: true
 allowBuilds:

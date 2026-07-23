@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@doc77/core": "workspace:^",
+    "@doc77/gallery": "workspace:^",
     "electron-updater": "^6.8.0"
   },
   "devDependencies": {

@@ -10,5 +10,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   splitting: false,
-  external: ['@modelcontextprotocol', '@doc77/core', '@doc77/mcp', '@doc77/ai'],
+  external: ['@modelcontextprotocol', '@doc77/core', '@doc77/mcp', '@doc77/ai', '@doc77/gallery'],
 });

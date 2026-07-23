@@ -43,7 +43,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@doc77/core": "workspace:^"
+    "@doc77/core": "workspace:^",
+    "@doc77/gallery": "workspace:^"
   },
   "peerDependencies": {
     "@doc77/ai": "workspace:^",
