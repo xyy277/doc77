@@ -7,5 +7,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   splitting: false,
-  external: ['@doc77/core', 'sharp', 'exif-reader'],
+  external: ['@doc77/core', 'sharp', 'exif-reader', 'express'],
 });
