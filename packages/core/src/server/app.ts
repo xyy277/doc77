@@ -2297,6 +2297,8 @@ export function createApp(
 
       // Map extension to MIME type
       const mimeTypes: Record<string, string> = {
+        '.html': 'text/html',
+        '.htm': 'text/html',
         '.png': 'image/png',
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg',

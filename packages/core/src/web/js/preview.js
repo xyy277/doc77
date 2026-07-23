@@ -567,7 +567,7 @@ function buildDocHTML(path, d) {
           '<div id="htmlCodeView">' + html + '</div>' +
           '<div id="htmlPreview" style="display:none"><div id="htmlPreviewContainer" style="position:relative;width:100%;min-height:calc(100vh - 160px);display:flex;flex-direction:column">' +
           '<button onclick="toggleHtmlPreviewFullscreen()" style="position:absolute;top:8px;right:8px;z-index:5;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px)" title="' + t('web.preview.htmlToggle.fullscreen') + '">⛶</button>' +
-          '<iframe src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div></div>' +
+          '<iframe data-src="' + d.rawUrl + '" style="flex:1;border:none;border-radius:8px;width:100%;min-height:60vh"></iframe></div></div>' +
           '</div>';
       }
     }
@@ -2107,7 +2107,6 @@ document.addEventListener('fullscreenchange', function () {
 });
 
 // HTML preview toggle
-var _htmlPreviewRawUrl = '';
 window.toggleHtmlPreview = function () {
   var codeView = document.getElementById('htmlCodeView');
   var preview = document.getElementById('htmlPreview');
@@ -2117,6 +2116,13 @@ window.toggleHtmlPreview = function () {
     codeView.style.display = 'none';
     preview.style.display = 'block';
     if (btn) btn.innerHTML = t('web.preview.htmlToggle.code');
+    // Lazy-load the iframe: set src from data-src on first show to avoid
+    // triggering a download when the server responds with octet-stream
+    var iframe = preview.querySelector('iframe[data-src]');
+    if (iframe && !iframe.src) {
+      iframe.src = iframe.dataset.src;
+      iframe.removeAttribute('data-src');
+    }
   } else {
     codeView.style.display = 'block';
     preview.style.display = 'none';
@@ -2351,31 +2357,49 @@ function runPython(code) {
 }
 
 // Initialize Pyodide: lazy-load CDN if needed, then call callback with pyodide instance
+var _pyodideLoading = null; // shared loading promise to avoid duplicate init
 function initPyodide(cb) {
   if (window._pyodide) { cb(window._pyodide); return; }
   var outEl = document.getElementById('codeOutputText');
   if (outEl) outEl.textContent = t('web.preview.codeRun.loadingPyodide');
   var pyodideUrl = window.__VENDOR_READY ? '/vendor/' : 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/';
 
-  // Check if the Pyodide CDN has already loaded its global init function
-  if (typeof window.loadPyodide === 'function') {
-    window.loadPyodide({ indexURL: pyodideUrl }).then(function(py) {
-      window._pyodide = py; cb(py);
-    });
-  } else {
-    var s = document.createElement('script');
-    s.src = pyodideUrl + 'pyodide.js';
-    s.onload = function() {
-      window.loadPyodide({ indexURL: pyodideUrl }).then(function(py) {
-        window._pyodide = py; cb(py);
-      });
-    };
-    s.onerror = function() {
+  // Dedup concurrent initPyodide calls — share one loading promise
+  if (!_pyodideLoading) {
+    _pyodideLoading = new Promise(function (resolve, reject) {
+      if (typeof window.loadPyodide === 'function') {
+        resolve();
+      } else {
+        var s = document.createElement('script');
+        s.src = pyodideUrl + 'pyodide.js';
+        s.onload = function () { resolve(); };
+        s.onerror = function () {
+          var el = document.getElementById('codeOutputText');
+          if (el) el.textContent = t('web.preview.codeRun.pyodideError');
+          reject(new Error('Failed to load pyodide.js script'));
+        };
+        document.head.appendChild(s);
+      }
+    }).then(function () {
+      // loadPyodide may already be defined from a prior init; always call it
+      return window.loadPyodide({ indexURL: pyodideUrl });
+    }).then(function (py) {
+      window._pyodide = py;
+    }).catch(function (err) {
+      // Clear shared promise so retry is possible
+      _pyodideLoading = null;
       var el = document.getElementById('codeOutputText');
-      if (el) el.textContent = t('web.preview.codeRun.pyodideError');
-    };
-    document.head.appendChild(s);
+      if (el) el.textContent = 'Pyodide Error: ' + (err.message || 'Unknown error');
+      console.error('[pyodide] init failed:', err);
+      throw err; // propagate so .then(cb) below won't fire
+    });
   }
+
+  _pyodideLoading.then(function () {
+    if (window._pyodide) cb(window._pyodide);
+  }).catch(function () {
+    // Error already handled above — do nothing
+  });
 }
 
 //══════════ Temp file drag & drop (stateless preview) ══════════

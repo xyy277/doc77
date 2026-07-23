@@ -63,13 +63,13 @@ export const VENDOR_ASSETS: VendorAsset[] = [
     size: '~600KB',
   },
   {
-    name: 'pyodide-pyodide.asm.wasm',
+    name: 'pyodide.asm.wasm',
     url: 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.asm.wasm',
     type: 'wasm',
     size: '~9MB',
   },
   {
-    name: 'pyodide-python_stdlib.zip',
+    name: 'python_stdlib.zip',
     url: 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/python_stdlib.zip',
     type: 'wasm',
     size: '~2MB',
