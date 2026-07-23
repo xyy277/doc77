@@ -3,7 +3,6 @@ import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Application } from 'express';
 import type { GalleryOptions } from '../types.js';
-import { createThumbnailHandler } from './thumbnail.js';
 import { createGalleryListHandler, createTimelineHandler } from './gallery.js';
 import { createExifHandler } from './exif.js';
 import {
@@ -17,24 +16,23 @@ import {
  */
 export async function registerGalleryRoutes(app: Application, opts: GalleryOptions): Promise<void> {
   // --- API Routes ---
-  const thumbHandler = createThumbnailHandler(opts);
-  const galleryList = createGalleryListHandler();
+  const galleryList = createGalleryListHandler(opts.thumbnailsDir);
   const timeline = createTimelineHandler();
   const exif = createExifHandler();
 
   app.get('/api/gallery/:projectId', galleryList);
   app.get('/api/gallery/timeline/:projectId', timeline);
-  app.get('/api/thumbnails/:projectId', (req, res, next) => {
-    thumbHandler(req, res).catch(next);
-  });
   app.get('/api/exif/:projectId', (req, res, next) => {
     exif(req, res).catch(next);
   });
 
-  // Diagnostic route — verify Express routing works
-  app.get('/api/thumbnails/ping', (_req, res) => {
-    res.json({ ok: true, time: Date.now() });
-  });
+  // --- Static thumbnail serving ---
+  // Thumbnails are generated eagerly by the gallery list API and served as static files
+  const { static: staticMiddleware } = await import('express');
+  app.use('/thumbnails', staticMiddleware(opts.thumbnailsDir, {
+    maxAge: '7d',
+    immutable: true,
+  }));
 
   app.get('/api/albums', createAlbumListHandler());
   app.post('/api/albums', createAlbumCreateHandler());

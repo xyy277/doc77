@@ -1,7 +1,8 @@
+import * as crypto from 'node:crypto';
 import type { Request, Response } from 'express';
 import { getConnection, listDir, validatePath } from '@doc77/core';
 import type { GalleryEntry, GalleryListResponse, TimelineGroup } from '../types.js';
-import { getCachedThumbnail } from '../thumbnail/cache.js';
+import { getOrGenerateThumbnail } from '../thumbnail/cache.js';
 
 const IMAGE_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.svg','.webp','.bmp','.ico','.avif']);
 const VIDEO_EXTS = new Set(['.mp4','.webm','.mov','.mkv','.avi','.m4v']);
@@ -18,9 +19,13 @@ function filenameToExtension(name: string): string {
   return dot === -1 ? '' : name.slice(dot).toLowerCase();
 }
 
+function computeSourceHash(projectId: number, relativePath: string, mtime: string, size: number): string {
+  return crypto.createHash('sha256').update(`${projectId}:${relativePath}:${mtime}:${size}`).digest('hex').slice(0, 16);
+}
+
 /** GET /api/gallery/:projectId?path=&sort=name|date|size&order=asc|desc&offset=0&limit=100&types=image,video */
-export function createGalleryListHandler() {
-  return (req: Request, res: Response): void => {
+export function createGalleryListHandler(thumbnailsDir: string) {
+  return async (req: Request, res: Response): Promise<void> => {
     const projectId = parseInt(req.params.projectId, 10);
     const dirPath = (req.query.path as string) || '';
     const sort = (req.query.sort as string) || 'name';
@@ -53,6 +58,14 @@ export function createGalleryListHandler() {
         if (!mediaType || !allowedTypes.has(mediaType)) continue;
 
         const relativePath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
+        const sourceHash = computeSourceHash(projectId, relativePath, entry.modified, entry.size);
+        const hashPrefix = sourceHash.slice(0, 2);
+
+        // Generate thumbnail eagerly (async, fire-and-forget for non-blocking response)
+        if (mediaType === 'image') {
+          getOrGenerateThumbnail(projectPath, relativePath, projectId, 'grid', thumbnailsDir).catch(() => {});
+          getOrGenerateThumbnail(projectPath, relativePath, projectId, 'preview', thumbnailsDir).catch(() => {});
+        }
 
         mediaEntries.push({
           name: entry.name,
@@ -61,8 +74,8 @@ export function createGalleryListHandler() {
           extension: filenameToExtension(entry.name),
           size: entry.size,
           modified: entry.modified,
-          thumbnail_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(relativePath)}&size=grid`,
-          preview_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(relativePath)}&size=preview`,
+          thumbnail_url: `/thumbnails/${hashPrefix}/${sourceHash}_grid.webp`,
+          preview_url: `/thumbnails/${hashPrefix}/${sourceHash}_preview.webp`,
           raw_url: `/api/raw/${projectId}?path=${encodeURIComponent(relativePath)}`,
           width: null,
           height: null,
@@ -146,8 +159,8 @@ export function createTimelineHandler() {
             start_date: `${label}-01`,
             end_date: `${label}-${String(lastDay).padStart(2, '0')}`,
             cover: {
-              thumbnail_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(data.first.source_path)}&size=grid`,
-              preview_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(data.first.source_path)}&size=preview`,
+              thumbnail_url: data.first.grid_path ? `/thumbnails/${data.first.grid_path}` : '',
+              preview_url: data.first.preview_path ? `/thumbnails/${data.first.preview_path}` : '',
             },
           };
         });
