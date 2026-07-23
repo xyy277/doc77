@@ -24,8 +24,17 @@ export async function registerGalleryRoutes(app: Application, opts: GalleryOptio
 
   app.get('/api/gallery/:projectId', galleryList);
   app.get('/api/gallery/timeline/:projectId', timeline);
-  app.get('/api/thumbnails/:projectId', thumbHandler);
-  app.get('/api/exif/:projectId', exif);
+  app.get('/api/thumbnails/:projectId', (req, res, next) => {
+    thumbHandler(req, res).catch(next);
+  });
+  app.get('/api/exif/:projectId', (req, res, next) => {
+    exif(req, res).catch(next);
+  });
+
+  // Diagnostic route — verify Express routing works
+  app.get('/api/thumbnails/ping', (_req, res) => {
+    res.json({ ok: true, time: Date.now() });
+  });
 
   app.get('/api/albums', createAlbumListHandler());
   app.post('/api/albums', createAlbumCreateHandler());

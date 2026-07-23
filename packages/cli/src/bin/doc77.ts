@@ -335,7 +335,7 @@ async function main() {
       if (galleryAvailable) {
         try {
           const { registerGalleryRoutes } = await import('@doc77/gallery');
-          registerGalleryRoutes(app, {
+          await registerGalleryRoutes(app, {
             thumbnailsDir: path.join(os.homedir(), '.doc77', 'thumbnails'),
           });
         } catch { /* Gallery init failed */ }
