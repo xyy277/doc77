@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doc77 Gallery</title>
+    <!-- Tailwind CSS Setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons for elegant, modern iconography -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        doc77: {
+                            50: '#f5f7fa',
+                            100: '#eef2f6',
+                            200: '#e1e7ef',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                            primary: '#3b82f6', // Bright blue for primary actions
+                            accent: '#60a5fa'
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'glow': '0 0 15px rgba(59, 130, 246, 0.5)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            background-color: #0f172a; /* doc77-900 */
+            color: #f8fafc;
+        }
+
+        /* Custom Scrollbar for dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5); /* doc77-800 with opacity */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155; /* doc77-700 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569; /* doc77-600 */
+        }
+
+        /* Hide scrollbar but allow scrolling for specific areas */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+
+        /* Masonry Grid Setup */
+        .masonry-grid {
+            columns: 2;
+            column-gap: 1rem;
+        }
+        @media (min-width: 640px) { .masonry-grid { columns: 3; } }
+        @media (min-width: 1024px) { .masonry-grid { columns: 4; } }
+        @media (min-width: 1280px) { .masonry-grid { columns: 5; } }
+        @media (min-width: 1536px) { .masonry-grid { columns: 6; } }
+
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 1rem;
+        }
+
+        /* Smooth transitions for interactions */
+        .image-card-hover {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+        }
+        .image-card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Image overlay gradient */
+        .img-overlay {
+            background: linear-gradient(to top, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0) 50%);
+        }
+
+        /* Select mode styling */
+        .select-mode-active .gallery-item-checkbox {
+            display: flex;
+        }
+        .gallery-item.selected .img-wrapper::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(59, 130, 246, 0.2);
+            border: 2px solid #3b82f6;
+            border-radius: 0.5rem;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body class="h-screen w-full overflow-hidden flex flex-col font-sans text-sm">
+
+    <!-- Top Header / App Bar -->
+    <header class="h-14 shrink-0 bg-doc77-900 border-b border-doc77-800 flex items-center justify-between px-4 z-20">
+        <!-- Left: Branding & Context -->
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-doc77-300 hover:text-white transition-colors cursor-pointer" onclick="goBackToDashboard()">
+                <i class="ph ph-arrow-left text-lg"></i>
+                <div class="flex items-center gap-2 px-2 py-1 bg-doc77-800 rounded-md">
+                    <span class="font-bold text-white text-base tracking-tight flex items-center gap-1">
+                        <span class="bg-blue-600 text-white rounded px-1.5 py-0.5 text-xs font-black">77</span>
+                        Doc77
+                    </span>
+                </div>
+            </div>
+
+            <!-- Breadcrumbs / Project Name -->
+            <div class="hidden sm:flex items-center text-doc77-400">
+                <i class="ph ph-caret-right text-xs mx-1"></i>
+                <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-doc77-800 cursor-pointer transition-colors text-doc77-200">
+                    <i class="ph-fill ph-folder text-yellow-500"></i>
+                    <span class="font-medium">My Photos</span>
+                </div>
+                <i class="ph ph-caret-right text-xs mx-1"></i>
+                <span class="text-doc77-300 font-medium">Gallery</span>
+            </div>
+        </div>
+
+        <!-- Center: Search (Desktop) -->
+        <div class="hidden md:flex flex-1 max-w-md mx-8 relative group">
+            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-doc77-500 group-focus-within:text-doc77-300"></i>
+            <input type="text" placeholder="Search photos, dates, tags..."
+                   class="w-full bg-doc77-950 border border-doc77-700 text-doc77-100 placeholder-doc77-500 rounded-full py-1.5 pl-9 pr-4 focus:outline-none focus:border-doc77-500 focus:bg-doc77-800 transition-all text-sm shadow-inner">
+            <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 hidden group-focus-within:flex text-doc77-500 text-xs">
+                <kbd class="font-sans border border-doc77-600 rounded px-1">esc</kbd>
+            </div>
+        </div>
+
+        <!-- Right: Actions & Tools -->
+        <div class="flex items-center gap-1 sm:gap-2">
+            <!-- View Toggles -->
+            <div class="flex bg-doc77-950 rounded-lg p-0.5 border border-doc77-800">
+                <button class="p-1.5 rounded-md bg-doc77-700 text-white shadow-sm" title="Grid View">
+                    <i class="ph ph-squares-four text-lg"></i>
+                </button>
+                <button class="p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors" title="List View">
+                    <i class="ph ph-list-dashes text-lg"></i>
+                </button>
+            </div>
+
+            <div class="w-px h-6 bg-doc77-800 mx-1"></div>
+
+            <button class="p-2 text-doc77-400 hover:text-white rounded-full hover:bg-doc77-800 transition-colors relative" title="Sort & Filter">
+                <i class="ph ph-faders text-lg"></i>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full border border-doc77-900"></span>
+            </button>
+            <button class="p-2 text-doc77-400 hover:text-white rounded-full hover:bg-doc77-800 transition-colors" title="Upload Media" onclick="triggerUpload()">
+                <i class="ph ph-upload-simple text-lg"></i>
+            </button>
+
+            <button class="ml-2 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium transition-colors shadow-glow text-sm" onclick="toggleSelectMode()" id="btn-select">
+                <i class="ph ph-check-circle"></i>
+                <span class="hidden sm:inline">Select</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Sidebar Navigation -->
+        <aside class="w-60 bg-doc77-900/50 border-r border-doc77-800 flex flex-col shrink-0 transition-all duration-300 hidden md:flex" id="sidebar">
+            <div class="flex-1 overflow-y-auto py-4 px-3 no-scrollbar space-y-6">
+
+                <!-- Main Nav -->
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 font-medium">
+                        <i class="ph-fill ph-image text-xl"></i>
+                        Photos
+                        <span class="ml-auto text-xs bg-blue-500/20 px-2 py-0.5 rounded-full">All</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group">
+                        <i class="ph ph-clock-counter-clockwise text-xl group-hover:text-doc77-200"></i>
+                        Timeline
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group">
+                        <i class="ph ph-video-camera text-xl group-hover:text-doc77-200"></i>
+                        Videos
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group">
+                        <i class="ph ph-star text-xl group-hover:text-yellow-400"></i>
+                        Favorites
+                    </a>
+                </nav>
+
+                <!-- Folders -->
+                <div>
+                    <div class="flex items-center justify-between px-3 mb-2 group cursor-pointer">
+                        <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-400 transition-colors">Folders</h3>
+                        <i class="ph ph-caret-down text-doc77-500"></i>
+                    </div>
+                    <ul class="space-y-0.5 text-sm ml-2 border-l border-doc77-800 pl-2">
+                        <li>
+                            <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors">
+                                <i class="ph-fill ph-folder text-yellow-500/80"></i>
+                                Camera Roll
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors">
+                                <i class="ph-fill ph-folder text-yellow-500/80"></i>
+                                Screenshots
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors">
+                                <i class="ph-fill ph-folder text-yellow-500/80"></i>
+                                Downloads
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Albums -->
+                <div>
+                    <div class="flex items-center justify-between px-3 mb-2 group cursor-pointer">
+                        <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-400 transition-colors">Albums</h3>
+                        <button class="text-doc77-500 hover:text-white transition-colors" title="New Album"><i class="ph ph-plus"></i></button>
+                    </div>
+                    <ul class="space-y-1">
+                        <li>
+                            <a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-300 hover:bg-doc77-800 transition-colors">
+                                <div class="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0 shadow-sm">
+                                    <i class="ph-fill ph-mountains text-white text-xs"></i>
+                                </div>
+                                <span class="truncate flex-1">Japan Trip 2024</span>
+                                <span class="text-xs text-doc77-500">142</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-300 hover:bg-doc77-800 transition-colors">
+                                <div class="w-6 h-6 rounded bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm">
+                                    <i class="ph-fill ph-cat text-white text-xs"></i>
+                                </div>
+                                <span class="truncate flex-1">Pets</span>
+                                <span class="text-xs text-doc77-500">58</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-300 hover:bg-doc77-800 transition-colors">
+                                <div class="w-6 h-6 rounded bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+                                    <i class="ph-fill ph-monitor text-white text-xs"></i>
+                                </div>
+                                <span class="truncate flex-1">Wallpapers</span>
+                                <span class="text-xs text-doc77-500">24</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Storage Info -->
+            <div class="p-4 border-t border-doc77-800 bg-doc77-900/80">
+                <div class="flex items-center justify-between text-xs mb-1">
+                    <span class="text-doc77-300 font-medium">Storage</span>
+                    <span class="text-doc77-400">12.3 GB / 50 GB</span>
+                </div>
+                <div class="h-1.5 w-full bg-doc77-800 rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 rounded-full" style="width: 25%"></div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col bg-[#0b1121] relative overflow-hidden">
+
+            <!-- Selection Toolbar (Hidden by default) -->
+            <div id="selection-toolbar" class="absolute top-0 left-0 right-0 bg-blue-600 text-white px-4 py-3 flex items-center justify-between z-10 transform -translate-y-full transition-transform duration-300 shadow-lg">
+                <div class="flex items-center gap-4">
+                    <button class="text-white hover:bg-blue-700 p-1 rounded transition-colors" onclick="toggleSelectMode()">
+                        <i class="ph ph-x text-xl"></i>
+                    </button>
+                    <span class="font-semibold text-lg"><span id="selected-count">0</span> Selected</span>
+                    <button class="text-blue-200 hover:text-white text-sm" onclick="selectAll()">Select All</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Add to Album"><i class="ph ph-plus-circle text-xl"></i></button>
+                    <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Download"><i class="ph ph-download-simple text-xl"></i></button>
+                    <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Share"><i class="ph ph-share-network text-xl"></i></button>
+                    <div class="w-px h-5 bg-blue-400/50 mx-1"></div>
+                    <button class="p-2 text-red-200 hover:bg-red-500 hover:text-white rounded-md transition-colors" title="Delete"><i class="ph ph-trash text-xl"></i></button>
+                </div>
+            </div>
+
+            <!-- Scrollable Grid Area -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-6" id="gallery-container">
+
+                <!-- Group: March 2024 -->
+                <div class="mb-8">
+                    <div class="sticky top-0 bg-[#0b1121]/95 backdrop-blur-sm z-10 py-2 mb-4 flex items-center justify-between border-b border-doc77-800/50">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-bold text-doc77-100">March 2024</h2>
+                            <span class="text-doc77-500 text-sm font-medium bg-doc77-800/50 px-2 py-0.5 rounded-full">12 items</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button class="text-doc77-400 hover:text-doc77-200 p-1"><i class="ph ph-dots-three text-xl"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Masonry Grid -->
+                    <div class="masonry-grid" id="grid-mar-2024">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Group: February 2024 -->
+                <div class="mb-8">
+                    <div class="sticky top-0 bg-[#0b1121]/95 backdrop-blur-sm z-10 py-2 mb-4 flex items-center justify-between border-b border-doc77-800/50">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-bold text-doc77-100">February 2024</h2>
+                            <span class="text-doc77-500 text-sm font-medium bg-doc77-800/50 px-2 py-0.5 rounded-full">8 items</span>
+                        </div>
+                    </div>
+
+                    <div class="masonry-grid" id="grid-feb-2024">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Loading indicator -->
+                <div class="py-8 flex flex-col items-center justify-center text-doc77-500 space-y-3">
+                    <i class="ph ph-spinner-gap animate-spin text-2xl text-blue-500"></i>
+                    <span class="text-sm">Loading more memories...</span>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Lightbox (Hidden by default) -->
+    <div id="lightbox" class="fixed inset-0 z-50 bg-black/95 hidden flex-col opacity-0 transition-opacity duration-300">
+
+        <!-- Lightbox Toolbar -->
+        <div class="flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent absolute top-0 left-0 right-0 z-10 transition-opacity duration-300" id="lightbox-toolbar">
+            <div class="flex items-center gap-3">
+                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" onclick="closeLightbox()">
+                    <i class="ph ph-arrow-left text-xl"></i>
+                </button>
+                <div>
+                    <div class="text-white font-medium drop-shadow-md" id="lb-filename">IMG_8472.jpg</div>
+                    <div class="text-doc77-300 text-xs drop-shadow-md" id="lb-date">Mar 15, 2024 • 14:30</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="text-white hover:text-blue-400 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Favorite">
+                    <i class="ph ph-star text-xl"></i>
+                </button>
+                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all hidden sm:block" title="Zoom In">
+                    <i class="ph ph-magnifying-glass-plus text-xl"></i>
+                </button>
+                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Download">
+                    <i class="ph ph-download-simple text-xl"></i>
+                </button>
+                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Info" onclick="toggleInfoPanel()">
+                    <i class="ph ph-info text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Lightbox Content Area -->
+        <div class="flex-1 flex items-center justify-center relative overflow-hidden" id="lightbox-content-area">
+            <!-- Previous Button -->
+            <button class="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-3 bg-black/20 hover:bg-black/50 rounded-full backdrop-blur-sm transition-all z-10 hidden sm:flex" onclick="navLightbox(-1)">
+                <i class="ph ph-caret-left text-3xl"></i>
+            </button>
+
+            <!-- Main Image -->
+            <img src="" alt="Preview" id="lb-image" class="max-w-full max-h-full object-contain select-none transition-transform duration-200">
+
+            <!-- Next Button -->
+            <button class="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-3 bg-black/20 hover:bg-black/50 rounded-full backdrop-blur-sm transition-all z-10 hidden sm:flex" onclick="navLightbox(1)">
+                <i class="ph ph-caret-right text-3xl"></i>
+            </button>
+        </div>
+
+        <!-- Info Sidebar (Right) -->
+        <div id="lb-info-panel" class="absolute top-0 right-0 bottom-0 w-80 bg-doc77-900 border-l border-doc77-800 transform translate-x-full transition-transform duration-300 overflow-y-auto no-scrollbar shadow-2xl flex flex-col z-20">
+            <div class="p-4 border-b border-doc77-800 flex items-center justify-between sticky top-0 bg-doc77-900 z-10">
+                <h3 class="font-semibold text-doc77-100 flex items-center gap-2">
+                    <i class="ph ph-info"></i> Details
+                </h3>
+                <button class="text-doc77-400 hover:text-white" onclick="toggleInfoPanel()">
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+
+            <div class="p-4 space-y-6">
+                <!-- File Details -->
+                <div class="space-y-3">
+                    <h4 class="text-xs uppercase tracking-wider text-doc77-500 font-semibold">File Info</h4>
+                    <div class="bg-doc77-950 rounded-lg p-3 space-y-2 text-sm border border-doc77-800/50">
+                        <div class="flex justify-between">
+                            <span class="text-doc77-400">Name</span>
+                            <span class="text-doc77-100 font-medium break-all text-right ml-4">DSC_0842.JPG</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-doc77-400">Date</span>
+                            <span class="text-doc77-100">Mar 15, 2024</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-doc77-400">Size</span>
+                            <span class="text-doc77-100">4.2 MB</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-doc77-400">Resolution</span>
+                            <span class="text-doc77-100">6000 x 4000</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Camera EXIF -->
+                <div class="space-y-3">
+                    <h4 class="text-xs uppercase tracking-wider text-doc77-500 font-semibold">Camera EXIF</h4>
+                    <div class="bg-doc77-950 rounded-lg p-3 space-y-3 text-sm border border-doc77-800/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded bg-doc77-800 flex items-center justify-center shrink-0">
+                                <i class="ph ph-camera text-doc77-300"></i>
+                            </div>
+                            <div>
+                                <div class="text-doc77-100 font-medium">Sony ILCE-7M4</div>
+                                <div class="text-xs text-doc77-400">FE 24-70mm F2.8 GM II</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-doc77-800/50 text-xs">
+                            <div class="bg-doc77-900 rounded p-1.5 text-center">
+                                <div class="text-doc77-500">ISO</div>
+                                <div class="text-doc77-200 font-medium mt-0.5">400</div>
+                            </div>
+                            <div class="bg-doc77-900 rounded p-1.5 text-center">
+                                <div class="text-doc77-500">Aperture</div>
+                                <div class="text-doc77-200 font-medium mt-0.5">f/2.8</div>
+                            </div>
+                            <div class="bg-doc77-900 rounded p-1.5 text-center">
+                                <div class="text-doc77-500">Shutter</div>
+                                <div class="text-doc77-200 font-medium mt-0.5">1/250s</div>
+                            </div>
+                            <div class="bg-doc77-900 rounded p-1.5 text-center">
+                                <div class="text-doc77-500">Focal Length</div>
+                                <div class="text-doc77-200 font-medium mt-0.5">35mm</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location placeholder -->
+                <div class="space-y-3">
+                    <h4 class="text-xs uppercase tracking-wider text-doc77-500 font-semibold">Location</h4>
+                    <div class="h-32 bg-doc77-950 rounded-lg border border-doc77-800/50 flex flex-col items-center justify-center text-doc77-500 relative overflow-hidden">
+                        <i class="ph ph-map-pin text-2xl mb-1 z-10"></i>
+                        <span class="text-xs z-10">No GPS data</span>
+                        <!-- Fake map background -->
+                        <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 10px 10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Project Context ---
+        // Read project from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentProjectId = urlParams.get('project');
+
+        // --- API Fetch Functions ---
+        async function fetchGallery(projectId, path = '', offset = 0) {
+          const resp = await fetch(`/api/gallery/${projectId}?path=${encodeURIComponent(path)}&offset=${offset}&limit=100`);
+          return resp.json();
+        }
+
+        async function fetchTimeline(projectId, path = '') {
+          const resp = await fetch(`/api/gallery/timeline/${projectId}?path=${encodeURIComponent(path)}`);
+          return resp.json();
+        }
+
+        // --- Fallback Mock Data (for standalone preview without backend) ---
+        const imageCategories = [
+            'nature', 'architecture', 'people', 'city', 'technology', 'food'
+        ];
+
+        function getRandomDimension() {
+            // Generate heights between 300 and 800 to create varied masonry look
+            return Math.floor(Math.random() * (800 - 300 + 1)) + 300;
+        }
+
+        // Generate mock media items (used when API is not available)
+        const mockMedia = Array.from({ length: 40 }).map((_, i) => {
+            const isVideo = Math.random() > 0.85; // 15% chance to be a video
+            const height = getRandomDimension();
+            const width = isVideo ? 640 : 600; // standard width for unsplash placeholder
+            const cat = imageCategories[Math.floor(Math.random() * imageCategories.length)];
+
+            // Generate fake filename
+            const id = Math.random().toString(36).substring(7).toUpperCase();
+            const filename = isVideo ? `VID_${id}.mp4` : `IMG_${id}.jpg`;
+
+            // Assign to group
+            const group = i < 24 ? 'mar-2024' : 'feb-2024';
+
+            return {
+                id: `media-${i}`,
+                type: isVideo ? 'video' : 'image',
+                url: `https://source.unsplash.com/random/${width}x${height}/?${cat}&sig=${i}`,
+                thumbnail: `https://source.unsplash.com/random/400x${Math.floor((height/width)*400)}/?${cat}&sig=${i}`, // smaller for grid
+                filename: filename,
+                group: group,
+                aspectRatio: width / height,
+                duration: isVideo ? '0:45' : null
+            };
+        });
+
+        // --- State Management ---
+        let state = {
+            selectMode: false,
+            selectedIds: new Set(),
+            currentLightboxIndex: -1,
+            lightboxItems: [] // flattened list for navigation
+        };
+
+        // --- Rendering Logic ---
+
+        function createMediaCard(item) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'masonry-item gallery-item relative rounded-lg overflow-hidden group cursor-pointer bg-doc77-800 image-card-hover border border-doc77-700/50';
+            wrapper.dataset.id = item.id;
+
+            // Container to maintain aspect ratio while image loads
+            const imgWrapper = document.createElement('div');
+            imgWrapper.className = 'img-wrapper relative w-full';
+            // Set padding-bottom based on aspect ratio to prevent layout shifts
+            imgWrapper.style.paddingBottom = `${(1/item.aspectRatio) * 100}%`;
+
+            // The image (or video cover)
+            const img = document.createElement('img');
+            img.src = item.thumbnail;
+            img.className = 'absolute top-0 left-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105';
+            img.loading = 'lazy';
+            img.alt = item.filename;
+
+            // Overlay for info (Gradient bottom)
+            const overlay = document.createElement('div');
+            overlay.className = 'absolute inset-0 img-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3';
+
+            // Filename text
+            const nameText = document.createElement('span');
+            nameText.className = 'text-white text-xs font-medium truncate drop-shadow-md';
+            nameText.textContent = item.filename;
+
+            overlay.appendChild(nameText);
+
+            // Video indicator overlay
+            if (item.type === 'video') {
+                const vidBadge = document.createElement('div');
+                vidBadge.className = 'absolute top-2 right-2 bg-black/60 backdrop-blur-md rounded-md px-1.5 py-0.5 flex items-center gap-1 text-[10px] text-white font-medium shadow-sm border border-white/10';
+                vidBadge.innerHTML = `<i class="ph-fill ph-play-circle text-doc77-200"></i> ${item.duration}`;
+                imgWrapper.appendChild(vidBadge);
+            }
+
+            // Selection Checkbox (Hidden initially, shown on hover or select mode)
+            const checkbox = document.createElement('div');
+            checkbox.className = 'gallery-item-checkbox absolute top-2 left-2 w-5 h-5 rounded-full border-2 border-white/70 bg-black/20 backdrop-blur-sm items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all z-10';
+            // Specific styling when checked via class 'selected' on wrapper handled in CSS mostly
+            checkbox.innerHTML = `<i class="ph-bold ph-check text-xs opacity-0 scale-50 transition-all"></i>`;
+
+            // Assembly
+            imgWrapper.appendChild(img);
+            imgWrapper.appendChild(overlay);
+            imgWrapper.appendChild(checkbox);
+            wrapper.appendChild(imgWrapper);
+
+            // Event Listeners
+            wrapper.addEventListener('click', (e) => handleItemClick(e, item));
+
+            return wrapper;
+        }
+
+        function renderGrid() {
+            const marGrid = document.getElementById('grid-mar-2024');
+            const febGrid = document.getElementById('grid-feb-2024');
+
+            marGrid.innerHTML = '';
+            febGrid.innerHTML = '';
+            state.lightboxItems = [];
+
+            mockMedia.forEach((item, index) => {
+                state.lightboxItems.push(item);
+                const card = createMediaCard(item);
+                if(item.group === 'mar-2024') marGrid.appendChild(card);
+                else febGrid.appendChild(card);
+            });
+        }
+
+        // --- Interaction Logic ---
+
+        function handleItemClick(e, item) {
+            const cardElement = e.currentTarget;
+
+            if (state.selectMode) {
+                // In select mode, click always toggles selection
+                toggleSelection(item.id, cardElement);
+                return;
+            }
+
+            // Check if user clicked the checkbox specifically while NOT in select mode
+            if (e.target.closest('.gallery-item-checkbox')) {
+                // Clicking checkbox turns on select mode
+                if (!state.selectMode) {
+                    toggleSelectMode();
+                }
+                toggleSelection(item.id, cardElement);
+                return;
+            }
+
+            // Normal click opens lightbox
+            openLightbox(item);
+        }
+
+        // --- Selection Mode ---
+
+        function toggleSelectMode() {
+            state.selectMode = !state.selectMode;
+            const container = document.getElementById('gallery-container');
+            const toolbar = document.getElementById('selection-toolbar');
+            const btnSelect = document.getElementById('btn-select');
+
+            if (state.selectMode) {
+                container.classList.add('select-mode-active');
+                toolbar.classList.remove('-translate-y-full');
+                btnSelect.classList.replace('bg-blue-600', 'bg-doc77-700');
+                btnSelect.innerHTML = `<i class="ph ph-x"></i><span class="hidden sm:inline">Cancel</span>`;
+            } else {
+                container.classList.remove('select-mode-active');
+                toolbar.classList.add('-translate-y-full');
+                btnSelect.classList.replace('bg-doc77-700', 'bg-blue-600');
+                btnSelect.innerHTML = `<i class="ph ph-check-circle"></i><span class="hidden sm:inline">Select</span>`;
+                // Clear selections
+                state.selectedIds.clear();
+                updateSelectionUI();
+            }
+        }
+
+        function toggleSelection(id, element) {
+            if (state.selectedIds.has(id)) {
+                state.selectedIds.delete(id);
+            } else {
+                state.selectedIds.add(id);
+            }
+            updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            document.getElementById('selected-count').innerText = state.selectedIds.size;
+
+            document.querySelectorAll('.gallery-item').forEach(el => {
+                const id = el.dataset.id;
+                const checkboxIcon = el.querySelector('.gallery-item-checkbox i');
+                const checkbox = el.querySelector('.gallery-item-checkbox');
+
+                if (state.selectedIds.has(id)) {
+                    el.classList.add('selected');
+                    checkbox.classList.replace('border-white/70', 'border-blue-500');
+                    checkbox.classList.replace('bg-black/20', 'bg-blue-500');
+                    checkbox.classList.remove('opacity-0', 'group-hover:opacity-100'); // Keep visible
+                    checkboxIcon.classList.remove('opacity-0', 'scale-50');
+                } else {
+                    el.classList.remove('selected');
+                    checkbox.classList.replace('border-blue-500', 'border-white/70');
+                    checkbox.classList.replace('bg-blue-500', 'bg-black/20');
+                    // Reset visibility based on hover state handled by CSS unless select mode is active
+                    if(!state.selectMode) {
+                        checkbox.classList.add('opacity-0', 'group-hover:opacity-100');
+                    }
+                    checkboxIcon.classList.add('opacity-0', 'scale-50');
+                }
+            });
+        }
+
+        function selectAll() {
+            mockMedia.forEach(item => state.selectedIds.add(item.id));
+            updateSelectionUI();
+        }
+
+        // --- Lightbox Logic ---
+
+        function openLightbox(item) {
+            const idx = state.lightboxItems.findIndex(i => i.id === item.id);
+            if (idx === -1) return;
+
+            state.currentLightboxIndex = idx;
+            updateLightboxView();
+
+            const lb = document.getElementById('lightbox');
+            lb.classList.remove('hidden');
+            // Small delay to allow display:block to apply before changing opacity for transition
+            requestAnimationFrame(() => {
+                lb.classList.remove('opacity-0');
+                lb.classList.add('opacity-100');
+            });
+
+            // Hide info panel initially
+            const infoPanel = document.getElementById('lb-info-panel');
+            infoPanel.classList.add('translate-x-full');
+
+            document.addEventListener('keydown', handleLightboxKeydown);
+        }
+
+        function closeLightbox() {
+            const lb = document.getElementById('lightbox');
+            lb.classList.remove('opacity-100');
+            lb.classList.add('opacity-0');
+
+            setTimeout(() => {
+                lb.classList.add('hidden');
+                document.getElementById('lb-image').src = ''; // clear memory
+            }, 300); // match transition duration
+
+            document.removeEventListener('keydown', handleLightboxKeydown);
+        }
+
+        function updateLightboxView() {
+            const item = state.lightboxItems[state.currentLightboxIndex];
+            const imgEl = document.getElementById('lb-image');
+
+            // Set source (in real app, might use higher res URL here)
+            imgEl.src = item.url;
+
+            document.getElementById('lb-filename').innerText = item.filename;
+            // Fake date based on group
+            const dateStr = item.group === 'mar-2024' ? 'Mar 15, 2024' : 'Feb 20, 2024';
+            document.getElementById('lb-date').innerText = `${dateStr} • ${item.type === 'video' ? 'Video' : 'Photo'}`;
+        }
+
+        function navLightbox(direction) {
+            let newIdx = state.currentLightboxIndex + direction;
+            if (newIdx < 0) newIdx = state.lightboxItems.length - 1; // loop
+            if (newIdx >= state.lightboxItems.length) newIdx = 0;
+
+            state.currentLightboxIndex = newIdx;
+
+            // Simple fade effect
+            const imgEl = document.getElementById('lb-image');
+            imgEl.style.opacity = '0.5';
+            imgEl.style.transform = `scale(0.98) translateX(${direction * 20}px)`;
+
+            setTimeout(() => {
+                updateLightboxView();
+                imgEl.style.opacity = '1';
+                imgEl.style.transform = 'scale(1) translateX(0)';
+            }, 150);
+        }
+
+        function toggleInfoPanel() {
+            const panel = document.getElementById('lb-info-panel');
+            panel.classList.toggle('translate-x-full');
+        }
+
+        function handleLightboxKeydown(e) {
+            if (e.key === 'Escape') closeLightbox();
+            else if (e.key === 'ArrowRight') navLightbox(1);
+            else if (e.key === 'ArrowLeft') navLightbox(-1);
+            else if (e.key === 'i' || e.key === 'I') toggleInfoPanel();
+        }
+
+        // --- Utility Functions ---
+        function goBackToDashboard() {
+            // Placeholder for app navigation
+            console.log("Navigating to dashboard...");
+            const header = document.querySelector('header');
+            header.style.backgroundColor = '#1e293b';
+            setTimeout(()=> header.style.backgroundColor = '', 200);
+        }
+
+        function triggerUpload() {
+            // Placeholder
+            console.log("Triggering upload dialog...");
+        }
+
+        // --- Initialization ---
+        window.onload = () => {
+            renderGrid();
+        };
+
+    </script>
+</body>
+</html>
