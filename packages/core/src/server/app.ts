@@ -66,9 +66,9 @@ async function auditLog(entry: Record<string, unknown>) {
 }
 
 // Module capabilities — set by CLI layer at startup
-let _capabilities = { ai: false, mcp: false, translate: false };
-export function setCapabilities(caps: { ai: boolean; mcp: boolean; translate: boolean }) {
-  _capabilities = caps;
+let _capabilities = { ai: false, mcp: false, translate: false, gallery: false };
+export function setCapabilities(caps: { ai: boolean; mcp: boolean; translate: boolean; gallery: boolean }) {
+  _capabilities = { ..._capabilities, ...caps };
 }
 
 // Server info — populated by CLI layer at startup for share link construction
