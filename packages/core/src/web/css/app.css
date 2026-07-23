@@ -982,6 +982,27 @@ body {
   opacity: 1;
 }
 
+.card-compact .card-gallery-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-light-bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.card-compact .card-gallery-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ═══ List View ═══ */
 .project-grid.list-view {
   grid-template-columns: 1fr;

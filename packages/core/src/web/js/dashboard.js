@@ -180,6 +180,10 @@ function renderCompactCard(p, inFavorites) {
       '<button class="btn-icon" onclick="event.stopPropagation();startEdit(' + p.id + ')" title="' + t('web.dashboard.edit') + '">✏️</button>' +
       '<button class="btn-icon" onclick="event.stopPropagation();doDelete(' + p.id + ')" title="' + t('web.dashboard.delete') + '">🗑</button>' +
     '</div>' +
+    // Gallery button (shown when gallery capability is available)
+    (window.__doc77_caps_gallery
+      ? '<a href="/gallery?project=' + p.id + '" class="card-gallery-btn" onclick="event.stopPropagation()"><i class="ph ph-image"></i> Gallery</a>'
+      : '') +
     // Inline edit form (hidden by default)
     '<div class="edit-form hidden" id="editForm-' + p.id + '" onclick="event.stopPropagation()">' +
       '<input id="editName-' + p.id + '" value="' + escAttr(p.name) + '" placeholder="' + t('web.dashboard.projectName') + '" class="input" style="width:100%;margin-bottom:8px">' +

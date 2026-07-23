@@ -46,10 +46,17 @@ window.__doc77_i18n_ready = fetch('/api/i18n?' + (function () {
 window.__doc77_caps_ai = false;
 window.__doc77_caps_mcp = false;
 window.__doc77_caps_translate = false;
+window.__doc77_caps_gallery = false;
 fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c){
   window.__doc77_caps_ai = c.ai;
   window.__doc77_caps_mcp = c.mcp;
   window.__doc77_caps_translate = c.translate;
+  window.__doc77_caps_gallery = c.gallery;
+  // Show gallery nav link if capability is present
+  var galleryLink = document.getElementById('headerGalleryLink');
+  if (galleryLink) {
+    galleryLink.style.display = c.gallery ? '' : 'none';
+  }
 }).catch(function(){});
 
 //══════════ Version badge + Update check ══════════
