@@ -169,16 +169,16 @@ function renderCompactCard(p, inFavorites) {
 
   return '<div class="card card-compact animate-in" data-id="' + p.id + '" onclick="openProject(' + p.id + ')">' +
     '<button class="' + starClass + '" data-id="' + p.id + '" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')">' + starIcon + '</button>' +
+    // Gallery button — top-right corner
+    (window.__doc77_caps_gallery
+      ? '<a href="/gallery?project=' + p.id + '" class="card-gallery-btn" onclick="event.stopPropagation()" title="Gallery">🖼️</a>'
+      : '') +
     '<div class="card-icon">' + obsidianIcon + '</div>' +
     '<div class="card-body">' +
       '<div class="card-name">' + esc(p.name) + obsidianBadge + '</div>' +
       '<div class="card-path" title="' + escAttr(p.path) + '">' + esc(shortPath(p.path)) + '</div>' +
       '<div class="card-date">' + dateLabel + '</div>' +
       tagsHtml +
-    // Gallery button (shown when gallery capability is available)
-    (window.__doc77_caps_gallery
-      ? '<a href="/gallery?project=' + p.id + '" class="card-gallery-btn" onclick="event.stopPropagation()">🖼️ Gallery</a>'
-      : '') +
     '</div>' +
     '<div class="card-actions">' +
       '<button class="btn-icon" onclick="event.stopPropagation();startEdit(' + p.id + ')" title="' + t('web.dashboard.edit') + '">✏️</button>' +

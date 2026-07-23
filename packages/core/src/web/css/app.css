@@ -894,6 +894,7 @@ body {
   align-content: start;
 }
 .card-compact {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -983,24 +984,27 @@ body {
 }
 
 .card-compact .card-gallery-btn {
-  display: inline-flex;
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--accent);
-  background: var(--accent-light-bg);
-  border: 1px solid var(--accent);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
   border-radius: 6px;
   text-decoration: none;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+  z-index: 2;
+}
+.card-compact:hover .card-gallery-btn {
+  opacity: 1;
 }
 .card-compact .card-gallery-btn:hover {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-light-bg);
 }
 
 /* ═══ List View ═══ */

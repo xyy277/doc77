@@ -598,6 +598,7 @@
   "web.index.registerCta.button": "➕ Register project",
   "web.index.recent.label": "🕐 Recent",
   "web.index.favorites.title": "⭐ Favorites",
+  "web.index.gallery": "🖼️ Gallery",
   "web.index.projects.title": "📂 All projects",
   "web.index.projects.searchPlaceholder": "🔍 Search projects...",
   "web.index.projects.sortRecent": "Recent",
