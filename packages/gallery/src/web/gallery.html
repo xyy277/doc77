@@ -138,12 +138,12 @@
             <!-- Breadcrumbs / Project Name -->
             <div class="hidden sm:flex items-center text-doc77-400">
                 <i class="ph ph-caret-right text-xs mx-1"></i>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-doc77-800 cursor-pointer transition-colors text-doc77-200">
+                <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-doc77-800 cursor-pointer transition-colors text-doc77-200" onclick="resetToPhotos()">
                     <i class="ph-fill ph-folder text-yellow-500"></i>
-                    <span class="font-medium">My Photos</span>
+                    <span class="font-medium breadcrumb-project-name">My Photos</span>
                 </div>
                 <i class="ph ph-caret-right text-xs mx-1"></i>
-                <span class="text-doc77-300 font-medium">Gallery</span>
+                <span class="text-doc77-300 font-medium breadcrumb-current-view">Gallery</span>
             </div>
         </div>
 
@@ -151,7 +151,7 @@
         <div class="hidden md:flex flex-1 max-w-md mx-8 relative group">
             <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-doc77-500 group-focus-within:text-doc77-300"></i>
             <input type="text" placeholder="Search photos, dates, tags..."
-                   class="w-full bg-doc77-950 border border-doc77-700 text-doc77-100 placeholder-doc77-500 rounded-full py-1.5 pl-9 pr-4 focus:outline-none focus:border-doc77-500 focus:bg-doc77-800 transition-all text-sm shadow-inner">
+                   class="w-full bg-doc77-950 border border-doc77-700 text-doc77-100 placeholder-doc77-500 rounded-full py-1.5 pl-9 pr-4 focus:outline-none focus:border-doc77-500 focus:bg-doc77-800 transition-all text-sm shadow-inner" id="search-input">
             <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 hidden group-focus-within:flex text-doc77-500 text-xs">
                 <kbd class="font-sans border border-doc77-600 rounded px-1">esc</kbd>
             </div>
@@ -161,17 +161,17 @@
         <div class="flex items-center gap-1 sm:gap-2">
             <!-- View Toggles -->
             <div class="flex bg-doc77-950 rounded-lg p-0.5 border border-doc77-800">
-                <button class="p-1.5 rounded-md bg-doc77-700 text-white shadow-sm" title="Grid View">
+                <button class="p-1.5 rounded-md bg-doc77-700 text-white shadow-sm" title="Grid View" id="btn-grid-view">
                     <i class="ph ph-squares-four text-lg"></i>
                 </button>
-                <button class="p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors" title="List View">
+                <button class="p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors" title="List View" id="btn-list-view">
                     <i class="ph ph-list-dashes text-lg"></i>
                 </button>
             </div>
 
             <div class="w-px h-6 bg-doc77-800 mx-1"></div>
 
-            <button class="p-2 text-doc77-400 hover:text-white rounded-full hover:bg-doc77-800 transition-colors relative" title="Sort & Filter">
+            <button class="p-2 text-doc77-400 hover:text-white rounded-full hover:bg-doc77-800 transition-colors relative" title="Sort & Filter" id="btn-sort-filter">
                 <i class="ph ph-faders text-lg"></i>
                 <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full border border-doc77-900"></span>
             </button>
@@ -194,20 +194,20 @@
 
                 <!-- Main Nav -->
                 <nav class="space-y-1">
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 font-medium">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 font-medium" data-view="photos">
                         <i class="ph-fill ph-image text-xl"></i>
                         Photos
                         <span class="ml-auto text-xs bg-blue-500/20 px-2 py-0.5 rounded-full">All</span>
                     </a>
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group" data-view="timeline">
                         <i class="ph ph-clock-counter-clockwise text-xl group-hover:text-doc77-200"></i>
                         Timeline
                     </a>
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group" data-view="videos">
                         <i class="ph ph-video-camera text-xl group-hover:text-doc77-200"></i>
                         Videos
                     </a>
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group" data-view="favorites">
                         <i class="ph ph-star text-xl group-hover:text-yellow-400"></i>
                         Favorites
                     </a>
@@ -219,25 +219,8 @@
                         <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-400 transition-colors">Folders</h3>
                         <i class="ph ph-caret-down text-doc77-500"></i>
                     </div>
-                    <ul class="space-y-0.5 text-sm ml-2 border-l border-doc77-800 pl-2">
-                        <li>
-                            <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors">
-                                <i class="ph-fill ph-folder text-yellow-500/80"></i>
-                                Camera Roll
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors">
-                                <i class="ph-fill ph-folder text-yellow-500/80"></i>
-                                Screenshots
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors">
-                                <i class="ph-fill ph-folder text-yellow-500/80"></i>
-                                Downloads
-                            </a>
-                        </li>
+                    <ul class="space-y-0.5 text-sm ml-2 border-l border-doc77-800 pl-2" id="folder-list">
+                        <!-- Dynamically populated by loadFolders() -->
                     </ul>
                 </div>
 
@@ -245,36 +228,10 @@
                 <div>
                     <div class="flex items-center justify-between px-3 mb-2 group cursor-pointer">
                         <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-400 transition-colors">Albums</h3>
-                        <button class="text-doc77-500 hover:text-white transition-colors" title="New Album"><i class="ph ph-plus"></i></button>
+                        <button class="text-doc77-500 hover:text-white transition-colors" title="New Album" onclick="createAlbum()"><i class="ph ph-plus"></i></button>
                     </div>
-                    <ul class="space-y-1">
-                        <li>
-                            <a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-300 hover:bg-doc77-800 transition-colors">
-                                <div class="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0 shadow-sm">
-                                    <i class="ph-fill ph-mountains text-white text-xs"></i>
-                                </div>
-                                <span class="truncate flex-1">Japan Trip 2024</span>
-                                <span class="text-xs text-doc77-500">142</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-300 hover:bg-doc77-800 transition-colors">
-                                <div class="w-6 h-6 rounded bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm">
-                                    <i class="ph-fill ph-cat text-white text-xs"></i>
-                                </div>
-                                <span class="truncate flex-1">Pets</span>
-                                <span class="text-xs text-doc77-500">58</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-300 hover:bg-doc77-800 transition-colors">
-                                <div class="w-6 h-6 rounded bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
-                                    <i class="ph-fill ph-monitor text-white text-xs"></i>
-                                </div>
-                                <span class="truncate flex-1">Wallpapers</span>
-                                <span class="text-xs text-doc77-500">24</span>
-                            </a>
-                        </li>
+                    <ul class="space-y-1" id="album-list">
+                        <!-- Dynamically populated by GalleryAlbum.renderAlbumSidebar() -->
                     </ul>
                 </div>
             </div>
@@ -283,10 +240,10 @@
             <div class="p-4 border-t border-doc77-800 bg-doc77-900/80">
                 <div class="flex items-center justify-between text-xs mb-1">
                     <span class="text-doc77-300 font-medium">Storage</span>
-                    <span class="text-doc77-400">12.3 GB / 50 GB</span>
+                    <span class="text-doc77-400" id="storage-info">--</span>
                 </div>
                 <div class="h-1.5 w-full bg-doc77-800 rounded-full overflow-hidden">
-                    <div class="h-full bg-blue-500 rounded-full" style="width: 25%"></div>
+                    <div class="h-full bg-blue-500 rounded-full" id="storage-bar" style="width: 0%"></div>
                 </div>
             </div>
         </aside>
@@ -303,7 +260,7 @@
                     <button class="text-blue-200 hover:text-white text-sm" onclick="selectAll()">Select All</button>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Add to Album"><i class="ph ph-plus-circle text-xl"></i></button>
+                    <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Add to Album" onclick="addSelectedToAlbum()"><i class="ph ph-plus-circle text-xl"></i></button>
                     <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Download"><i class="ph ph-download-simple text-xl"></i></button>
                     <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Share"><i class="ph ph-share-network text-xl"></i></button>
                     <div class="w-px h-5 bg-blue-400/50 mx-1"></div>
@@ -311,358 +268,390 @@
                 </div>
             </div>
 
-            <!-- Scrollable Grid Area -->
+            <!-- Scrollable Grid Area (populated by GalleryCore.renderGrid) -->
             <div class="flex-1 overflow-y-auto p-4 md:p-6" id="gallery-container">
-
-                <!-- Group: March 2024 -->
-                <div class="mb-8">
-                    <div class="sticky top-0 bg-[#0b1121]/95 backdrop-blur-sm z-10 py-2 mb-4 flex items-center justify-between border-b border-doc77-800/50">
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-lg font-bold text-doc77-100">March 2024</h2>
-                            <span class="text-doc77-500 text-sm font-medium bg-doc77-800/50 px-2 py-0.5 rounded-full">12 items</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button class="text-doc77-400 hover:text-doc77-200 p-1"><i class="ph ph-dots-three text-xl"></i></button>
-                        </div>
-                    </div>
-
-                    <!-- Masonry Grid -->
-                    <div class="masonry-grid" id="grid-mar-2024">
-                        <!-- Populated by JS -->
-                    </div>
+                <div class="flex items-center justify-center h-full text-doc77-500">
+                    <i class="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mr-2"></i>
+                    <span>Loading gallery...</span>
                 </div>
-
-                <!-- Group: February 2024 -->
-                <div class="mb-8">
-                    <div class="sticky top-0 bg-[#0b1121]/95 backdrop-blur-sm z-10 py-2 mb-4 flex items-center justify-between border-b border-doc77-800/50">
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-lg font-bold text-doc77-100">February 2024</h2>
-                            <span class="text-doc77-500 text-sm font-medium bg-doc77-800/50 px-2 py-0.5 rounded-full">8 items</span>
-                        </div>
-                    </div>
-
-                    <div class="masonry-grid" id="grid-feb-2024">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- Loading indicator -->
-                <div class="py-8 flex flex-col items-center justify-center text-doc77-500 space-y-3">
-                    <i class="ph ph-spinner-gap animate-spin text-2xl text-blue-500"></i>
-                    <span class="text-sm">Loading more memories...</span>
-                </div>
-
             </div>
         </main>
     </div>
 
-    <!-- Lightbox (Hidden by default) -->
-    <div id="lightbox" class="fixed inset-0 z-50 bg-black/95 hidden flex-col opacity-0 transition-opacity duration-300">
+    <!-- Lightbox is dynamically created by GalleryLightbox.render() -->
 
-        <!-- Lightbox Toolbar -->
-        <div class="flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent absolute top-0 left-0 right-0 z-10 transition-opacity duration-300" id="lightbox-toolbar">
-            <div class="flex items-center gap-3">
-                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" onclick="closeLightbox()">
-                    <i class="ph ph-arrow-left text-xl"></i>
-                </button>
-                <div>
-                    <div class="text-white font-medium drop-shadow-md" id="lb-filename">IMG_8472.jpg</div>
-                    <div class="text-doc77-300 text-xs drop-shadow-md" id="lb-date">Mar 15, 2024 • 14:30</div>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <button class="text-white hover:text-blue-400 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Favorite">
-                    <i class="ph ph-star text-xl"></i>
-                </button>
-                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all hidden sm:block" title="Zoom In">
-                    <i class="ph ph-magnifying-glass-plus text-xl"></i>
-                </button>
-                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Download">
-                    <i class="ph ph-download-simple text-xl"></i>
-                </button>
-                <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Info" onclick="toggleInfoPanel()">
-                    <i class="ph ph-info text-xl"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Lightbox Content Area -->
-        <div class="flex-1 flex items-center justify-center relative overflow-hidden" id="lightbox-content-area">
-            <!-- Previous Button -->
-            <button class="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-3 bg-black/20 hover:bg-black/50 rounded-full backdrop-blur-sm transition-all z-10 hidden sm:flex" onclick="navLightbox(-1)">
-                <i class="ph ph-caret-left text-3xl"></i>
-            </button>
-
-            <!-- Main Image -->
-            <img src="" alt="Preview" id="lb-image" class="max-w-full max-h-full object-contain select-none transition-transform duration-200">
-
-            <!-- Next Button -->
-            <button class="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-3 bg-black/20 hover:bg-black/50 rounded-full backdrop-blur-sm transition-all z-10 hidden sm:flex" onclick="navLightbox(1)">
-                <i class="ph ph-caret-right text-3xl"></i>
-            </button>
-        </div>
-
-        <!-- Info Sidebar (Right) -->
-        <div id="lb-info-panel" class="absolute top-0 right-0 bottom-0 w-80 bg-doc77-900 border-l border-doc77-800 transform translate-x-full transition-transform duration-300 overflow-y-auto no-scrollbar shadow-2xl flex flex-col z-20">
-            <div class="p-4 border-b border-doc77-800 flex items-center justify-between sticky top-0 bg-doc77-900 z-10">
-                <h3 class="font-semibold text-doc77-100 flex items-center gap-2">
-                    <i class="ph ph-info"></i> Details
-                </h3>
-                <button class="text-doc77-400 hover:text-white" onclick="toggleInfoPanel()">
-                    <i class="ph ph-x"></i>
-                </button>
-            </div>
-
-            <div class="p-4 space-y-6">
-                <!-- File Details -->
-                <div class="space-y-3">
-                    <h4 class="text-xs uppercase tracking-wider text-doc77-500 font-semibold">File Info</h4>
-                    <div class="bg-doc77-950 rounded-lg p-3 space-y-2 text-sm border border-doc77-800/50">
-                        <div class="flex justify-between">
-                            <span class="text-doc77-400">Name</span>
-                            <span class="text-doc77-100 font-medium break-all text-right ml-4">DSC_0842.JPG</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-doc77-400">Date</span>
-                            <span class="text-doc77-100">Mar 15, 2024</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-doc77-400">Size</span>
-                            <span class="text-doc77-100">4.2 MB</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-doc77-400">Resolution</span>
-                            <span class="text-doc77-100">6000 x 4000</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Camera EXIF -->
-                <div class="space-y-3">
-                    <h4 class="text-xs uppercase tracking-wider text-doc77-500 font-semibold">Camera EXIF</h4>
-                    <div class="bg-doc77-950 rounded-lg p-3 space-y-3 text-sm border border-doc77-800/50">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded bg-doc77-800 flex items-center justify-center shrink-0">
-                                <i class="ph ph-camera text-doc77-300"></i>
-                            </div>
-                            <div>
-                                <div class="text-doc77-100 font-medium">Sony ILCE-7M4</div>
-                                <div class="text-xs text-doc77-400">FE 24-70mm F2.8 GM II</div>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-doc77-800/50 text-xs">
-                            <div class="bg-doc77-900 rounded p-1.5 text-center">
-                                <div class="text-doc77-500">ISO</div>
-                                <div class="text-doc77-200 font-medium mt-0.5">400</div>
-                            </div>
-                            <div class="bg-doc77-900 rounded p-1.5 text-center">
-                                <div class="text-doc77-500">Aperture</div>
-                                <div class="text-doc77-200 font-medium mt-0.5">f/2.8</div>
-                            </div>
-                            <div class="bg-doc77-900 rounded p-1.5 text-center">
-                                <div class="text-doc77-500">Shutter</div>
-                                <div class="text-doc77-200 font-medium mt-0.5">1/250s</div>
-                            </div>
-                            <div class="bg-doc77-900 rounded p-1.5 text-center">
-                                <div class="text-doc77-500">Focal Length</div>
-                                <div class="text-doc77-200 font-medium mt-0.5">35mm</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Location placeholder -->
-                <div class="space-y-3">
-                    <h4 class="text-xs uppercase tracking-wider text-doc77-500 font-semibold">Location</h4>
-                    <div class="h-32 bg-doc77-950 rounded-lg border border-doc77-800/50 flex flex-col items-center justify-center text-doc77-500 relative overflow-hidden">
-                        <i class="ph ph-map-pin text-2xl mb-1 z-10"></i>
-                        <span class="text-xs z-10">No GPS data</span>
-                        <!-- Fake map background -->
-                        <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 10px 10px;"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <script src="js/gallery-core.js"></script>
+    <script src="js/gallery-album.js"></script>
+    <script src="js/gallery-lightbox.js"></script>
 
     <script>
-        // --- Project Context ---
-        // Read project from URL parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentProjectId = urlParams.get('project');
-
-        // --- API Fetch Functions ---
-        async function fetchGallery(projectId, path = '', offset = 0) {
-          const resp = await fetch(`/api/gallery/${projectId}?path=${encodeURIComponent(path)}&offset=${offset}&limit=100`);
-          return resp.json();
-        }
-
-        async function fetchTimeline(projectId, path = '') {
-          const resp = await fetch(`/api/gallery/timeline/${projectId}?path=${encodeURIComponent(path)}`);
-          return resp.json();
-        }
-
-        // --- Fallback Mock Data (for standalone preview without backend) ---
-        const imageCategories = [
-            'nature', 'architecture', 'people', 'city', 'technology', 'food'
-        ];
-
-        function getRandomDimension() {
-            // Generate heights between 300 and 800 to create varied masonry look
-            return Math.floor(Math.random() * (800 - 300 + 1)) + 300;
-        }
-
-        // Generate mock media items (used when API is not available)
-        const mockMedia = Array.from({ length: 40 }).map((_, i) => {
-            const isVideo = Math.random() > 0.85; // 15% chance to be a video
-            const height = getRandomDimension();
-            const width = isVideo ? 640 : 600; // standard width for unsplash placeholder
-            const cat = imageCategories[Math.floor(Math.random() * imageCategories.length)];
-
-            // Generate fake filename
-            const id = Math.random().toString(36).substring(7).toUpperCase();
-            const filename = isVideo ? `VID_${id}.mp4` : `IMG_${id}.jpg`;
-
-            // Assign to group
-            const group = i < 24 ? 'mar-2024' : 'feb-2024';
-
-            return {
-                id: `media-${i}`,
-                type: isVideo ? 'video' : 'image',
-                url: `https://source.unsplash.com/random/${width}x${height}/?${cat}&sig=${i}`,
-                thumbnail: `https://source.unsplash.com/random/400x${Math.floor((height/width)*400)}/?${cat}&sig=${i}`, // smaller for grid
-                filename: filename,
-                group: group,
-                aspectRatio: width / height,
-                duration: isVideo ? '0:45' : null
-            };
-        });
-
         // --- State Management ---
         let state = {
+            projectId: null,
+            currentPath: '',
+            items: [],
+            offset: 0,
+            limit: 100,
+            total: 0,
             selectMode: false,
             selectedIds: new Set(),
-            currentLightboxIndex: -1,
-            lightboxItems: [] // flattened list for navigation
+            currentView: 'photos',
+            sortBy: 'date',
+            sortOrder: 'desc',
+            searchQuery: ''
         };
 
-        // --- Rendering Logic ---
-
-        function createMediaCard(item) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'masonry-item gallery-item relative rounded-lg overflow-hidden group cursor-pointer bg-doc77-800 image-card-hover border border-doc77-700/50';
-            wrapper.dataset.id = item.id;
-
-            // Container to maintain aspect ratio while image loads
-            const imgWrapper = document.createElement('div');
-            imgWrapper.className = 'img-wrapper relative w-full';
-            // Set padding-bottom based on aspect ratio to prevent layout shifts
-            imgWrapper.style.paddingBottom = `${(1/item.aspectRatio) * 100}%`;
-
-            // The image (or video cover)
-            const img = document.createElement('img');
-            img.src = item.thumbnail;
-            img.className = 'absolute top-0 left-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105';
-            img.loading = 'lazy';
-            img.alt = item.filename;
-
-            // Overlay for info (Gradient bottom)
-            const overlay = document.createElement('div');
-            overlay.className = 'absolute inset-0 img-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3';
-
-            // Filename text
-            const nameText = document.createElement('span');
-            nameText.className = 'text-white text-xs font-medium truncate drop-shadow-md';
-            nameText.textContent = item.filename;
-
-            overlay.appendChild(nameText);
-
-            // Video indicator overlay
-            if (item.type === 'video') {
-                const vidBadge = document.createElement('div');
-                vidBadge.className = 'absolute top-2 right-2 bg-black/60 backdrop-blur-md rounded-md px-1.5 py-0.5 flex items-center gap-1 text-[10px] text-white font-medium shadow-sm border border-white/10';
-                vidBadge.innerHTML = `<i class="ph-fill ph-play-circle text-doc77-200"></i> ${item.duration}`;
-                imgWrapper.appendChild(vidBadge);
+        // --- Initialization ---
+        async function init() {
+            state.projectId = parseInt(new URLSearchParams(window.location.search).get('project'), 10);
+            if (!state.projectId) {
+                try {
+                    const resp = await fetch('/api/projects');
+                    const projects = await resp.json();
+                    if (projects.length === 1) {
+                        state.projectId = projects[0].id;
+                    } else {
+                        renderProjectPicker(projects);
+                        return;
+                    }
+                } catch (e) {
+                    document.getElementById('gallery-container').innerHTML =
+                        '<div class="flex items-center justify-center h-full text-doc77-500">Backend not available</div>';
+                    return;
+                }
             }
-
-            // Selection Checkbox (Hidden initially, shown on hover or select mode)
-            const checkbox = document.createElement('div');
-            checkbox.className = 'gallery-item-checkbox absolute top-2 left-2 w-5 h-5 rounded-full border-2 border-white/70 bg-black/20 backdrop-blur-sm items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all z-10';
-            // Specific styling when checked via class 'selected' on wrapper handled in CSS mostly
-            checkbox.innerHTML = `<i class="ph-bold ph-check text-xs opacity-0 scale-50 transition-all"></i>`;
-
-            // Assembly
-            imgWrapper.appendChild(img);
-            imgWrapper.appendChild(overlay);
-            imgWrapper.appendChild(checkbox);
-            wrapper.appendChild(imgWrapper);
-
-            // Event Listeners
-            wrapper.addEventListener('click', (e) => handleItemClick(e, item));
-
-            return wrapper;
+            updateBreadcrumb();
+            wireSidebarNav();
+            loadFolders();
+            loadAlbums();
+            loadGallery();
         }
 
-        function renderGrid() {
-            const marGrid = document.getElementById('grid-mar-2024');
-            const febGrid = document.getElementById('grid-feb-2024');
+        async function updateBreadcrumb() {
+            try {
+                const resp = await fetch('/api/projects');
+                const projects = await resp.json();
+                var project = null;
+                for (var i = 0; i < projects.length; i++) {
+                    if (projects[i].id === state.projectId) {
+                        project = projects[i];
+                        break;
+                    }
+                }
+                if (project) {
+                    var nameEl = document.querySelector('.breadcrumb-project-name');
+                    if (nameEl) nameEl.textContent = project.name;
+                }
+            } catch (_) {}
+        }
 
-            marGrid.innerHTML = '';
-            febGrid.innerHTML = '';
-            state.lightboxItems = [];
+        function renderProjectPicker(projects) {
+            var container = document.getElementById('gallery-container');
+            var html = '<div class="flex items-center justify-center h-full"><div class="text-center space-y-4"><h2 class="text-xl font-bold text-doc77-100">Select a Project</h2><div class="space-y-2">';
+            for (var i = 0; i < projects.length; i++) {
+                html += '<button class="block w-full text-left px-4 py-2 bg-doc77-800 hover:bg-doc77-700 rounded text-doc77-200 transition-colors" onclick="selectProject(' + projects[i].id + ')"><i class="ph-fill ph-folder text-yellow-500 mr-2"></i>' + escHtml(projects[i].name) + '</button>';
+            }
+            html += '</div></div></div>';
+            container.innerHTML = html;
+        }
 
-            mockMedia.forEach((item, index) => {
-                state.lightboxItems.push(item);
-                const card = createMediaCard(item);
-                if(item.group === 'mar-2024') marGrid.appendChild(card);
-                else febGrid.appendChild(card);
+        function selectProject(id) {
+            state.projectId = id;
+            updateBreadcrumb();
+            loadGallery();
+            loadFolders();
+            loadAlbums();
+        }
+
+        function resetToPhotos() {
+            state.currentPath = '';
+            state.currentView = 'photos';
+            state.sortBy = 'date';
+            state.sortOrder = 'desc';
+            state.searchQuery = '';
+            var searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+            setActiveNav(document.querySelector('#sidebar nav a[data-view="photos"]'));
+            updateBreadcrumbPath();
+            loadGallery();
+        }
+
+        // --- Gallery Loading ---
+
+        async function loadGallery(path, resetOffset) {
+            if (resetOffset === undefined) resetOffset = true;
+            if (path !== undefined) state.currentPath = path;
+            if (resetOffset) state.offset = 0;
+
+            var params = new URLSearchParams();
+            params.set('path', state.currentPath);
+            params.set('offset', state.offset);
+            params.set('limit', state.limit);
+            params.set('sort', state.sortBy);
+            params.set('order', state.sortOrder);
+
+            // Filter by media type for videos view
+            var types = 'image,video';
+            if (state.currentView === 'videos') types = 'video';
+            params.set('types', types);
+
+            if (state.searchQuery) params.set('q', state.searchQuery);
+
+            try {
+                var resp = await fetch('/api/gallery/' + state.projectId + '?' + params.toString());
+                var data = await resp.json();
+                state.items = resetOffset ? (data.entries || []) : (state.items || []).concat(data.entries || []);
+                state.total = data.total || 0;
+
+                var container = document.getElementById('gallery-container');
+                window.GalleryCore.renderGrid(container, state.items, {
+                    grouped: state.currentView === 'photos' || state.currentView === 'videos',
+                    projectId: state.projectId,
+                    onCardClick: function(item) {
+                        if (state.selectMode) {
+                            toggleSelection(item.path || item.id, null);
+                        } else {
+                            window.GalleryLightbox.open(item, state.items, state.projectId);
+                        }
+                    }
+                });
+                window.GalleryCore.setupLazyLoading();
+                updateBreadcrumbPath();
+            } catch (e) {
+                var container = document.getElementById('gallery-container');
+                container.innerHTML = '<div class="flex items-center justify-center h-full text-doc77-500">Failed to load gallery</div>';
+            }
+        }
+
+        async function loadTimeline() {
+            try {
+                var resp = await fetch('/api/gallery/timeline/' + state.projectId + '?path=' + encodeURIComponent(state.currentPath));
+                var data = await resp.json();
+                state.items = data.entries || data.groups || [];
+                var container = document.getElementById('gallery-container');
+                window.GalleryCore.renderGrid(container, state.items, {
+                    grouped: false,
+                    projectId: state.projectId,
+                    onCardClick: function(item) {
+                        if (state.selectMode) {
+                            toggleSelection(item.path || item.id, null);
+                        } else {
+                            window.GalleryLightbox.open(item, state.items, state.projectId);
+                        }
+                    }
+                });
+                updateBreadcrumbPath();
+            } catch (e) {
+                // silently fall back
+            }
+        }
+
+        // --- Sidebar Navigation ---
+
+        function wireSidebarNav() {
+            var links = document.querySelectorAll('#sidebar nav a');
+            for (var i = 0; i < links.length; i++) {
+                (function(link) {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var view = link.getAttribute('data-view');
+                        if (!view) return;
+                        setActiveNav(link);
+                        state.currentView = view;
+                        state.currentPath = '';
+                        if (view === 'timeline') {
+                            loadTimeline();
+                        } else {
+                            loadGallery();
+                        }
+                    });
+                })(links[i]);
+            }
+        }
+
+        function setActiveNav(el) {
+            var links = document.querySelectorAll('#sidebar nav a');
+            for (var i = 0; i < links.length; i++) {
+                links[i].classList.remove('bg-blue-500/10', 'text-blue-400', 'font-medium');
+                links[i].classList.add('text-doc77-300');
+            }
+            el.classList.add('bg-blue-500/10', 'text-blue-400', 'font-medium');
+            el.classList.remove('text-doc77-300');
+        }
+
+        // --- Folder Tree ---
+
+        async function loadFolders() {
+            try {
+                var resp = await fetch('/api/tree/' + state.projectId);
+                var data = await resp.json();
+                var folderList = document.getElementById('folder-list');
+                if (!folderList || !data.entries) return;
+                folderList.innerHTML = renderFolderItems(data.entries, '');
+                // Wire folder clicks
+                var folderLinks = folderList.querySelectorAll('a[data-path]');
+                for (var i = 0; i < folderLinks.length; i++) {
+                    (function(a) {
+                        a.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            state.currentView = 'folder';
+                            loadGallery(a.getAttribute('data-path'));
+                        });
+                    })(folderLinks[i]);
+                }
+            } catch (e) {
+                // silently ignore — folders may not be available
+            }
+        }
+
+        function renderFolderItems(entries, prefix) {
+            var html = '';
+            for (var i = 0; i < entries.length; i++) {
+                var entry = entries[i];
+                if (entry.type === 'directory') {
+                    var path = prefix ? prefix + '/' + entry.name : entry.name;
+                    html += '<li><a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors" data-path="' + escAttr(path) + '"><i class="ph-fill ph-folder text-yellow-500/80"></i><span class="truncate">' + escHtml(entry.name) + '</span></a></li>';
+                }
+            }
+            return html || '<li class="px-2 py-1.5 text-doc77-500 text-xs">No folders</li>';
+        }
+
+        // --- Albums ---
+
+        async function loadAlbums() {
+            try {
+                var albumList = document.getElementById('album-list');
+                if (albumList) {
+                    await window.GalleryAlbum.renderAlbumSidebar(albumList, state.projectId);
+                }
+            } catch (e) {
+                // silently ignore
+            }
+        }
+
+        async function createAlbum() {
+            var name = prompt('New album name:');
+            if (!name || !name.trim()) return;
+            try {
+                await window.GalleryAlbum.createAlbum(name.trim(), '');
+                loadAlbums();
+            } catch (e) {
+                alert('Failed to create album');
+            }
+        }
+
+        // --- Search ---
+
+        var searchTimeout;
+        function setupSearch() {
+            var input = document.getElementById('search-input');
+            if (!input) return;
+            input.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function() {
+                    state.searchQuery = input.value.trim();
+                    if (state.currentView === 'timeline') {
+                        loadTimeline();
+                    } else {
+                        loadGallery();
+                    }
+                }, 400);
+            });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    input.value = '';
+                    state.searchQuery = '';
+                    if (state.currentView === 'timeline') {
+                        loadTimeline();
+                    } else {
+                        loadGallery();
+                    }
+                }
             });
         }
 
-        // --- Interaction Logic ---
+        // --- Sort / Filter ---
 
-        function handleItemClick(e, item) {
-            const cardElement = e.currentTarget;
+        function setupSortFilter() {
+            var btn = document.getElementById('btn-sort-filter');
+            if (!btn) return;
 
-            if (state.selectMode) {
-                // In select mode, click always toggles selection
-                toggleSelection(item.id, cardElement);
-                return;
-            }
-
-            // Check if user clicked the checkbox specifically while NOT in select mode
-            if (e.target.closest('.gallery-item-checkbox')) {
-                // Clicking checkbox turns on select mode
-                if (!state.selectMode) {
-                    toggleSelectMode();
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var existing = document.getElementById('sort-dropdown');
+                if (existing) {
+                    existing.remove();
+                    return;
                 }
-                toggleSelection(item.id, cardElement);
-                return;
-            }
 
-            // Normal click opens lightbox
-            openLightbox(item);
+                var dropdown = document.createElement('div');
+                dropdown.id = 'sort-dropdown';
+                dropdown.className = 'absolute top-full right-0 mt-1 w-48 bg-doc77-900 border border-doc77-700 rounded-lg shadow-2xl z-50 py-1';
+
+                var sorts = [
+                    { label: 'Date (newest)', sortBy: 'date', sortOrder: 'desc' },
+                    { label: 'Date (oldest)', sortBy: 'date', sortOrder: 'asc' },
+                    { label: 'Name (A-Z)', sortBy: 'name', sortOrder: 'asc' },
+                    { label: 'Name (Z-A)', sortBy: 'name', sortOrder: 'desc' },
+                    { label: 'Size (largest)', sortBy: 'size', sortOrder: 'desc' },
+                    { label: 'Size (smallest)', sortBy: 'size', sortOrder: 'asc' },
+                ];
+
+                for (var i = 0; i < sorts.length; i++) {
+                    (function(opt) {
+                        var item = document.createElement('button');
+                        item.className = 'block w-full text-left px-3 py-1.5 text-sm text-doc77-300 hover:bg-doc77-800 hover:text-white transition-colors';
+                        item.textContent = opt.label;
+                        if (state.sortBy === opt.sortBy && state.sortOrder === opt.sortOrder) {
+                            item.classList.add('text-blue-400', 'font-medium');
+                        }
+                        item.addEventListener('click', function() {
+                            state.sortBy = opt.sortBy;
+                            state.sortOrder = opt.sortOrder;
+                            if (state.currentView === 'timeline') {
+                                loadTimeline();
+                            } else {
+                                loadGallery();
+                            }
+                            var dd = document.getElementById('sort-dropdown');
+                            if (dd) dd.remove();
+                        });
+                        dropdown.appendChild(item);
+                    })(sorts[i]);
+                }
+
+                btn.parentElement.style.position = 'relative';
+                btn.parentElement.appendChild(dropdown);
+
+                var closeHandler = function() {
+                    var dd = document.getElementById('sort-dropdown');
+                    if (dd) dd.remove();
+                    document.removeEventListener('click', closeHandler);
+                };
+                setTimeout(function() {
+                    document.addEventListener('click', closeHandler);
+                }, 0);
+            });
         }
 
         // --- Selection Mode ---
 
         function toggleSelectMode() {
             state.selectMode = !state.selectMode;
-            const container = document.getElementById('gallery-container');
-            const toolbar = document.getElementById('selection-toolbar');
-            const btnSelect = document.getElementById('btn-select');
+            var container = document.getElementById('gallery-container');
+            var toolbar = document.getElementById('selection-toolbar');
+            var btnSelect = document.getElementById('btn-select');
 
             if (state.selectMode) {
                 container.classList.add('select-mode-active');
                 toolbar.classList.remove('-translate-y-full');
-                btnSelect.classList.replace('bg-blue-600', 'bg-doc77-700');
-                btnSelect.innerHTML = `<i class="ph ph-x"></i><span class="hidden sm:inline">Cancel</span>`;
+                btnSelect.className = 'ml-2 flex items-center gap-2 bg-doc77-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm';
+                btnSelect.innerHTML = '<i class="ph ph-x"></i><span class="hidden sm:inline">Cancel</span>';
             } else {
                 container.classList.remove('select-mode-active');
                 toolbar.classList.add('-translate-y-full');
-                btnSelect.classList.replace('bg-doc77-700', 'bg-blue-600');
-                btnSelect.innerHTML = `<i class="ph ph-check-circle"></i><span class="hidden sm:inline">Select</span>`;
-                // Clear selections
+                btnSelect.className = 'ml-2 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium transition-colors shadow-glow text-sm';
+                btnSelect.innerHTML = '<i class="ph ph-check-circle"></i><span class="hidden sm:inline">Select</span>';
                 state.selectedIds.clear();
                 updateSelectionUI();
             }
@@ -678,137 +667,110 @@
         }
 
         function updateSelectionUI() {
-            document.getElementById('selected-count').innerText = state.selectedIds.size;
-
-            document.querySelectorAll('.gallery-item').forEach(el => {
-                const id = el.dataset.id;
-                const checkboxIcon = el.querySelector('.gallery-item-checkbox i');
-                const checkbox = el.querySelector('.gallery-item-checkbox');
+            document.getElementById('selected-count').textContent = state.selectedIds.size;
+            var items = document.querySelectorAll('.gallery-item');
+            for (var i = 0; i < items.length; i++) {
+                var el = items[i];
+                var id = el.dataset.id;
+                var checkboxIcon = el.querySelector('.gallery-item-checkbox i');
+                var checkbox = el.querySelector('.gallery-item-checkbox');
 
                 if (state.selectedIds.has(id)) {
                     el.classList.add('selected');
-                    checkbox.classList.replace('border-white/70', 'border-blue-500');
-                    checkbox.classList.replace('bg-black/20', 'bg-blue-500');
-                    checkbox.classList.remove('opacity-0', 'group-hover:opacity-100'); // Keep visible
-                    checkboxIcon.classList.remove('opacity-0', 'scale-50');
+                    if (checkbox) {
+                        checkbox.classList.replace('border-white/70', 'border-blue-500');
+                        checkbox.classList.replace('bg-black/20', 'bg-blue-500');
+                        checkbox.classList.remove('opacity-0', 'group-hover:opacity-100');
+                    }
+                    if (checkboxIcon) checkboxIcon.classList.remove('opacity-0', 'scale-50');
                 } else {
                     el.classList.remove('selected');
-                    checkbox.classList.replace('border-blue-500', 'border-white/70');
-                    checkbox.classList.replace('bg-blue-500', 'bg-black/20');
-                    // Reset visibility based on hover state handled by CSS unless select mode is active
-                    if(!state.selectMode) {
-                        checkbox.classList.add('opacity-0', 'group-hover:opacity-100');
+                    if (checkbox) {
+                        checkbox.classList.replace('border-blue-500', 'border-white/70');
+                        checkbox.classList.replace('bg-blue-500', 'bg-black/20');
+                        if (!state.selectMode) {
+                            checkbox.classList.add('opacity-0', 'group-hover:opacity-100');
+                        }
                     }
-                    checkboxIcon.classList.add('opacity-0', 'scale-50');
+                    if (checkboxIcon) checkboxIcon.classList.add('opacity-0', 'scale-50');
                 }
-            });
+            }
         }
 
         function selectAll() {
-            mockMedia.forEach(item => state.selectedIds.add(item.id));
+            for (var i = 0; i < state.items.length; i++) {
+                state.selectedIds.add(state.items[i].path || state.items[i].id);
+            }
             updateSelectionUI();
         }
 
-        // --- Lightbox Logic ---
+        // --- Add to Album (Selection Mode) ---
 
-        function openLightbox(item) {
-            const idx = state.lightboxItems.findIndex(i => i.id === item.id);
-            if (idx === -1) return;
-
-            state.currentLightboxIndex = idx;
-            updateLightboxView();
-
-            const lb = document.getElementById('lightbox');
-            lb.classList.remove('hidden');
-            // Small delay to allow display:block to apply before changing opacity for transition
-            requestAnimationFrame(() => {
-                lb.classList.remove('opacity-0');
-                lb.classList.add('opacity-100');
-            });
-
-            // Hide info panel initially
-            const infoPanel = document.getElementById('lb-info-panel');
-            infoPanel.classList.add('translate-x-full');
-
-            document.addEventListener('keydown', handleLightboxKeydown);
+        async function addSelectedToAlbum() {
+            var paths = Array.from(state.selectedIds);
+            if (paths.length === 0) {
+                alert('No items selected');
+                return;
+            }
+            var albumId = prompt('Enter Album ID to add ' + paths.length + ' selected items:');
+            if (!albumId || !albumId.trim()) return;
+            try {
+                await window.GalleryAlbum.addToAlbum(parseInt(albumId.trim()), state.projectId, paths);
+                state.selectedIds.clear();
+                updateSelectionUI();
+                toggleSelectMode();
+                alert('Added ' + paths.length + ' items to album successfully');
+            } catch (e) {
+                alert('Failed to add to album: ' + (e.message || 'unknown error'));
+            }
         }
 
-        function closeLightbox() {
-            const lb = document.getElementById('lightbox');
-            lb.classList.remove('opacity-100');
-            lb.classList.add('opacity-0');
+        // --- Breadcrumb ---
 
-            setTimeout(() => {
-                lb.classList.add('hidden');
-                document.getElementById('lb-image').src = ''; // clear memory
-            }, 300); // match transition duration
-
-            document.removeEventListener('keydown', handleLightboxKeydown);
-        }
-
-        function updateLightboxView() {
-            const item = state.lightboxItems[state.currentLightboxIndex];
-            const imgEl = document.getElementById('lb-image');
-
-            // Set source (in real app, might use higher res URL here)
-            imgEl.src = item.url;
-
-            document.getElementById('lb-filename').innerText = item.filename;
-            // Fake date based on group
-            const dateStr = item.group === 'mar-2024' ? 'Mar 15, 2024' : 'Feb 20, 2024';
-            document.getElementById('lb-date').innerText = `${dateStr} • ${item.type === 'video' ? 'Video' : 'Photo'}`;
-        }
-
-        function navLightbox(direction) {
-            let newIdx = state.currentLightboxIndex + direction;
-            if (newIdx < 0) newIdx = state.lightboxItems.length - 1; // loop
-            if (newIdx >= state.lightboxItems.length) newIdx = 0;
-
-            state.currentLightboxIndex = newIdx;
-
-            // Simple fade effect
-            const imgEl = document.getElementById('lb-image');
-            imgEl.style.opacity = '0.5';
-            imgEl.style.transform = `scale(0.98) translateX(${direction * 20}px)`;
-
-            setTimeout(() => {
-                updateLightboxView();
-                imgEl.style.opacity = '1';
-                imgEl.style.transform = 'scale(1) translateX(0)';
-            }, 150);
-        }
-
-        function toggleInfoPanel() {
-            const panel = document.getElementById('lb-info-panel');
-            panel.classList.toggle('translate-x-full');
-        }
-
-        function handleLightboxKeydown(e) {
-            if (e.key === 'Escape') closeLightbox();
-            else if (e.key === 'ArrowRight') navLightbox(1);
-            else if (e.key === 'ArrowLeft') navLightbox(-1);
-            else if (e.key === 'i' || e.key === 'I') toggleInfoPanel();
+        function updateBreadcrumbPath() {
+            var viewEl = document.querySelector('.breadcrumb-current-view');
+            if (!viewEl) return;
+            if (state.currentPath) {
+                viewEl.textContent = state.currentPath;
+            } else {
+                var viewLabels = { photos: 'Gallery', timeline: 'Timeline', videos: 'Videos', favorites: 'Favorites', folder: 'Gallery' };
+                viewEl.textContent = viewLabels[state.currentView] || 'Gallery';
+            }
         }
 
         // --- Utility Functions ---
+
         function goBackToDashboard() {
-            // Placeholder for app navigation
-            console.log("Navigating to dashboard...");
-            const header = document.querySelector('header');
-            header.style.backgroundColor = '#1e293b';
-            setTimeout(()=> header.style.backgroundColor = '', 200);
+            window.location.href = '/';
         }
 
         function triggerUpload() {
-            // Placeholder
-            console.log("Triggering upload dialog...");
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.accept = 'image/*,video/*';
+            input.onchange = function() {
+                alert('Upload via API: POST /api/upload/' + state.projectId);
+            };
+            input.click();
+        }
+
+        function escHtml(s) {
+            return String(s).replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+            });
+        }
+
+        function escAttr(s) {
+            return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         // --- Initialization ---
-        window.onload = () => {
-            renderGrid();
-        };
-
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+            setupSearch();
+            setupSortFilter();
+        });
     </script>
 </body>
 </html>
