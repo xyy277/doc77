@@ -63,8 +63,8 @@ export function createGalleryListHandler(thumbnailsDir: string) {
 
         // Generate thumbnail eagerly (async, fire-and-forget for non-blocking response)
         if (mediaType === 'image') {
-          getOrGenerateThumbnail(projectPath, relativePath, projectId, 'grid', thumbnailsDir).catch(() => {});
-          getOrGenerateThumbnail(projectPath, relativePath, projectId, 'preview', thumbnailsDir).catch(() => {});
+          getOrGenerateThumbnail(project.path, relativePath, projectId, 'grid', thumbnailsDir).catch(() => {});
+          getOrGenerateThumbnail(project.path, relativePath, projectId, 'preview', thumbnailsDir).catch(() => {});
         }
 
         mediaEntries.push({
