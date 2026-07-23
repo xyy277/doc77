@@ -74,6 +74,8 @@ function basename(p) { return p.split('/').pop() || p; }
 function tabsStorageKey() { return 'doc77-tabs-' + pid; }
 
 var CAPABILITIES = { ai: false, mcp: false };
+var currentViewMode = 'list';
+var currentDir = '';
 // Server-pushed write-task lifecycle events (executed/failed) via SSE.
 var taskEventSrc = null;
 function initTaskEvents() {
@@ -120,6 +122,64 @@ function applyCapabilities() {
     var tBtn = document.getElementById('translateBtn');
     if (tBtn) { tBtn.classList.remove('hidden'); tBtn.disabled = false; }
   }
+  if (CAPABILITIES.gallery) {
+    setupGalleryToggle();
+  }
+}
+
+// Gallery View Toggle
+function setupGalleryToggle() {
+  var toggle = document.getElementById('viewToggle');
+  if (!toggle) return;
+  toggle.style.display = 'flex';
+
+  toggle.querySelectorAll('button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      currentViewMode = btn.dataset.view;
+      toggle.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+
+      if (currentViewMode === 'grid') {
+        loadGalleryView();
+      } else {
+        loadListView();
+      }
+    });
+  });
+}
+
+async function loadGalleryView() {
+  var treeContainer = document.getElementById('tree');
+  if (!treeContainer) return;
+  treeContainer.innerHTML = '<div class="masonry-grid" id="previewGalleryGrid"></div>';
+
+  try {
+    var resp = await fetch('/api/gallery/' + pid + '?path=' + encodeURIComponent(currentDir || '') + '&limit=100');
+    var data = await resp.json();
+    var grid = document.getElementById('previewGalleryGrid');
+
+    if (window.GalleryCore && typeof window.GalleryCore.renderGrid === 'function') {
+      window.GalleryCore.renderGrid(grid, data.entries, {
+        grouped: true,
+        projectId: pid,
+        onCardClick: function(item) {
+          if (window.GalleryLightbox && typeof window.GalleryLightbox.open === 'function') {
+            window.GalleryLightbox.open(item, data.entries, pid);
+          }
+        },
+      });
+      if (typeof window.GalleryCore.setupLazyLoading === 'function') {
+        window.GalleryCore.setupLazyLoading();
+      }
+    }
+  } catch(e) {
+    treeContainer.innerHTML = '<div class="text-center py-6 text-slate-500 text-xs">' + t('web.preview.loadFailed') + '</div>';
+  }
+}
+
+function loadListView() {
+  // Restore file tree
+  loadTree(currentDir || '');
 }
 
 (async function boot() {
