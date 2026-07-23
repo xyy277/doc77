@@ -1,4 +1,10 @@
 import { getConnection, type DatabaseCompat } from '@doc77/core';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as crypto from 'node:crypto';
+import { validatePath } from '@doc77/core';
+import { generateThumbnail } from './engine.js';
+import type { ThumbnailSize } from '../types.js';
 
 /** Row in thumbnail_cache table */
 export interface ThumbnailCacheRow {
@@ -53,4 +59,73 @@ export function getCachedByPathPrefix(sourcePath: string): ThumbnailCacheRow | u
   return db.prepare(
     'SELECT * FROM thumbnail_cache WHERE source_path = ?'
   ).get(sourcePath) as ThumbnailCacheRow | undefined;
+}
+
+export interface ResolvedThumbnail {
+  cachePath: string;
+  width: number;
+  height: number;
+  exifDate: string | null;
+}
+
+/**
+ * Get thumbnail from cache or generate it.
+ * Checks mtime to detect stale caches.
+ */
+export async function getOrGenerateThumbnail(
+  projectPath: string,
+  relativePath: string,
+  projectId: number,
+  size: ThumbnailSize,
+  outputDir: string,
+): Promise<ResolvedThumbnail> {
+  const absPath = validatePath(projectPath, relativePath);
+  const stats = fs.statSync(absPath);
+  const sourceHash = computeSourceHashLocal(projectId, relativePath, stats.mtime.toISOString(), stats.size);
+
+  // Check cache
+  const cached = getCachedThumbnail(sourceHash);
+  if (cached) {
+    const sizeField = size === 'grid' ? cached.grid_path : cached.preview_path;
+    if (sizeField) {
+      const cachedAbsPath = path.join(outputDir, sizeField);
+      if (fs.existsSync(cachedAbsPath)) {
+        return {
+          cachePath: cachedAbsPath,
+          width: cached.width || 0,
+          height: cached.height || 0,
+          exifDate: cached.exif_date,
+        };
+      }
+    }
+  }
+
+  // Generate new thumbnail
+  const result = await generateThumbnail(projectPath, relativePath, projectId, size, outputDir);
+
+  // Upsert cache record
+  upsertThumbnailCache({
+    source_hash: sourceHash,
+    source_path: relativePath,
+    source_size: stats.size,
+    source_mtime: stats.mtime.toISOString(),
+    grid_path: size === 'grid' ? result.relativePath : (cached?.grid_path || null),
+    preview_path: size === 'preview' ? result.relativePath : (cached?.preview_path || null),
+    video_cover_path: cached?.video_cover_path || null,
+    width: result.width,
+    height: result.height,
+    exif_date: result.exifDate || cached?.exif_date || null,
+  });
+
+  return {
+    cachePath: result.cachePath,
+    width: result.width,
+    height: result.height,
+    exifDate: result.exifDate,
+  };
+}
+
+function computeSourceHashLocal(projectId: number, relativePath: string, mtime: string, size: number): string {
+  const input = `${projectId}:${relativePath}:${mtime}:${size}`;
+  return crypto.createHash('sha256').update(input).digest('hex').slice(0, 16);
 }
