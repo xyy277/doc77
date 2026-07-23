@@ -1,9 +1,8 @@
 import { getConnection, type DatabaseCompat } from '@doc77/core';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import * as crypto from 'node:crypto';
 import { validatePath } from '@doc77/core';
-import { generateThumbnail } from './engine.js';
+import { generateThumbnail, computeSourceHash } from './engine.js';
 import type { ThumbnailSize } from '../types.js';
 
 /** Row in thumbnail_cache table */
@@ -83,7 +82,7 @@ export async function getOrGenerateThumbnail(
 ): Promise<ResolvedThumbnail> {
   const absPath = validatePath(projectPath, relativePath);
   const stats = fs.statSync(absPath);
-  const sourceHash = computeSourceHashLocal(projectId, relativePath, stats.mtime.toISOString(), stats.size);
+  const sourceHash = computeSourceHash(projectId, relativePath, stats.mtime.toISOString(), stats.size);
 
   // Check cache
   const cached = getCachedThumbnail(sourceHash);
@@ -126,9 +125,4 @@ export async function getOrGenerateThumbnail(
     height: result.height,
     exifDate: result.exifDate,
   };
-}
-
-function computeSourceHashLocal(projectId: number, relativePath: string, mtime: string, size: number): string {
-  const input = `${projectId}:${relativePath}:${mtime}:${size}`;
-  return crypto.createHash('sha256').update(input).digest('hex').slice(0, 16);
 }
