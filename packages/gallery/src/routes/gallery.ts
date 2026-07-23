@@ -118,13 +118,14 @@ export function createTimelineHandler() {
       const rows = db.prepare(
         `SELECT source_path, exif_date, source_mtime, grid_path, preview_path
          FROM thumbnail_cache
-         WHERE source_path LIKE ?`
-      ).all(dirPath ? `${dirPath}%` : '%') as any[];
+         WHERE project_id = ? AND source_path LIKE ?`
+      ).all(projectId, dirPath ? `${dirPath}%` : '%') as any[];
 
       // Group by month
       const groups: Map<string, { count: number; first: any }> = new Map();
       for (const row of rows) {
         const date = row.exif_date || row.source_mtime;
+        if (!date) continue;
         const month = date.slice(0, 7); // YYYY-MM
         if (!groups.has(month)) {
           groups.set(month, { count: 0, first: row });
@@ -134,16 +135,22 @@ export function createTimelineHandler() {
 
       const timeline: TimelineGroup[] = Array.from(groups.entries())
         .sort((a, b) => b[0].localeCompare(a[0])) // newest first
-        .map(([label, data]) => ({
-          label,
-          count: data.count,
-          start_date: `${label}-01`,
-          end_date: `${label}-31`,
-          cover: {
-            thumbnail_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(data.first.source_path)}&size=grid`,
-            preview_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(data.first.source_path)}&size=preview`,
-          },
-        }));
+        .map(([label, data]) => {
+          const [yearStr, monthStr] = label.split('-');
+          const year = parseInt(yearStr, 10);
+          const month = parseInt(monthStr, 10);
+          const lastDay = new Date(year, month, 0).getDate();
+          return {
+            label,
+            count: data.count,
+            start_date: `${label}-01`,
+            end_date: `${label}-${String(lastDay).padStart(2, '0')}`,
+            cover: {
+              thumbnail_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(data.first.source_path)}&size=grid`,
+              preview_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(data.first.source_path)}&size=preview`,
+            },
+          };
+        });
 
       res.json({ groups: timeline });
     } catch (e: any) {

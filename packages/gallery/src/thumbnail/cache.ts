@@ -9,6 +9,7 @@ import type { ThumbnailSize } from '../types.js';
 /** Row in thumbnail_cache table */
 export interface ThumbnailCacheRow {
   source_hash: string;
+  project_id: number;
   source_path: string;
   source_size: number;
   source_mtime: string;
@@ -34,10 +35,11 @@ export function upsertThumbnailCache(row: Omit<ThumbnailCacheRow, 'created_at'>)
   const db = getConnection();
   db.prepare(`
     INSERT INTO thumbnail_cache
-      (source_hash, source_path, source_size, source_mtime, grid_path, preview_path,
+      (source_hash, project_id, source_path, source_size, source_mtime, grid_path, preview_path,
        video_cover_path, width, height, exif_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(source_hash) DO UPDATE SET
+      project_id = excluded.project_id,
       source_mtime = excluded.source_mtime,
       grid_path = excluded.grid_path,
       preview_path = excluded.preview_path,
@@ -47,7 +49,7 @@ export function upsertThumbnailCache(row: Omit<ThumbnailCacheRow, 'created_at'>)
       exif_date = excluded.exif_date,
       created_at = datetime('now')
   `).run(
-    row.source_hash, row.source_path, row.source_size, row.source_mtime,
+    row.source_hash, row.project_id, row.source_path, row.source_size, row.source_mtime,
     row.grid_path, row.preview_path, row.video_cover_path,
     row.width, row.height, row.exif_date
   );
@@ -106,6 +108,7 @@ export async function getOrGenerateThumbnail(
   // Upsert cache record
   upsertThumbnailCache({
     source_hash: sourceHash,
+    project_id: projectId,
     source_path: relativePath,
     source_size: stats.size,
     source_mtime: stats.mtime.toISOString(),

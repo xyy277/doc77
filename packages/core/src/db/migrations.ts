@@ -55,6 +55,9 @@ export function runMigrations(db?: DatabaseCompat): void {
 
   // v5: Gallery tables (thumbnail cache, albums)
   conn.exec(GALLERY_SCHEMA_SQL);
+
+  // v6: Add project_id to thumbnail_cache for cross-project isolation
+  addColumnIfNotExists(conn, 'thumbnail_cache', 'project_id', 'INTEGER NOT NULL DEFAULT 0');
 }
 
 const SCHEMA_SQL = `
@@ -202,6 +205,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_last_opened ON projects(last_opened);
 const GALLERY_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS thumbnail_cache (
   source_hash TEXT PRIMARY KEY,
+  project_id INTEGER NOT NULL DEFAULT 0,
   source_path TEXT NOT NULL,
   source_size INTEGER NOT NULL,
   source_mtime TEXT NOT NULL,
