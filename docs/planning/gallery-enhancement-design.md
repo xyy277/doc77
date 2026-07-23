@@ -269,77 +269,300 @@ CREATE TABLE IF NOT EXISTS gallery_album_items (
 
 ---
 
-## 四、前端架构
+## 四、前端 UI 设计
 
-### 4.1 gallery.html（独立图片库页面）
+> **权威 UI 参考文件**：`docs/design/gallery_ui.html`
+>
+> 实现时必须参考该文件中的完整 HTML/CSS/JS 代码，包括所有 Tailwind class、CSS 自定义属性、动画曲线、间距、阴影、颜色、交互状态。以下文档是对该 UI 设计稿的结构化描述，但**具体样式以设计稿源码为准**。
 
-```
-┌────────────────────────────────────────────────────────┐
-│  Header: 项目选择器 │ 🔍 搜索 │ 视图切换 │ ⚙ 排序     │
-├──────────────┬─────────────────────────────────────────┤
-│              │                                         │
-│  📁 文件夹   │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐  │
-│    Photos/   │  │ thumb│ │ thumb│ │ ▶vid │ │ thumb│  │
-│    📅 2024-03│  │ name  │ │ name  │ │ name  │ │ name  │  │
-│    📅 2024-02│  └──────┘ └──────┘ └──────┘ └──────┘  │
-│  📅 时间线   │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┘  │
-│  📁 相册1    │  │      │ │      │ │      │             │
-│  📁 相册2    │  └──────┘ └──────┘ └──────┘             │
-│              │                                         │
-└──────────────┴─────────────────────────────────────────┘
-```
+### 4.0 Design Tokens
 
-- 侧边栏 3 个 tab 切换：文件夹树 / 时间线 / 相册列表
-- CSS Grid: `grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))`
-- 每张卡片：缩略图（`object-fit: cover`）+ 文件名（溢出省略）+ 类型徽标
-- 视频卡片：封面 + ▶ 播放图标 overlay + 时长 badge（若有）
-- 点击 → lightbox（gallery-lightbox.js）
-- Shift/Ctrl 多选 → 批量操作（加入相册、下载）
-- 拖拽文件/文件夹到页面 → 上传（复用现有 temp-preview 机制）
-- 响应式：手机端 `minmax(120px, 1fr)`，单列侧边栏折叠为底栏
+> **参考**：`docs/design/gallery_ui.html` lines 16-42（tailwind.config 扩展色板）、lines 48-119（CSS 自定义属性与动画）
 
-### 4.2 preview.html 内嵌画廊
+| Token | Value | Usage |
+|---|---|---|
+| Font | Inter (300/400/500/600/700), Google Fonts | 全局排版 |
+| Icons | Phosphor Icons (`@phosphor-icons/web`) | 所有图标，替代现有 emoji |
+| BG Primary | `#0f172a` (doc77-900) | 页面背景 |
+| BG Secondary | `#0b1121` | 主内容区背景（略深于 sidebar） |
+| BG Card | `doc77-800` | 卡片底色 |
+| Border | `doc77-800` | 分割线、卡片边框 |
+| Text Primary | `#f8fafc` | 标题、文件名 |
+| Text Secondary | `doc77-300` | 导航项 |
+| Text Muted | `doc77-400/500` | 元数据、辅助文本 |
+| Accent | `#3b82f6` (blue-500) | 主操作按钮、选中态 |
+| Shadow Soft | `0 4px 20px -2px rgba(0,0,0,0.05)` | 卡片默认 |
+| Shadow Glow | `0 0 15px rgba(59,130,246,0.5)` | Primary 按钮 |
+| Shadow Card Hover | `0 10px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.3)` | 卡片 hover |
+| Transition Card | `transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease` | 卡片交互 |
+| Transition Lightbox | `opacity 0.3s` | 灯箱开闭 |
+| Transition Panel | `transform 0.3s` | 信息面板滑入 |
 
-在现有文件树上方增加视图切换按钮：
-```
-[📋 列表] [📷 画廊]
-```
+### 4.1 页面布局 (gallery.html)
 
-切换到画廊时：
-- 左侧文件树区域替换为 grid 组件
-- 导航到某个目录 → grid 展示该目录下所有图片/视频
-- 点击图片 → 复用 gallery-lightbox.js
-- grid 组件从 gallery-core.js 引入（`gallery-core.js` 通过 `<script>` 标签在 preview.html 中加载，由 gallery webDir 提供）
-
-### 4.3 前端文件依赖（纯原生 JS，零构建）
+> **参考**：`docs/design/gallery_ui.html` 完整 DOM 结构 (lines 122-357)
 
 ```
-gallery.html:
-  → /gallery/js/gallery-core.js     (网格、懒加载)
-  → /gallery/js/gallery-lightbox.js (增强灯箱)
-  → /gallery/js/gallery-album.js    (相册管理)
-  → 公共依赖: app.css (主题变量)
-
-preview.html:
-  → /gallery/js/gallery-core.js     (复用网格组件)
-  → /gallery/js/gallery-lightbox.js (复用灯箱，替代现有的 openImageLightbox)
-  → 不再需要 preview.js 中的简易 lightbox 代码 (lines 2217-2296)
+┌─ Header (h-14) ───────────────────────────────────────────────────────┐
+│ [← Doc77] › My Photos › Gallery  │  🔍 Search... [esc] │ [Grid][List] │
+│                                   │                      [≡][↑][☑]   │
+├─ Sidebar (w-60) ──┬─ Main Content (flex-1, bg=#0b1121) ──────────────┤
+│                    │                                                   │
+│  NAV:              │  ┌─ Sticky Group Header ──────────────────────┐  │
+│  🖼 Photos (active) │  │ March 2024          12 items          [⋯]  │  │
+│  🕐 Timeline       │  ├────────────────────────────────────────────┤  │
+│  🎬 Videos         │  │  Masonry Grid (responsive columns)         │  │
+│  ⭐ Favorites      │  │  ┌────┐ ┌────┐ ┌──────┐ ┌────┐            │  │
+│                    │  │  │    │ │    │ │      │ │    │            │  │
+│  FOLDERS:          │  │  │    │ │    │ │      │ │    │            │  │
+│  📁 Camera Roll    │  │  └────┘ └────┘ └──────┘ └────┘            │  │
+│  📁 Screenshots    │  │  ┌──────┐ ┌────┐ ┌────┐ ┌──────┐          │  │
+│  📁 Downloads      │  │  │ ▶vid │ │    │ │    │ │      │          │  │
+│                    │  │  └──────┘ └────┘ └────┘ └──────┘          │  │
+│  ALBUMS:           │  │  ...                                       │  │
+│  🏔 Japan Trip  142│  ├────────────────────────────────────────────┤  │
+│  🐱 Pets        58 │  │ February 2024         8 items        [⋯]  │  │
+│  🖥 Wallpapers  24 │  │  ┌────┐ ┌──────┐ ┌────┐ ┌────┐            │  │
+│                    │  │  │    │ │      │ │    │ │    │            │  │
+│  ───────────────── │  │  └────┘ └──────┘ └────┘ └────┘            │  │
+│  Storage:          │  │                                             │  │
+│  ████░░░░ 25%      │  │  ⏳ Loading more memories...               │  │
+│  12.3/50 GB        │  │                                             │  │
+└────────────────────┴─┴───────────────────────────────────────────────┘
 ```
 
-静态资源通过 Express 提供：
-```typescript
-// register.ts
-app.use('/gallery', express.static(galleryWebDir));
+### 4.2 Header / App Bar
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ [← Doc77]  ›  📁 My Photos  ›  Gallery                              │
+│                                                                      │
+│              ┌──────────────────────────────┐  ┌─────┬─────┐ ┌────┐ │
+│              │ 🔍 Search photos, dates...   │  │ ▦ ▤ │  ≡  │ │ ☑  │ │
+│              │                       [esc]  │  │Grid │Sort │ │Sel │ │
+│              └──────────────────────────────┘  └─────┴─────┘ └────┘ │
+│                                                ↑View   ↑Filter      │
+│                                                Toggle               │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.4 enhanced lightbox 功能（gallery-lightbox.js）
+- **左侧**：返回按钮 + Doc77 Logo + 面包屑导航（项目名 › Gallery）
+- **中间**：搜索框（`rounded-full`, 带键盘快捷键 hint `esc`，focus 时显示）
+- **右侧**：
+  - 视图切换：Grid / List 两个 icon button，选中态 `bg-doc77-700`，未选中 `text-doc77-400`
+  - 分割线
+  - Sort & Filter 按钮（有 active filter 时显示蓝色小圆点 badge）
+  - Upload 按钮
+  - Select 按钮（`bg-blue-600`, 带 glow shadow，进入选择模式后变为 Cancel）
 
-在现有 lightbox 基础上增强：
-- 现有功能保留：缩放（25%-500%）、箭头导航、键盘操作、sibling 切换
-- **新增**：滑动/拖动切换（touch + mouse drag）、双指缩放（pinch zoom）
-- **新增**：信息面板（按 `I` 切换，显示 EXIF + 直方图占位）
-- **新增**：全屏模式（按 `F`，Fullscreen API）
-- **新增**：下载按钮、分享按钮
+### 4.3 侧边栏 (w-60, hidden on mobile)
+
+**结构**（自上而下，可滚动，`no-scrollbar`）：
+
+1. **Main Navigation**
+   - Photos（默认 active：`bg-blue-500/10 text-blue-400`，右侧显示 "All" badge）
+   - Timeline
+   - Videos
+   - Favorites（hover 时图标变黄 `group-hover:text-yellow-400`）
+
+2. **Folders Section**
+   - Header：「FOLDERS」（`text-xs uppercase tracking-wider`），可折叠（点击旋转 caret icon）
+   - 列表项：文件夹图标（`ph-fill ph-folder text-yellow-500/80`）+ 名称
+   - 左侧有竖线装饰（`border-l border-doc77-800`）
+
+3. **Albums Section**
+   - Header：「ALBUMS」+ ➕ 新建按钮
+   - 列表项：彩色渐变封面方块（`w-6 h-6 rounded bg-gradient-to-br`）+ 名称 + 数量 badge
+   - 示例配色：Japan Trip → purple→pink，Pets → green→emerald，Wallpapers → blue→indigo
+
+4. **Storage Info Bar**（固定在底部，`border-t`）
+   - 进度条：`h-1.5 rounded-full`，蓝色填充
+   - 文本：`12.3 GB / 50 GB`
+
+### 4.4 主内容区 — Masonry 网格
+
+> **参考**：`docs/design/gallery_ui.html` lines 77-118（CSS，columns/masonry 实现）、lines 315-355（HTML 分组结构）、lines 536-602（JS createMediaCard 函数）
+
+**分组标题**（sticky 吸顶）：
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ March 2024                  12 items                       [⋯]  │
+│ (text-lg font-bold, 底部 border, backdrop-blur 半透明背景)       │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Masonry Layout**（CSS Columns 实现）：
+
+```css
+.masonry-grid       { columns: 2; column-gap: 1rem; }
+@media (min-width: 640px)  { columns: 3; }
+@media (min-width: 1024px) { columns: 4; }
+@media (min-width: 1280px) { columns: 5; }
+@media (min-width: 1536px) { columns: 6; }
+
+.masonry-item       { break-inside: avoid; margin-bottom: 1rem; }
+```
+
+**卡片组件**（`.masonry-item.gallery-item`）：
+
+```
+┌──────────────────────────┐
+│ ⊙                    🎬  │  ← 左上：选择 checkbox（hover 显示）
+│                      0:45│  ← 右上：视频时长 badge（仅视频）
+│                          │
+│                          │  ← 图片：object-cover，hover 时 scale(1.05)
+│                          │
+│                          │
+│  ┌──────────────────────┐│  ← 底部渐变 overlay（hover 显示）
+│  │ IMG_8472.jpg         ││  ← 文件名（白色，text-xs，drop-shadow）
+│  └──────────────────────┘│
+└──────────────────────────┘
+```
+
+**卡片状态**：
+
+| 状态 | 视觉变化 |
+|---|---|
+| 默认 | `rounded-lg border border-doc77-700/50 bg-doc77-800` |
+| Hover | `translateY(-4px)` + 加强阴影 + 底部 overlay 淡入 + 图片 `scale(1.05)` + checkbox 显示 |
+| 选中（select mode） | 蓝色半透明 overlay + `border-2 border-blue-500` + checkbox 常显蓝底白勾 |
+| 视频卡片 | 右上角黑色半透明 badge：▶ play icon + 时长 |
+
+### 4.5 选择模式 (Select Mode)
+
+> **参考**：`docs/design/gallery_ui.html` lines 106-118（CSS 选中态）、lines 297-312（Selection Toolbar HTML）、lines 631-694（JS toggleSelectMode/updateSelectionUI）
+
+**触发**：点击 Header 中 Select 按钮，或点击卡片上的 checkbox
+
+**Selection Toolbar**（从顶部滑入，覆盖在内容区上方）：
+
+```
+┌─ Selection Toolbar (bg-blue-600, z-10) ──────────────────────────┐
+│ [✕]  3 Selected  │  Select All  │  [+ Album] [↓] [Share] │ [🗑] │
+│       (font-semibold text-lg)   │                             │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- 动画：`transform -translate-y-full → translate-y-0`（`duration-300`）
+- 批量操作：Add to Album / Download / Share / Delete（红色 hover）
+- 点击 ✕ 或 Cancel 退出选择模式，清除所有选中
+- **Select All**：选中当前范围内的所有媒体项
+
+**选中态卡片**：
+```css
+.gallery-item.selected .img-wrapper::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: rgba(59, 130, 246, 0.2);     /* 蓝色半透明 */
+  border: 2px solid #3b82f6;               /* 蓝色边框 */
+  border-radius: 0.5rem;
+}
+```
+
+### 4.6 Lightbox（灯箱）
+
+> **参考**：`docs/design/gallery_ui.html` lines 360-486（完整 Lightbox HTML 结构）、lines 697-775（JS openLightbox/closeLightbox/navLightbox/toggleInfoPanel/keydown handler）
+
+**整体**：`fixed inset-0 z-50 bg-black/95`，开闭时 `opacity 0→1` 过渡（300ms）
+
+```
+┌─ Lightbox Toolbar (顶部渐变黑→透明, absolute) ────────────────────┐
+│ [←] IMG_8472.jpg          │ [☆] [🔍+] [↓] [ℹ]                   │
+│     Mar 15, 2024 • 14:30  │  Favorite Zoom Download Info         │
+├────────────────────────────┴──────────────────────────────────────┤
+│                          ┌─────────┐                              │
+│              [◀]         │  IMAGE  │         [▶]                 │
+│            (left)        │         │        (right)              │
+│                          └─────────┘                              │
+│                    导航箭头 (hidden on mobile)                    │
+├──────────────────────────────────────────────────────────────────┤
+│  ← Info Panel (右侧滑入, w-80, bg-doc77-900) ──────────────────→ │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │ ℹ Details                                            [✕]   │ │
+│  │─────────────────────────────────────────────────────────────│ │
+│  │ FILE INFO                                                  │ │
+│  │ ┌─────────────────────────────────────────────────────────┐ │ │
+│  │ │ Name       DSC_0842.JPG                                 │ │ │
+│  │ │ Date       Mar 15, 2024                                 │ │ │
+│  │ │ Size       4.2 MB                                       │ │ │
+│  │ │ Resolution 6000 x 4000                                  │ │ │
+│  │ └─────────────────────────────────────────────────────────┘ │ │
+│  │                                                             │ │
+│  │ CAMERA EXIF                                                │ │
+│  │ ┌─────────────────────────────────────────────────────────┐ │ │
+│  │ │ 📷 Sony ILCE-7M4                                       │ │ │
+│  │ │    FE 24-70mm F2.8 GM II                                │ │ │
+│  │ │─────────────────────────────────────────────────────────│ │ │
+│  │ │  ISO 400  │  Aperture f/2.8  │  Shutter 1/250s  │ 35mm │ │ │
+│  │ └─────────────────────────────────────────────────────────┘ │ │
+│  │                                                             │ │
+│  │ LOCATION                                                   │ │
+│  │ ┌─────────────────────────────────────────────────────────┐ │ │
+│  │ │              📍 No GPS data                             │ │ │
+│  │ │         (dot-grid placeholder background)               │ │ │
+│  │ └─────────────────────────────────────────────────────────┘ │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**键盘快捷键**：
+
+| 键 | 操作 |
+|---|---|
+| `Escape` | 关闭灯箱 |
+| `←` / `→` | 前后导航（循环） |
+| `I` | 切换 Info Panel |
+
+**导航动画**：切换图片时，旧图 `opacity: 0.5, scale(0.98) + translateX(±20px)` → 150ms 后新图淡入归位。
+
+### 4.7 preview.html 内嵌画廊
+
+预览页视图切换沿用 gallery.html 的设计语言：
+
+```
+文件树上方:
+  ┌──────────────────────┐
+  │  [📋 List] [📷 Grid] │  ← 与 gallery.html Header 中一致的 toggle
+  └──────────────────────┘
+
+切换到 Grid 时：
+  - 左侧区域变为 masonry grid（复用 gallery-core.js 的 createMediaCard 函数）
+  - 当前目录的图片/视频按 date 分组（若当前目录无子目录，不分组直接网格）
+  - 点击图片 → 打开同一 lightbox（复用 gallery-lightbox.js）
+  - 选择模式也可用（无 Selection Toolbar，用 preview 自身 toolbar）
+```
+
+### 4.8 响应式行为
+
+| 断点 | 行为 |
+|---|---|
+| `< md` (768px) | 侧边栏隐藏，底部 tab bar 替代；header 简化 |
+| `md–lg` (768-1024px) | 侧边栏显示但可折叠；masonry 3-4 列 |
+| `lg–xl` (1024-1280px) | 完整布局；masonry 4-5 列 |
+| `> 2xl` (1536px+) | masonry 6 列，充分利用超宽屏 |
+
+### 4.9 前端文件清单
+
+```
+gallery.html 依赖:
+  → tailwindcss CDN (已沿用现有 preview.html 的 CDN 模式)
+  → Phosphor Icons CDN (unpkg/@phosphor-icons/web)
+  → Google Fonts: Inter
+  → /gallery/js/gallery-core.js     (masonry 网格、卡片组件、懒加载、选择模式)
+  → /gallery/js/gallery-lightbox.js (增强灯箱、EXIF 信息面板、键盘导航)
+  → /gallery/js/gallery-album.js    (相册管理 UI)
+
+preview.html 复用:
+  → /gallery/js/gallery-core.js     (createMediaCard 函数)
+  → /gallery/js/gallery-lightbox.js (替代现有 openImageLightbox)
+```
+
+### 4.10 与现有设计系统的关系
+
+- **Phosphor Icons 替代 emoji**：gallery.html 使用 Phosphor Icons（矢量、统一风格），与现有 preview.html 的 emoji 图标体系并存。后续可逐步迁移。
+- **Tailwind 沿用**：gallery.html 使用 Tailwind CDN（与 preview.html 一致），自定义 `doc77-*` 色板扩展。
+- **Dark-only**：gallery.html 为深色主题专属设计，符合图片库"沉浸式浏览"的产品意图。Dashboard 和 Preview 页保持双主题不变。
+- **app.css 共享**：公共变量（主题色、间距）从 app.css 引入，gallery 特有样式内联或 gallery.css。
 
 ---
 
