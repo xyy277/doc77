@@ -52,6 +52,9 @@ export function runMigrations(db?: DatabaseCompat): void {
 
   // v4: Project tags (JSON array)
   addColumnIfNotExists(conn, 'projects', 'tags', "TEXT NOT NULL DEFAULT '[]'");
+
+  // v5: Gallery tables (thumbnail cache, albums)
+  conn.exec(GALLERY_SCHEMA_SQL);
 }
 
 const SCHEMA_SQL = `
@@ -194,4 +197,40 @@ CREATE TABLE IF NOT EXISTS recent_files (
 CREATE INDEX IF NOT EXISTS idx_favorites_created ON favorites(created_at);
 CREATE INDEX IF NOT EXISTS idx_recent_files_viewed ON recent_files(viewed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_projects_last_opened ON projects(last_opened);
+`;
+
+const GALLERY_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS thumbnail_cache (
+  source_hash TEXT PRIMARY KEY,
+  source_path TEXT NOT NULL,
+  source_size INTEGER NOT NULL,
+  source_mtime TEXT NOT NULL,
+  grid_path TEXT,
+  preview_path TEXT,
+  video_cover_path TEXT,
+  width INTEGER,
+  height INTEGER,
+  exif_date TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_thumbnail_source_path ON thumbnail_cache(source_path);
+
+CREATE TABLE IF NOT EXISTS gallery_albums (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  cover_source_hash TEXT,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS gallery_album_items (
+  album_id INTEGER REFERENCES gallery_albums(id) ON DELETE CASCADE,
+  project_id INTEGER NOT NULL,
+  file_path TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  added_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (album_id, project_id, file_path)
+);
 `;
