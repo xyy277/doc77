@@ -54,12 +54,13 @@ export function upsertThumbnailCache(row: Omit<ThumbnailCacheRow, 'created_at'>)
   );
 }
 
-/** Get all thumbnail records for a project by source_path prefix lookup */
-export function getCachedByPathPrefix(sourcePath: string): ThumbnailCacheRow | undefined {
+/** Get cached thumbnail by source_path prefix, with optional project_id filter */
+export function getCachedByPathPrefix(sourcePath: string, projectId?: number): ThumbnailCacheRow | undefined {
   const db = getConnection();
-  return db.prepare(
-    'SELECT * FROM thumbnail_cache WHERE source_path = ?'
-  ).get(sourcePath) as ThumbnailCacheRow | undefined;
+  const sql = projectId
+    ? 'SELECT * FROM thumbnail_cache WHERE source_path = ? AND project_id = ?'
+    : 'SELECT * FROM thumbnail_cache WHERE source_path = ?';
+  return db.prepare(sql).get(...(projectId ? [sourcePath, projectId] : [sourcePath])) as ThumbnailCacheRow | undefined;
 }
 
 export interface ResolvedThumbnail {
