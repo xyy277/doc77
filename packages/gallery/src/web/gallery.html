@@ -161,10 +161,10 @@
         <div class="flex items-center gap-1 sm:gap-2">
             <!-- View Toggles -->
             <div class="flex bg-doc77-950 rounded-lg p-0.5 border border-doc77-800">
-                <button class="p-1.5 rounded-md bg-doc77-700 text-white shadow-sm" title="Grid View" id="btn-grid-view">
+                <button class="p-1.5 rounded-md bg-doc77-700 text-white shadow-sm" title="Grid View" id="btn-grid-view" onclick="switchView('grid')">
                     <i class="ph ph-squares-four text-lg"></i>
                 </button>
-                <button class="p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors" title="List View" id="btn-list-view">
+                <button class="p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors" title="List View" id="btn-list-view" onclick="switchView('list')">
                     <i class="ph ph-list-dashes text-lg"></i>
                 </button>
             </div>
@@ -296,10 +296,53 @@
             selectMode: false,
             selectedIds: new Set(),
             currentView: 'photos',
+            viewMode: 'grid',
             sortBy: 'date',
             sortOrder: 'desc',
             searchQuery: ''
         };
+
+        function switchView(mode) {
+            state.viewMode = mode;
+            var gridBtn = document.getElementById('btn-grid-view');
+            var listBtn = document.getElementById('btn-list-view');
+            if (mode === 'grid') {
+                gridBtn.className = 'p-1.5 rounded-md bg-doc77-700 text-white shadow-sm';
+                listBtn.className = 'p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors';
+            } else {
+                listBtn.className = 'p-1.5 rounded-md bg-doc77-700 text-white shadow-sm';
+                gridBtn.className = 'p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors';
+            }
+            loadGallery(state.currentPath, true);
+        }
+
+        function renderListView(container, items) {
+            container.innerHTML = '';
+            var list = document.createElement('div');
+            list.className = 'flex flex-col gap-1';
+            items.forEach(function(item) {
+                var row = document.createElement('div');
+                row.className = 'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-doc77-800 cursor-pointer transition-colors border border-transparent hover:border-doc77-700/50';
+                row.onclick = function() { window.GalleryLightbox.open(item, state.items, state.projectId); };
+                var thumb = document.createElement('img');
+                thumb.src = item.thumbnail_url;
+                thumb.className = 'w-10 h-10 rounded object-cover bg-doc77-800 shrink-0';
+                thumb.loading = 'lazy';
+                var info = document.createElement('div');
+                info.className = 'flex-1 min-w-0';
+                info.innerHTML = '<div class="text-sm text-doc77-100 truncate">' + item.name + '</div><div class="text-xs text-doc77-500">' + (item.type === 'video' ? '🎬 ' : '') + formatSize(item.size) + '</div>';
+                row.appendChild(thumb);
+                row.appendChild(info);
+                list.appendChild(row);
+            });
+            container.appendChild(list);
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
 
         // --- Initialization ---
         async function init() {
@@ -404,17 +447,21 @@
                 state.total = data.total || 0;
 
                 var container = document.getElementById('gallery-container');
-                window.GalleryCore.renderGrid(container, state.items, {
-                    grouped: state.currentView === 'photos' || state.currentView === 'videos',
-                    projectId: state.projectId,
-                    onCardClick: function(item) {
-                        if (state.selectMode) {
-                            toggleSelection(item.path || item.id, null);
-                        } else {
-                            window.GalleryLightbox.open(item, state.items, state.projectId);
+                if (state.viewMode === 'list') {
+                    renderListView(container, state.items);
+                } else {
+                    window.GalleryCore.renderGrid(container, state.items, {
+                        grouped: state.currentView === 'photos' || state.currentView === 'videos',
+                        projectId: state.projectId,
+                        onCardClick: function(item) {
+                            if (state.selectMode) {
+                                toggleSelection(item.path || item.id, null);
+                            } else {
+                                window.GalleryLightbox.open(item, state.items, state.projectId);
+                            }
                         }
-                    }
                 });
+                }
                 window.GalleryCore.setupLazyLoading();
                 updateBreadcrumbPath();
             } catch (e) {
@@ -530,13 +577,14 @@
         }
 
         async function createAlbum() {
-            var name = prompt('New album name:');
+            var name = await window.promptDialog({ title: 'New Album', message: 'Enter album name:', placeholder: 'Album name' });
             if (!name || !name.trim()) return;
             try {
                 await window.GalleryAlbum.createAlbum(name.trim(), '');
                 loadAlbums();
+                window.toast('Album created', 'success');
             } catch (e) {
-                alert('Failed to create album');
+                window.toast('Failed to create album', 'error');
             }
         }
 
@@ -709,19 +757,19 @@
         async function addSelectedToAlbum() {
             var paths = Array.from(state.selectedIds);
             if (paths.length === 0) {
-                alert('No items selected');
+                window.toast('No items selected', 'warning');
                 return;
             }
-            var albumId = prompt('Enter Album ID to add ' + paths.length + ' selected items:');
+            var albumId = await window.promptDialog({ title: 'Add to Album', message: 'Enter Album ID for ' + paths.length + ' items:', placeholder: 'Album ID', type: 'number' });
             if (!albumId || !albumId.trim()) return;
             try {
                 await window.GalleryAlbum.addToAlbum(parseInt(albumId.trim()), state.projectId, paths);
                 state.selectedIds.clear();
                 updateSelectionUI();
                 toggleSelectMode();
-                alert('Added ' + paths.length + ' items to album successfully');
+                window.toast('Added ' + paths.length + ' items to album', 'success');
             } catch (e) {
-                alert('Failed to add to album: ' + (e.message || 'unknown error'));
+                window.toast('Failed to add to album: ' + (e.message || 'unknown error'), 'error');
             }
         }
 
@@ -750,7 +798,7 @@
             input.multiple = true;
             input.accept = 'image/*,video/*';
             input.onchange = function() {
-                alert('Upload via API: POST /api/upload/' + state.projectId);
+                window.toast('Upload started', 'info');
             };
             input.click();
         }
