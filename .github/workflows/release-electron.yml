@@ -57,9 +57,9 @@ jobs:
       - name: Sync version
         run: node scripts/sync-version.cjs
 
-      - name: Build core + CLI
+      - name: Build core + CLI + gallery
         run: |
-          pnpm --filter @doc77/core --filter @doc77/cli build
+          pnpm --filter @doc77/core --filter @doc77/gallery --filter @doc77/cli build
 
       - name: Download vendor assets
         run: |

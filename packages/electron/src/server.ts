@@ -28,7 +28,7 @@ interface CoreModule {
   createAIChatHandler: (deps: Record<string, unknown>) => unknown;
   createQueueApproveHandler: (executeApprovedTasks: unknown) => unknown;
   createEventsHandler: (eventBus: unknown) => unknown;
-  setCapabilities: (caps: { ai: boolean; mcp: boolean; translate: boolean }) => void;
+  setCapabilities: (caps: { ai: boolean; mcp: boolean; translate: boolean; gallery: boolean }) => void;
   isEngineAvailable: () => Promise<boolean>;
   getConfig: (key: string) => string | undefined;
 }
@@ -122,7 +122,21 @@ async function registerInstalledModules(core: CoreModule, app: ExpressLike): Pro
   } catch {
     /* engine probe failed — report unavailable */
   }
-  core.setCapabilities({ ai: !!ai, mcp: !!mcp, translate });
+
+  // Gallery — first-party feature loaded from workspace, not a one-click module.
+  let galleryAvailable = false;
+  try {
+    const gallery = await dynamicImport('@doc77/gallery');
+    if (gallery?.registerGalleryRoutes) {
+      const thumbnailsDir = path.join(os.homedir(), '.doc77', 'thumbnails');
+      await gallery.registerGalleryRoutes(app, { thumbnailsDir });
+      galleryAvailable = true;
+    }
+  } catch {
+    /* gallery not built or unavailable */
+  }
+
+  core.setCapabilities({ ai: !!ai, mcp: !!mcp, translate, gallery: galleryAvailable });
 }
 
 /** Find an available port starting from `start`, up to `start + 99`. */
