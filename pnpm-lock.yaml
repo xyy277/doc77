@@ -139,6 +139,10 @@ importers:
       sharp:
         specifier: ^0.33.0
         version: 0.33.0
+    devDependencies:
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
 
   packages/mcp:
     dependencies:
