@@ -33,7 +33,7 @@
     }
   },
   "scripts": {
-    "build": "tsup && node -e \"require('fs').cpSync('src/web','dist/web',{recursive:true})\" && node -e \"const fs=require('fs');const p=require('path');['index.html','preview.html'].forEach(f=>{const fp=p.join('dist/web',f);if(!fs.existsSync(fp)){console.error('ERROR: '+fp+' missing after build');process.exit(1)}});console.log('Build OK: web assets verified')\"",
+    "build": "tsup && node -e \"require('fs').cpSync('src/web','dist/web',{recursive:true})\" && npx @tailwindcss/cli -i src/web/css/tailwind.css -o dist/web/css/tailwind.css --minify && node -e \"const fs=require('fs');const p=require('path');['index.html','preview.html'].forEach(f=>{const fp=p.join('dist/web',f);if(!fs.existsSync(fp)){console.error('ERROR: '+fp+' missing after build');process.exit(1)}});console.log('Build OK: web assets verified')\"",
     "dev": "tsup --watch",
     "dev:start": "pnpm -w run dev:start",
     "dev:restart": "pnpm -w run dev:restart",
@@ -50,6 +50,7 @@
   },
   "devDependencies": {
     "@huggingface/transformers": "^4.2.0",
+    "@tailwindcss/cli": "^4.3.3",
     "@types/express": "^5.0.0",
     "@types/qrcode": "^1.5.6"
   },

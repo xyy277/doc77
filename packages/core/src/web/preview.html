@@ -1,47 +1,23 @@
 <!DOCTYPE html>
-<html lang="zh-CN" class="h-full tw-loading" data-i18n-page>
+<html lang="zh-CN" class="h-full" data-i18n-page>
 <head>
 <script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
 <style>.i18n-loading body{visibility:hidden}</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title data-i18n="web.preview.pageTitle">Doc77 — Preview</title>
-<!-- 尽早应用主题 + 隐藏内容直到 Tailwind 就绪，避免切换/进入项目时的样式闪烁(FOUC) -->
+<!-- 尽早应用主题 + 静态 Tailwind CSS -->
 <script>(function(){try{var s=localStorage.getItem('doc77-theme');var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();</script>
 <style>
 html{background:#f8fafc}html.dark{background:#0f172a}
-/* Tailwind 就绪前隐藏正文，只显示加载动画，避免样式闪烁(FOUC) */
-html.tw-loading body{visibility:hidden}
-.boot-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;visibility:visible;z-index:9999}
-html:not(.tw-loading) .boot-overlay{display:none}
-.boot-spinner{width:34px;height:34px;border:3px solid rgba(100,116,139,.25);border-top-color:#3b82f6;border-radius:50%;animation:bootspin .7s linear infinite}
-@keyframes bootspin{to{transform:rotate(360deg)}}
 </style>
-<script>window.__VENDOR_READY=false;fetch('/vendor/.ready').then(r=>{if(r.ok)window.__VENDOR_READY=true}).catch(()=>{});</script>
-<script>
-(function(){
-  var revealed = false;
-  function reveal(){ if (revealed) return; revealed = true; document.documentElement.classList.remove('tw-loading'); }
-  var s = document.createElement('script');
-  s.src = (window.__VENDOR_READY ? '/vendor/tailwind.js' : 'https://cdn.tailwindcss.com');
-  s.onload = function() {
-    try { tailwind.config = { darkMode: 'class', theme: { extend: {} } }; } catch(e) {}
-    // 等 JIT 应用 config 后再显示，避免闪一下默认样式
-    requestAnimationFrame(function(){ requestAnimationFrame(reveal); });
-  };
-  s.onerror = reveal; // CDN unreachable — don't hide forever
-  document.head.appendChild(s);
-  setTimeout(reveal, 3000); // fallback: show after 3s regardless
-})();
-</script>
+<link rel="stylesheet" href="css/tailwind.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme">
 <link rel="stylesheet" id="katexCss" data-src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="css/app.css">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 </head>
 <body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden">
-<!-- 加载动画：Tailwind 就绪后由 tw-loading 移除自动隐藏 -->
-<div class="boot-overlay"><div class="boot-spinner"></div></div>
 
 <div class="flex h-screen w-full">
 
@@ -93,11 +69,6 @@ html:not(.tw-loading) .boot-overlay{display:none}
       <div class="collapsible-content flex flex-col flex-1 min-h-0">
       <div class="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider flex justify-between items-center shrink-0"><span data-i18n="web.preview.sidebar.fileTree">File Tree</span><button class="hover:text-slate-300 transition-colors" data-i18n-title="web.preview.sidebar.refreshCache" title="Refresh cache" onclick="refreshTree()">🔄</button></div>
       <div class="px-3 mb-2 shrink-0"><div class="relative"><span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span><input id="fileFilter" data-i18n-placeholder="web.preview.sidebar.filterFiles" placeholder="Filter files..." oninput="applyFilter()" class="w-full bg-slate-950 border border-slate-800 rounded-md pl-8 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"></div></div>
-      <!-- View toggle: shown when gallery capability is available -->
-      <div class="view-toggle px-3 pb-2 shrink-0" id="viewToggle" style="display:none">
-        <button class="active flex-1 px-2 py-1 text-xs font-medium rounded-l-md border border-slate-700 bg-blue-600 text-white" data-view="list">📋 List</button>
-        <button class="flex-1 px-2 py-1 text-xs font-medium rounded-r-md border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700" data-view="grid">📷 Grid</button>
-      </div>
       <div class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-dark" id="tree" role="tree"><div class="text-center py-6 text-slate-500 text-xs"><span data-i18n="web.preview.sidebar.selectProject">Select a project to start</span></div></div>
       </div>
     </div>
@@ -147,9 +118,9 @@ html:not(.tw-loading) .boot-overlay{display:none}
         <button id="runBtn" disabled onclick="runCode()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed hidden" data-i18n-title="web.preview.toolbar.runCode" title="Run code">▶ <span class="hidden sm:inline" data-i18n="web.preview.toolbar.run">Run</span></button>
         <button id="aiBtn" disabled onclick="doAISummary()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md transition-colors border border-purple-100 dark:border-purple-800 disabled:opacity-40 disabled:cursor-not-allowed">✨ <span class="hidden sm:inline" data-i18n="web.preview.toolbar.aiSummary">AI Summary</span></button>
         <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
-        <button id="editBtn" disabled onclick="toggleEditMode()" class="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.editFile" title="Edit">✏️ <span class="hidden sm:inline" data-i18n="web.preview.toolbar.editFile">Edit</span></button>
-        <button id="externalEditBtn" disabled onclick="revealFile('edit')" class="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.openExternalEditor" title="Open in Editor">↗️ <span class="hidden sm:inline" data-i18n="web.preview.toolbar.openExternalEditor">Open in Editor</span></button>
-        <button id="revealBtn" disabled onclick="revealFile('reveal')" class="flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.showInFolder" title="Show in folder">📂 <span class="hidden sm:inline" data-i18n="web.preview.toolbar.showInFolder">Show in folder</span></button>
+        <button id="editBtn" disabled onclick="toggleEditMode()" class="hidden sm:flex items-center justify-center w-8 h-8 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.editFile" title="Edit">✏️</button>
+        <button id="externalEditBtn" disabled onclick="revealFile('edit')" class="hidden sm:flex items-center justify-center w-8 h-8 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.openExternalEditor" title="Open in Editor">↗️</button>
+        <button id="revealBtn" disabled onclick="revealFile('reveal')" class="flex items-center justify-center w-8 h-8 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.showInFolder" title="Show in folder">📂</button>
         <button id="exportBtn" disabled onclick="exportHTML()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.exportTitle" title="Export as self-contained HTML">📥 <span class="hidden sm:inline" data-i18n="web.preview.toolbar.export">Export</span></button>
         <button id="shareBtn" disabled onclick="shareDocument()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed" data-i18n-title="web.preview.toolbar.shareTitle" title="Create LAN share link">🔗 <span class="hidden sm:inline" data-i18n="web.preview.toolbar.share">Share</span></button>
       </div>

@@ -13,7 +13,6 @@ export interface VendorAsset {
 }
 
 export const VENDOR_ASSETS: VendorAsset[] = [
-  { name: 'tailwind.js', url: 'https://cdn.tailwindcss.com', type: 'js', size: '~500KB' },
   {
     name: 'mermaid.min.js',
     url: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js',

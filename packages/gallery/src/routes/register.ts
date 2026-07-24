@@ -8,7 +8,7 @@ import { createExifHandler } from './exif.js';
 import {
   createAlbumListHandler, createAlbumCreateHandler,
   createAlbumUpdateHandler, createAlbumDeleteHandler,
-  createAlbumAddItemHandler, createAlbumRemoveItemHandler,
+  createAlbumAddItemHandler, createAlbumRemoveItemHandler, createAlbumItemsListHandler,
 } from '../album/routes.js';
 
 /**
@@ -38,6 +38,7 @@ export async function registerGalleryRoutes(app: Application, opts: GalleryOptio
   app.post('/api/albums', createAlbumCreateHandler());
   app.put('/api/albums/:albumId', createAlbumUpdateHandler());
   app.delete('/api/albums/:albumId', createAlbumDeleteHandler());
+  app.get('/api/albums/:albumId/items', createAlbumItemsListHandler());
   app.post('/api/albums/:albumId/items', createAlbumAddItemHandler());
   app.delete('/api/albums/:albumId/items', createAlbumRemoveItemHandler());
 

@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Doc77 Gallery</title>
+    <!-- FOUC prevention: apply theme class before any rendering -->
+    <script>(function(){try{var s=localStorage.getItem('doc77-theme');var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();</script>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
     <!-- Tailwind CSS Setup -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons for elegant, modern iconography -->
@@ -45,23 +48,37 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
         body {
+            background-color: #f5f7fa; /* doc77-50 */
+            color: #0f172a; /* doc77-900 */
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .dark body {
             background-color: #0f172a; /* doc77-900 */
             color: #f8fafc;
         }
 
-        /* Custom Scrollbar for dark theme */
+        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: rgba(30, 41, 59, 0.5); /* doc77-800 with opacity */
+            background: #eef2f6; /* doc77-100 */
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5); /* doc77-800/50 */
         }
         ::-webkit-scrollbar-thumb {
-            background: #334155; /* doc77-700 */
+            background: #cbd5e1; /* doc77-300 */
             border-radius: 4px;
         }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155; /* doc77-700 */
+        }
         ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; /* doc77-400 */
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
             background: #475569; /* doc77-600 */
         }
 
@@ -95,17 +112,171 @@
         }
         .image-card-hover:hover {
             transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .dark .image-card-hover:hover {
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
         }
 
         /* Image overlay gradient */
         .img-overlay {
+            background: linear-gradient(to top, rgba(248, 250, 252, 0.8) 0%, rgba(248, 250, 252, 0) 50%);
+        }
+        .dark .img-overlay {
             background: linear-gradient(to top, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0) 50%);
+        }
+
+        /* === Dark Mode Sidebar (explicit rules — matches gallery_ui_dark.html) === */
+        .dark #sidebar {
+            background-color: rgba(15, 23, 42, 0.5); /* doc77-900/50 */
+            border-color: #1e293b; /* doc77-800 */
+        }
+        .dark #sidebar nav a {
+            color: #cbd5e1; /* doc77-300 */
+        }
+        .dark #sidebar nav a.bg-blue-50,
+        .dark #sidebar nav a.text-blue-600 {
+            background-color: rgba(59, 130, 246, 0.1) !important; /* blue-500/10 */
+            color: #60a5fa !important; /* blue-400 */
+        }
+        .dark #sidebar nav a:hover {
+            background-color: #1e293b; /* doc77-800 */
+            color: #f8fafc; /* doc77-100 */
+        }
+        .dark #sidebar .group-hover\:text-doc77-200,
+        .dark #sidebar nav a:hover i {
+            color: #e1e7ef; /* doc77-200 */
+        }
+        .dark #sidebar nav a[data-view="favorites"]:hover i {
+            color: #facc15; /* yellow-400 */
+        }
+        .dark #sidebar ul[id="folder-list"] {
+            border-color: #1e293b; /* doc77-800 */
+        }
+        .dark #folder-list a,
+        .dark #album-list a {
+            color: #cbd5e1; /* doc77-300 */
+        }
+        .dark #folder-list a:hover,
+        .dark #album-list a:hover {
+            background-color: #1e293b; /* doc77-800 */
+        }
+        .dark #sidebar .border-t {
+            border-color: #1e293b; /* doc77-800 */
+        }
+        .dark #sidebar .bg-doc77-50 {
+            background-color: rgba(15, 23, 42, 0.8); /* doc77-900/80 */
+        }
+
+        /* === Dark Mode Header (explicit rules — matches gallery_ui_dark.html) === */
+        .dark header {
+            background-color: #0f172a; /* doc77-900 */
+            border-color: #1e293b; /* doc77-800 */
+        }
+        .dark header #search-input {
+            background-color: #020617; /* doc77-950 */
+            border-color: #334155; /* doc77-700 */
+            color: #f8fafc;
+        }
+        .dark header #search-input::placeholder {
+            color: #64748b; /* doc77-500 */
+        }
+        .dark header #search-input:focus {
+            border-color: #64748b; /* doc77-500 */
+            background-color: #1e293b; /* doc77-800 */
+        }
+        .dark header .bg-doc77-50 {
+            background-color: #020617; /* doc77-950 — view toggle container */
+        }
+        .dark header .border-doc77-200 {
+            border-color: #1e293b; /* doc77-800 */
+        }
+        .dark header .bg-doc77-200 {
+            background-color: #334155; /* doc77-700 — cancel btn */
+        }
+
+        /* === Dark Mode Main Area === */
+        .dark main {
+            background-color: #0b1121;
+        }
+
+        /* Thumbnail navigator (lightbox) */
+        .lb-thumb-nav {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            width: 160px;
+            height: 120px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(0,0,0,0.6);
+            z-index: 10;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .lb-thumb-nav .lb-thumb-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            opacity: 0.6;
+        }
+        .lb-thumb-nav .lb-thumb-box {
+            position: absolute;
+            top: 0; left: 0;
+            border: 2px solid #3b82f6;
+            background: rgba(59, 130, 246, 0.15);
+            border-radius: 2px;
+        }
+
+        /* === Dark Mode: dynamically-created elements (JS-generated DOM) === */
+
+        /* Section group headers (gallery-core.js renderGrid) */
+        .dark .section-header {
+            background-color: rgba(11, 17, 33, 0.95); /* [#0b1121]/95 */
+            border-color: rgba(30, 41, 59, 0.5); /* doc77-800/50 */
+        }
+
+        /* Card wrapper (gallery-core.js createMediaCard) */
+        .dark .gallery-item.masonry-item {
+            background-color: #1e293b; /* doc77-800 */
+            border-color: rgba(51, 65, 85, 0.5); /* doc77-700/50 */
+        }
+
+        /* Sort/filter dropdown (setupSortFilter) */
+        .dark #sort-dropdown {
+            background-color: #0f172a; /* doc77-900 */
+            border-color: #334155; /* doc77-700 */
+        }
+        .dark #sort-dropdown button {
+            color: #cbd5e1; /* doc77-300 */
+        }
+        .dark #sort-dropdown button:hover {
+            background-color: #1e293b; /* doc77-800 */
+            color: #fff;
+        }
+
+        /* List view rows (renderListView) */
+        .dark .flex.flex-col.gap-1 > div {
+            color: #f8fafc; /* text-doc77-100 */
+        }
+        .dark .flex.flex-col.gap-1 > div:hover {
+            background-color: #1e293b; /* doc77-800 */
+            border-color: rgba(51, 65, 85, 0.5); /* doc77-700/50 */
+        }
+
+        /* Project picker buttons (renderProjectPicker) */
+        .dark #gallery-container button.bg-doc77-100 {
+            background-color: #1e293b; /* doc77-800 */
+            color: #e1e7ef; /* doc77-200 */
+        }
+        .dark #gallery-container button.bg-doc77-100:hover {
+            background-color: #334155; /* doc77-700 */
         }
 
         /* Select mode styling */
         .select-mode-active .gallery-item-checkbox {
             display: flex;
+            opacity: 1 !important;
         }
         .gallery-item.selected .img-wrapper::after {
             content: '';
@@ -117,18 +288,46 @@
             pointer-events: none;
         }
 
+        /* Theme toggle button — matches dashboard's btn-icon */
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border-radius: 6px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: #64748b; /* doc77-500 */
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+        .btn-icon:hover {
+            background: #eef2f6; /* doc77-100 */
+            color: #0f172a; /* doc77-900 */
+        }
+        .dark .btn-icon {
+            color: #94a3b8; /* doc77-400 */
+        }
+        .dark .btn-icon:hover {
+            background: #1e293b; /* doc77-800 */
+            color: #f8fafc;
+        }
+
     </style>
 </head>
 <body class="h-screen w-full overflow-hidden flex flex-col font-sans text-sm">
 
     <!-- Top Header / App Bar -->
-    <header class="h-14 shrink-0 bg-doc77-900 border-b border-doc77-800 flex items-center justify-between px-4 z-20">
+    <header class="h-14 shrink-0 bg-white border-b border-doc77-200 dark:bg-doc77-900 dark:border-doc77-800 flex items-center justify-between px-4 z-20 transition-colors duration-200">
         <!-- Left: Branding & Context -->
         <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2 text-doc77-300 hover:text-white transition-colors cursor-pointer" onclick="goBackToDashboard()">
+            <div class="flex items-center gap-2 text-doc77-600 hover:text-doc77-900 dark:text-doc77-300 dark:hover:text-white transition-colors cursor-pointer" onclick="goBackToDashboard()">
                 <i class="ph ph-arrow-left text-lg"></i>
-                <div class="flex items-center gap-2 px-2 py-1 bg-doc77-800 rounded-md">
-                    <span class="font-bold text-white text-base tracking-tight flex items-center gap-1">
+                <div class="flex items-center gap-2 px-2 py-1 bg-doc77-100 dark:bg-doc77-800 rounded-md">
+                    <span class="font-bold text-doc77-900 dark:text-white text-base tracking-tight flex items-center gap-1">
                         <span class="bg-blue-600 text-white rounded px-1.5 py-0.5 text-xs font-black">77</span>
                         Doc77
                     </span>
@@ -136,46 +335,49 @@
             </div>
 
             <!-- Breadcrumbs / Project Name -->
-            <div class="hidden sm:flex items-center text-doc77-400">
+            <div class="hidden sm:flex items-center text-doc77-500 dark:text-doc77-400">
                 <i class="ph ph-caret-right text-xs mx-1"></i>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-doc77-800 cursor-pointer transition-colors text-doc77-200" onclick="resetToPhotos()">
+                <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-doc77-100 dark:hover:bg-doc77-800 cursor-pointer transition-colors text-doc77-700 dark:text-doc77-200" onclick="resetToPhotos()">
                     <i class="ph-fill ph-folder text-yellow-500"></i>
                     <span class="font-medium breadcrumb-project-name">My Photos</span>
                 </div>
                 <i class="ph ph-caret-right text-xs mx-1"></i>
-                <span class="text-doc77-300 font-medium breadcrumb-current-view">Gallery</span>
+                <span class="text-doc77-600 dark:text-doc77-300 font-medium breadcrumb-current-view">Gallery</span>
             </div>
         </div>
 
         <!-- Center: Search (Desktop) -->
         <div class="hidden md:flex flex-1 max-w-md mx-8 relative group">
-            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-doc77-500 group-focus-within:text-doc77-300"></i>
+            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-doc77-400 dark:text-doc77-500 group-focus-within:text-doc77-600 dark:group-focus-within:text-doc77-300"></i>
             <input type="text" placeholder="Search photos, dates, tags..."
-                   class="w-full bg-doc77-950 border border-doc77-700 text-doc77-100 placeholder-doc77-500 rounded-full py-1.5 pl-9 pr-4 focus:outline-none focus:border-doc77-500 focus:bg-doc77-800 transition-all text-sm shadow-inner" id="search-input">
-            <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 hidden group-focus-within:flex text-doc77-500 text-xs">
-                <kbd class="font-sans border border-doc77-600 rounded px-1">esc</kbd>
+                   class="w-full bg-doc77-50 border border-doc77-200 text-doc77-800 placeholder-doc77-400 rounded-full py-1.5 pl-9 pr-4 focus:outline-none focus:border-doc77-500 focus:bg-white dark:bg-doc77-950 dark:border-doc77-700 dark:text-doc77-100 dark:placeholder-doc77-500 dark:focus:border-doc77-500 dark:focus:bg-doc77-800 transition-all text-sm shadow-sm dark:shadow-inner" id="search-input">
+            <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 hidden group-focus-within:flex text-doc77-400 dark:text-doc77-500 text-xs">
+                <kbd class="font-sans border border-doc77-200 dark:border-doc77-600 rounded px-1">esc</kbd>
             </div>
         </div>
 
         <!-- Right: Actions & Tools -->
         <div class="flex items-center gap-1 sm:gap-2">
+            <!-- Theme Toggle Button -->
+            <button onclick="toggleTheme()" class="btn-icon" id="themeBtn" title="Toggle theme">🌙</button>
+
             <!-- View Toggles -->
-            <div class="flex bg-doc77-950 rounded-lg p-0.5 border border-doc77-800">
-                <button class="p-1.5 rounded-md bg-doc77-700 text-white shadow-sm" title="Grid View" id="btn-grid-view" onclick="switchView('grid')">
+            <div class="flex bg-doc77-50 dark:bg-doc77-950 rounded-lg p-0.5 border border-doc77-200 dark:border-doc77-800">
+                <button class="p-1.5 rounded-md bg-white dark:bg-doc77-700 text-doc77-900 dark:text-white shadow-sm" title="Grid View" id="btn-grid-view" onclick="switchView('grid')">
                     <i class="ph ph-squares-four text-lg"></i>
                 </button>
-                <button class="p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors" title="List View" id="btn-list-view" onclick="switchView('list')">
+                <button class="p-1.5 rounded-md text-doc77-500 dark:text-doc77-400 hover:text-doc77-700 dark:hover:text-doc77-200 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors" title="List View" id="btn-list-view" onclick="switchView('list')">
                     <i class="ph ph-list-dashes text-lg"></i>
                 </button>
             </div>
 
-            <div class="w-px h-6 bg-doc77-800 mx-1"></div>
+            <div class="w-px h-6 bg-doc77-200 dark:bg-doc77-800 mx-1"></div>
 
-            <button class="p-2 text-doc77-400 hover:text-white rounded-full hover:bg-doc77-800 transition-colors relative" title="Sort & Filter" id="btn-sort-filter">
+            <button class="p-2 text-doc77-600 hover:text-doc77-900 dark:text-doc77-400 dark:hover:text-white rounded-full hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors relative" title="Sort & Filter" id="btn-sort-filter">
                 <i class="ph ph-faders text-lg"></i>
-                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full border border-doc77-900"></span>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full border border-white dark:border-doc77-900"></span>
             </button>
-            <button class="p-2 text-doc77-400 hover:text-white rounded-full hover:bg-doc77-800 transition-colors" title="Upload Media" onclick="triggerUpload()">
+            <button class="p-2 text-doc77-600 hover:text-doc77-900 dark:text-doc77-400 dark:hover:text-white rounded-full hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors" title="Upload Media" onclick="triggerUpload()">
                 <i class="ph ph-upload-simple text-lg"></i>
             </button>
 
@@ -189,46 +391,49 @@
     <div class="flex-1 flex overflow-hidden relative">
 
         <!-- Sidebar Navigation -->
-        <aside class="w-60 bg-doc77-900/50 border-r border-doc77-800 flex flex-col shrink-0 transition-all duration-300 hidden md:flex" id="sidebar">
+        <aside class="w-60 bg-doc77-50/50 border-r border-doc77-200 dark:bg-doc77-900/50 dark:border-doc77-800 flex flex-col shrink-0 transition-all duration-300 hidden md:flex" id="sidebar">
             <div class="flex-1 overflow-y-auto py-4 px-3 no-scrollbar space-y-6">
 
                 <!-- Main Nav -->
                 <nav class="space-y-1">
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 font-medium" data-view="photos">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium" data-view="photos">
                         <i class="ph-fill ph-image text-xl"></i>
                         Photos
-                        <span class="ml-auto text-xs bg-blue-500/20 px-2 py-0.5 rounded-full">All</span>
+                        <span class="ml-auto text-xs bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">All</span>
                     </a>
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group" data-view="timeline">
-                        <i class="ph ph-clock-counter-clockwise text-xl group-hover:text-doc77-200"></i>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-600 hover:bg-doc77-100 hover:text-doc77-900 dark:text-doc77-300 dark:hover:bg-doc77-800 dark:hover:text-doc77-100 transition-colors group" data-view="timeline">
+                        <i class="ph ph-clock-counter-clockwise text-xl group-hover:text-doc77-800 dark:group-hover:text-doc77-200"></i>
                         Timeline
                     </a>
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group" data-view="videos">
-                        <i class="ph ph-video-camera text-xl group-hover:text-doc77-200"></i>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-600 hover:bg-doc77-100 hover:text-doc77-900 dark:text-doc77-300 dark:hover:bg-doc77-800 dark:hover:text-doc77-100 transition-colors group" data-view="videos">
+                        <i class="ph ph-video-camera text-xl group-hover:text-doc77-800 dark:group-hover:text-doc77-200"></i>
                         Videos
                     </a>
-                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-300 hover:bg-doc77-800 hover:text-doc77-100 transition-colors group" data-view="favorites">
-                        <i class="ph ph-star text-xl group-hover:text-yellow-400"></i>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-doc77-600 hover:bg-doc77-100 hover:text-doc77-900 dark:text-doc77-300 dark:hover:bg-doc77-800 dark:hover:text-doc77-100 transition-colors group" data-view="favorites">
+                        <i class="ph ph-star text-xl group-hover:text-yellow-500 dark:group-hover:text-yellow-400"></i>
                         Favorites
                     </a>
                 </nav>
 
                 <!-- Folders -->
                 <div>
-                    <div class="flex items-center justify-between px-3 mb-2 group cursor-pointer">
-                        <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-400 transition-colors">Folders</h3>
-                        <i class="ph ph-caret-down text-doc77-500"></i>
+                    <div class="flex items-center justify-between px-3 mb-2 group cursor-pointer" onclick="var ul=document.getElementById('folder-list');var icon=this.querySelector('i');ul.classList.toggle('hidden');icon.className=ul.classList.contains('hidden')?'ph ph-caret-right text-doc77-400 dark:text-doc77-500':'ph ph-caret-down text-doc77-400 dark:text-doc77-500';">
+                        <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-700 dark:group-hover:text-doc77-400 transition-colors">Folders</h3>
+                        <i class="ph ph-caret-down text-doc77-400 dark:text-doc77-500"></i>
                     </div>
-                    <ul class="space-y-0.5 text-sm ml-2 border-l border-doc77-800 pl-2" id="folder-list">
+                    <ul class="space-y-0.5 text-sm ml-2 border-l border-doc77-200 dark:border-doc77-800 pl-2" id="folder-list">
                         <!-- Dynamically populated by loadFolders() -->
                     </ul>
                 </div>
 
                 <!-- Albums -->
                 <div>
-                    <div class="flex items-center justify-between px-3 mb-2 group cursor-pointer">
-                        <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-400 transition-colors">Albums</h3>
-                        <button class="text-doc77-500 hover:text-white transition-colors" title="New Album" onclick="createAlbum()"><i class="ph ph-plus"></i></button>
+                    <div class="flex items-center justify-between px-3 mb-2 group cursor-pointer" onclick="var ul=document.getElementById('album-list');var icon=this.querySelector('i:not(.ph-plus)');if(!icon)icon=this.querySelector('i');ul.classList.toggle('hidden');var isHidden=ul.classList.contains('hidden');if(isHidden){icon.className='ph ph-caret-right text-doc77-400 dark:text-doc77-500';}else{icon.className='ph ph-caret-down text-doc77-400 dark:text-doc77-500';}">
+                        <h3 class="text-xs font-semibold text-doc77-500 uppercase tracking-wider group-hover:text-doc77-700 dark:group-hover:text-doc77-400 transition-colors">Albums</h3>
+                        <div class="flex items-center gap-1">
+                            <i class="ph ph-caret-down text-doc77-400 dark:text-doc77-500"></i>
+                            <button class="text-doc77-400 dark:text-doc77-500 hover:text-doc77-700 dark:hover:text-white transition-colors" title="New Album" onclick="event.stopPropagation();createAlbum()"><i class="ph ph-plus"></i></button>
+                        </div>
                     </div>
                     <ul class="space-y-1" id="album-list">
                         <!-- Dynamically populated by GalleryAlbum.renderAlbumSidebar() -->
@@ -237,21 +442,21 @@
             </div>
 
             <!-- Storage Info -->
-            <div class="p-4 border-t border-doc77-800 bg-doc77-900/80">
+            <div class="p-4 border-t border-doc77-200 dark:border-doc77-800 bg-doc77-50 dark:bg-doc77-900/80 transition-colors duration-200">
                 <div class="flex items-center justify-between text-xs mb-1">
-                    <span class="text-doc77-300 font-medium">Storage</span>
-                    <span class="text-doc77-400" id="storage-info">--</span>
+                    <span class="text-doc77-600 dark:text-doc77-300 font-medium">Storage</span>
+                    <span class="text-doc77-500 dark:text-doc77-400" id="storage-info">--</span>
                 </div>
-                <div class="h-1.5 w-full bg-doc77-800 rounded-full overflow-hidden">
+                <div class="h-1.5 w-full bg-doc77-200 dark:bg-doc77-800 rounded-full overflow-hidden">
                     <div class="h-full bg-blue-500 rounded-full" id="storage-bar" style="width: 0%"></div>
                 </div>
             </div>
         </aside>
 
-        <main class="flex-1 flex flex-col bg-[#0b1121] relative overflow-hidden">
+        <main class="flex-1 flex flex-col bg-white dark:bg-[#0b1121] relative overflow-hidden transition-colors duration-200">
 
             <!-- Selection Toolbar (Hidden by default) -->
-            <div id="selection-toolbar" class="absolute top-0 left-0 right-0 bg-blue-600 text-white px-4 py-3 flex items-center justify-between z-10 transform -translate-y-full transition-transform duration-300 shadow-lg">
+            <div id="selection-toolbar" class="shrink-0 bg-blue-600 text-white px-4 py-3 flex items-center justify-between z-10 transition-all duration-300 shadow-lg overflow-hidden" style="max-height:0;padding-top:0;padding-bottom:0;opacity:0">
                 <div class="flex items-center gap-4">
                     <button class="text-white hover:bg-blue-700 p-1 rounded transition-colors" onclick="toggleSelectMode()">
                         <i class="ph ph-x text-xl"></i>
@@ -270,7 +475,7 @@
 
             <!-- Scrollable Grid Area (populated by GalleryCore.renderGrid) -->
             <div class="flex-1 overflow-y-auto p-4 md:p-6" id="gallery-container">
-                <div class="flex items-center justify-center h-full text-doc77-500">
+                <div class="flex items-center justify-center h-full text-doc77-400 dark:text-doc77-500">
                     <i class="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mr-2"></i>
                     <span>Loading gallery...</span>
                 </div>
@@ -307,11 +512,11 @@
             var gridBtn = document.getElementById('btn-grid-view');
             var listBtn = document.getElementById('btn-list-view');
             if (mode === 'grid') {
-                gridBtn.className = 'p-1.5 rounded-md bg-doc77-700 text-white shadow-sm';
-                listBtn.className = 'p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors';
+                gridBtn.className = 'p-1.5 rounded-md bg-white dark:bg-doc77-700 text-doc77-900 dark:text-white shadow-sm';
+                listBtn.className = 'p-1.5 rounded-md text-doc77-500 dark:text-doc77-400 hover:text-doc77-700 dark:hover:text-doc77-200 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors';
             } else {
-                listBtn.className = 'p-1.5 rounded-md bg-doc77-700 text-white shadow-sm';
-                gridBtn.className = 'p-1.5 rounded-md text-doc77-400 hover:text-doc77-200 hover:bg-doc77-800 transition-colors';
+                listBtn.className = 'p-1.5 rounded-md bg-white dark:bg-doc77-700 text-doc77-900 dark:text-white shadow-sm';
+                gridBtn.className = 'p-1.5 rounded-md text-doc77-500 dark:text-doc77-400 hover:text-doc77-700 dark:hover:text-doc77-200 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors';
             }
             loadGallery(state.currentPath, true);
         }
@@ -322,15 +527,18 @@
             list.className = 'flex flex-col gap-1';
             items.forEach(function(item) {
                 var row = document.createElement('div');
-                row.className = 'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-doc77-800 cursor-pointer transition-colors border border-transparent hover:border-doc77-700/50';
-                row.onclick = function() { window.GalleryLightbox.open(item, state.items, state.projectId); };
+                row.className = 'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-doc77-100 dark:hover:bg-doc77-800 cursor-pointer transition-colors border border-transparent hover:border-doc77-200 dark:hover:border-doc77-700/50';
+                row.onclick = function() {
+                    if (state.selectMode) { toggleSelection(item.path || item.id, null); }
+                    else { window.GalleryLightbox.open(item, state.items, state.projectId); }
+                };
                 var thumb = document.createElement('img');
                 thumb.src = item.thumbnail_url;
-                thumb.className = 'w-10 h-10 rounded object-cover bg-doc77-800 shrink-0';
+                thumb.className = 'w-10 h-10 rounded object-cover bg-doc77-100 dark:bg-doc77-800 shrink-0';
                 thumb.loading = 'lazy';
                 var info = document.createElement('div');
                 info.className = 'flex-1 min-w-0';
-                info.innerHTML = '<div class="text-sm text-doc77-100 truncate">' + item.name + '</div><div class="text-xs text-doc77-500">' + (item.type === 'video' ? '🎬 ' : '') + formatSize(item.size) + '</div>';
+                info.innerHTML = '<div class="text-sm text-doc77-900 dark:text-doc77-100 truncate">' + item.name + '</div><div class="text-xs text-doc77-500">' + (item.type === 'video' ? '🎬 ' : '') + formatSize(item.size) + '</div>';
                 row.appendChild(thumb);
                 row.appendChild(info);
                 list.appendChild(row);
@@ -359,7 +567,7 @@
                     }
                 } catch (e) {
                     document.getElementById('gallery-container').innerHTML =
-                        '<div class="flex items-center justify-center h-full text-doc77-500">Backend not available</div>';
+                        '<div class="flex items-center justify-center h-full text-doc77-400 dark:text-doc77-500">Backend not available</div>';
                     return;
                 }
             }
@@ -390,9 +598,9 @@
 
         function renderProjectPicker(projects) {
             var container = document.getElementById('gallery-container');
-            var html = '<div class="flex items-center justify-center h-full"><div class="text-center space-y-4"><h2 class="text-xl font-bold text-doc77-100">Select a Project</h2><div class="space-y-2">';
+            var html = '<div class="flex items-center justify-center h-full"><div class="text-center space-y-4"><h2 class="text-xl font-bold text-doc77-900 dark:text-doc77-100">Select a Project</h2><div class="space-y-2">';
             for (var i = 0; i < projects.length; i++) {
-                html += '<button class="block w-full text-left px-4 py-2 bg-doc77-800 hover:bg-doc77-700 rounded text-doc77-200 transition-colors" onclick="selectProject(' + projects[i].id + ')"><i class="ph-fill ph-folder text-yellow-500 mr-2"></i>' + escHtml(projects[i].name) + '</button>';
+                html += '<button class="block w-full text-left px-4 py-2 bg-doc77-100 dark:bg-doc77-800 hover:bg-doc77-200 dark:hover:bg-doc77-700 rounded text-doc77-700 dark:text-doc77-200 transition-colors" onclick="selectProject(' + projects[i].id + ')"><i class="ph-fill ph-folder text-yellow-500 mr-2"></i>' + escHtml(projects[i].name) + '</button>';
             }
             html += '</div></div></div>';
             container.innerHTML = html;
@@ -453,7 +661,13 @@
                     window.GalleryCore.renderGrid(container, state.items, {
                         grouped: state.currentView === 'photos' || state.currentView === 'videos',
                         projectId: state.projectId,
-                        onCardClick: function(item) {
+                        onCardClick: function(item, e) {
+                            // Checkbox click: enter select mode and toggle
+                            if (e && e.target && (e.target.closest('.gallery-item-checkbox') || e.target.closest('.gallery-item-checkbox i'))) {
+                                if (!state.selectMode) toggleSelectMode();
+                                toggleSelection(item.path || item.id, null);
+                                return;
+                            }
                             if (state.selectMode) {
                                 toggleSelection(item.path || item.id, null);
                             } else {
@@ -466,7 +680,7 @@
                 updateBreadcrumbPath();
             } catch (e) {
                 var container = document.getElementById('gallery-container');
-                container.innerHTML = '<div class="flex items-center justify-center h-full text-doc77-500">Failed to load gallery</div>';
+                container.innerHTML = '<div class="flex items-center justify-center h-full text-doc77-400 dark:text-doc77-500">Failed to load gallery</div>';
             }
         }
 
@@ -474,12 +688,33 @@
             try {
                 var resp = await fetch('/api/gallery/timeline/' + state.projectId + '?path=' + encodeURIComponent(state.currentPath));
                 var data = await resp.json();
-                state.items = data.entries || data.groups || [];
+                var groups = data.entries || data.groups || [];
+                // Transform timeline groups into flat media-item format for renderGrid
+                state.items = [];
+                for (var g = 0; g < groups.length; g++) {
+                    var gd = groups[g];
+                    state.items.push({
+                        name: gd.label || '',
+                        path: 'timeline:' + (gd.label || ''),
+                        thumbnail_url: gd.cover ? gd.cover.thumbnail_url : '',
+                        preview_url: gd.cover ? gd.cover.preview_url : '',
+                        type: 'image',
+                        width: 400,
+                        height: 300,
+                        count: gd.count || 0,
+                        isTimeline: true
+                    });
+                }
                 var container = document.getElementById('gallery-container');
                 window.GalleryCore.renderGrid(container, state.items, {
                     grouped: false,
                     projectId: state.projectId,
-                    onCardClick: function(item) {
+                    onCardClick: function(item, ev) {
+                        if (ev && ev.target && (ev.target.closest('.gallery-item-checkbox') || ev.target.closest('.gallery-item-checkbox i'))) {
+                            if (!state.selectMode) toggleSelectMode();
+                            toggleSelection(item.path || item.id, null);
+                            return;
+                        }
                         if (state.selectMode) {
                             toggleSelection(item.path || item.id, null);
                         } else {
@@ -492,6 +727,52 @@
                 // silently fall back
             }
         }
+
+        // --- Album Gallery Loading ---
+        async function loadAlbumGallery(albumId, albumName) {
+            state.currentView = 'album';
+            state.currentPath = '';
+            try {
+                var resp = await fetch('/api/albums/' + albumId + '/items');
+                var data = await resp.json();
+                var items = data.items || [];
+                if (items.length === 0) {
+                    state.items = [];
+                    var container = document.getElementById('gallery-container');
+                    container.innerHTML = '<div class="flex items-center justify-center h-full text-doc77-400 dark:text-doc77-500">Album "' + escHtml(albumName) + '" is empty</div>';
+                    updateBreadcrumbPath();
+                    return;
+                }
+                // Fetch gallery entries for the first project
+                var projectId = items[0].project_id;
+                var paths = items.map(function(it) { return encodeURIComponent(it.file_path); }).join(',');
+                var pathsParam = items.map(function(it) { return '&paths=' + encodeURIComponent(it.file_path); }).join('');
+                var gr = await fetch('/api/gallery/' + projectId + '?limit=' + items.length + pathsParam);
+                var gd = await gr.json();
+                state.items = gd.entries || [];
+                state.projectId = projectId;
+                var container = document.getElementById('gallery-container');
+                window.GalleryCore.renderGrid(container, state.items, {
+                    grouped: false,
+                    projectId: projectId,
+                    onCardClick: function(item, ev) {
+                        if (ev && ev.target && (ev.target.closest('.gallery-item-checkbox') || ev.target.closest('.gallery-item-checkbox i'))) {
+                            if (!state.selectMode) toggleSelectMode();
+                            toggleSelection(item.path || item.id, null);
+                            return;
+                        }
+                        if (state.selectMode) { toggleSelection(item.path || item.id, null); }
+                        else { window.GalleryLightbox.open(item, state.items, state.projectId); }
+                    }
+                });
+                updateBreadcrumbPath();
+            } catch (e) {
+                var container = document.getElementById('gallery-container');
+                container.innerHTML = '<div class="flex items-center justify-center h-full text-doc77-400 dark:text-doc77-500">Failed to load album</div>';
+            }
+        }
+        // Expose for gallery-album.js
+        window.loadAlbumGallery = loadAlbumGallery;
 
         // --- Sidebar Navigation ---
 
@@ -519,11 +800,11 @@
         function setActiveNav(el) {
             var links = document.querySelectorAll('#sidebar nav a');
             for (var i = 0; i < links.length; i++) {
-                links[i].classList.remove('bg-blue-500/10', 'text-blue-400', 'font-medium');
-                links[i].classList.add('text-doc77-300');
+                links[i].classList.remove('bg-blue-50', 'text-blue-600', 'font-medium');
+                links[i].classList.add('text-doc77-600');
             }
-            el.classList.add('bg-blue-500/10', 'text-blue-400', 'font-medium');
-            el.classList.remove('text-doc77-300');
+            el.classList.add('bg-blue-50', 'text-blue-600', 'font-medium');
+            el.classList.remove('text-doc77-600');
         }
 
         // --- Folder Tree ---
@@ -557,10 +838,10 @@
                 var entry = entries[i];
                 if (entry.type === 'directory') {
                     var path = prefix ? prefix + '/' + entry.name : entry.name;
-                    html += '<li><a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-300 hover:bg-doc77-800 transition-colors" data-path="' + escAttr(path) + '"><i class="ph-fill ph-folder text-yellow-500/80"></i><span class="truncate">' + escHtml(entry.name) + '</span></a></li>';
+                    html += '<li><a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-600 dark:text-doc77-300 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors" data-path="' + escAttr(path) + '"><i class="ph-fill ph-folder text-yellow-500/80"></i><span class="truncate">' + escHtml(entry.name) + '</span></a></li>';
                 }
             }
-            return html || '<li class="px-2 py-1.5 text-doc77-500 text-xs">No folders</li>';
+            return html || '<li class="px-2 py-1.5 text-doc77-400 dark:text-doc77-500 text-xs">No folders</li>';
         }
 
         // --- Albums ---
@@ -634,7 +915,12 @@
 
                 var dropdown = document.createElement('div');
                 dropdown.id = 'sort-dropdown';
-                dropdown.className = 'absolute top-full right-0 mt-1 w-48 bg-doc77-900 border border-doc77-700 rounded-lg shadow-2xl z-50 py-1';
+                dropdown.className = 'fixed w-48 bg-white dark:bg-doc77-900 border border-doc77-200 dark:border-doc77-700 rounded-lg shadow-2xl py-1';
+                dropdown.style.zIndex = '9999';
+                // Position below the button
+                var rect = btn.getBoundingClientRect();
+                dropdown.style.top = (rect.bottom + 4) + 'px';
+                dropdown.style.right = (window.innerWidth - rect.right) + 'px';
 
                 var sorts = [
                     { label: 'Date (newest)', sortBy: 'date', sortOrder: 'desc' },
@@ -648,10 +934,10 @@
                 for (var i = 0; i < sorts.length; i++) {
                     (function(opt) {
                         var item = document.createElement('button');
-                        item.className = 'block w-full text-left px-3 py-1.5 text-sm text-doc77-300 hover:bg-doc77-800 hover:text-white transition-colors';
+                        item.className = 'block w-full text-left px-3 py-1.5 text-sm text-doc77-600 dark:text-doc77-300 hover:bg-doc77-100 dark:hover:bg-doc77-800 hover:text-doc77-900 dark:hover:text-white transition-colors';
                         item.textContent = opt.label;
                         if (state.sortBy === opt.sortBy && state.sortOrder === opt.sortOrder) {
-                            item.classList.add('text-blue-400', 'font-medium');
+                            item.classList.add('text-blue-600', 'dark:text-blue-400', 'font-medium');
                         }
                         item.addEventListener('click', function() {
                             state.sortBy = opt.sortBy;
@@ -668,8 +954,7 @@
                     })(sorts[i]);
                 }
 
-                btn.parentElement.style.position = 'relative';
-                btn.parentElement.appendChild(dropdown);
+                document.body.appendChild(dropdown);
 
                 var closeHandler = function() {
                     var dd = document.getElementById('sort-dropdown');
@@ -692,12 +977,18 @@
 
             if (state.selectMode) {
                 container.classList.add('select-mode-active');
-                toolbar.classList.remove('-translate-y-full');
-                btnSelect.className = 'ml-2 flex items-center gap-2 bg-doc77-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm';
+                toolbar.style.maxHeight = '52px';
+                toolbar.style.paddingTop = '12px';
+                toolbar.style.paddingBottom = '12px';
+                toolbar.style.opacity = '1';
+                btnSelect.className = 'ml-2 flex items-center gap-2 bg-doc77-200 dark:bg-doc77-700 text-doc77-900 dark:text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm';
                 btnSelect.innerHTML = '<i class="ph ph-x"></i><span class="hidden sm:inline">Cancel</span>';
             } else {
                 container.classList.remove('select-mode-active');
-                toolbar.classList.add('-translate-y-full');
+                toolbar.style.maxHeight = '0';
+                toolbar.style.paddingTop = '0';
+                toolbar.style.paddingBottom = '0';
+                toolbar.style.opacity = '0';
                 btnSelect.className = 'ml-2 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium transition-colors shadow-glow text-sm';
                 btnSelect.innerHTML = '<i class="ph ph-check-circle"></i><span class="hidden sm:inline">Select</span>';
                 state.selectedIds.clear();
@@ -754,18 +1045,98 @@
 
         // --- Add to Album (Selection Mode) ---
 
+        function albumPickerDialog(projectId) {
+            return new Promise(async function(resolve) {
+                // Fetch albums
+                var albums = [];
+                try { var r = await fetch('/api/albums'); albums = await r.json(); } catch(e) {}
+                // Build overlay
+                var overlay = document.createElement('div');
+                overlay.className = 'fixed inset-0 z-[10000] flex items-center justify-center';
+                overlay.style.background = 'rgba(0,0,0,0.5)';
+                var listHtml = '';
+                for (var i = 0; i < albums.length; i++) {
+                    listHtml += '<button class="album-option w-full text-left px-4 py-2.5 text-sm text-doc77-900 dark:text-doc77-100 hover:bg-doc77-100 dark:hover:bg-doc77-800 rounded-lg transition-colors flex items-center gap-3" data-id="' + albums[i].id + '" data-name="' + escHtml(albums[i].name) + '">'
+                        + '<div class="w-7 h-7 rounded bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0"><i class="ph-fill ph-images text-white text-xs"></i></div>'
+                        + '<span class="flex-1 truncate">' + escHtml(albums[i].name) + '</span>'
+                        + '<span class="text-xs text-doc77-500">' + (albums[i].item_count || 0) + '</span>'
+                        + '</button>';
+                }
+                overlay.innerHTML = '<div class="bg-white dark:bg-doc77-900 rounded-xl p-6 shadow-2xl max-w-sm w-11/12 border border-doc77-200 dark:border-doc77-700">'
+                    + '<h3 class="text-sm font-semibold text-doc77-900 dark:text-doc77-100 mb-1">Add to Album</h3>'
+                    + '<p class="text-xs text-doc77-500 mb-3" id="album-pick-count"></p>'
+                    + '<input class="w-full px-3 py-2 text-sm border border-doc77-200 dark:border-doc77-700 rounded-lg bg-doc77-50 dark:bg-doc77-950 text-doc77-900 dark:text-doc77-100 focus:outline-none focus:border-blue-500 mb-2" placeholder="Search or type new album name..." id="album-search-input">'
+                    + '<div class="max-h-48 overflow-y-auto space-y-1 mb-3" id="album-list-container">' + listHtml + '</div>'
+                    + '<div class="flex justify-end gap-2">'
+                    + '<button class="px-4 py-2 text-xs font-medium rounded-lg text-doc77-500 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors cancel-btn">Cancel</button>'
+                    + '<button class="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors ok-btn">Select</button>'
+                    + '</div></div>';
+                document.body.appendChild(overlay);
+                var searchInput = overlay.querySelector('#album-search-input');
+                var listContainer = overlay.querySelector('#album-list-container');
+                var selectedId = null;
+
+                // Filter on input
+                searchInput.addEventListener('input', function() {
+                    var q = this.value.toLowerCase();
+                    var opts = listContainer.querySelectorAll('.album-option');
+                    for (var j = 0; j < opts.length; j++) {
+                        var name = (opts[j].dataset.name || '').toLowerCase();
+                        opts[j].style.display = name.indexOf(q) >= 0 ? '' : 'none';
+                    }
+                });
+
+                // Click to select
+                listContainer.addEventListener('click', function(e) {
+                    var btn = e.target.closest('.album-option');
+                    if (!btn) return;
+                    listContainer.querySelectorAll('.album-option').forEach(function(b) { b.classList.remove('ring-2', 'ring-blue-500'); });
+                    btn.classList.add('ring-2', 'ring-blue-500');
+                    selectedId = btn.dataset.id;
+                });
+
+                overlay.querySelector('.cancel-btn').onclick = function() { overlay.remove(); resolve(null); };
+                overlay.querySelector('.ok-btn').onclick = function() {
+                    var name = searchInput.value.trim();
+                    if (selectedId) { overlay.remove(); resolve({id: parseInt(selectedId), name: ''}); }
+                    else if (name) { overlay.remove(); resolve({id: null, name: name}); }
+                    else { overlay.remove(); resolve(null); }
+                };
+                overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.remove(); resolve(null); } });
+                searchInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') { overlay.remove(); resolve(null); }
+                    if (e.key === 'Enter') {
+                        var n = searchInput.value.trim();
+                        if (selectedId) { overlay.remove(); resolve({id: parseInt(selectedId), name: ''}); }
+                        else if (n) { overlay.remove(); resolve({id: null, name: n}); }
+                        else { overlay.remove(); resolve(null); }
+                    }
+                });
+                setTimeout(function() { searchInput.focus(); }, 100);
+            });
+        }
+
         async function addSelectedToAlbum() {
             var paths = Array.from(state.selectedIds);
             if (paths.length === 0) {
                 window.toast('No items selected', 'warning');
                 return;
             }
-            var albumId = await window.promptDialog({ title: 'Add to Album', message: 'Enter Album ID for ' + paths.length + ' items:', placeholder: 'Album ID', type: 'number' });
-            if (!albumId || !albumId.trim()) return;
+            // Show album count in dialog
+            var result = await albumPickerDialog(state.projectId);
+            if (!result) return;
             try {
-                await window.GalleryAlbum.addToAlbum(parseInt(albumId.trim()), state.projectId, paths);
+                var albumId = result.id;
+                // If new album name typed, create it first
+                if (!albumId && result.name) {
+                    var created = await window.GalleryAlbum.createAlbum(result.name, '');
+                    albumId = created.id;
+                }
+                if (!albumId) { window.toast('No album selected', 'warning'); return; }
+                await window.GalleryAlbum.addToAlbum(albumId, state.projectId, paths);
                 state.selectedIds.clear();
                 updateSelectionUI();
+                loadAlbums();
                 toggleSelectMode();
                 window.toast('Added ' + paths.length + ' items to album', 'success');
             } catch (e) {
@@ -781,9 +1152,29 @@
             if (state.currentPath) {
                 viewEl.textContent = state.currentPath;
             } else {
-                var viewLabels = { photos: 'Gallery', timeline: 'Timeline', videos: 'Videos', favorites: 'Favorites', folder: 'Gallery' };
+                var viewLabels = { photos: 'Gallery', timeline: 'Timeline', videos: 'Videos', favorites: 'Favorites', folder: 'Gallery', album: 'Album' };
                 viewEl.textContent = viewLabels[state.currentView] || 'Gallery';
             }
+        }
+
+        // --- Theme ---
+
+        function initTheme() {
+            try {
+                var saved = localStorage.getItem('doc77-theme');
+                var prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var isDark = saved === 'dark' || (!saved && prefers);
+                document.documentElement.classList.toggle('dark', isDark);
+                var btn = document.getElementById('themeBtn');
+                if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+            } catch(e) {}
+        }
+
+        function toggleTheme() {
+            var isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('doc77-theme', isDark ? 'dark' : 'light');
+            var btn = document.getElementById('themeBtn');
+            if (btn) btn.textContent = isDark ? '☀️' : '🌙';
         }
 
         // --- Utility Functions ---
@@ -803,6 +1194,48 @@
             input.click();
         }
 
+        // --- Prompt dialog (standalone, since gallery doesn't load common.js) ---
+        window.promptDialog = function(opts) {
+            opts = opts || {};
+            return new Promise(function(resolve) {
+                var overlay = document.createElement('div');
+                overlay.className = 'fixed inset-0 z-[10000] flex items-center justify-center';
+                overlay.style.background = 'rgba(0,0,0,0.5)';
+                overlay.innerHTML = '<div class="bg-white dark:bg-doc77-900 rounded-xl p-6 shadow-2xl max-w-sm w-11/12 border border-doc77-200 dark:border-doc77-700">'
+                    + (opts.title ? '<h3 class="text-sm font-semibold text-doc77-900 dark:text-doc77-100 mb-3">' + escHtml(opts.title) + '</h3>' : '')
+                    + (opts.message ? '<p class="text-xs text-doc77-500 mb-3">' + escHtml(opts.message) + '</p>' : '')
+                    + '<input class="w-full px-3 py-2 text-sm border border-doc77-200 dark:border-doc77-700 rounded-lg bg-doc77-50 dark:bg-doc77-950 text-doc77-900 dark:text-doc77-100 focus:outline-none focus:border-blue-500 mb-4" type="' + (opts.type || 'text') + '" placeholder="' + escHtml(opts.placeholder || '') + '">'
+                    + '<div class="flex justify-end gap-2">'
+                    + '<button class="px-4 py-2 text-xs font-medium rounded-lg text-doc77-500 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors cancel-btn">Cancel</button>'
+                    + '<button class="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors ok-btn">' + escHtml(opts.okText || 'OK') + '</button>'
+                    + '</div></div>';
+                document.body.appendChild(overlay);
+                var input = overlay.querySelector('input');
+                setTimeout(function() { input.focus(); input.select(); }, 100);
+                overlay.querySelector('.cancel-btn').onclick = function() { overlay.remove(); resolve(null); };
+                overlay.querySelector('.ok-btn').onclick = function() { var v = input.value.trim(); overlay.remove(); resolve(v || null); };
+                overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.remove(); resolve(null); } });
+                input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { var v = input.value.trim(); overlay.remove(); resolve(v || null); } if (e.key === 'Escape') { overlay.remove(); resolve(null); } });
+            });
+        };
+
+        // --- Toast notification (standalone, since gallery doesn't load common.js) ---
+        (function() {
+            var tc = document.createElement('div');
+            tc.className = 'toast-container';
+            tc.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+            document.body.appendChild(tc);
+            window.toast = function(msg, type) {
+                type = type || 'info';
+                var colors = { success: '#22c55e', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+                var t = document.createElement('div');
+                t.style.cssText = 'pointer-events:auto;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;color:#fff;background:' + (colors[type] || colors.info) + ';box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:1;transition:opacity 0.3s;max-width:320px';
+                t.textContent = msg;
+                tc.appendChild(t);
+                setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 2500);
+            };
+        })();
+
         function escHtml(s) {
             return String(s).replace(/[&<>"']/g, function(m) {
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
@@ -815,6 +1248,7 @@
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', function() {
+            initTheme();
             init();
             setupSearch();
             setupSortFilter();

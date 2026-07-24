@@ -37,7 +37,7 @@ window.GalleryAlbum = (function() {
   async function renderAlbumSidebar(container, projectId) {
     const albums = await fetchAlbums();
     container.innerHTML = albums.map(a =>
-      `<li><a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-300 hover:bg-doc77-800 transition-colors">
+      `<li><a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-600 dark:text-doc77-300 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors album-nav-item" data-album-id="${a.id}" data-album-name="${escHtml(a.name)}">
         <div class="w-6 h-6 rounded bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
           <i class="ph-fill ph-images text-white text-xs"></i>
         </div>
@@ -45,6 +45,17 @@ window.GalleryAlbum = (function() {
         <span class="text-xs text-doc77-500">${a.item_count || 0}</span>
       </a></li>`
     ).join('');
+    // Wire album click handlers
+    container.querySelectorAll('.album-nav-item').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        e.preventDefault();
+        var albumId = parseInt(this.dataset.albumId);
+        var albumName = this.dataset.albumName;
+        if (typeof window.loadAlbumGallery === 'function') {
+          window.loadAlbumGallery(albumId, albumName);
+        }
+      });
+    });
   }
 
   function escHtml(s) {

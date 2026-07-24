@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { listAlbums, createAlbum, updateAlbum, deleteAlbum, addAlbumItem, removeAlbumItem } from './store.js';
+import { listAlbums, createAlbum, updateAlbum, deleteAlbum, addAlbumItem, removeAlbumItem, listAlbumItems } from './store.js';
 
 export function createAlbumListHandler() {
   return (_req: Request, res: Response): void => {
@@ -79,6 +79,22 @@ export function createAlbumAddItemHandler() {
     try {
       addAlbumItem(albumId, project_id, file_path);
       res.status(201).json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  };
+}
+
+export function createAlbumItemsListHandler() {
+  return (req: Request, res: Response): void => {
+    const albumId = parseInt(req.params.albumId, 10);
+    if (isNaN(albumId)) {
+      res.status(400).json({ error: 'Invalid album id' });
+      return;
+    }
+    try {
+      const items = listAlbumItems(albumId);
+      res.json({ items });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

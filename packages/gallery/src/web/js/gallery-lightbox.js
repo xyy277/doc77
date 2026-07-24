@@ -8,6 +8,23 @@ window.GalleryLightbox = (function() {
     currentIndex: -1,
     projectId: null,
     visible: false,
+    // Zoom
+    zoomLevel: 1,
+    panX: 0,
+    panY: 0,
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    // Auto-play
+    playing: false,
+    playInterval: null,
+    playSpeed: 4000,
+    // Transition effect
+    transitionEffect: (function(){ try { return localStorage.getItem('doc77-gallery-transition-effect') || 'dissolve'; } catch(e) { return 'dissolve'; } })(),
+    // Particle canvas
+    particleCanvas: null,
+    particleCtx: null,
+    particleAnimId: null,
   };
 
   /**
@@ -30,6 +47,8 @@ window.GalleryLightbox = (function() {
    */
   function close() {
     state.visible = false;
+    stopSlideshow();
+    resetZoom();
     const lb = document.getElementById('galleryLightbox');
     if (lb) {
       lb.style.opacity = '0';
@@ -247,15 +266,314 @@ window.GalleryLightbox = (function() {
     if (panel) panel.classList.toggle('translate-x-full');
   }
 
+  // ═══════════ Zoom System ═══════════
+  function applyZoom() {
+    var img = document.getElementById('lb-image');
+    var navEl = document.getElementById('lb-thumb-nav');
+    if (img) {
+      img.style.transform = 'scale(' + state.zoomLevel + ') translate(' + state.panX + 'px, ' + state.panY + 'px)';
+      img.style.cursor = state.zoomLevel > 1 ? (state.isDragging ? 'grabbing' : 'grab') : 'default';
+    }
+    if (navEl) {
+      navEl.style.display = state.zoomLevel > 1 ? 'block' : 'none';
+    }
+    updateThumbNav();
+  }
+
+  function zoomIn() {
+    state.zoomLevel = Math.min(5, state.zoomLevel + 0.5);
+    applyZoom();
+  }
+
+  function zoomOut() {
+    state.zoomLevel = Math.max(0.5, state.zoomLevel - 0.5);
+    if (state.zoomLevel <= 1) { state.panX = 0; state.panY = 0; }
+    applyZoom();
+  }
+
+  function resetZoom() {
+    state.zoomLevel = 1;
+    state.panX = 0; state.panY = 0;
+    applyZoom();
+  }
+
+  function setupZoomEvents() {
+    var area = document.getElementById('lightbox-content-area');
+    if (!area) return;
+    // Mouse wheel zoom
+    area.addEventListener('wheel', function(e) {
+      if (!state.visible) return;
+      e.preventDefault();
+      var delta = e.deltaY > 0 ? -0.25 : 0.25;
+      state.zoomLevel = Math.max(0.5, Math.min(5, state.zoomLevel + delta));
+      if (state.zoomLevel <= 1) { state.panX = 0; state.panY = 0; }
+      applyZoom();
+    }, { passive: false });
+    // Drag to pan (when zoomed)
+    area.addEventListener('pointerdown', function(e) {
+      if (!state.visible || state.zoomLevel <= 1) return;
+      state.isDragging = true;
+      state.dragStartX = e.clientX - state.panX;
+      state.dragStartY = e.clientY - state.panY;
+      area.setPointerCapture(e.pointerId);
+      applyZoom();
+    });
+    area.addEventListener('pointermove', function(e) {
+      if (!state.isDragging) return;
+      state.panX = e.clientX - state.dragStartX;
+      state.panY = e.clientY - state.dragStartY;
+      applyZoom();
+    });
+    area.addEventListener('pointerup', function() { state.isDragging = false; applyZoom(); });
+  }
+
+  // Thumbnail navigator
+  function updateThumbNav() {
+    var nav = document.getElementById('lb-thumb-nav');
+    if (!nav || state.zoomLevel <= 1) return;
+    var img = document.getElementById('lb-image');
+    if (!img || !img.naturalWidth) return;
+    var tnImg = nav.querySelector('.lb-thumb-img');
+    var tnBox = nav.querySelector('.lb-thumb-box');
+    if (tnImg && tnImg.src !== img.src) tnImg.src = img.src;
+    // Viewport rect indicator
+    var area = document.getElementById('lightbox-content-area');
+    if (area && tnBox) {
+      var aw = area.clientWidth, ah = area.clientHeight;
+      var iw = img.naturalWidth * state.zoomLevel, ih = img.naturalHeight * state.zoomLevel;
+      var vx = (-state.panX / iw) * 100, vy = (-state.panY / ih) * 100;
+      var vw = (aw / iw) * 100, vh = (ah / ih) * 100;
+      tnBox.style.left = Math.max(0, Math.min(100 - vw, vx)) + '%';
+      tnBox.style.top = Math.max(0, Math.min(100 - vh, vy)) + '%';
+      tnBox.style.width = Math.min(100, vw) + '%';
+      tnBox.style.height = Math.min(100, vh) + '%';
+    }
+  }
+
+  // ═══════════ Auto-Play / Slideshow ═══════════
+  function toggleSlideshow() {
+    if (state.playing) { stopSlideshow(); return; }
+    startSlideshow();
+  }
+
+  function startSlideshow() {
+    state.playing = true;
+    var btn = document.getElementById('lb-slideshow-btn');
+    if (btn) { btn.innerHTML = '<i class="ph ph-pause text-xl"></i>'; btn.title = 'Pause'; }
+    // Hide prev/next arrows during slideshow
+    var prev = document.querySelector('#galleryLightbox button[onclick*="nav(-1)"]');
+    var next = document.querySelector('#galleryLightbox button[onclick*="nav(1)"]');
+    if (prev) prev.style.display = 'none';
+    if (next) next.style.display = 'none';
+    scheduleNextSlide();
+  }
+
+  function stopSlideshow() {
+    state.playing = false;
+    if (state.playInterval) { clearTimeout(state.playInterval); state.playInterval = null; }
+    var btn = document.getElementById('lb-slideshow-btn');
+    if (btn) { btn.innerHTML = '<i class="ph ph-play text-xl"></i>'; btn.title = 'Auto-play'; }
+    var prev = document.querySelector('#galleryLightbox button[onclick*="nav(-1)"]');
+    var next = document.querySelector('#galleryLightbox button[onclick*="nav(1)"]');
+    if (prev) prev.style.display = '';
+    if (next) next.style.display = '';
+  }
+
+  function scheduleNextSlide() {
+    if (!state.playing) return;
+    state.playInterval = setTimeout(function() {
+      if (!state.playing) return;
+      doTransition(1);
+      scheduleNextSlide();
+    }, state.playSpeed);
+  }
+
+  function setPlaySpeed(speed) {
+    state.playSpeed = speed;
+    try { localStorage.setItem('doc77-gallery-play-speed', speed); } catch(e) {}
+    if (state.playing) {
+      if (state.playInterval) clearTimeout(state.playInterval);
+      scheduleNextSlide();
+    }
+  }
+
+  // ═══════════ Transition Effects ═══════════
+  function doTransition(direction) {
+    switch (state.transitionEffect) {
+      case 'dissolve': particleTransition(direction); break;
+      case 'fade': fadeTransition(direction); break;
+      case 'slide': slideTransition(direction); break;
+      default: simpleTransition(direction); break;
+    }
+  }
+
+  function simpleTransition(direction) {
+    resetZoom();
+    nav(direction);
+  }
+
+  function fadeTransition(direction) {
+    resetZoom();
+    var img = document.getElementById('lb-image');
+    if (img) { img.style.opacity = '0'; img.style.transition = 'opacity 0.3s'; }
+    setTimeout(function() {
+      nav(direction);
+      if (img) { img.style.opacity = '1'; setTimeout(function() { img.style.transition = ''; }, 350); }
+    }, 300);
+  }
+
+  function slideTransition(direction) {
+    resetZoom();
+    var img = document.getElementById('lb-image');
+    if (img) { img.style.transform = 'translateX(' + (direction * 60) + 'px)'; img.style.opacity = '0'; img.style.transition = 'transform 0.3s, opacity 0.3s'; }
+    setTimeout(function() {
+      nav(direction);
+      if (img) { img.style.transform = 'translateX(' + (-direction * 20) + 'px)'; img.style.opacity = '0.7'; }
+      requestAnimationFrame(function() {
+        if (img) { img.style.transform = 'translateX(0)'; img.style.opacity = '1'; setTimeout(function() { img.style.transition = ''; }, 350); }
+      });
+    }, 300);
+  }
+
+  function particleTransition(direction) {
+    resetZoom();
+    var img = document.getElementById('lb-image');
+    var area = document.getElementById('lightbox-content-area');
+    if (!img || !area) { simpleTransition(direction); return; }
+
+    // Create canvas overlay
+    var canvas = document.createElement('canvas');
+    canvas.id = 'lb-particle-canvas';
+    canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:5;pointer-events:none';
+    var rect = area.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    area.appendChild(canvas);
+    var ctx = canvas.getContext('2d');
+
+    // Determine particle grid density
+    var gridSize = Math.max(4, Math.floor(Math.min(rect.width, rect.height) / 80));
+    var particles = [];
+    // Sample current image into particles
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    if (iw && ih) {
+      // Draw image to an offscreen canvas to sample pixels
+      var offCanvas = document.createElement('canvas');
+      offCanvas.width = Math.min(iw, rect.width);
+      offCanvas.height = Math.min(ih, rect.height);
+      var offCtx = offCanvas.getContext('2d');
+      // Draw the displayed image region
+      try {
+        offCtx.drawImage(img, 0, 0, offCanvas.width, offCanvas.height);
+        for (var y = 0; y < offCanvas.height; y += gridSize) {
+          for (var x = 0; x < offCanvas.width; x += gridSize) {
+            var pixel = offCtx.getImageData(x, y, 1, 1).data;
+            if (pixel[3] < 10) continue; // skip transparent
+            particles.push({
+              sx: x, sy: y,
+              x: x, y: y,
+              color: 'rgb(' + pixel[0] + ',' + pixel[1] + ',' + pixel[2] + ')',
+              size: gridSize,
+              vx: (Math.random() - 0.5) * 8,
+              vy: (Math.random() - 0.5) * 8 - 3,
+              life: 1
+            });
+          }
+        }
+      } catch(e) { /* fall through to simple transition */ }
+    }
+
+    if (particles.length === 0) {
+      canvas.remove();
+      simpleTransition(direction);
+      return;
+    }
+
+    // Phase 1: Dissolve (particles fly apart)
+    var startTime = performance.now();
+    var dissolveDuration = 500;
+
+    function animateDissolve(time) {
+      var elapsed = time - startTime;
+      var progress = Math.min(1, elapsed / dissolveDuration);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        var alpha = 1 - progress;
+        p.x = p.sx + p.vx * progress * 60;
+        p.y = p.sy + p.vy * progress * 60;
+        p.size = gridSize * (1 - progress * 0.7);
+        ctx.fillStyle = p.color.replace(')', ', ' + alpha + ')').replace('rgb', 'rgba');
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, Math.max(1, p.size), Math.max(1, p.size));
+      }
+
+      if (progress < 1) {
+        state.particleAnimId = requestAnimationFrame(animateDissolve);
+      } else {
+        // Phase 2: Switch image + rebuild
+        nav(direction);
+        // Reset particles for rebuild
+        for (var j = 0; j < particles.length; j++) {
+          var q = particles[j];
+          var angle = Math.random() * Math.PI * 2;
+          var dist = 60 + Math.random() * 200;
+          q.sx = q.x; q.sy = q.y; // current position becomes start
+          q.tx = (canvas.width / 2) + Math.cos(angle) * dist;
+          q.ty = (canvas.height / 2) + Math.sin(angle) * dist;
+          q.vx = (q.x - q.tx) / 10;
+          q.vy = (q.y - q.ty) / 10;
+          q.life = 1;
+        }
+        startTime = performance.now();
+        state.particleAnimId = requestAnimationFrame(animateRebuild);
+      }
+    }
+
+    function animateRebuild(time) {
+      var elapsed = time - startTime;
+      var progress = Math.min(1, elapsed / dissolveDuration);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        var alpha = progress;
+        p.x = p.sx + (p.tx - p.sx) * progress;
+        p.y = p.sy + (p.ty - p.sy) * progress;
+        p.size = gridSize * (0.3 + progress * 0.7);
+        ctx.fillStyle = p.color.replace(')', ', ' + alpha + ')').replace('rgb', 'rgba');
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, Math.max(1, p.size), Math.max(1, p.size));
+      }
+
+      if (progress < 1) {
+        state.particleAnimId = requestAnimationFrame(animateRebuild);
+      } else {
+        canvas.remove();
+        state.particleAnimId = null;
+      }
+    }
+
+    state.particleAnimId = requestAnimationFrame(animateDissolve);
+  }
+
+  function setTransitionEffect(effect) {
+    state.transitionEffect = effect;
+    try { localStorage.setItem('doc77-gallery-transition-effect', effect); } catch(e) {}
+  }
+
   /**
    * Global keyboard event handler.
    * Escape: close | ArrowLeft: prev | ArrowRight: next | I: toggle info panel
    */
   function onKeydown(e) {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') { stopSlideshow(); close(); }
     else if (e.key === 'ArrowRight') nav(1);
     else if (e.key === 'ArrowLeft') nav(-1);
     else if (e.key === 'i' || e.key === 'I') toggleInfoPanel();
+    else if (e.key === '+' || e.key === '=') zoomIn();
+    else if (e.key === '-') zoomOut();
+    else if (e.key === '0') resetZoom();
+    else if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); toggleSlideshow(); }
   }
 
   /**
@@ -281,6 +599,26 @@ window.GalleryLightbox = (function() {
       + '    </div>'
       + '  </div>'
       + '  <div class="flex items-center gap-2">'
+      + '    <button class="text-white hover:text-blue-400 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Zoom Out" onclick="GalleryLightbox.zoomOut()">'
+      + '      <i class="ph ph-magnifying-glass-minus text-xl"></i>'
+      + '    </button>'
+      + '    <button class="text-white hover:text-blue-400 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Zoom In" onclick="GalleryLightbox.zoomIn()">'
+      + '      <i class="ph ph-magnifying-glass-plus text-xl"></i>'
+      + '    </button>'
+      + '    <button class="text-white hover:text-blue-400 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Reset Zoom" onclick="GalleryLightbox.resetZoom()">'
+      + '      <i class="ph ph-arrows-clockwise text-xl"></i>'
+      + '    </button>'
+      + '    <div class="w-px h-5 bg-white/20 mx-1"></div>'
+      + '    <button class="text-white hover:text-blue-400 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Auto-play" id="lb-slideshow-btn" onclick="GalleryLightbox.toggleSlideshow()">'
+      + '      <i class="ph ph-play text-xl"></i>'
+      + '    </button>'
+      + '    <select id="lb-speed-select" class="bg-black/30 text-white/80 text-xs rounded px-2 py-1 border border-white/20 focus:outline-none" onchange="GalleryLightbox.setPlaySpeed(parseInt(this.value))" title="Speed">'
+      + '      <option value="2000">2s</option><option value="4000" selected>4s</option><option value="6000">6s</option><option value="10000">10s</option>'
+      + '    </select>'
+      + '    <select id="lb-effect-select" class="bg-black/30 text-white/80 text-xs rounded px-2 py-1 border border-white/20 focus:outline-none" onchange="GalleryLightbox.setTransitionEffect(this.value)" title="Transition">'
+      + '      <option value="dissolve">Particles</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="none">None</option>'
+      + '    </select>'
+      + '    <div class="w-px h-5 bg-white/20 mx-1"></div>'
       + '    <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Download">'
       + '      <i class="ph ph-download-simple text-xl"></i>'
       + '    </button>'
@@ -293,7 +631,8 @@ window.GalleryLightbox = (function() {
       + '  <button class="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-3 bg-black/20 hover:bg-black/50 rounded-full backdrop-blur-sm transition-all z-10 hidden sm:flex" onclick="GalleryLightbox.nav(-1)">'
       + '    <i class="ph ph-caret-left text-3xl"></i>'
       + '  </button>'
-      + '  <img src="" alt="" id="lb-image" class="max-w-full max-h-full object-contain select-none">'
+      + '  <img src="" alt="" id="lb-image" class="max-w-full max-h-full object-contain select-none" style="transition:transform 0.15s">'
+      + '  <div id="lb-thumb-nav" class="lb-thumb-nav" style="display:none"><img class="lb-thumb-img" src="" alt=""><div class="lb-thumb-box"></div></div>'
       + '  <button class="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-3 bg-black/20 hover:bg-black/50 rounded-full backdrop-blur-sm transition-all z-10 hidden sm:flex" onclick="GalleryLightbox.nav(1)">'
       + '    <i class="ph ph-caret-right text-3xl"></i>'
       + '  </button>'
@@ -310,6 +649,15 @@ window.GalleryLightbox = (function() {
 
     document.body.appendChild(overlay);
 
+    // Init zoom events on the content area
+    setupZoomEvents();
+
+    // Set saved play speed and effect
+    var speedSel = document.getElementById('lb-speed-select');
+    var effectSel = document.getElementById('lb-effect-select');
+    if (speedSel) { try { var ss = localStorage.getItem('doc77-gallery-play-speed'); if (ss) speedSel.value = ss; state.playSpeed = parseInt(ss); } catch(e) {} }
+    if (effectSel) { effectSel.value = state.transitionEffect; }
+
     // Trigger fade-in on next frame so the transition plays
     requestAnimationFrame(function() {
       overlay.style.opacity = '1';
@@ -319,5 +667,5 @@ window.GalleryLightbox = (function() {
     fetchExif();
   }
 
-  return { open, close, nav, toggleInfoPanel };
+  return { open, close, nav, toggleInfoPanel, zoomIn, zoomOut, resetZoom, toggleSlideshow, setPlaySpeed, setTransitionEffect };
 })();

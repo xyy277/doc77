@@ -8,6 +8,7 @@
 <title data-i18n="web.index.title">Doc77 — Local Document Preview &amp; Management</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
 
@@ -21,11 +22,14 @@
     <div style="display:flex;align-items:center;gap:16px">
       <div class="header-greeting" id="greeting">👋 Good afternoon</div>
       <div class="header-stats">
-        <span class="header-stat-badge">📂 <span id="headerProjCount">0</span></span>
-        <span class="header-stat-badge">⭐ <span id="headerFavCount">0</span></span>
-        <span class="header-stat-badge">🕐 <span id="headerRecentCount">0</span></span>
+        <span class="header-stat-badge" data-i18n-title="web.index.stats.projects" title="Projects">📂 <span id="headerProjCount">0</span></span>
+        <span class="header-stat-badge" data-i18n-title="web.index.stats.favorites" title="Favorites">⭐ <span id="headerFavCount">0</span></span>
+        <span class="header-stat-badge" data-i18n-title="web.index.stats.recent" title="Recently Modified">🕐 <span id="headerRecentCount">0</span></span>
       </div>
-      <a href="/gallery" class="header-stat-badge" id="headerGalleryLink" style="display:none">🖼️ <span data-i18n="web.index.gallery">Gallery</span></a>
+      <button id="headerGalleryLink" class="gallery-logo-btn" style="display:none" onclick="window.open('/gallery','_blank')" data-i18n-title="web.index.gallery" title="Gallery">
+        <span class="gallery-logo-icon">77</span>
+        <span data-i18n="web.index.gallery">Gallery</span>
+      </button>
       <span class="header-status"><span class="header-dot pulse"></span><span data-i18n="web.index.status.running">Running</span></span>
       <span class="version-badge" id="versionBadge" data-i18n-title="web.index.status.loading" title="Loading...">--</span>
       <div class="header-actions">

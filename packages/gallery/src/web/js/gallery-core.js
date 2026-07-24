@@ -18,7 +18,7 @@ function isMediaFile(name) {
  */
 function createMediaCard(item) {
   const wrapper = document.createElement('div');
-  wrapper.className = 'masonry-item gallery-item relative rounded-lg overflow-hidden group cursor-pointer bg-doc77-800 image-card-hover border border-doc77-700/50';
+  wrapper.className = 'masonry-item gallery-item relative rounded-lg overflow-hidden group cursor-pointer bg-doc77-100 dark:bg-doc77-800 image-card-hover border border-doc77-200 dark:border-doc77-700/50 transition-colors duration-200';
   wrapper.dataset.id = item.path;
 
   const imgWrapper = document.createElement('div');
@@ -45,6 +45,14 @@ function createMediaCard(item) {
   nameText.className = 'text-white text-xs font-medium truncate drop-shadow-md';
   nameText.textContent = item.name;
   overlay.appendChild(nameText);
+
+  // Timeline badge (month label + count)
+  if (item.isTimeline) {
+    var tlBadge = document.createElement('div');
+    tlBadge.className = 'absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-md rounded-md px-2 py-1 text-xs text-white font-medium text-center shadow-sm';
+    tlBadge.innerHTML = (item.name || '') + ' <span class="text-white/60">(' + (item.count || 0) + ')</span>';
+    imgWrapper.appendChild(tlBadge);
+  }
 
   // Video badge
   if (item.type === 'video') {
@@ -91,8 +99,8 @@ function renderGrid(container, items, options = {}) {
       section.className = 'mb-8';
 
       const header = document.createElement('div');
-      header.className = 'sticky top-0 bg-[#0b1121]/95 backdrop-blur-sm z-10 py-2 mb-4 flex items-center justify-between border-b border-doc77-800/50';
-      header.innerHTML = '<div class="flex items-center gap-2"><h2 class="text-lg font-bold text-doc77-100">' + label + '</h2><span class="text-doc77-500 text-sm font-medium bg-doc77-800/50 px-2 py-0.5 rounded-full">' + groupItems.length + ' items</span></div>';
+      header.className = 'section-header sticky top-0 bg-white/95 dark:bg-[#0b1121]/95 backdrop-blur-sm z-10 py-2 mb-4 flex items-center justify-between border-b border-doc77-100 dark:border-doc77-800/50 transition-colors duration-200';
+      header.innerHTML = '<div class="flex items-center gap-2"><h2 class="text-lg font-bold text-doc77-900 dark:text-doc77-100">' + label + '</h2><span class="text-doc77-500 text-sm font-medium bg-doc77-100 dark:bg-doc77-800/50 px-2 py-0.5 rounded-full">' + groupItems.length + ' items</span></div>';
       section.appendChild(header);
 
       const grid = document.createElement('div');

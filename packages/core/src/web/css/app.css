@@ -415,6 +415,62 @@ body {
   font-weight: 600;
   font-size: 12px;
 }
+/* Gallery logo button (header) */
+.gallery-logo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 6px;
+  border-radius: 14px;
+  background: var(--accent-light-bg);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+.gallery-logo-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
+.gallery-logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  transition: background var(--transition-fast);
+}
+.gallery-logo-btn:hover .gallery-logo-icon {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+
+/* Card gallery badge (top-right corner) */
+.card-gallery-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-right: 2px;
+}
+
 .header-greeting {
   font-size: 13px;
   font-weight: 500;
@@ -992,12 +1048,13 @@ body {
   justify-content: center;
   width: 28px;
   height: 28px;
-  font-size: 14px;
+  font-size: 16px;
   border-radius: 6px;
   text-decoration: none;
   cursor: pointer;
+  color: var(--text-muted);
   opacity: 0;
-  transition: opacity var(--transition-fast), background var(--transition-fast);
+  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
   z-index: 2;
 }
 .card-compact:hover .card-gallery-btn {
@@ -1005,6 +1062,7 @@ body {
 }
 .card-compact .card-gallery-btn:hover {
   background: var(--accent-light-bg);
+  color: var(--accent);
 }
 
 /* ═══ List View ═══ */

@@ -235,7 +235,7 @@ export function createApp(
   const vendorDir = process.env.DOC77_ELECTRON
     ? process.env.DOC77_VENDOR_DIR || path.join(process.resourcesPath!, 'vendor')
     : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
-  app.use('/vendor', express.static(vendorDir, { fallthrough: true }));
+  app.use('/vendor', express.static(vendorDir, { fallthrough: true, dotfiles: 'allow' }));
 
   // CORS — allow all origins (localhost-only binding for security)
   app.use((_req: Request, res: Response, next: NextFunction) => {

@@ -2,11 +2,15 @@ import { getConnection } from '@doc77/core';
 import type { Album } from '../types.js';
 
 /** List all albums */
-export function listAlbums(): Album[] {
+export function listAlbums(): (Album & { item_count: number })[] {
   const db = getConnection();
-  return db.prepare(
-    'SELECT * FROM gallery_albums ORDER BY sort_order, created_at DESC'
-  ).all() as Album[];
+  return db.prepare(`
+    SELECT a.*, COUNT(i.file_path) AS item_count
+    FROM gallery_albums a
+    LEFT JOIN gallery_album_items i ON i.album_id = a.id
+    GROUP BY a.id
+    ORDER BY a.sort_order, a.created_at DESC
+  `).all() as (Album & { item_count: number })[];
 }
 
 /** Create a new album */
@@ -54,4 +58,12 @@ export function removeAlbumItem(albumId: number, projectId: number, filePath: st
   db.prepare(
     'DELETE FROM gallery_album_items WHERE album_id = ? AND project_id = ? AND file_path = ?'
   ).run(albumId, projectId, filePath);
+}
+
+/** List items in an album */
+export function listAlbumItems(albumId: number): { project_id: number; file_path: string }[] {
+  const db = getConnection();
+  return db.prepare(
+    'SELECT project_id, file_path FROM gallery_album_items WHERE album_id = ? ORDER BY sort_order'
+  ).all(albumId) as { project_id: number; file_path: string }[];
 }

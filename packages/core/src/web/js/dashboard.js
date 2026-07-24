@@ -171,7 +171,7 @@ function renderCompactCard(p, inFavorites) {
     '<button class="' + starClass + '" data-id="' + p.id + '" onclick="event.stopPropagation();toggleFavorite(' + p.id + ')">' + starIcon + '</button>' +
     // Gallery button — top-right corner
     (window.__doc77_caps_gallery
-      ? '<a href="/gallery?project=' + p.id + '" class="card-gallery-btn" onclick="event.stopPropagation()" title="Gallery">🖼️</a>'
+      ? '<a href="/gallery?project=' + p.id + '" class="card-gallery-btn" onclick="event.stopPropagation()" title="Gallery"><span class="card-gallery-badge">77</span></a>'
       : '') +
     '<div class="card-icon">' + obsidianIcon + '</div>' +
     '<div class="card-body">' +

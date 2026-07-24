@@ -74,7 +74,6 @@ function basename(p) { return p.split('/').pop() || p; }
 function tabsStorageKey() { return 'doc77-tabs-' + pid; }
 
 var CAPABILITIES = { ai: false, mcp: false };
-var currentViewMode = 'list';
 var currentDir = '';
 // Server-pushed write-task lifecycle events (executed/failed) via SSE.
 var taskEventSrc = null;
@@ -123,63 +122,8 @@ function applyCapabilities() {
     if (tBtn) { tBtn.classList.remove('hidden'); tBtn.disabled = false; }
   }
   if (CAPABILITIES.gallery) {
-    setupGalleryToggle();
+    // Gallery capability available — gallery link shown in header by stats.js
   }
-}
-
-// Gallery View Toggle
-function setupGalleryToggle() {
-  var toggle = document.getElementById('viewToggle');
-  if (!toggle) return;
-  toggle.style.display = 'flex';
-
-  toggle.querySelectorAll('button').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      currentViewMode = btn.dataset.view;
-      toggle.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-
-      if (currentViewMode === 'grid') {
-        loadGalleryView();
-      } else {
-        loadListView();
-      }
-    });
-  });
-}
-
-async function loadGalleryView() {
-  var treeContainer = document.getElementById('tree');
-  if (!treeContainer) return;
-  treeContainer.innerHTML = '<div class="masonry-grid" id="previewGalleryGrid"></div>';
-
-  try {
-    var resp = await fetch('/api/gallery/' + pid + '?path=' + encodeURIComponent(currentDir || '') + '&limit=100');
-    var data = await resp.json();
-    var grid = document.getElementById('previewGalleryGrid');
-
-    if (window.GalleryCore && typeof window.GalleryCore.renderGrid === 'function') {
-      window.GalleryCore.renderGrid(grid, data.entries, {
-        grouped: true,
-        projectId: pid,
-        onCardClick: function(item) {
-          if (window.GalleryLightbox && typeof window.GalleryLightbox.open === 'function') {
-            window.GalleryLightbox.open(item, data.entries, pid);
-          }
-        },
-      });
-      if (typeof window.GalleryCore.setupLazyLoading === 'function') {
-        window.GalleryCore.setupLazyLoading();
-      }
-    }
-  } catch(e) {
-    treeContainer.innerHTML = '<div class="text-center py-6 text-slate-500 text-xs">' + t('web.preview.loadFailed') + '</div>';
-  }
-}
-
-function loadListView() {
-  // Restore file tree
-  loadTree(currentDir || '');
 }
 
 (async function boot() {
@@ -1294,19 +1238,24 @@ function exitTranslateMode() {
 })();
 
 // Feature 6: Auto-Scroll
-var autoScrollRAF = null, autoScrollActive = false;
+var autoScrollRAF = null, autoScrollActive = false, autoScrollSpeed = 60;
+// Update speed in real-time when dropdown changes while auto-scrolling
+document.addEventListener('DOMContentLoaded', function() {
+  var sel = document.getElementById('scrollSpeed');
+  if (sel) sel.addEventListener('change', function() { autoScrollSpeed = parseFloat(this.value) || 60; });
+});
 function toggleAutoScroll() {
   if (autoScrollActive) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; autoScrollActive = false; document.getElementById('autoScrollBtn').textContent = '▶'; document.getElementById('scrollSpeed').classList.add('hidden'); return; }
   autoScrollActive = true;
   document.getElementById('autoScrollBtn').textContent = '⏸';
   document.getElementById('scrollSpeed').classList.remove('hidden');
-  var speed = parseFloat(document.getElementById('scrollSpeed').value) || 60;
+  autoScrollSpeed = parseFloat(document.getElementById('scrollSpeed').value) || 60;
   var lastTime = performance.now();
   var a = document.getElementById('contentArea');
   function step(time) {
     if (!autoScrollActive) return;
     var delta = (time - lastTime) / 1000;
-    a.scrollTop += speed * delta;
+    a.scrollTop += autoScrollSpeed * delta;
     lastTime = time;
     if (a.scrollTop >= a.scrollHeight - a.clientHeight - 2) { toggleAutoScroll(); return; }
     autoScrollRAF = requestAnimationFrame(step);
@@ -1831,7 +1780,7 @@ function doSave(cb, skipPreview) {
             fetch('/api/content/'+proj.id+'?path='+encodeURIComponent(currentFile),{method:'PUT',headers:fh,body:JSON.stringify({content:content})})
             .then(function(r2){return r2.json().then(function(d2){if(!r2.ok)throw new Error(d2.error);return d2;});})
             .then(function(d2){editModifiedTime=d2.modified;markSaved();if(!skipPreview)updateEditPreview(content);if(cb)cb();})
-            .catch(function(e){alert(t('web.preview.edit.saveFailed', {message: e.message}));});
+            .catch(function(e){toast(t('web.preview.edit.saveFailed', {message: e.message}), 'error');});
           }},
           {text:t('web.preview.edit.cancel'),cls:''}
         ]);
@@ -1849,7 +1798,7 @@ function doSave(cb, skipPreview) {
     delete paneCache[currentFile]; // force re-fetch from server on re-render
     if (cb) cb();
   })
-  .catch(function(e) { alert(t('web.preview.edit.saveFailed') + ': ' + e.message); });
+  .catch(function(e) { toast(t('web.preview.edit.saveFailed') + ': ' + e.message, 'error'); });
 }
 
 function markSaved() {

@@ -155,7 +155,7 @@ window.importWorkspace = async function () {
   var input = document.getElementById('workspacePath');
   var wsPath = input.value.trim();
   if (!wsPath) {
-    wsPath = window.prompt(t('web.register.wsPrompt'), '~/my.code-workspace');
+    wsPath = await window.promptDialog({ title: t('web.register.wsPrompt'), placeholder: '~/my.code-workspace' });
     if (!wsPath) return;
     input.value = wsPath;
   }

@@ -712,8 +712,8 @@ async function renderAccountSection(){
 }
 function doLogout() { sessionStorage.removeItem("doc77-auth"); location.reload(); }
 async function forceResetPw() {
-  if (!confirm(t('common.confirm.forceResetTitle'))) return;
-  var pw = prompt(t('common.auth.enterCurrentPassword'));
+  if (!(await confirmDialog(t('common.confirm.forceResetTitle')))) return;
+  var pw = await promptDialog({ title: t('common.auth.enterCurrentPassword'), type: 'password' });
   if (!pw) return;
   try {
     var r = await fetch('/api/auth/force-reset', {
@@ -722,9 +722,9 @@ async function forceResetPw() {
       body: JSON.stringify({password: pw, confirm: 'yes-i-know'})
     });
     var d = await r.json();
-    if (d.ok) { alert('✅ ' + t('common.auth.securityCleared')); sessionStorage.removeItem('doc77-auth'); location.reload(); }
-    else { alert('❌ ' + (d.error || t('common.auth.opFailed2'))); }
-  } catch(e) { alert('❌ ' + t('common.auth.requestFailed', {message: e.message})); }
+    if (d.ok) { toast('✅ ' + t('common.auth.securityCleared'), 'success'); setTimeout(function() { sessionStorage.removeItem('doc77-auth'); location.reload(); }, 1000); }
+    else { toast('❌ ' + (d.error || t('common.auth.opFailed2')), 'error'); }
+  } catch(e) { toast('❌ ' + t('common.auth.requestFailed', {message: e.message}), 'error'); }
 }
 function updateStrength() {
   var p = (document.getElementById('newPass') && document.getElementById('newPass').value) || '';
@@ -1099,10 +1099,11 @@ function loadActiveShares(container) {
 
 /** Revoke a share token. */
 function revokeShare(token, btn) {
-  if (!confirm(t('common.share.revokeConfirm'))) return;
-  btn.disabled = true;
-  btn.textContent = t('common.share.revoking');
-  fetch('/api/share/' + token, { method: 'DELETE' })
+  confirmDialog(t('common.share.revokeConfirm')).then(function(ok) {
+    if (!ok) return;
+    btn.disabled = true;
+    btn.textContent = t('common.share.revoking');
+    fetch('/api/share/' + token, { method: 'DELETE' })
     .then(function(r) {
       if (r.ok) {
         toast(t('common.share.revoked'), 'success');
@@ -1119,6 +1120,7 @@ function revokeShare(token, btn) {
       btn.disabled = false;
       btn.textContent = t('common.share.revoke');
     });
+  });
 }
 
 function escHtml(s) {
