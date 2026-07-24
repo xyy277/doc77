@@ -191,7 +191,7 @@
   "api.auth.noPassword": "未设置密码",
   "api.auth.accountLocked": "账户已锁定，请稍后再试",
   "api.auth.passwordResetRequired": "系统已升级，请重新设置密码",
-  "api.auth.tooManyAttempts": "密码错误次数过多，已锁定15分钟",
+  "api.auth.tooManyAttempts": "登录尝试次数过多，请 1 分钟后再试",
   "api.auth.wrongPassword": "密码错误（{fails}/{max}）",
   "api.auth.noRecoveryCode": "未设置恢复码",
   "api.lanRestricted": "该操作仅限于本地访问。服务器管理员可在 Account 设置中关闭此限制。",

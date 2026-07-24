@@ -2811,6 +2811,11 @@ export function createApp(
 
   // === Auth API ===
 
+  const loginRateLimiter = createRateLimiter();
+  function clientIp(req: Request): string {
+    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+  }
+
   // Check auth status
   app.get('/api/auth/status', (_req: Request, res: Response) => {
     try {
@@ -2860,6 +2865,19 @@ export function createApp(
       res.status(400).json({ error: t('api.auth.passwordRequired'), code: 'PASSWORD_REQUIRED' });
       return;
     }
+
+    // Rate limit: 5 attempts per minute per IP
+    const ip = clientIp(req);
+    const { allowed, remaining } = loginRateLimiter.check(`login:${ip}`, 5, 60000, Date.now());
+    if (!allowed) {
+      res.status(429).json({
+        error: t('api.auth.tooManyAttempts') || 'Too many login attempts. Try again in 1 minute.',
+        code: 'TOO_MANY_ATTEMPTS',
+        retryAfter: 60,
+      });
+      return;
+    }
+
     try {
       const result = auth.verifyLogin(password);
       if (result.ok) {

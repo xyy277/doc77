@@ -192,7 +192,7 @@
   "api.auth.noPassword": "No password is set",
   "api.auth.accountLocked": "Account is locked, please try again later",
   "api.auth.passwordResetRequired": "System has been upgraded, please reset your password",
-  "api.auth.tooManyAttempts": "Too many incorrect attempts, account locked for 15 minutes",
+  "api.auth.tooManyAttempts": "Too many login attempts. Please try again in 1 minute.",
   "api.auth.wrongPassword": "Incorrect password ({fails}/{max})",
   "api.auth.noRecoveryCode": "No recovery codes are set",
   "api.electron.installDone": "{mod}@{version} installed. Restart to take effect",
