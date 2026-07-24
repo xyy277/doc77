@@ -4,6 +4,13 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-24] — `1.0.7`
+
+### 全包 (`1.0.7`)
+
+**Security**
+- 登录端点新增速率限制：每 IP 每分钟最多 5 次尝试，超限返回 429
+
 ## [2026-07-24] — `1.0.6`
 
 ### 全包 (`1.0.6`)
