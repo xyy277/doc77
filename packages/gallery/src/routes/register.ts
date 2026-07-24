@@ -6,9 +6,13 @@ import type { GalleryOptions } from '../types.js';
 import { createGalleryListHandler, createTimelineHandler } from './gallery.js';
 import { createExifHandler } from './exif.js';
 import {
-  createAlbumListHandler, createAlbumCreateHandler,
-  createAlbumUpdateHandler, createAlbumDeleteHandler,
-  createAlbumAddItemHandler, createAlbumRemoveItemHandler, createAlbumItemsListHandler,
+  createAlbumListHandler,
+  createAlbumCreateHandler,
+  createAlbumUpdateHandler,
+  createAlbumDeleteHandler,
+  createAlbumAddItemHandler,
+  createAlbumRemoveItemHandler,
+  createAlbumItemsListHandler,
 } from '../album/routes.js';
 
 /**
@@ -29,10 +33,13 @@ export async function registerGalleryRoutes(app: Application, opts: GalleryOptio
   // --- Static thumbnail serving ---
   // Thumbnails are generated eagerly by the gallery list API and served as static files
   const { static: staticMiddleware } = await import('express');
-  app.use('/thumbnails', staticMiddleware(opts.thumbnailsDir, {
-    maxAge: '7d',
-    immutable: true,
-  }));
+  app.use(
+    '/thumbnails',
+    staticMiddleware(opts.thumbnailsDir, {
+      maxAge: '7d',
+      immutable: true,
+    }),
+  );
 
   app.get('/api/albums', createAlbumListHandler());
   app.post('/api/albums', createAlbumCreateHandler());
@@ -45,8 +52,8 @@ export async function registerGalleryRoutes(app: Application, opts: GalleryOptio
   // --- Static Web Assets ---
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const webCandidates = [
-    path.join(moduleDir, '..', 'web'),           // dist/web/
-    path.join(moduleDir, '..', 'src', 'web'),    // dev fallback
+    path.join(moduleDir, '..', 'web'), // dist/web/
+    path.join(moduleDir, '..', 'src', 'web'), // dev fallback
   ];
   let webDir = '';
   for (const candidate of webCandidates) {

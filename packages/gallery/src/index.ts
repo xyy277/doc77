@@ -6,6 +6,19 @@
 export { registerGalleryRoutes } from './routes/register.js';
 export { getOrGenerateThumbnail } from './thumbnail/cache.js';
 export { readExif } from './exif/reader.js';
-export { listAlbums, createAlbum, updateAlbum, deleteAlbum, addAlbumItem, removeAlbumItem } from './album/store.js';
-export type { GalleryOptions, GalleryEntry, GalleryListResponse, TimelineGroup, Album } from './types.js';
+export {
+  listAlbums,
+  createAlbum,
+  updateAlbum,
+  deleteAlbum,
+  addAlbumItem,
+  removeAlbumItem,
+} from './album/store.js';
+export type {
+  GalleryOptions,
+  GalleryEntry,
+  GalleryListResponse,
+  TimelineGroup,
+  Album,
+} from './types.js';
 export type { ExifData } from './exif/reader.js';

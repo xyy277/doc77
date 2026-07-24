@@ -55,7 +55,9 @@ async function detectModules() {
       await import('@doc77/gallery');
       galleryAvailable = true;
     }
-  } catch { /* Gallery not installed, sharp missing, or platform incompatible */ }
+  } catch {
+    /* Gallery not installed, sharp missing, or platform incompatible */
+  }
 }
 async function tryGetMcp(names: string[]): Promise<Record<string, any> | null> {
   if (!mcpAvailable) return null;
@@ -338,13 +340,20 @@ async function main() {
           await registerGalleryRoutes(app, {
             thumbnailsDir: path.join(os.homedir(), '.doc77', 'thumbnails'),
           });
-        } catch { /* Gallery init failed */ }
+        } catch {
+          /* Gallery init failed */
+        }
       }
 
       // Inject capabilities into app
       try {
         const { setCapabilities } = await import('@doc77/core');
-        setCapabilities({ ai: aiAvailable, mcp: mcpAvailable, translate: translateAvailable, gallery: galleryAvailable });
+        setCapabilities({
+          ai: aiAvailable,
+          mcp: mcpAvailable,
+          translate: translateAvailable,
+          gallery: galleryAvailable,
+        });
       } catch {}
 
       const server = http.createServer(app);

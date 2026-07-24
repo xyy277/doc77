@@ -19,19 +19,26 @@ export function createThumbnailHandler(opts: GalleryOptions) {
 
     try {
       const db = getConnection();
-      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
       if (!project) {
         res.status(404).json({ error: 'Project not found' });
         return;
       }
 
       const result = await getOrGenerateThumbnail(
-        project.path, filePath, projectId, size, opts.thumbnailsDir
+        project.path,
+        filePath,
+        projectId,
+        size,
+        opts.thumbnailsDir,
       );
 
       // Check if the generated file actually exists
       if (!fs.existsSync(result.cachePath)) {
-        res.status(500).json({ error: 'Thumbnail file not found after generation: ' + result.cachePath });
+        res
+          .status(500)
+          .json({ error: 'Thumbnail file not found after generation: ' + result.cachePath });
         return;
       }
 

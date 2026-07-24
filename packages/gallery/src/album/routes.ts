@@ -1,5 +1,13 @@
 import type { Request, Response } from 'express';
-import { listAlbums, createAlbum, updateAlbum, deleteAlbum, addAlbumItem, removeAlbumItem, listAlbumItems } from './store.js';
+import {
+  listAlbums,
+  createAlbum,
+  updateAlbum,
+  deleteAlbum,
+  addAlbumItem,
+  removeAlbumItem,
+  listAlbumItems,
+} from './store.js';
 
 export function createAlbumListHandler() {
   return (_req: Request, res: Response): void => {

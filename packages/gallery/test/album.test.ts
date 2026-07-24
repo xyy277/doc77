@@ -12,9 +12,11 @@ describe('AlbumStore', () => {
     await initDatabase(dbPath);
     runMigrations();
     // Create a test project for foreign key references
-    getConnection().prepare(
-      "INSERT OR IGNORE INTO projects (id, name, path) VALUES (1, 'test-project', '/tmp/test')"
-    ).run();
+    getConnection()
+      .prepare(
+        "INSERT OR IGNORE INTO projects (id, name, path) VALUES (1, 'test-project', '/tmp/test')",
+      )
+      .run();
   });
 
   afterAll(() => {

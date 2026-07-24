@@ -10,7 +10,12 @@ const SIZE_CONFIG: Record<ThumbnailSize, number> = {
   preview: 1200,
 };
 
-export function computeSourceHash(projectId: number, relativePath: string, mtime: string, size: number): string {
+export function computeSourceHash(
+  projectId: number,
+  relativePath: string,
+  mtime: string,
+  size: number,
+): string {
   const input = `${projectId}:${relativePath}:${mtime}:${size}`;
   return crypto.createHash('sha256').update(input).digest('hex').slice(0, 16);
 }
@@ -36,7 +41,12 @@ export async function generateThumbnail(
 ): Promise<ThumbnailResult> {
   const absPath = validatePath(projectPath, relativePath);
   const stats = fs.statSync(absPath);
-  const sourceHash = computeSourceHash(projectId, relativePath, stats.mtime.toISOString(), stats.size);
+  const sourceHash = computeSourceHash(
+    projectId,
+    relativePath,
+    stats.mtime.toISOString(),
+    stats.size,
+  );
   const hashPrefix = sourceHash.slice(0, 2);
   const cacheDir = path.join(outputDir, hashPrefix);
   fs.mkdirSync(cacheDir, { recursive: true });

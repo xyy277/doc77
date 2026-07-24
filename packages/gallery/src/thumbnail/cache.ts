@@ -24,15 +24,15 @@ export interface ThumbnailCacheRow {
 /** Get cached thumbnail record by hash */
 export function getCachedThumbnail(sourceHash: string): ThumbnailCacheRow | undefined {
   const db = getConnection();
-  return db.prepare(
-    'SELECT * FROM thumbnail_cache WHERE source_hash = ?'
-  ).get(sourceHash) as ThumbnailCacheRow | undefined;
+  return db.prepare('SELECT * FROM thumbnail_cache WHERE source_hash = ?').get(sourceHash) as
+    ThumbnailCacheRow | undefined;
 }
 
 /** Upsert a thumbnail cache record */
 export function upsertThumbnailCache(row: Omit<ThumbnailCacheRow, 'created_at'>): void {
   const db = getConnection();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO thumbnail_cache
       (source_hash, project_id, source_path, source_size, source_mtime, grid_path, preview_path,
        video_cover_path, width, height, exif_date)
@@ -47,20 +47,33 @@ export function upsertThumbnailCache(row: Omit<ThumbnailCacheRow, 'created_at'>)
       height = excluded.height,
       exif_date = excluded.exif_date,
       created_at = datetime('now')
-  `).run(
-    row.source_hash, row.project_id, row.source_path, row.source_size, row.source_mtime,
-    row.grid_path, row.preview_path, row.video_cover_path,
-    row.width, row.height, row.exif_date
+  `,
+  ).run(
+    row.source_hash,
+    row.project_id,
+    row.source_path,
+    row.source_size,
+    row.source_mtime,
+    row.grid_path,
+    row.preview_path,
+    row.video_cover_path,
+    row.width,
+    row.height,
+    row.exif_date,
   );
 }
 
 /** Get cached thumbnail by source_path prefix, with optional project_id filter */
-export function getCachedByPathPrefix(sourcePath: string, projectId?: number): ThumbnailCacheRow | undefined {
+export function getCachedByPathPrefix(
+  sourcePath: string,
+  projectId?: number,
+): ThumbnailCacheRow | undefined {
   const db = getConnection();
   const sql = projectId
     ? 'SELECT * FROM thumbnail_cache WHERE source_path = ? AND project_id = ?'
     : 'SELECT * FROM thumbnail_cache WHERE source_path = ?';
-  return db.prepare(sql).get(...(projectId ? [sourcePath, projectId] : [sourcePath])) as ThumbnailCacheRow | undefined;
+  return db.prepare(sql).get(...(projectId ? [sourcePath, projectId] : [sourcePath])) as
+    ThumbnailCacheRow | undefined;
 }
 
 export interface ResolvedThumbnail {
@@ -83,7 +96,12 @@ export async function getOrGenerateThumbnail(
 ): Promise<ResolvedThumbnail> {
   const absPath = validatePath(projectPath, relativePath);
   const stats = fs.statSync(absPath);
-  const sourceHash = computeSourceHash(projectId, relativePath, stats.mtime.toISOString(), stats.size);
+  const sourceHash = computeSourceHash(
+    projectId,
+    relativePath,
+    stats.mtime.toISOString(),
+    stats.size,
+  );
 
   // Check cache
   const cached = getCachedThumbnail(sourceHash);
@@ -112,8 +130,8 @@ export async function getOrGenerateThumbnail(
     source_path: relativePath,
     source_size: stats.size,
     source_mtime: stats.mtime.toISOString(),
-    grid_path: size === 'grid' ? result.relativePath : (cached?.grid_path || null),
-    preview_path: size === 'preview' ? result.relativePath : (cached?.preview_path || null),
+    grid_path: size === 'grid' ? result.relativePath : cached?.grid_path || null,
+    preview_path: size === 'preview' ? result.relativePath : cached?.preview_path || null,
     video_cover_path: cached?.video_cover_path || null,
     width: result.width,
     height: result.height,

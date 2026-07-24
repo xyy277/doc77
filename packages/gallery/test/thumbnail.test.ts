@@ -12,9 +12,12 @@ describe('generateThumbnail', () => {
   beforeAll(async () => {
     // Create a minimal 100x100 red PNG using sharp
     const sharp = await import('sharp');
-    await sharp.default({
-      create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } },
-    }).png().toFile(testImg);
+    await sharp
+      .default({
+        create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } },
+      })
+      .png()
+      .toFile(testImg);
   });
 
   afterAll(() => {

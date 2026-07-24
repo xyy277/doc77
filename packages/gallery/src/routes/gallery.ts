@@ -4,8 +4,18 @@ import { getConnection, listDir, validatePath } from '@doc77/core';
 import type { GalleryEntry, GalleryListResponse, TimelineGroup } from '../types.js';
 import { getOrGenerateThumbnail } from '../thumbnail/cache.js';
 
-const IMAGE_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.svg','.webp','.bmp','.ico','.avif']);
-const VIDEO_EXTS = new Set(['.mp4','.webm','.mov','.mkv','.avi','.m4v']);
+const IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.svg',
+  '.webp',
+  '.bmp',
+  '.ico',
+  '.avif',
+]);
+const VIDEO_EXTS = new Set(['.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v']);
 
 function isMediaFile(name: string): 'image' | 'video' | null {
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
@@ -19,8 +29,17 @@ function filenameToExtension(name: string): string {
   return dot === -1 ? '' : name.slice(dot).toLowerCase();
 }
 
-function computeSourceHash(projectId: number, relativePath: string, mtime: string, size: number): string {
-  return crypto.createHash('sha256').update(`${projectId}:${relativePath}:${mtime}:${size}`).digest('hex').slice(0, 16);
+function computeSourceHash(
+  projectId: number,
+  relativePath: string,
+  mtime: string,
+  size: number,
+): string {
+  return crypto
+    .createHash('sha256')
+    .update(`${projectId}:${relativePath}:${mtime}:${size}`)
+    .digest('hex')
+    .slice(0, 16);
 }
 
 /** GET /api/gallery/:projectId?path=&sort=name|date|size&order=asc|desc&offset=0&limit=100&types=image,video */
@@ -42,7 +61,8 @@ export function createGalleryListHandler(thumbnailsDir: string) {
 
     try {
       const db = getConnection();
-      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
       if (!project) {
         res.status(404).json({ error: 'Project not found' });
         return;
@@ -63,8 +83,20 @@ export function createGalleryListHandler(thumbnailsDir: string) {
 
         // Generate thumbnail eagerly (async, fire-and-forget for non-blocking response)
         if (mediaType === 'image') {
-          getOrGenerateThumbnail(project.path, relativePath, projectId, 'grid', thumbnailsDir).catch(() => {});
-          getOrGenerateThumbnail(project.path, relativePath, projectId, 'preview', thumbnailsDir).catch(() => {});
+          getOrGenerateThumbnail(
+            project.path,
+            relativePath,
+            projectId,
+            'grid',
+            thumbnailsDir,
+          ).catch(() => {});
+          getOrGenerateThumbnail(
+            project.path,
+            relativePath,
+            projectId,
+            'preview',
+            thumbnailsDir,
+          ).catch(() => {});
         }
 
         mediaEntries.push({
@@ -87,7 +119,7 @@ export function createGalleryListHandler(thumbnailsDir: string) {
       // Sort
       mediaEntries.sort((a, b) => {
         const mul = order === 'desc' ? -1 : 1;
-        if (sort === 'date') return mul * (a.modified.localeCompare(b.modified));
+        if (sort === 'date') return mul * a.modified.localeCompare(b.modified);
         if (sort === 'size') return mul * (a.size - b.size);
         return mul * a.name.localeCompare(b.name);
       });
@@ -121,18 +153,21 @@ export function createTimelineHandler() {
 
     try {
       const db = getConnection();
-      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
       if (!project) {
         res.status(404).json({ error: 'Project not found' });
         return;
       }
 
       // Get all cached thumbnails for this project (by path prefix scan)
-      const rows = db.prepare(
-        `SELECT source_path, exif_date, source_mtime, grid_path, preview_path
+      const rows = db
+        .prepare(
+          `SELECT source_path, exif_date, source_mtime, grid_path, preview_path
          FROM thumbnail_cache
-         WHERE project_id = ? AND source_path LIKE ?`
-      ).all(projectId, dirPath ? `${dirPath}%` : '%') as any[];
+         WHERE project_id = ? AND source_path LIKE ?`,
+        )
+        .all(projectId, dirPath ? `${dirPath}%` : '%') as any[];
 
       // Group by month
       const groups: Map<string, { count: number; first: any }> = new Map();

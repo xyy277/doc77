@@ -4,6 +4,18 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-24] — `1.0.5`
+
+### 全包 (`1.0.5`)
+
+**Changed**
+- Tailwind CSS: 从 CDN 运行时（400KB JS）迁移到构建时静态生成（47KB CSS）
+- Vendor 资产: 移除 tailwind.js 依赖
+
+**Fixed**
+- 修复 tailwindcss CDN 连接失败时 preview 页面样式丢失的问题
+- 修复 express.static dotfiles 默认 `ignore` 导致 vendor `.ready` 不可读的问题
+
 ## [2026-07-22] — `1.0.4`
 
 ### 全包 (`1.0.4`)

@@ -1,18 +1,26 @@
 {
   "name": "@doc77/gallery",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Doc77 Gallery — thumbnail engine, media gallery UI, album management",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xyy277/doc77.git"
   },
-  "keywords": ["doc77", "gallery", "images", "thumbnails", "media"],
+  "keywords": [
+    "doc77",
+    "gallery",
+    "images",
+    "thumbnails",
+    "media"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

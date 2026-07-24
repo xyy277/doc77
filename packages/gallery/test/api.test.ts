@@ -13,15 +13,18 @@ describe('Gallery API routes', () => {
   beforeAll(async () => {
     await initDatabase(dbPath);
     runMigrations();
-    getConnection().prepare(
-      "INSERT OR IGNORE INTO projects (id, name, path) VALUES (1, 'test', ?)"
-    ).run(thumbDir);
+    getConnection()
+      .prepare("INSERT OR IGNORE INTO projects (id, name, path) VALUES (1, 'test', ?)")
+      .run(thumbDir);
     // Create a test image
     fs.mkdirSync(thumbDir, { recursive: true });
     const sharp = await import('sharp');
-    await sharp.default({
-      create: { width: 100, height: 100, channels: 3, background: { r: 0, g: 0, b: 255 } },
-    }).png().toFile(path.join(thumbDir, 'blue.png'));
+    await sharp
+      .default({
+        create: { width: 100, height: 100, channels: 3, background: { r: 0, g: 0, b: 255 } },
+      })
+      .png()
+      .toFile(path.join(thumbDir, 'blue.png'));
   });
 
   afterAll(() => {
@@ -72,7 +75,11 @@ describe('Gallery API routes', () => {
 });
 
 // Minimal fetch helper for express app testing
-async function fetchFromApp(app: express.Application, url: string, init?: RequestInit): Promise<any> {
+async function fetchFromApp(
+  app: express.Application,
+  url: string,
+  init?: RequestInit,
+): Promise<any> {
   return new Promise((resolve, reject) => {
     const server = app.listen(0, () => {
       const addr = server.address() as { port: number };

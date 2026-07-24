@@ -52,7 +52,10 @@ function dmsToDecimal(dms: number[], ref?: string): number {
  * Read EXIF data from an image file.
  * Uses sharp for metadata extraction and exif-reader for parsing.
  */
-export async function readExif(projectPath: string, relativePath: string): Promise<ExifData | null> {
+export async function readExif(
+  projectPath: string,
+  relativePath: string,
+): Promise<ExifData | null> {
   const absPath = validatePath(projectPath, relativePath);
 
   try {
