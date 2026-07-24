@@ -15,6 +15,9 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 **Fixed**
 - 修复 tailwindcss CDN 连接失败时 preview 页面样式丢失的问题
 - 修复 express.static dotfiles 默认 `ignore` 导致 vendor `.ready` 不可读的问题
+- Electron 构建缺失 gallery 包，导致注册项目卡片无 git 标记、相册等功能不可用
+- CI check:i18n 白名单未包含 mcp prompts（AI 系统提示词），导致流水线失败
+- CI 中 gallery 测试因 express 非直接依赖在 pnpm symlink 模式下找不到模块
 
 ## [2026-07-22] — `1.0.4`
 
