@@ -42,7 +42,7 @@ function computeSourceHash(
     .slice(0, 16);
 }
 
-/** GET /api/gallery/:projectId?path=&sort=name|date|size&order=asc|desc&offset=0&limit=100&types=image,video */
+/** GET /api/gallery/:projectId?path=&sort=name|date|size&order=asc|desc&offset=0&limit=100&types=image,video&paths= */
 export function createGalleryListHandler(thumbnailsDir: string) {
   return async (req: Request, res: Response): Promise<void> => {
     const projectId = parseInt(req.params.projectId, 10);
@@ -53,6 +53,11 @@ export function createGalleryListHandler(thumbnailsDir: string) {
     const limit = Math.min(parseInt((req.query.limit as string) || '100', 10), 200);
     const types = (req.query.types as string) || 'image,video';
     const allowedTypes = new Set(types.split(','));
+    // Support explicit path filter (album view passes specific file paths)
+    const rawPaths = req.query.paths;
+    const filterPaths: string[] | null = rawPaths
+      ? (Array.isArray(rawPaths) ? rawPaths : [rawPaths]).filter(Boolean) as string[]
+      : null;
 
     if (isNaN(projectId)) {
       res.status(400).json({ error: 'Invalid project id' });
@@ -78,6 +83,8 @@ export function createGalleryListHandler(thumbnailsDir: string) {
         if (!mediaType || !allowedTypes.has(mediaType)) continue;
 
         const relativePath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
+        // When paths filter is set, skip entries not in the list
+        if (filterPaths && !filterPaths.includes(relativePath)) continue;
         const sourceHash = computeSourceHash(projectId, relativePath, entry.modified, entry.size);
         const hashPrefix = sourceHash.slice(0, 2);
 
