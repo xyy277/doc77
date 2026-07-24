@@ -4,6 +4,14 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-24] — `1.0.6`
+
+### 全包 (`1.0.6`)
+
+**Fixed**
+- Gallery album 点击后不显示图片缩略图：backend 忽略 `paths` 过滤参数
+- Gallery 页面仍使用 CDN tailwind，离线环境样式丢失
+
 ## [2026-07-24] — `1.0.5`
 
 ### 全包 (`1.0.5`)

@@ -56,7 +56,7 @@ export function createGalleryListHandler(thumbnailsDir: string) {
     // Support explicit path filter (album view passes specific file paths)
     const rawPaths = req.query.paths;
     const filterPaths: string[] | null = rawPaths
-      ? (Array.isArray(rawPaths) ? rawPaths : [rawPaths]).filter(Boolean) as string[]
+      ? ((Array.isArray(rawPaths) ? rawPaths : [rawPaths]).filter(Boolean) as string[])
       : null;
 
     if (isNaN(projectId)) {
