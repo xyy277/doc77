@@ -4,6 +4,14 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-07-24] — `1.0.8`
+
+### 全包 (`1.0.8`)
+
+**Fixed**
+- Gallery: Tailwind CSS 构建时添加 `@source` 指令扫描 gallery 文件，确保样式正确生成
+- Monorepo: vitest 添加 root 配置，修复 monorepo workspace 解析问题
+
 ## [2026-07-24] — `1.0.7`
 
 ### 全包 (`1.0.7`)
