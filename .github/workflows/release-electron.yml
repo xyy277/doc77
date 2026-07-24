@@ -2,7 +2,7 @@ name: Release Electron
 
 on:
   push:
-    tags: ['electron-v*']
+    tags: ['v*']
 
 permissions:
   contents: write
@@ -83,7 +83,7 @@ jobs:
 
       - name: Extract release notes from CHANGELOG
         shell: bash
-        run: node scripts/extract-changelog.cjs --version ${GITHUB_REF_NAME#electron-v} > release-notes.md
+        run: node scripts/extract-changelog.cjs --version ${GITHUB_REF_NAME#v} > release-notes.md
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2

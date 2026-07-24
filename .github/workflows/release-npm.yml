@@ -3,8 +3,7 @@ name: Release npm
 on:
   push:
     tags:
-      - 'v*'
-      - '!electron-v*'    # 排除 electron tag，避免重复触发
+      - 'npm-v*'           # npm 发布走手动，不再由 git tag 触发
 
 permissions:
   contents: write          # 创建 GitHub Release 需要

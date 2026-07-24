@@ -4,7 +4,7 @@
 
 ## 最终工作流
 
-**触发**：`git tag electron-vX.X.X && git push --tags`
+**触发**：`git tag vX.X.X && git push --tags`（统一用 `v*` 触发 Electron 构建，npm 发布走手动 `bash scripts/publish.sh`）
 
 **核心配置 3 要素**：
 1. `.npmrc` 设 `node-linker=hoisted` + `shamefully-hoist=true`
