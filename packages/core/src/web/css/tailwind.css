@@ -1,2 +1,5 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Include gallery package source files so Tailwind discovers classes used there */
+@source "../../../../gallery/src/web/";
