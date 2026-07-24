@@ -28,7 +28,12 @@ interface CoreModule {
   createAIChatHandler: (deps: Record<string, unknown>) => unknown;
   createQueueApproveHandler: (executeApprovedTasks: unknown) => unknown;
   createEventsHandler: (eventBus: unknown) => unknown;
-  setCapabilities: (caps: { ai: boolean; mcp: boolean; translate: boolean; gallery: boolean }) => void;
+  setCapabilities: (caps: {
+    ai: boolean;
+    mcp: boolean;
+    translate: boolean;
+    gallery: boolean;
+  }) => void;
   isEngineAvailable: () => Promise<boolean>;
   getConfig: (key: string) => string | undefined;
 }
