@@ -157,7 +157,12 @@ ${OUTLINE_CSS}
 <div class="doc77-share-page">
   <header class="doc77-share-header">
     <a href="/" class="brand">Doc77</a>
-    <span class="info">${escapeHtml(t('web.sharePage.readonlyBadge'))}</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button id="copyBtn" onclick="copySharedContent()" style="padding:6px 12px;font-size:12px;font-weight:500;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:4px">
+        📋 <span id="copyBtnText">${escapeHtml(t('web.sharePage.copy'))}</span>
+      </button>
+      <span class="info">${escapeHtml(t('web.sharePage.readonlyBadge'))}</span>
+    </div>
   </header>
   <div class="doc77-layout">
     <div class="doc77-main">
@@ -184,7 +189,24 @@ ${OUTLINE_CSS}
   <nav class="doc77-outline-list" id="outlineDrawerList"></nav>
 </div>
 <script>
+var _rawContent='';
 function escHtml(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function copySharedContent(){
+  var text=_rawContent;
+  if(!text){text=document.getElementById('content').textContent||'';}
+  var btn=document.getElementById('copyBtnText');
+  var orig=btn.textContent;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(function(){
+      btn.textContent='✓ Copied!';
+      setTimeout(function(){btn.textContent=orig;},1500);
+    }).catch(function(){fallbackCopy(text);btn.textContent='✓ Copied!';setTimeout(function(){btn.textContent=orig;},1500);});
+  }else{fallbackCopy(text);btn.textContent='✓ Copied!';setTimeout(function(){btn.textContent=orig;},1500);}
+}
+function fallbackCopy(text){
+  var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.left='-9999px';
+  document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+}
 function buildOutline(){
   var container=document.getElementById('content');
   var headings=container.querySelectorAll('h1, h2, h3');
@@ -241,6 +263,7 @@ document.getElementById('outlineList').addEventListener('click',function(e){
 fetch('/api/share/' + window.location.pathname.split('/').pop() + '/data')
   .then(function(r){ if(!r.ok) throw new Error('not found'); return r.json(); })
   .then(function(d){
+    _rawContent = d.rawContent || '';
     var c = document.getElementById('content');
     if(d.theme === 'dark') document.documentElement.classList.add('dark');
     document.title = d.title + ' — Doc77';

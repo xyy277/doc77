@@ -648,6 +648,18 @@ function afterActivate(path, d) {
       runBtn.classList.remove('hidden'); runBtn.disabled = false; runBtn.dataset.lang = ext; runBtn.dataset.code = d.content;
     } else { runBtn.classList.add('hidden'); runBtn.disabled = true; }
   }
+  // Copy FAB: show for text-based files (md, txt, code, etc.)
+  var copyBtn = document.getElementById('copyContentBtn');
+  if (copyBtn) {
+    var copyExts = ['.md','.mdx','.markdown','.txt','.json','.yaml','.yml','.toml',
+      '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
+      '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
+      '.conf','.cfg','.ini','.csv','.log'];
+    var showCopy = !isTemp && copyExts.some(function(ext) {
+      return (currentFile || '').toLowerCase().endsWith(ext);
+    });
+    copyBtn.style.display = showCopy ? 'flex' : 'none';
+  }
   updateReadingTime(d);
   refreshOutline();
   document.getElementById('readingProgress').style.width = '0%';
@@ -1246,21 +1258,62 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 function toggleAutoScroll() {
   if (autoScrollActive) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; autoScrollActive = false; document.getElementById('autoScrollBtn').textContent = '▶'; document.getElementById('scrollSpeed').classList.add('hidden'); return; }
+  var a = document.getElementById('contentArea');
+  if (!a) { toast(t('web.preview.noContentArea'), 'error'); return; }
   autoScrollActive = true;
   document.getElementById('autoScrollBtn').textContent = '⏸';
   document.getElementById('scrollSpeed').classList.remove('hidden');
   autoScrollSpeed = parseFloat(document.getElementById('scrollSpeed').value) || 60;
   var lastTime = performance.now();
-  var a = document.getElementById('contentArea');
   function step(time) {
     if (!autoScrollActive) return;
-    var delta = (time - lastTime) / 1000;
-    a.scrollTop += autoScrollSpeed * delta;
+    var aCur = document.getElementById('contentArea');
+    if (!aCur) { autoScrollActive = false; document.getElementById('autoScrollBtn').textContent = '▶'; document.getElementById('scrollSpeed').classList.add('hidden'); return; }
+    var delta = Math.min((time - lastTime) / 1000, 0.1);
+    aCur.scrollTop += autoScrollSpeed * delta;
     lastTime = time;
-    if (a.scrollTop >= a.scrollHeight - a.clientHeight - 2) { toggleAutoScroll(); return; }
+    if (aCur.scrollTop >= aCur.scrollHeight - aCur.clientHeight) { toggleAutoScroll(); return; }
     autoScrollRAF = requestAnimationFrame(step);
   }
   autoScrollRAF = requestAnimationFrame(step);
+}
+
+// Feature 6a: Copy content FAB
+function copyDocumentContent() {
+  if (!currentFile) { toast(t('web.preview.openDocFirst'), 'error'); return; }
+  var btn = document.getElementById('copyContentBtn');
+  if (!btn) return;
+  var origHTML = btn.innerHTML;
+  // Fetch raw content from server
+  fetch('/api/content/' + pid + '?path=' + encodeURIComponent(currentFile))
+    .then(function(r) { if (!r.ok) throw new Error('fetch failed'); return r.text(); })
+    .then(function(raw) {
+      return navigator.clipboard ? navigator.clipboard.writeText(raw).then(function() { return raw; }) : Promise.reject('no clipboard');
+    })
+    .then(function() {
+      btn.innerHTML = '✓';
+      toast(t('web.preview.copySuccess'), 'success');
+      setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
+    })
+    .catch(function() {
+      // Fallback: copy rendered text from DOM
+      var docContent = document.getElementById('docContent') || document.querySelector('.doc-content');
+      var text = docContent ? (docContent.textContent || '') : '';
+      if (text && navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function() {
+          btn.innerHTML = '✓';
+          toast(t('web.preview.copySuccess'), 'success');
+          setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
+        }).catch(function() { toast(t('web.preview.copyFailed'), 'error'); });
+      } else if (text) {
+        fallbackCopy(text);
+        btn.innerHTML = '✓';
+        toast(t('web.preview.copySuccess'), 'success');
+        setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
+      } else {
+        toast(t('web.preview.copyFailed'), 'error');
+      }
+    });
 }
 
 // Feature 7: AI Summary

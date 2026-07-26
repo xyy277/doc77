@@ -2,7 +2,7 @@
  * Doc77 Electron — Main process entry
  * Port probe → spawn server → BrowserWindow → system tray.
  */
-import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, shell, nativeImage } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -40,12 +40,50 @@ function createWindow(port: number): void {
   mainWindow.loadURL(`http://localhost:${port}`);
   mainWindow.once('ready-to-show', () => mainWindow?.show());
 
+  // Intercept external links — open in system browser instead of leaving the app
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const parsed = new URL(url);
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+
   mainWindow.on('close', (e) => {
     if (!shuttingDown) {
       e.preventDefault();
       mainWindow?.hide(); // minimize to tray
     }
   });
+}
+
+/** Build minimal application menu — macOS keeps system menu, Windows/Linux get bare minimum. */
+function buildAppMenu(): void {
+  const isMac = process.platform === 'darwin';
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // macOS: system app menu (About, Preferences, Quit) — platform convention
+    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    // macOS: standard Edit menu (Undo, Redo, Cut, Copy, Paste, Select All)
+    ...(isMac ? [{ role: 'editMenu' as const }] : []),
+    // Minimal Help menu
+    {
+      label: 'Help',
+      role: 'help',
+      submenu: [
+        {
+          label: 'About Doc77',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.show();
+              mainWindow.focus();
+            }
+          },
+        },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 async function boot(): Promise<void> {
@@ -117,7 +155,10 @@ if (!gotLock) {
     }
   });
 
-  app.whenReady().then(() => boot().catch(reportBootFailure));
+  app.whenReady().then(() => {
+    buildAppMenu();
+    boot().catch(reportBootFailure);
+  });
 }
 
 app.on('before-quit', () => {

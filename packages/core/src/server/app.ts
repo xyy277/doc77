@@ -1869,16 +1869,19 @@ export function createApp(
             projectId: token.projectId,
             filePath: token.filePath,
           }),
+          rawContent: content,
         };
       } else if (renderer === 'code') {
         rendered = {
           type: 'code',
           content: renderCode(content, ext),
+          rawContent: content,
         };
       } else if (renderer === 'mermaid') {
         rendered = {
           type: 'mermaid',
           content: `<pre class="mermaid">${content}</pre>`,
+          rawContent: content,
         };
       } else if (renderer === 'image' || renderer === 'pdf') {
         rendered = {
@@ -1890,6 +1893,7 @@ export function createApp(
         rendered = {
           type: 'text',
           content: `<pre class="text-sm whitespace-pre-wrap font-mono">${content}</pre>`,
+          rawContent: content,
         };
       }
 

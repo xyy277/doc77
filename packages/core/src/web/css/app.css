@@ -1740,6 +1740,7 @@ body {
 }
 .settings-panel {
   position: relative;
+  z-index: 51;
   width: 100%;
   max-width: 28rem;
   background: var(--bg-card);

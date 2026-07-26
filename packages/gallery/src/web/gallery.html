@@ -487,6 +487,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Add to Album" onclick="addSelectedToAlbum()"><i class="ph ph-plus-circle text-xl"></i></button>
+                    <button class="p-2 hover:bg-blue-700 rounded-md transition-colors hidden" title="Remove from Album" onclick="removeSelectedFromAlbum()" id="btn-remove-album"><i class="ph ph-minus-circle text-xl"></i></button>
                     <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Download"><i class="ph ph-download-simple text-xl"></i></button>
                     <button class="p-2 hover:bg-blue-700 rounded-md transition-colors" title="Share"><i class="ph ph-share-network text-xl"></i></button>
                     <div class="w-px h-5 bg-blue-400/50 mx-1"></div>
@@ -522,6 +523,8 @@
             selectMode: false,
             selectedIds: new Set(),
             currentView: 'photos',
+            currentAlbumId: null,
+            currentAlbumName: '',
             viewMode: 'grid',
             sortBy: 'date',
             sortOrder: 'desc',
@@ -752,7 +755,12 @@
         // --- Album Gallery Loading ---
         async function loadAlbumGallery(albumId, albumName) {
             state.currentView = 'album';
+            state.currentAlbumId = albumId;
+            state.currentAlbumName = albumName;
             state.currentPath = '';
+            // Show remove-from-album button for album views
+            var removeBtn = document.getElementById('btn-remove-album');
+            if (removeBtn) removeBtn.classList.remove('hidden');
             try {
                 var resp = await fetch('/api/albums/' + albumId + '/items');
                 var data = await resp.json();
@@ -807,7 +815,11 @@
                         if (!view) return;
                         setActiveNav(link);
                         state.currentView = view;
+                        state.currentAlbumId = null;
+                        state.currentAlbumName = '';
                         state.currentPath = '';
+                        var removeBtn = document.getElementById('btn-remove-album');
+                        if (removeBtn) removeBtn.classList.add('hidden');
                         if (view === 'timeline') {
                             loadTimeline();
                         } else {
@@ -887,6 +899,18 @@
                 window.toast('Album created', 'success');
             } catch (e) {
                 window.toast('Failed to create album', 'error');
+            }
+        }
+
+        async function confirmDeleteAlbum(albumId, albumName) {
+        window.confirmDeleteAlbum = confirmDeleteAlbum;
+            if (!confirm('Delete album "' + albumName + '"?\nThis cannot be undone. Items in this album will not be deleted.')) return;
+            try {
+                await window.GalleryAlbum.deleteAlbum(albumId);
+                loadAlbums();
+                window.toast('Album deleted', 'success');
+            } catch (e) {
+                window.toast('Failed to delete album', 'error');
             }
         }
 
@@ -1162,6 +1186,29 @@
                 window.toast('Added ' + paths.length + ' items to album', 'success');
             } catch (e) {
                 window.toast('Failed to add to album: ' + (e.message || 'unknown error'), 'error');
+            }
+        }
+
+        async function removeSelectedFromAlbum() {
+            var paths = Array.from(state.selectedIds);
+            if (paths.length === 0) { window.toast('No items selected', 'warning'); return; }
+            var albumId = state.currentAlbumId;
+            if (!albumId) { window.toast('Not in album view', 'error'); return; }
+            try {
+                for (var i = 0; i < paths.length; i++) {
+                    await fetch('/api/albums/' + albumId + '/items', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_id: state.projectId, file_path: paths[i] }),
+                    });
+                }
+                state.selectedIds.clear();
+                updateSelectionUI();
+                loadAlbumGallery(albumId, state.currentAlbumName);
+                loadAlbums();
+                window.toast('Removed ' + paths.length + ' item(s) from album', 'success');
+            } catch (e) {
+                window.toast('Failed to remove: ' + (e.message || 'unknown error'), 'error');
             }
         }
 

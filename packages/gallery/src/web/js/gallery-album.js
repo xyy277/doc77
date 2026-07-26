@@ -37,13 +37,18 @@ window.GalleryAlbum = (function() {
   async function renderAlbumSidebar(container, projectId) {
     const albums = await fetchAlbums();
     container.innerHTML = albums.map(a =>
-      `<li><a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-600 dark:text-doc77-300 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors album-nav-item" data-album-id="${a.id}" data-album-name="${escHtml(a.name)}">
-        <div class="w-6 h-6 rounded bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
-          <i class="ph-fill ph-images text-white text-xs"></i>
-        </div>
-        <span class="truncate flex-1">${escHtml(a.name)}</span>
-        <span class="text-xs text-doc77-500">${a.item_count || 0}</span>
-      </a></li>`
+      `<li class="flex items-center group/album gap-0.5">
+        <a href="#" class="flex items-center gap-3 px-3 py-1.5 rounded-lg text-doc77-600 dark:text-doc77-300 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors album-nav-item flex-1 min-w-0" data-album-id="${a.id}" data-album-name="${escHtml(a.name)}">
+          <div class="w-6 h-6 rounded bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+            <i class="ph-fill ph-images text-white text-xs"></i>
+          </div>
+          <span class="truncate flex-1">${escHtml(a.name)}</span>
+          <span class="text-xs text-doc77-500">${a.item_count || 0}</span>
+        </a>
+        <button class="shrink-0 p-1.5 rounded-lg text-doc77-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover/album:opacity-100" title="Delete album" data-delete-album-id="${a.id}" data-delete-album-name="${escHtml(a.name)}">
+          <i class="ph ph-trash text-sm"></i>
+        </button>
+      </li>`
     ).join('');
     // Wire album click handlers
     container.querySelectorAll('.album-nav-item').forEach(function(el) {
@@ -55,6 +60,21 @@ window.GalleryAlbum = (function() {
           window.loadAlbumGallery(albumId, albumName);
         }
       });
+    });
+    // Wire delete button clicks via delegation (avoids XSS via inline onclick)
+    container.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-delete-album-id]');
+      if (!btn) return;
+      e.stopPropagation();
+      e.preventDefault();
+      var albumId = parseInt(btn.dataset.deleteAlbumId, 10);
+      var albumName = btn.dataset.deleteAlbumName;
+      // confirmDeleteAlbum is defined in gallery.html
+      if (typeof window.confirmDeleteAlbum === 'function') {
+        window.confirmDeleteAlbum(albumId, albumName);
+      } else if (typeof confirmDeleteAlbum === 'function') {
+        confirmDeleteAlbum(albumId, albumName);
+      }
     });
   }
 
