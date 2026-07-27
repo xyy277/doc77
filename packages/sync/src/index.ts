@@ -39,3 +39,13 @@ export function createSyncEngine(): SyncEngine {
   }
   return _engine;
 }
+
+// Merge
+export { threeWayMerge, resolveConflicts } from './merge/diff3.js';
+export type { MergeResult, MergeChunk } from './merge/diff3.js';
+
+// Crypto (E2EE)
+export { encrypt, decrypt, encryptFile, decryptFile, deriveKey, generateSalt, generateRecoveryCode } from './crypto/encrypt.js';
+export type { EncryptedPayload, EncryptedFile } from './crypto/encrypt.js';
+export { Keyring, getKeyring } from './crypto/keyring.js';
+export type { KeyringState } from './crypto/keyring.js';
