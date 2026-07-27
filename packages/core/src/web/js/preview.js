@@ -58,9 +58,9 @@ var editMode = false;
 var editDirty = false;
 var editModifiedTime = null;
 var editSplitRatio = parseInt(localStorage.getItem('doc77_edit_ratio') || '50', 10);
-var editAutoSave = true;
+var editAutoSave = localStorage.getItem('doc77_editor_autosave') !== 'false'; // default true, read from config
 var editAutoSaveTimer = null;
-var editAutoSaveMs = 2000;
+var editAutoSaveMs = parseInt(localStorage.getItem('doc77_editor_autosave_delay') || '2000', 10);
 var editOutlineWasManualCollapsed = false;
 
 //══════════ 多 tab 状态 ══════════
@@ -619,13 +619,14 @@ function afterActivate(path, d) {
   if (isTemp) {
     ['aiBtn','editBtn','externalEditBtn','revealBtn'].forEach(function(id){ var el = document.getElementById(id); if (el) el.disabled = true; });
   }
-  // Show edit button only for editable file types (not temp)
+  // Show edit button only for editable file types (not temp, not mobile)
+  var isMobileDevice = /iphone|ipad|ipod|android/i.test(navigator.userAgent) || window.innerWidth < 768;
   var editableExts = ['.md','.mdx','.txt','.markdown','.json','.yaml','.yml','.toml',
     '.ts','.tsx','.js','.jsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h',
     '.css','.scss','.less','.html','.htm','.xml','.svg','.sh','.bash','.zsh',
     '.env.example','.gitignore','.dockerignore','.editorconfig',
     '.conf','.cfg','.ini','.csv','.log'];
-  var isEditable = !isTemp && editableExts.some(function(ext) {
+  var isEditable = !isTemp && !isMobileDevice && editableExts.some(function(ext) {
     return (currentFile || '').toLowerCase().endsWith(ext);
   });
   var editBtnEl = document.getElementById('editBtn');
@@ -1780,7 +1781,12 @@ async function initEditorInstance(initialText) {
   window._editEditor = window.EditorCore.createEditor(pane, {
     initialValue: initialText,
     language: getEditLanguage(currentFile),
-    onSave: function() { doSave(); }
+    onSave: function() { doSave(); },
+    onEscape: function() { exitEditMode(); },
+    onCursorChange: function(pos) {
+      var el = document.getElementById('statusCursor');
+      if (el) el.textContent = t('web.preview.edit.lineCol') + ' ' + pos.line + ':' + pos.col;
+    }
   });
 
   var el = pane.querySelector('.cm-editor, .editor-textarea-fallback');
@@ -1865,24 +1871,35 @@ function updateEditPreviewLive(content) {
   var pp = document.getElementById('editPreviewPane');
   if (!pp) return;
   try {
-    // Inline-render raw markdown as HTML preview (synchronous, instant)
     var ext = (currentFile || '').split('.').pop().toLowerCase();
     if (ext === 'md' || ext === 'markdown' || ext === 'mdx') {
-      // Basic markdown-like rendering: headings, bold, italic, code blocks, lists
-      var html = content
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/^### (.+)$/gm,'<h4 style="margin:1em 0 .3em;font-size:15px">$1</h4>')
-        .replace(/^## (.+)$/gm,'<h3 style="margin:1.2em 0 .4em;font-size:17px">$1</h3>')
-        .replace(/^# (.+)$/gm,'<h2 style="margin:1.4em 0 .5em;font-size:20px">$1</h2>')
-        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g,'<em>$1</em>')
-        .replace(/`([^`]+)`/g,'<code style="background:var(--bg-code,#f1f5f9);padding:1px 4px;border-radius:3px;font-size:13px">$1</code>')
-        .replace(/^\- (.+)$/gm,'<li style="margin-left:1.5em">$1</li>')
-        .replace(/\n\n/g,'<br><br>')
-        .replace(/\n/g,'<br>');
-      pp.innerHTML = '<div style="padding:16px 20px;font-size:14px;line-height:1.7;color:var(--text-primary,#1e293b)">' + html + '</div>';
+      // Use marked for proper rendering (matches actual preview output)
+      if (window.marked) {
+        var html = window.marked.parse(content, { breaks: true, gfm: true });
+        pp.innerHTML = '<div class="doc-content" style="padding:16px 20px">' + html + '</div>';
+        // Highlight code blocks in preview
+        setTimeout(function() {
+          pp.querySelectorAll('pre code').forEach(function(block) {
+            if (window.hljs) window.hljs.highlightElement(block);
+          });
+        }, 10);
+      } else {
+        // Fallback: basic rendering if marked not available
+        pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px">' + escapeHtml(content) + '</pre>';
+      }
     } else {
-      pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px">' + escapeHtml(content) + '</pre>';
+      pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px"><code>' + escapeHtml(content) + '</code></pre>';
+      // Highlight code preview
+      setTimeout(function() {
+        var codeEl = pp.querySelector('pre code');
+        if (codeEl && window.hljs) {
+          var lang = getEditLanguage(currentFile);
+          if (lang && lang !== 'text') {
+            codeEl.className = 'language-' + lang;
+            window.hljs.highlightElement(codeEl);
+          }
+        }
+      }, 10);
     }
   } catch(e) {
     pp.innerHTML = '<pre style="white-space:pre-wrap;font-size:14px;padding:16px 20px">' + escapeHtml(content) + '</pre>';
@@ -1984,6 +2001,23 @@ function initEditDivider() {
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
   };
+
+  // Synchronized scrolling (editor → preview)
+  var pp = document.getElementById('editPreviewPane');
+  if (pp && ep) {
+    var syncScrollEnabled = localStorage.getItem('doc77_editor_syncscroll') !== 'false';
+    if (syncScrollEnabled) {
+      var editorScrollEl = ep.querySelector('.cm-scroller') || ep;
+      var syncing = false;
+      editorScrollEl.addEventListener('scroll', function() {
+        if (syncing) return;
+        syncing = true;
+        var ratio = editorScrollEl.scrollTop / (editorScrollEl.scrollHeight - editorScrollEl.clientHeight || 1);
+        pp.scrollTop = ratio * (pp.scrollHeight - pp.clientHeight);
+        requestAnimationFrame(function() { syncing = false; });
+      });
+    }
+  }
 }
 
 function cleanupEditDivider() {

@@ -6,6 +6,7 @@ packages:
   - "packages/electron"
   - "packages/gallery"
   - "packages/mcp"
+  - "packages/sync"
 linkWorkspacePackages: true
 allowBuilds:
   '@parcel/watcher': true

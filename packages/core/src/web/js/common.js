@@ -1131,3 +1131,158 @@ function escHtml(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+//══════════ PWA: Service Worker + Offline + Install ══════════
+
+// --- Service Worker Registration ---
+(function registerSW() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').then(function (reg) {
+        // 检查更新
+        reg.addEventListener('updatefound', function () {
+          var newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', function () {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // 新版本可用，提示刷新
+              if (window.toast) toast('Doc77 updated. Refresh to apply.', 'info');
+            }
+          });
+        });
+      }).catch(function () {
+        // SW 注册失败，静默忽略
+      });
+    });
+  }
+})();
+
+// --- Offline Detection + Banner ---
+window.__doc77_offline = !navigator.onLine;
+
+(function initOfflineDetection() {
+  var banner = null;
+
+  function createBanner() {
+    if (banner) return;
+    banner = document.createElement('div');
+    banner.id = 'pwa-offline-banner';
+    banner.className = 'pwa-offline-banner';
+    banner.innerHTML = '<span>\uD83D\uDCF4</span> <span data-i18n="common.pwa.offline">Offline mode — showing cached content</span>';
+    document.body.appendChild(banner);
+    if (window.applyI18n) applyI18n(banner);
+  }
+
+  function removeBanner() {
+    if (banner) {
+      banner.remove();
+      banner = null;
+    }
+  }
+
+  function goOffline() {
+    window.__doc77_offline = true;
+    createBanner();
+    document.body.classList.add('is-offline');
+  }
+
+  function goOnline() {
+    window.__doc77_offline = false;
+    removeBanner();
+    document.body.classList.remove('is-offline');
+  }
+
+  window.addEventListener('offline', goOffline);
+  window.addEventListener('online', goOnline);
+
+  // 初始状态
+  if (!navigator.onLine) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', goOffline);
+    } else {
+      goOffline();
+    }
+  }
+})();
+
+// --- PWA Install Prompt ---
+(function initInstallPrompt() {
+  var deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallBanner();
+  });
+
+  function showInstallBanner() {
+    // 不重复显示
+    if (document.getElementById('pwa-install-banner')) return;
+    // 用户之前关闭过则不再显示（7天内）
+    var dismissed = localStorage.getItem('doc77-pwa-dismissed');
+    if (dismissed && Date.now() - parseInt(dismissed) < 7 * 86400000) return;
+
+    var el = document.createElement('div');
+    el.id = 'pwa-install-banner';
+    el.className = 'pwa-install-banner';
+    el.innerHTML =
+      '<div class="pwa-install-inner">' +
+        '<span class="pwa-install-icon">\uD83D\uDCF1</span>' +
+        '<span class="pwa-install-text" data-i18n="common.pwa.install">Install Doc77 to your home screen for quick access</span>' +
+        '<button class="pwa-install-btn" onclick="window.__doc77_install()" data-i18n="common.pwa.installBtn">Install</button>' +
+        '<button class="pwa-install-close" onclick="window.__doc77_dismissInstall()" aria-label="Close">&times;</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    if (window.applyI18n) applyI18n(el);
+  }
+
+  window.__doc77_install = function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function (result) {
+      if (result.outcome === 'accepted') {
+        localStorage.setItem('doc77-pwa-installed', '1');
+      }
+      deferredPrompt = null;
+      dismissBanner();
+    });
+  };
+
+  window.__doc77_dismissInstall = function () {
+    localStorage.setItem('doc77-pwa-dismissed', String(Date.now()));
+    dismissBanner();
+  };
+
+  function dismissBanner() {
+    var el = document.getElementById('pwa-install-banner');
+    if (el) el.remove();
+  }
+
+  // iOS Safari 检测（无法自动提示）
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (isIOS && !isStandalone && !localStorage.getItem('doc77-pwa-dismissed')) {
+    // 延迟显示，等页面加载完
+    setTimeout(function () {
+      if (document.getElementById('pwa-install-banner')) return;
+      var el = document.createElement('div');
+      el.id = 'pwa-install-banner';
+      el.className = 'pwa-install-banner';
+      el.innerHTML =
+        '<div class="pwa-install-inner">' +
+          '<span class="pwa-install-icon">\uD83D\uDCF1</span>' +
+          '<span class="pwa-install-text">Tap <b>Share</b> then <b>Add to Home Screen</b> to install Doc77</span>' +
+          '<button class="pwa-install-close" onclick="window.__doc77_dismissInstall()" aria-label="Close">&times;</button>' +
+        '</div>';
+      document.body.appendChild(el);
+    }, 3000);
+  }
+})();
+
+// --- Clear offline cache (exposed for settings panel) ---
+window.__doc77_clearCache = function () {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
+    toast('Offline cache cleared', 'success');
+  }
+};

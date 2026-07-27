@@ -58,6 +58,12 @@ export function runMigrations(db?: DatabaseCompat): void {
 
   // v6: Add project_id to thumbnail_cache for cross-project isolation
   addColumnIfNotExists(conn, 'thumbnail_cache', 'project_id', 'INTEGER NOT NULL DEFAULT 0');
+
+  // v7: Full-text search (FTS5)
+  conn.exec(SEARCH_SCHEMA_SQL);
+
+  // v8: Sync engine tables
+  conn.exec(SYNC_SCHEMA_SQL);
 }
 
 const SCHEMA_SQL = `
@@ -237,4 +243,70 @@ CREATE TABLE IF NOT EXISTS gallery_album_items (
   added_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (album_id, project_id, file_path)
 );
+`;
+
+const SEARCH_SCHEMA_SQL = `
+-- Full-text search: FTS5 virtual table
+CREATE VIRTUAL TABLE IF NOT EXISTS file_content_fts USING fts5(
+  project_id UNINDEXED,
+  file_path UNINDEXED,
+  title,
+  content,
+  tokenize='unicode61'
+);
+
+-- Search index metadata (track sync state)
+CREATE TABLE IF NOT EXISTS search_index_meta (
+  project_id INTEGER NOT NULL,
+  file_path TEXT NOT NULL,
+  file_hash TEXT NOT NULL,
+  file_mtime TEXT NOT NULL,
+  file_size INTEGER DEFAULT 0,
+  indexed_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (project_id, file_path)
+);
+CREATE INDEX IF NOT EXISTS idx_search_meta_project ON search_index_meta(project_id);
+`;
+
+const SYNC_SCHEMA_SQL = `
+-- Sync configuration per project
+CREATE TABLE IF NOT EXISTS sync_configs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  adapter_type TEXT NOT NULL,
+  config_json TEXT NOT NULL,
+  direction TEXT DEFAULT 'bidirectional',
+  interval_seconds INTEGER DEFAULT 1800,
+  enabled INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(project_id)
+);
+
+-- Sync state tracking
+CREATE TABLE IF NOT EXISTS sync_state (
+  project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'idle',
+  last_sync_at TEXT,
+  last_baseline TEXT,
+  last_error TEXT,
+  total_pushed INTEGER DEFAULT 0,
+  total_pulled INTEGER DEFAULT 0,
+  total_conflicts INTEGER DEFAULT 0
+);
+
+-- Sync operation log
+CREATE TABLE IF NOT EXISTS sync_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  direction TEXT,
+  status TEXT,
+  files_pushed INTEGER DEFAULT 0,
+  files_pulled INTEGER DEFAULT 0,
+  conflicts INTEGER DEFAULT 0,
+  error_message TEXT,
+  duration_ms INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sync_log_project ON sync_log(project_id, created_at);
 `;

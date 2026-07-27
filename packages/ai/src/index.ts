@@ -8,6 +8,8 @@ export { VERSION } from './version.gen.js';
 
 // Provider
 export { AiProvider, normalizeMessages } from './provider/index.js';
+export { OllamaProvider } from './provider/ollama.js';
+export type { OllamaProviderConfig, OllamaModelInfo } from './provider/ollama.js';
 export type {
   AiProviderConfig,
   AiMessage,

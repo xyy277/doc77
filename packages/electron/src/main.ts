@@ -2,7 +2,7 @@
  * Doc77 Electron — Main process entry
  * Port probe → spawn server → BrowserWindow → system tray.
  */
-import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, shell, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, shell, nativeImage, globalShortcut, Notification } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -19,11 +19,35 @@ let server: ServerProcess | null = null;
 let tray: Tray | null = null;
 let shuttingDown = false;
 
+// ═══ Window state persistence ═══
+const WINDOW_STATE_PATH = path.join(os.homedir(), '.doc77', 'window-state.json');
+interface WindowState { x?: number; y?: number; width: number; height: number; maximized?: boolean }
+
+function loadWindowState(): WindowState {
+  try {
+    const data = fs.readFileSync(WINDOW_STATE_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch { return { width: 1280, height: 800 }; }
+}
+
+function saveWindowState(): void {
+  if (!mainWindow) return;
+  const bounds = mainWindow.getBounds();
+  const state: WindowState = { ...bounds, maximized: mainWindow.isMaximized() };
+  try {
+    fs.mkdirSync(path.dirname(WINDOW_STATE_PATH), { recursive: true });
+    fs.writeFileSync(WINDOW_STATE_PATH, JSON.stringify(state));
+  } catch {}
+}
+
 function createWindow(port: number): void {
   const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+  const state = loadWindowState();
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: state.width,
+    height: state.height,
+    x: state.x,
+    y: state.y,
     minWidth: 900,
     minHeight: 600,
     title: 'Doc77',
@@ -37,8 +61,13 @@ function createWindow(port: number): void {
     },
   });
 
+  if (state.maximized) mainWindow.maximize();
   mainWindow.loadURL(`http://localhost:${port}`);
   mainWindow.once('ready-to-show', () => mainWindow?.show());
+
+  // Save window state on resize/move
+  mainWindow.on('resize', saveWindowState);
+  mainWindow.on('move', saveWindowState);
 
   // Intercept external links — open in system browser instead of leaving the app
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -147,22 +176,52 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, commandLine) => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
+    // Windows: file path passed as last command line arg
+    const filePath = commandLine.find((arg) => /\.(md|txt|pdf|json|yaml|yml)$/i.test(arg));
+    if (filePath) handleFileOpen(filePath);
   });
 
   app.whenReady().then(() => {
     buildAppMenu();
     boot().catch(reportBootFailure);
+
+    // Global shortcut: Ctrl+Shift+D to toggle window
+    globalShortcut.register('CommandOrControl+Shift+D', () => {
+      if (mainWindow?.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow?.show();
+        mainWindow?.focus();
+      }
+    });
   });
 }
 
+// File association: open files passed via command line (Windows) or open-file event (macOS)
+function handleFileOpen(filePath: string): void {
+  if (!mainWindow || !server) return;
+  mainWindow.show();
+  mainWindow.focus();
+  // Navigate to preview with the file path
+  mainWindow.loadURL(`http://localhost:${server.port}/preview.html?file=${encodeURIComponent(filePath)}`);
+}
+
+// macOS: open-file event
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  handleFileOpen(filePath);
+});
+
 app.on('before-quit', () => {
   shuttingDown = true;
+  globalShortcut.unregisterAll();
+  saveWindowState();
   server?.kill();
 });
 

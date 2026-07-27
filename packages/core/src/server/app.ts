@@ -46,6 +46,9 @@ import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 import { getMobileInfo, publishMdns } from './mobile-mdns.js';
 import { installElectronModule } from './electron-install.js';
+import { searchProject, searchAll } from '../search/query.js';
+import { indexFile, fullIndex, getIndexStats, clearProjectIndex } from '../search/indexer.js';
+import { getTunnelManager } from '../tunnel/manager.js';
 
 import { VERSION } from '../version.gen.js';
 import { getConfig } from '../db/config.js';
@@ -222,6 +225,58 @@ export function createApp(
     res.status(404).type('html').send('<h1>Not Found</h1>');
   });
 
+  // === PWA routes (manifest, service worker, icons) ===
+
+  app.get('/manifest.json', (_req: Request, res: Response) => {
+    if (webDir) {
+      const manifestPath = path.join(webDir, 'manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        res.type('application/manifest+json');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.sendFile(manifestPath);
+        return;
+      }
+    }
+    // Dynamic fallback manifest
+    res.type('application/manifest+json').json({
+      name: 'Doc77',
+      short_name: 'Doc77',
+      start_url: '/',
+      display: 'standalone',
+      background_color: '#0f172a',
+      theme_color: '#1e293b',
+      icons: [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+      ],
+    });
+  });
+
+  app.get('/sw.js', (_req: Request, res: Response) => {
+    if (webDir) {
+      const swPath = path.join(webDir, 'sw.js');
+      if (fs.existsSync(swPath)) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Service-Worker-Allowed', '/');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.sendFile(swPath);
+        return;
+      }
+    }
+    res.status(404).send('// Service Worker not available');
+  });
+
+  // PWA icons
+  if (webDir) {
+    const iconsDir = path.join(webDir, 'icons');
+    if (fs.existsSync(iconsDir)) {
+      app.use('/icons', express.static(iconsDir, {
+        maxAge: '7d',
+        immutable: true,
+      }));
+    }
+  }
+
   // === Static file serving (after explicit routes) ===
 
   if (webDir) {
@@ -340,6 +395,23 @@ export function createApp(
   // Module capabilities
   app.get('/api/capabilities', (_req: Request, res: Response) => {
     res.json(_capabilities);
+  });
+
+  // AI: Ollama detection + model listing
+  app.get('/api/ai/ollama/status', async (_req: Request, res: Response) => {
+    try {
+      const { OllamaProvider } = await import('@doc77/ai');
+      const provider = new OllamaProvider({ apiKey: 'ollama' });
+      const health = await provider.healthCheck();
+      if (!health.ok) {
+        res.json({ installed: false, running: false, error: health.error });
+        return;
+      }
+      const models = await provider.listModels();
+      res.json({ installed: true, running: true, version: health.version, models });
+    } catch {
+      res.json({ installed: false, running: false, error: '@doc77/ai not available' });
+    }
   });
 
   // Electron: one-click install for AI/MCP/translate modules
@@ -2250,6 +2322,9 @@ export function createApp(
           ).run(projectId, path.dirname(filePath));
         } catch {}
 
+        // 12. Incremental FTS index update
+        try { indexFile(projectId, project.path, filePath); } catch { /* non-critical */ }
+
         res.json({ ok: true, size: newStats.size, modified: newStats.mtime.toISOString() });
       } catch (writeErr: unknown) {
         // Rollback
@@ -2811,6 +2886,109 @@ export function createApp(
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
     }
+  });
+
+  // === Full-text search (FTS5) API ===
+
+  // Search within a project
+  app.get('/api/fts/:projectId', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.projectId, 10);
+    const q = (req.query.q as string) || '';
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 100);
+    const offset = parseInt(req.query.offset as string, 10) || 0;
+    const pathFilter = (req.query.path as string) || undefined;
+
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (!q || q.length < 1) { res.status(400).json({ error: 'q parameter is required' }); return; }
+
+    try {
+      const result = searchProject(projectId, q, { limit, offset, pathFilter });
+      res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Search failed';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Global search across all projects
+  app.get('/api/fts', (req: Request, res: Response) => {
+    const q = (req.query.q as string) || '';
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 10, 50);
+
+    if (!q || q.length < 1) { res.status(400).json({ error: 'q parameter is required' }); return; }
+
+    try {
+      const result = searchAll(q, { limit });
+      res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Search failed';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Trigger full index for a project
+  app.post('/api/fts/:projectId/index', async (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.projectId, 10);
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+
+    try {
+      const db = getConnection();
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
+      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+
+      // Run indexing in background, respond immediately
+      res.json({ status: 'indexing', message: 'Full index started in background' });
+      fullIndex(projectId, project.path).catch(() => {});
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Index failed';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Get index stats
+  app.get('/api/fts/:projectId/stats', (req: Request, res: Response) => {
+    const projectId = parseInt(req.params.projectId, 10);
+    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    try {
+      const stats = getIndexStats(projectId);
+      res.json(stats);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // === Tunnel API (remote access) ===
+
+  app.get('/api/tunnel/status', (_req: Request, res: Response) => {
+    const mgr = getTunnelManager();
+    res.json(mgr.getStatus());
+  });
+
+  app.post('/api/tunnel/start', async (req: Request, res: Response) => {
+    const mgr = getTunnelManager();
+    const body = req.body || {};
+    const config = {
+      provider: body.provider || 'cloudflare',
+      enabled: true,
+      cfToken: body.cfToken || undefined,
+      cfDomain: body.cfDomain || undefined,
+      quickTunnel: body.quickTunnel !== false,
+      tsFunnel: body.tsFunnel || false,
+      localPort: _serverInfo.port,
+    };
+    try {
+      const info = await mgr.start(config);
+      res.json(info);
+    } catch (e: unknown) {
+      res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to start tunnel' });
+    }
+  });
+
+  app.post('/api/tunnel/stop', async (_req: Request, res: Response) => {
+    const mgr = getTunnelManager();
+    await mgr.stop();
+    res.json({ ok: true, status: 'stopped' });
   });
 
   // === Auth API ===
