@@ -49,6 +49,7 @@ import { installElectronModule } from './electron-install.js';
 import { searchProject, searchAll } from '../search/query.js';
 import { indexFile, fullIndex, getIndexStats, clearProjectIndex } from '../search/indexer.js';
 import { getTunnelManager } from '../tunnel/manager.js';
+import { getPluginLoader } from '../plugin/loader.js';
 
 import { VERSION } from '../version.gen.js';
 import { getConfig } from '../db/config.js';
@@ -2989,6 +2990,27 @@ export function createApp(
     const mgr = getTunnelManager();
     await mgr.stop();
     res.json({ ok: true, status: 'stopped' });
+  });
+
+  // === Plugin API ===
+
+  app.get('/api/plugins', (_req: Request, res: Response) => {
+    const loader = getPluginLoader();
+    res.json({ plugins: loader.list() });
+  });
+
+  app.put('/api/plugins/:name/toggle', (req: Request, res: Response) => {
+    const loader = getPluginLoader();
+    const enabled = req.body?.enabled !== false;
+    const ok = loader.toggle(req.params.name, enabled);
+    if (!ok) { res.status(404).json({ error: 'Plugin not found' }); return; }
+    res.json({ ok: true, name: req.params.name, enabled });
+  });
+
+  app.post('/api/plugins/discover', async (_req: Request, res: Response) => {
+    const loader = getPluginLoader();
+    await loader.discover();
+    res.json({ ok: true, plugins: loader.list() });
   });
 
   // === Auth API ===
