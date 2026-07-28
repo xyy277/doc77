@@ -39,10 +39,9 @@ export async function connectHttp(
     // MCP endpoint — POST only
     if (req.method === 'POST' && (req.url === '/' || req.url === '/mcp')) {
       try {
-        const body = await readBody(req);
-        // Handle MCP request via the server's internal transport
-        // Note: @modelcontextprotocol/sdk ^1.0.0 may not expose a direct handleRequest method.
-        // For now, respond with a structured message indicating HTTP transport is available.
+        // Consume the request body (required to drain the stream even though
+        // the SDK does not yet expose a direct handleRequest method here).
+        await readBody(req);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
@@ -56,6 +55,7 @@ export async function connectHttp(
         );
         return;
       } catch (err) {
+        console.error('[mcp-http]', err instanceof Error ? err.message : err);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Internal server error' }));
         return;

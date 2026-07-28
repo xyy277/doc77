@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 /**
  * Sensitive file patterns that should never be exposed.
@@ -103,8 +103,64 @@ export function readFirstNLines(
 }
 
 /**
- * Get file/directory stats.
+ * Async version of isBinaryFile — checks for null bytes in the first 8KB
+ * without blocking the event loop. Uses file handle + async reads.
  */
+export async function isBinaryFileAsync(absolutePath: string): Promise<boolean> {
+  let fh: fs.promises.FileHandle | undefined;
+  try {
+    fh = await fs.promises.open(absolutePath, 'r');
+    const buf = Buffer.alloc(8192);
+    const { bytesRead } = await fh.read(buf, 0, 8192, 0);
+    for (let i = 0; i < bytesRead; i++) {
+      if (buf[i] === 0) return true;
+    }
+    return false;
+  } catch {
+    return true; // treat unreadable as binary for safety
+  } finally {
+    await fh?.close();
+  }
+}
+
+/**
+ * Async version of readFirstNLines — reads the first N lines without blocking.
+ */
+export async function readFirstNLinesAsync(
+  absolutePath: string,
+  maxLines: number,
+): Promise<{ content: string; truncated: boolean; totalBytes: number }> {
+  const stats = await fs.promises.stat(absolutePath);
+  const totalBytes = stats.size;
+  let fh: fs.promises.FileHandle | undefined;
+  try {
+    fh = await fs.promises.open(absolutePath, 'r');
+    const buf = Buffer.alloc(65536); // 64KB chunks
+    let pos = 0,
+      lines = 0;
+    const parts: string[] = [];
+
+    while (lines < maxLines && pos < totalBytes) {
+      const { bytesRead } = await fh.read(buf, 0, buf.length, pos);
+      if (bytesRead === 0) break;
+      const chunk = buf.toString('utf-8', 0, bytesRead);
+      const chunkLines = chunk.split('\n');
+      lines += chunkLines.length - 1;
+      if (lines >= maxLines) {
+        const takeLines = chunkLines.slice(0, maxLines - (lines - chunkLines.length + 1));
+        parts.push(takeLines.join('\n'));
+        break;
+      }
+      parts.push(chunk);
+      pos += bytesRead;
+    }
+
+    const content = parts.join('');
+    return { content, truncated: pos < totalBytes, totalBytes };
+  } finally {
+    await fh?.close();
+  }
+}
 export function statFile(absolutePath: string): fs.Stats {
   return fs.statSync(absolutePath);
 }
@@ -261,12 +317,16 @@ function isWsl(): boolean {
 /**
  * Try to convert a Windows path to WSL path using `wslpath`.
  * Returns null if wslpath is not available or conversion fails.
+ *
+ * Security: uses execFileSync (no shell) with the path passed as a single argv
+ * element to prevent command injection via user-supplied paths.
  */
 function tryWslPath(windowsPath: string): string | null {
   try {
-    const result = execSync(`wslpath -u "${windowsPath}"`, {
+    const result = execFileSync('wslpath', ['-u', windowsPath], {
       encoding: 'utf-8',
       timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     if (result.startsWith('/')) {
       return result;

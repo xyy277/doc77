@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { Request, Response } from 'express';
 import { getConnection } from '@doc77/core';

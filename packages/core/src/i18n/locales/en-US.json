@@ -218,6 +218,7 @@
   "api.auth.passwordTooShort": "Password must be at least 6 characters",
   "api.auth.passwordAlreadySet": "Password already set, please use the change password function",
   "api.auth.passwordRequired": "Password is required",
+  "api.auth.loginRequired": "Login required to access this resource",
   "api.auth.confirmRequired": "Please include \"yes-i-know\" in the request body to confirm the operation",
   "api.auth.passwordRequiredForReset": "A password is currently set, please provide the password field",
   "api.auth.incorrectPassword": "Incorrect password",

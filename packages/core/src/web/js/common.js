@@ -3,6 +3,43 @@
  * 包含: Theme, Toast/Confirm, Settings, Login Gate, Helpers, i18n Runtime
  */
 
+//══════════ Auth fetch interceptor ══════════
+// Attach the session bearer token to every same-origin /api/ request so the
+// server-side auth middleware can validate it, and surface a re-login on 401.
+(function () {
+  var _origFetch = window.fetch;
+  window.fetch = function (input, init) {
+    init = init || {};
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var sameOrigin = url.charAt(0) === '/' || url.indexOf(location.origin) === 0;
+    if (sameOrigin && url.indexOf('/api/') !== -1) {
+      var tok = sessionStorage.getItem('doc77-auth');
+      // tok === '1' is a legacy flag from older builds — treat as no token.
+      if (tok && tok !== '1') {
+        var headers = init.headers;
+        if (headers instanceof Headers) {
+          if (!headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + tok);
+        } else if (headers && typeof headers === 'object') {
+          if (!headers['Authorization']) headers['Authorization'] = 'Bearer ' + tok;
+        } else {
+          init.headers = { 'Authorization': 'Bearer ' + tok };
+        }
+      }
+    }
+    return _origFetch.call(this, input, init).then(function (resp) {
+      // A 401 from a non-auth endpoint means the session expired/invalidated.
+      if (resp.status === 401 && url.indexOf('/api/auth/') === -1) {
+        sessionStorage.removeItem('doc77-auth');
+        // Avoid reload loops on pages that don't run the login gate.
+        if (typeof window.__doc77_noAuthReload === 'undefined' || !window.__doc77_noAuthReload) {
+          location.reload();
+        }
+      }
+      return resp;
+    });
+  };
+})();
+
 //══════════ i18n ══════════
 window.__doc77_dict = {};
 window.t = function (key, params) {
@@ -710,7 +747,11 @@ async function renderAccountSection(){
       '<button onclick="setupPw()" class="btn btn-primary" style="width:100%;font-size:13px">' + t('common.auth.setupPassword') + '</button>';
   }
 }
-function doLogout() { sessionStorage.removeItem("doc77-auth"); location.reload(); }
+function doLogout() {
+  // Fire-and-forget: invalidate the server-side session, then clear locally.
+  try { fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+  sessionStorage.removeItem("doc77-auth"); location.reload();
+}
 async function forceResetPw() {
   if (!(await confirmDialog(t('common.confirm.forceResetTitle')))) return;
   var pw = await promptDialog({ title: t('common.auth.enterCurrentPassword'), type: 'password' });
@@ -827,7 +868,7 @@ async function regenerateRC(){
             prog.advance(3);
             prog.complete(function() {
               if (rd.recovery_codes) { showRecoveryCodesModal(rd.recovery_codes); }
-              sessionStorage.setItem("doc77-auth","1");
+              sessionStorage.setItem("doc77-auth", rd.token || "1");
               // Smooth exit transition
               var gate = document.getElementById("loginGate");
 
@@ -894,7 +935,7 @@ async function regenerateRC(){
           var r2 = await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})});
           var d2 = await r2.json();
           if (d2.ok) {
-            sessionStorage.setItem("doc77-auth","1");
+            sessionStorage.setItem("doc77-auth", d2.token || "1");
             if (d2.recovery_codes) { showRecoveryCodesModal(d2.recovery_codes); }
 
             // ── Glow Ripple: 3-phase login transition ──

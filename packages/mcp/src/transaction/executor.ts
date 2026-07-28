@@ -5,7 +5,7 @@ import { runPreflightCheck } from './preflight.js';
 import { performShadowBackup, rollbackFromShadow, type UndoLog } from './shadow.js';
 import { acquireProjectLock, releaseProjectLock } from './lock.js';
 import { safeMove } from './safeMove.js';
-import { checkFileSize, writeAuditLog } from './audit.js';
+import { writeAuditLog } from './audit.js';
 import { getEventBus } from '../event-bus.js';
 import { getSessionConfig } from '../tools/session.js';
 

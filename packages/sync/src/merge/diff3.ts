@@ -25,9 +25,6 @@ export function threeWayMerge(base: string, local: string, remote: string): Merg
   const localLines = local.split('\n');
   const remoteLines = remote.split('\n');
 
-  const localDiff = diffLines(baseLines, localLines);
-  const remoteDiff = diffLines(baseLines, remoteLines);
-
   const chunks: MergeChunk[] = [];
   let hasConflicts = false;
   let conflictCount = 0;
@@ -119,16 +116,4 @@ export function resolveConflicts(
   }
 
   return lines.join('\n');
-}
-
-/**
- * Simple line diff — returns which lines differ from base.
- */
-function diffLines(base: string[], target: string[]): boolean[] {
-  const result: boolean[] = [];
-  const maxLen = Math.max(base.length, target.length);
-  for (let i = 0; i < maxLen; i++) {
-    result.push(base[i] !== target[i]);
-  }
-  return result;
 }

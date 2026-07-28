@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { exec, execSync } from 'node:child_process';
+import { exec, execFileSync } from 'node:child_process';
 import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
@@ -24,7 +24,9 @@ import {
   readFile,
   readFileRaw,
   isBinaryFile,
+  isBinaryFileAsync,
   readFirstNLines,
+  readFirstNLinesAsync,
   validatePath,
   resolveProjectPath,
   isSensitiveFile,
@@ -302,12 +304,67 @@ export function createApp(
   app.use((_req: Request, res: Response, next: NextFunction) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Doc77-Token');
     if (_req.method === 'OPTIONS') {
       res.sendStatus(204);
       return;
     }
     next();
+  });
+
+  // --- Authentication middleware ---
+  // Doc77 is "secure-by-default": when an access password is configured, every
+  // non-public API route requires a valid bearer session token obtained via
+  // /api/auth/login (or /api/auth/forgot-password/reset). When no password is
+  // set the server runs in open mode — intended only for localhost binding.
+  //
+  // This closes the previously-documented "tech debt" gap (spec Section 11)
+  // where login returned a predictable, never-validated token, leaving every
+  // API endpoint reachable by anyone on the LAN when bound to 0.0.0.0.
+  const PUBLIC_API_ROUTES = new Set<string>([
+    '/api/auth/login',
+    '/api/auth/setup',
+    '/api/auth/status',
+    '/api/auth/forgot-password/verify',
+    '/api/auth/forgot-password/reset',
+    '/api/health',
+    '/api/i18n',
+    '/api/server-info',
+    '/api/capabilities',
+    '/api/mobile/info',
+    '/api/ai/ollama/status',
+  ]);
+  const PUBLIC_API_PREFIXES = ['/api/share/'];
+
+  function extractBearerToken(req: Request): string | null {
+    const h = req.headers['authorization'];
+    if (typeof h === 'string' && h.startsWith('Bearer ')) {
+      return h.slice(7).trim() || null;
+    }
+    const x = req.headers['x-doc77-token'];
+    if (typeof x === 'string') return x.trim() || null;
+    return null;
+  }
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Only gate API routes; static/HTML/share pages are handled separately.
+    if (!req.path.startsWith('/api/')) return next();
+    if (PUBLIC_API_ROUTES.has(req.path)) return next();
+    if (PUBLIC_API_PREFIXES.some((p) => req.path.startsWith(p))) return next();
+    // Open mode: no password configured → no session required.
+    if (!auth.isPasswordSet()) return next();
+    // Password configured → require a valid, non-expired session token.
+    const token = extractBearerToken(req);
+    if (token && auth.validateSessionToken(token)) return next();
+    res
+      .status(401)
+      .json({ error: t('api.auth.loginRequired') || 'Login required', code: 'AUTH_REQUIRED' });
+  });
+
+  // Logout — invalidate the caller's session token.
+  app.post('/api/auth/logout', (req: Request, res: Response) => {
+    auth.destroySession(extractBearerToken(req));
+    res.json({ ok: true });
   });
 
   // --- mDNS publisher for mobile companion discovery ---
@@ -869,12 +926,17 @@ export function createApp(
       try {
         const raw = (() => {
           try {
-            return execSync(
-              `find "${root}" -maxdepth 4 -type d -name "${folderName}" 2>/dev/null; true`,
-              { timeout: 4000, encoding: 'utf-8', maxBuffer: 1024 * 1024 },
-            ).trim();
+            // Security: use execFileSync (no shell) and pass folderName as a
+            // single argv element to prevent command injection. The previous
+            // template-string form allowed RCE via a crafted folderName.
+            return execFileSync('find', [root, '-maxdepth', '4', '-type', 'd', '-name', folderName], {
+              timeout: 4000,
+              encoding: 'utf-8',
+              maxBuffer: 1024 * 1024,
+              stdio: ['ignore', 'pipe', 'ignore'],
+            }).trim();
           } catch (e: unknown) {
-            // execSync throws on non-zero exit, but stdout may still have results
+            // execFileSync throws on non-zero exit, but stdout may still have results
             const err = e as { stdout?: string; stderr?: string };
             return (err.stdout || '').trim();
           }
@@ -1565,7 +1627,7 @@ export function createApp(
   });
 
   // File content with renderer dispatch + safety gates
-  app.get('/api/content/:id', (req: Request, res: Response) => {
+  app.get('/api/content/:id', async (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
     const filePath = req.query.path as string;
 
@@ -1592,7 +1654,7 @@ export function createApp(
       const obsidianMode = project.obsidian_mode === 1;
 
       const absPath = validatePath(project.path, filePath);
-      const stats = fs.statSync(absPath);
+      const stats = await fs.promises.stat(absPath);
       const rendererType = getRendererForFile(filePath);
 
       // --- Safety Gate 1: Unsupported format ---
@@ -1608,7 +1670,7 @@ export function createApp(
       }
 
       // --- Safety Gate 2: Binary file detection ---
-      if (rendererType === 'text' && isBinaryFile(absPath)) {
+      if (rendererType === 'text' && (await isBinaryFileAsync(absPath))) {
         res.json({
           path: filePath,
           type: 'unsupported',
@@ -1624,7 +1686,7 @@ export function createApp(
       if (sizeLimit > 0 && stats.size > sizeLimit) {
         // For text-based formats: truncate and warn
         if (['markdown', 'mermaid', 'code', 'text'].includes(rendererType)) {
-          const { content, truncated, totalBytes } = readFirstNLines(absPath, 10000);
+          const { content, truncated, totalBytes } = await readFirstNLinesAsync(absPath, 10000);
           res.json({
             path: filePath,
             type: rendererType === 'text' ? 'text' : rendererType,
@@ -1651,7 +1713,7 @@ export function createApp(
       // --- Normal render ---
       switch (rendererType) {
         case 'markdown': {
-          const raw = readFile(absPath);
+          const raw = await fs.promises.readFile(absPath, 'utf-8');
           res.json({
             path: filePath,
             type: 'markdown',
@@ -1662,7 +1724,7 @@ export function createApp(
           return;
         }
         case 'mermaid': {
-          const raw = readFile(absPath);
+          const raw = await fs.promises.readFile(absPath, 'utf-8');
           res.json({
             path: filePath,
             type: 'mermaid',
@@ -1673,7 +1735,7 @@ export function createApp(
           return;
         }
         case 'code': {
-          const raw = readFile(absPath);
+          const raw = await fs.promises.readFile(absPath, 'utf-8');
           res.json({
             path: filePath,
             type: 'code',
@@ -1714,7 +1776,7 @@ export function createApp(
           });
           return;
         default: {
-          const raw = readFile(absPath);
+          const raw = await fs.promises.readFile(absPath, 'utf-8');
           res.json({ path: filePath, type: 'text', content: raw });
         }
       }
@@ -2358,7 +2420,7 @@ export function createApp(
   });
 
   // Serve raw binary files (images, PDFs) with proper Content-Type
-  app.get('/api/raw/:id', (req: Request, res: Response) => {
+  app.get('/api/raw/:id', async (req: Request, res: Response) => {
     const projectId = parseInt(req.params.id, 10);
     const filePath = req.query.path as string;
 
@@ -2399,7 +2461,7 @@ export function createApp(
       };
       const contentType = mimeTypes[ext] || 'application/octet-stream';
 
-      const buffer = fs.readFileSync(absPath);
+      const buffer = await fs.promises.readFile(absPath);
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Length', buffer.length);
       res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -2446,29 +2508,37 @@ export function createApp(
             return false;
           }
         })();
+
+      // Shell-quote a path for safe interpolation into a shell command.
+      // Unix filenames may contain $, `, (), etc. — wrap in single quotes and
+      // escape any embedded single quotes. On Windows the filesystem disallows
+      // shell metacharacters (", |, <, >, …) so double-quoting is safe.
+      const sq = (p: string): string =>
+        platform === 'win32' ? `"${p}"` : `'${p.replace(/'/g, "'\\''")}'`;
+
       let command: string;
 
       if (action === 'edit') {
         if (isWSL) {
-          // WSL: use 'code' command (installed by VS Code Remote) or cmd.exe for Windows VS Code
-          command = `code "${absPath}" 2>/dev/null || cmd.exe /c start "vscode://file/${absPath}" 2>/dev/null || explorer.exe /select,"${absPath.replace(/\//g, '\\')}"`;
+          // WSL bash → code / cmd.exe / explorer.exe fallback chain
+          command = `code ${sq(absPath)} 2>/dev/null || cmd.exe /c start "" "vscode://file/${absPath}" 2>/dev/null || explorer.exe /select,${absPath.replace(/\//g, '\\')}`;
         } else if (platform === 'darwin') {
-          command = `open "vscode://file/${absPath}" 2>/dev/null || open -R "${absPath}"`;
+          command = `open ${sq('vscode://file/' + absPath)} 2>/dev/null || open -R ${sq(absPath)}`;
         } else if (platform === 'win32') {
-          command = `start "" "vscode://file/${absPath}" 2>nul || explorer /select,"${absPath}"`;
+          command = `start "" "vscode://file/${absPath}" 2>nul || explorer /select,${sq(absPath)}`;
         } else {
-          command = `xdg-open "vscode://file/${absPath}" 2>/dev/null || xdg-open "${path.dirname(absPath)}"`;
+          command = `xdg-open ${sq('vscode://file/' + absPath)} 2>/dev/null || xdg-open ${sq(path.dirname(absPath))}`;
         }
       } else {
         // Reveal in file manager
         if (isWSL) {
-          command = `explorer.exe /select,"${absPath.replace(/\//g, '\\')}"`;
+          command = `explorer.exe /select,${absPath.replace(/\//g, '\\')}`;
         } else if (platform === 'darwin') {
-          command = `open -R "${absPath}"`;
+          command = `open -R ${sq(absPath)}`;
         } else if (platform === 'win32') {
-          command = `explorer /select,"${absPath}"`;
+          command = `explorer /select,${sq(absPath)}`;
         } else {
-          command = `xdg-open "${path.dirname(absPath)}"`;
+          command = `xdg-open ${sq(path.dirname(absPath))}`;
         }
       }
 
@@ -3056,7 +3126,9 @@ export function createApp(
           .json({ error: t('api.auth.passwordAlreadySet'), code: 'PASSWORD_ALREADY_SET' });
         return;
       }
-      res.json({ ok: true, recovery_codes: codes.formatted });
+      // Stay logged in after first-time setup — issue a real session token so
+      // the caller can immediately reach authenticated API routes.
+      res.json({ ok: true, recovery_codes: codes.formatted, token: auth.issueSessionToken() });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }

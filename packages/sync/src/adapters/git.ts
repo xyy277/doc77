@@ -2,8 +2,6 @@
  * Git sync adapter — uses simple-git for Git operations.
  */
 import simpleGit, { type SimpleGit } from 'simple-git';
-import * as path from 'node:path';
-import * as fs from 'node:fs';
 import type {
   SyncAdapter,
   AdapterConfig,
@@ -19,7 +17,7 @@ export class GitAdapter implements SyncAdapter {
   readonly name = 'git';
   readonly displayName = 'Git Repository';
 
-  private getGit(projectPath: string, config: GitAdapterConfig): SimpleGit {
+  private getGit(projectPath: string, _config: GitAdapterConfig): SimpleGit {
     const git = simpleGit(projectPath);
     return git;
   }
@@ -63,7 +61,6 @@ export class GitAdapter implements SyncAdapter {
 
       // Get current status before pull
       const statusBefore = await git.status();
-      const localModified = new Set(statusBefore.modified);
 
       // Pull with strategy
       const strategy = gitConfig.pullStrategy || 'merge';
@@ -74,7 +71,6 @@ export class GitAdapter implements SyncAdapter {
       }
 
       // Count changes
-      const statusAfter = await git.status();
       const diff = await git.diff(['--name-status', 'HEAD@{1}', 'HEAD']);
       const lines = diff.split('\n').filter(Boolean);
       for (const line of lines) {
@@ -162,8 +158,6 @@ export class GitAdapter implements SyncAdapter {
     // This requires the remote to be fetched first
     try {
       const git = simpleGit();
-      const branch = cfg.branch || 'main';
-      const remote = cfg.remoteName || 'origin';
 
       // ls-remote to check availability
       await git.listRemote(['--heads', cfg.remoteUrl]);

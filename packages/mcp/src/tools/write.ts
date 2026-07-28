@@ -118,7 +118,6 @@ export async function copyFile(
     { path: string } | undefined;
   if (!project) throw new Error('Project not found');
 
-  const srcAbs = path.join(project.path, source);
   const tgtAbs = path.join(project.path, target);
 
   // Pre-check: target existence
@@ -294,6 +293,12 @@ export function registerWriteTools(server: McpServer): void {
       inputSchema: {
         project_id: z.number().describe(t('mcp.param.projectId')),
         operations: z.array(z.record(z.unknown())).describe(t('mcp.param.operations')),
+        auto_approve: z
+          .boolean()
+          .optional()
+          .describe(
+            'When true, non-delete operations execute immediately without approval. Delete operations always require approval.',
+          ),
       },
     },
     {
@@ -364,6 +369,7 @@ export function registerWriteTools(server: McpServer): void {
               args.project_id as number,
               sessionId,
               args.operations as Array<{ type: string } & Record<string, unknown>>,
+              args.auto_approve as boolean | undefined,
             );
             break;
           case 'get_task_status':

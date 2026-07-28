@@ -2,7 +2,7 @@
  * Doc77 Electron — Main process entry
  * Port probe → spawn server → BrowserWindow → system tray.
  */
-import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, shell, nativeImage, globalShortcut, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, shell, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -16,6 +16,7 @@ app.commandLine.appendSwitch('enable-zero-copy');
 
 let mainWindow: BrowserWindow | null = null;
 let server: ServerProcess | null = null;
+// tray reference is kept to prevent garbage collection of the system tray.
 let tray: Tray | null = null;
 let shuttingDown = false;
 
@@ -222,6 +223,8 @@ app.on('before-quit', () => {
   shuttingDown = true;
   globalShortcut.unregisterAll();
   saveWindowState();
+  tray?.destroy();
+  tray = null;
   server?.kill();
 });
 

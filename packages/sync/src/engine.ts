@@ -4,11 +4,9 @@
 import type {
   SyncAdapter,
   SyncConfig,
-  SyncState,
   SyncResult,
   SyncContext,
   SyncDirection,
-  ConflictEntry,
   GitAdapterConfig,
 } from './types.js';
 import { GitAdapter } from './adapters/git.js';
@@ -156,7 +154,7 @@ export class SyncEngine {
    * Stop all schedulers.
    */
   stopAll(): void {
-    for (const [id, timer] of this.timers) {
+    for (const [, timer] of this.timers) {
       clearInterval(timer);
     }
     this.timers.clear();

@@ -217,6 +217,7 @@
   "api.auth.passwordTooShort": "密码至少6位",
   "api.auth.passwordAlreadySet": "密码已设置，请使用修改密码功能",
   "api.auth.passwordRequired": "密码不能为空",
+  "api.auth.loginRequired": "需要登录后才能访问",
   "api.auth.confirmRequired": "请在请求体中提供 confirm: \"yes-i-know\" 以确认操作",
   "api.auth.passwordRequiredForReset": "当前已设置密码，请提供 password 字段",
   "api.auth.incorrectPassword": "密码错误",

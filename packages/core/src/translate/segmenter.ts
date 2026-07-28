@@ -60,8 +60,7 @@ function splitByRegex(text: string, regex: RegExp): string[] {
   const parts: string[] = [];
   let lastIndex = 0;
   const g = new RegExp(regex.source, 'g');
-  let m: RegExpExecArray | null;
-  while ((m = g.exec(text)) !== null) {
+  while (g.exec(text) !== null) {
     parts.push(text.slice(lastIndex, g.lastIndex));
     lastIndex = g.lastIndex;
   }

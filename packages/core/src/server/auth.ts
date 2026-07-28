@@ -1,6 +1,6 @@
 import { getConnection } from '../db/connection.js';
 import * as crypto from '../crypto.js';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { t } from '../i18n/index.js';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,89 @@ function verifyStoredResetToken(token: string): { valid: boolean; codeIndex?: nu
 
 // In-memory store for DEK during reset flow (5-min TTL)
 const resetState = new Map<string, { dek: Buffer; codeIndex: number; expiresAt: number }>();
+
+// ---------------------------------------------------------------------------
+// Auth session store (in-memory, sliding TTL)
+// ---------------------------------------------------------------------------
+// Login issues an opaque, cryptographically-random bearer token. Valid tokens
+// live here with a sliding 12-hour TTL. The store is process-local: a server
+// restart logs everyone out, which is acceptable for a local document server.
+const AUTH_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const authSessions = new Map<string, { expiresAt: number }>();
+
+function sweepExpiredAuthSessions(now = Date.now()): void {
+  for (const [tok, entry] of authSessions) {
+    if (now > entry.expiresAt) authSessions.delete(tok);
+  }
+}
+
+/** Create a new auth session and return its opaque bearer token. */
+function createAuthSession(): string {
+  sweepExpiredAuthSessions();
+  const token = randomBytes(32).toString('hex');
+  authSessions.set(token, { expiresAt: Date.now() + AUTH_SESSION_TTL_MS });
+  return token;
+}
+
+/**
+ * Issue a new session token without verifying a password.
+ * Used by the first-time setup flow, where the caller has just *set* the
+ * password (so there is nothing to verify) and should stay logged in.
+ */
+export function issueSessionToken(): string {
+  return createAuthSession();
+}
+
+/**
+ * Validate a bearer token. Returns true when the token is known and not
+ * expired, and refreshes its sliding TTL on success.
+ */
+export function validateSessionToken(token: string | undefined | null): boolean {
+  if (!token) return false;
+  sweepExpiredAuthSessions();
+  const entry = authSessions.get(token);
+  if (!entry) return false;
+  if (Date.now() > entry.expiresAt) {
+    authSessions.delete(token);
+    return false;
+  }
+  // Sliding renewal: keep active users logged in.
+  entry.expiresAt = Date.now() + AUTH_SESSION_TTL_MS;
+  return true;
+}
+
+/** Invalidate a session token (logout). Returns true if a session was removed. */
+export function destroySession(token: string | undefined | null): boolean {
+  if (!token) return false;
+  return authSessions.delete(token);
+}
+
+/**
+ * Invalidate every outstanding session token. Call after any credential change
+ * (password change/reset, force-reset) so that stolen or stale tokens stop
+ * working immediately.
+ */
+export function revokeAllSessions(): void {
+  authSessions.clear();
+}
+
+/**
+ * Whether a password has been set. When false, the server runs in open mode
+ * (typically localhost-only) and no auth is required. When true, callers must
+ * present a valid session token obtained via login or recovery.
+ */
+export function isPasswordSet(): boolean {
+  try {
+    const row = getConnection().prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
+      { password_hash: string | null } | undefined;
+    return !!row?.password_hash;
+  } catch {
+    // DB not ready — fail closed for safety on routes that check, but most
+    // callers additionally guard with try/catch. Returning false here keeps
+    // startup (before DB init) from locking out the dashboard.
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Password setup with DEK
@@ -385,7 +468,10 @@ export function verifyLogin(password: string): {
   }
 
   db.prepare('UPDATE user_auth SET failed_attempts=0, locked_until=NULL WHERE id=1').run();
-  return { ok: true, token: 'session-' + Date.now(), status: 200 };
+  // Issue a cryptographically-random session token stored server-side.
+  // (Previous implementation returned the predictable string 'session-' + Date.now(),
+  //  which was trivially guessable and never validated on subsequent requests.)
+  return { ok: true, token: createAuthSession(), status: 200 };
 }
 
 // ---------------------------------------------------------------------------
@@ -565,6 +651,8 @@ export function resetPasswordWithToken(
 
   // Clean up in-memory state
   resetState.delete(resetToken);
+  // Revoke any other active sessions — the credential set changed.
+  revokeAllSessions();
 
   return { ok: true, status: 200 };
 }
@@ -657,6 +745,8 @@ export function changePassword(
 
     writeAuditLog('password_changed', {}, source, 'success');
 
+    // Credential set changed — invalidate all outstanding sessions.
+    revokeAllSessions();
     return { ok: true, codes, status: 200 };
   }
 
@@ -700,6 +790,8 @@ export function changePassword(
 
   writeAuditLog('password_changed', {}, source, 'success');
 
+  // Credential set changed — invalidate all outstanding sessions.
+  revokeAllSessions();
   return { ok: true, status: 200 };
 }
 
@@ -841,4 +933,7 @@ export function forceResetPassword(): void {
   db.prepare("DELETE FROM config WHERE key IN ('ai.token', 'ai.base_url', 'ai.model')").run();
 
   writeAuditLog('password_force_reset', {}, 'cli', 'success');
+
+  // All auth state wiped — every existing session is now invalid.
+  revokeAllSessions();
 }
