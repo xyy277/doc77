@@ -32,6 +32,14 @@ config.local.*
 .agents/
 skills-lock.json
 
+# IDE / agent tool working directories
+.qoder/
+.trae/
+.workbuddy/
+
+# Test artifacts
+test-output.txt
+
 # 常规忽略
 *.log
 .DS_Store

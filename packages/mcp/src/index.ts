@@ -34,6 +34,31 @@ export {
   getTaskStatus,
 } from './tools/write.js';
 export type { WriteTask } from './tools/write.js';
+
+// Tool Router + Annotations (Phase 6 — permission gateway)
+export { ToolRouter } from './tools/router.js';
+export type {
+  ToolHandler,
+  ToolContext,
+  ToolRouterDeps,
+  ToolRouteResult,
+  ToolCall,
+} from './tools/router.js';
+export {
+  TOOL_ANNOTATIONS,
+  riskLevelPermits,
+  getAnnotation,
+  isReadOnlyTool,
+  requiresApproval,
+  isDestructive,
+  classifyBatchOps,
+} from './tools/annotations.js';
+export type {
+  ToolAnnotation,
+  ToolPermission,
+  ToolConcurrency,
+  RiskLevel,
+} from './tools/annotations.js';
 export {
   configureAgent,
   sessionAuthorize,

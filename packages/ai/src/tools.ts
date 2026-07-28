@@ -1,5 +1,5 @@
 import { t } from '@doc77/core';
-import type { ToolDefinition } from '../provider/index.js';
+import type { ToolDefinition } from './provider/index.js';
 
 /**
  * MCP Read Tool Definitions — OpenAI Function Calling format.

@@ -19,8 +19,13 @@ window.GalleryLightbox = (function() {
     playing: false,
     playInterval: null,
     playSpeed: 4000,
-    // Transition effect
-    transitionEffect: (function(){ try { return localStorage.getItem('doc77-gallery-transition-effect') || 'dissolve'; } catch(e) { return 'dissolve'; } })(),
+    // Transition effect — 'crossfade' is the default (GPU-accelerated, Apple Photos style).
+    // One-time migration: users with the old 'dissolve' default are migrated to 'crossfade'.
+    transitionEffect: (function(){ try {
+      var saved = localStorage.getItem('doc77-gallery-transition-effect');
+      if (!saved || saved === 'dissolve') { localStorage.setItem('doc77-gallery-transition-effect', 'crossfade'); return 'crossfade'; }
+      return saved;
+    } catch(e) { return 'crossfade'; } })(),
     // Particle canvas
     particleCanvas: null,
     particleCtx: null,
@@ -49,6 +54,10 @@ window.GalleryLightbox = (function() {
     state.visible = false;
     stopSlideshow();
     resetZoom();
+    // Clean up any in-progress particle animation to prevent leaks
+    if (state.particleAnimId) { cancelAnimationFrame(state.particleAnimId); state.particleAnimId = null; }
+    var particleCanvas = document.getElementById('lb-particle-canvas');
+    if (particleCanvas) particleCanvas.remove();
     const lb = document.getElementById('galleryLightbox');
     if (lb) {
       lb.style.opacity = '0';
@@ -400,11 +409,51 @@ window.GalleryLightbox = (function() {
   // ═══════════ Transition Effects ═══════════
   function doTransition(direction) {
     switch (state.transitionEffect) {
+      case 'crossfade': crossfadeKenBurns(direction); break;
       case 'dissolve': particleTransition(direction); break;
       case 'fade': fadeTransition(direction); break;
       case 'slide': slideTransition(direction); break;
       default: simpleTransition(direction); break;
     }
+  }
+
+  /**
+   * GPU-accelerated crossfade + Ken Burns slow zoom.
+   * Uses only CSS opacity + transform (composited on GPU, zero per-frame JS).
+   * Inspired by Apple Photos / Google Photos transitions.
+   */
+  function crossfadeKenBurns(direction) {
+    resetZoom();
+    var img = document.getElementById('lb-image');
+    if (!img) { simpleTransition(direction); return; }
+
+    // Phase 1: fade current image out + slight zoom
+    img.style.transition = 'opacity 0.28s ease, transform 0.28s ease';
+    img.style.opacity = '0';
+    img.style.transform = 'scale(1.03)';
+
+    setTimeout(function () {
+      // Switch to the next image
+      nav(direction);
+
+      // Phase 2: start new image invisible + slightly larger
+      img.style.transition = 'none';
+      img.style.opacity = '0';
+      img.style.transform = 'scale(1.04)';
+
+      // Force reflow so the transition actually runs
+      void img.offsetWidth;
+
+      // Animate in: fade + slow Ken Burns zoom over 4s
+      img.style.transition = 'opacity 0.4s ease, transform 4s linear';
+      img.style.opacity = '1';
+      img.style.transform = 'scale(1)';
+
+      // Clear the slow zoom after fade completes so manual zoom/pan works
+      setTimeout(function () {
+        img.style.transition = '';
+      }, 450);
+    }, 280);
   }
 
   function simpleTransition(direction) {
@@ -616,7 +665,7 @@ window.GalleryLightbox = (function() {
       + '      <option value="2000">2s</option><option value="4000" selected>4s</option><option value="6000">6s</option><option value="10000">10s</option>'
       + '    </select>'
       + '    <select id="lb-effect-select" class="bg-black/30 text-white/80 text-xs rounded px-2 py-1 border border-white/20 focus:outline-none" onchange="GalleryLightbox.setTransitionEffect(this.value)" title="Transition">'
-      + '      <option value="dissolve">Particles</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="none">None</option>'
+      + '      <option value="crossfade">Crossfade</option><option value="dissolve">Particles</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="none">None</option>'
       + '    </select>'
       + '    <div class="w-px h-5 bg-white/20 mx-1"></div>'
       + '    <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Download">'

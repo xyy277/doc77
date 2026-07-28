@@ -1266,13 +1266,16 @@ function toggleAutoScroll() {
   document.getElementById('scrollSpeed').classList.remove('hidden');
   autoScrollSpeed = parseFloat(document.getElementById('scrollSpeed').value) || 60;
   var lastTime = performance.now();
+  var scrollAccum = 0; // Fractional scroll accumulator — prevents sub-pixel truncation at slow speeds
   function step(time) {
     if (!autoScrollActive) return;
     var aCur = document.getElementById('contentArea');
     if (!aCur) { autoScrollActive = false; document.getElementById('autoScrollBtn').textContent = '▶'; document.getElementById('scrollSpeed').classList.add('hidden'); return; }
     var delta = Math.min((time - lastTime) / 1000, 0.1);
-    aCur.scrollTop += autoScrollSpeed * delta;
     lastTime = time;
+    scrollAccum += autoScrollSpeed * delta;
+    var wholePx = Math.floor(scrollAccum);
+    if (wholePx > 0) { scrollAccum -= wholePx; aCur.scrollTop += wholePx; }
     if (aCur.scrollTop >= aCur.scrollHeight - aCur.clientHeight) { toggleAutoScroll(); return; }
     autoScrollRAF = requestAnimationFrame(step);
   }

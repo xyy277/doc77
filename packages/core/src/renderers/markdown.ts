@@ -361,7 +361,6 @@ export function renderMarkdown(
   let html = marked.parse(content, {
     gfm: true,
     breaks: false,
-    headerIds: true,
     renderer,
   }) as string;
 

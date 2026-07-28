@@ -270,7 +270,10 @@ describe('MCP Read-only Tools', () => {
       } catch {
         /* ignore */
       }
-      fs.rmSync(testDir2, { recursive: true, force: true });
+      // Guard against undefined testDir2 (e.g. when beforeEach fails before assignment)
+      if (testDir2) {
+        fs.rmSync(testDir2, { recursive: true, force: true });
+      }
     });
 
     it('should support depth=0 (unlimited recursion)', async () => {

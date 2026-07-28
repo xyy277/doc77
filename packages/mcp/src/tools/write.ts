@@ -292,7 +292,7 @@ export function registerWriteTools(server: McpServer): void {
       description: t('mcp.tool.batchOperations.desc'),
       inputSchema: {
         project_id: z.number().describe(t('mcp.param.projectId')),
-        operations: z.array(z.record(z.unknown())).describe(t('mcp.param.operations')),
+        operations: z.array(z.record(z.string(), z.unknown())).describe(t('mcp.param.operations')),
         auto_approve: z
           .boolean()
           .optional()

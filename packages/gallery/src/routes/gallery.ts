@@ -51,7 +51,7 @@ export function createGalleryListHandler(thumbnailsDir: string) {
     const order = (req.query.order as string) || 'asc';
     const offset = parseInt((req.query.offset as string) || '0', 10);
     const limit = Math.min(parseInt((req.query.limit as string) || '100', 10), 200);
-    const types = (req.query.types as string) || 'image,video';
+    const types = (req.query.types as string) || 'image,video,dir';
     const allowedTypes = new Set(types.split(','));
     // Support explicit path filter (album view passes specific file paths)
     const rawPaths = req.query.paths;
@@ -78,13 +78,37 @@ export function createGalleryListHandler(thumbnailsDir: string) {
       const mediaEntries: GalleryEntry[] = [];
 
       for (const entry of entries) {
+        const relativePath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
+        // When paths filter is set, skip entries not in the list
+        if (filterPaths && !filterPaths.includes(relativePath)) continue;
+
+        // Directory entries — included when 'dir' is in types (default for photos view)
+        if (entry.type === 'directory') {
+          if (!allowedTypes.has('dir')) continue;
+          mediaEntries.push({
+            name: entry.name,
+            path: relativePath,
+            type: 'directory',
+            extension: '',
+            size: 0,
+            modified: entry.modified,
+            thumbnail_url: '',
+            preview_url: '',
+            raw_url: '',
+            width: null,
+            height: null,
+            exif_date: null,
+            duration: null,
+            entry_count: null,
+          });
+          continue;
+        }
+
+        // File entries — only media files
         if (entry.type !== 'file') continue;
         const mediaType = isMediaFile(entry.name);
         if (!mediaType || !allowedTypes.has(mediaType)) continue;
 
-        const relativePath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
-        // When paths filter is set, skip entries not in the list
-        if (filterPaths && !filterPaths.includes(relativePath)) continue;
         const sourceHash = computeSourceHash(projectId, relativePath, entry.modified, entry.size);
         const hashPrefix = sourceHash.slice(0, 2);
 
@@ -113,8 +137,8 @@ export function createGalleryListHandler(thumbnailsDir: string) {
           extension: filenameToExtension(entry.name),
           size: entry.size,
           modified: entry.modified,
-          thumbnail_url: `/thumbnails/${hashPrefix}/${sourceHash}_grid.webp`,
-          preview_url: `/thumbnails/${hashPrefix}/${sourceHash}_preview.webp`,
+          thumbnail_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(relativePath)}&size=grid`,
+          preview_url: `/api/thumbnails/${projectId}?path=${encodeURIComponent(relativePath)}&size=preview`,
           raw_url: `/api/raw/${projectId}?path=${encodeURIComponent(relativePath)}`,
           width: null,
           height: null,
@@ -123,8 +147,11 @@ export function createGalleryListHandler(thumbnailsDir: string) {
         });
       }
 
-      // Sort
+      // Sort — directories first, then files by chosen key
       mediaEntries.sort((a, b) => {
+        // Directories always come first
+        if (a.type === 'directory' && b.type !== 'directory') return -1;
+        if (a.type !== 'directory' && b.type === 'directory') return 1;
         const mul = order === 'desc' ? -1 : 1;
         if (sort === 'date') return mul * a.modified.localeCompare(b.modified);
         if (sort === 'size') return mul * (a.size - b.size);

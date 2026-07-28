@@ -22,6 +22,11 @@ export interface AgentResponse {
 
 /**
  * Doc77 AI Agent — handles conversation with tool-use ReAct loop.
+ *
+ * @deprecated Use {@link AgentLoop} (from agent/loop.ts) instead. DocAgent is
+ *             retained for backward compatibility but lacks context management,
+ *             tree-structured persistence, streaming tool execution, and
+ *             real-time steering. New code should use AgentLoop.
  */
 export class DocAgent {
   private provider: AiProvider;

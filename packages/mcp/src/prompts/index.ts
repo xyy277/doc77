@@ -7,9 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export function registerPrompts(server: McpServer): void {
   server.prompt(
     'organize-project',
-    {
-      description: '帮我整理项目目录结构',
-    },
+    '帮我整理项目目录结构',
     async () => ({
       messages: [
         {
@@ -32,9 +30,7 @@ export function registerPrompts(server: McpServer): void {
 
   server.prompt(
     'search-and-classify',
-    {
-      description: '搜索并归类文档',
-    },
+    '搜索并归类文档',
     async () => ({
       messages: [
         {
@@ -81,9 +77,7 @@ export function registerPrompts(server: McpServer): void {
 
   server.prompt(
     'find-duplicates',
-    {
-      description: '查找重复或相似文件',
-    },
+    '查找重复或相似文件',
     async () => ({
       messages: [
         {

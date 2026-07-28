@@ -42,8 +42,20 @@ import {
 } from '../renderers/index.js';
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
 import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.js';
+import { createToolRouterExecutor } from './tool-router-factory.js';
 import { createRateLimiter } from './rate-limit.js';
 import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
+import {
+  createSession,
+  getSession,
+  updateSession,
+  appendMessage,
+  getMessage,
+  getMessagePath,
+  switchBranch,
+  addTokenUsage,
+  logToolCall,
+} from '../db/session-store.js';
 import { isMobileRequest } from './mobile-detect.js';
 import * as auth from './auth.js';
 import { getMobileInfo, publishMdns } from './mobile-mdns.js';
@@ -57,6 +69,10 @@ import { VERSION } from '../version.gen.js';
 import { getConfig } from '../db/config.js';
 import { initI18n, t } from '../i18n/index.js';
 import { buildI18nResponse } from './i18n-route.js';
+import { registerAiSessionRoutes } from './routes/ai-sessions.js';
+import { registerAiMessageRoutes } from './routes/ai-messages.js';
+import { registerAiSearchRoutes } from './routes/ai-search.js';
+import { registerAiSkillRoutes, setSkillEngine } from './routes/ai-skills.js';
 import { bundleHTML, ShareManager } from '../export/index.js';
 import { getLocalIP, getLocalIPs, renderSharePage, renderShareError } from '../export/helpers.js';
 import QRCode from 'qrcode';
@@ -90,6 +106,16 @@ export function setServerInfo(info: { bind: string; port: number }) {
 function getServerInfo() {
   return _serverInfo;
 }
+
+/**
+ * Active InterruptQueue instances, keyed by session ID.
+ * Populated by createAgentLoopHandler when an AgentLoop starts, cleared
+ * when it finishes. The /api/ai/chat/interrupt endpoint reads from this map.
+ */
+const _activeInterruptQueues = new Map<string, {
+  cancel: () => void;
+  inject: (msg: string) => void;
+}>();
 
 /**
  * Create and configure the Express application.
@@ -207,6 +233,23 @@ export function createApp(
     res.status(404).type('html').send('<h1>Not Found</h1>');
   });
 
+  // === AI workspace ===
+  // Dedicated full-screen multi-session chat UI (Phase 5 redesign).
+  // Mounted at /ai so it can be linked from the dashboard header and
+  // opened independently of the document preview.
+  app.get('/ai', (_req: Request, res: Response) => {
+    if (!webDir) {
+      res.status(404).type('html').send('<h1>Not Found</h1>');
+      return;
+    }
+    const target = path.join(webDir, 'ai.html');
+    if (fs.existsSync(target)) {
+      res.sendFile(target, { dotfiles: 'allow' });
+      return;
+    }
+    res.status(404).type('html').send('<h1>Not Found</h1>');
+  });
+
   app.get('/preview.html', (_req: Request, res: Response) => {
     if (!webDir) {
       res.status(404).type('html').send('<h1>Not Found</h1>');
@@ -296,7 +339,7 @@ export function createApp(
   // Electron: bundled in resources/vendor/ (via extraResources).
   // CLI / dev: ~/.doc77/vendor/ (populated by `doc77 vendor-install`).
   const vendorDir = process.env.DOC77_ELECTRON
-    ? process.env.DOC77_VENDOR_DIR || path.join(process.resourcesPath!, 'vendor')
+    ? process.env.DOC77_VENDOR_DIR || path.join((process as NodeJS.Process & { resourcesPath?: string }).resourcesPath!, 'vendor')
     : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
   app.use('/vendor', express.static(vendorDir, { fallthrough: true, dotfiles: 'allow' }));
 
@@ -781,7 +824,7 @@ export function createApp(
   });
 
   app.delete('/api/projects/:id', (req: Request, res: Response) => {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid project id' });
       return;
@@ -796,7 +839,7 @@ export function createApp(
 
   // Update project
   app.put('/api/projects/:id', (req: Request, res: Response) => {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const { name, path: newPath, obsidian_mode, tags } = req.body;
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid project id' });
@@ -818,7 +861,7 @@ export function createApp(
 
   // Touch project (update last_opened)
   app.post('/api/projects/:id/touch', (req: Request, res: Response) => {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid project id' });
       return;
@@ -829,7 +872,7 @@ export function createApp(
 
   // Toggle project favorite
   app.put('/api/projects/:id/favorite', (req: Request, res: Response) => {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid project id' });
       return;
@@ -1202,7 +1245,7 @@ export function createApp(
 
   // Refresh tree cache for a project
   app.post('/api/tree/:id/refresh', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     if (isNaN(projectId)) {
       res.status(400).json({ error: 'Invalid project id' });
       return;
@@ -1251,7 +1294,7 @@ export function createApp(
 
   // Create empty file
   app.post('/api/tree/:id/file', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const dirPath = (req.query.path as string) || '';
     const { name } = req.body || {};
 
@@ -1295,7 +1338,7 @@ export function createApp(
 
   // Create folder
   app.post('/api/tree/:id/folder', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const dirPath = (req.query.path as string) || '';
     const { name } = req.body || {};
 
@@ -1339,7 +1382,7 @@ export function createApp(
 
   // Rename file or folder
   app.put('/api/tree/:id/rename', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const oldPath = (req.query.path as string) || '';
     const { newName } = req.body || {};
 
@@ -1404,7 +1447,7 @@ export function createApp(
 
   // Delete file or folder
   app.delete('/api/tree/:id', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const targetPath = (req.query.path as string) || '';
 
     if (isNaN(projectId)) {
@@ -1476,7 +1519,7 @@ export function createApp(
 
   // Get bookmarks for a project
   app.get('/api/tree/:id/bookmarks', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     if (isNaN(projectId)) {
       res.status(400).json({ error: 'Invalid project id' });
       return;
@@ -1497,7 +1540,7 @@ export function createApp(
 
   // Toggle bookmark
   app.put('/api/tree/:id/bookmark', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const filePath = (req.query.path as string) || '';
     const { action } = req.body || {};
     if (isNaN(projectId)) {
@@ -1533,7 +1576,7 @@ export function createApp(
 
   // Migrate bookmarks from localStorage to SQLite (idempotent)
   app.post('/api/tree/:id/bookmarks/migrate', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const { bookmarks } = req.body || {};
     if (isNaN(projectId)) {
       res.status(400).json({ error: 'Invalid project id' });
@@ -1605,7 +1648,7 @@ export function createApp(
 
   // Directory tree
   app.get('/api/tree/:id', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const dirPath = (req.query.path as string) || '';
 
     if (isNaN(projectId)) {
@@ -1628,7 +1671,7 @@ export function createApp(
 
   // File content with renderer dispatch + safety gates
   app.get('/api/content/:id', async (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const filePath = req.query.path as string;
 
     if (isNaN(projectId)) {
@@ -1975,7 +2018,7 @@ export function createApp(
 
   /** GET /s/:token — Share page (read-only preview) */
   app.get('/s/:token', (req: Request, res: Response) => {
-    const token = shareManager.validate(req.params.token);
+    const token = shareManager.validate(req.params.token as string);
     if (!token) {
       res.status(404).send(renderShareError(t('api.share.expired')));
       return;
@@ -1985,7 +2028,7 @@ export function createApp(
 
   /** GET /api/share/:token/data — Get rendered content for share page */
   app.get('/api/share/:token/data', (req: Request, res: Response) => {
-    const token = shareManager.validate(req.params.token);
+    const token = shareManager.validate(req.params.token as string);
     if (!token) {
       res.status(404).json({ error: t('api.share.expired'), code: 'SHARE_EXPIRED' });
       return;
@@ -1995,7 +2038,7 @@ export function createApp(
       const content = readFile(token.filePath);
       const ext = path.extname(token.filePath).toLowerCase();
       const renderer = getRendererForFile(token.filePath);
-      let rendered: { type: string; content: string; rawUrl?: string };
+      let rendered: { type: string; content: string; rawUrl?: string; rawContent?: string };
 
       if (renderer === 'markdown') {
         rendered = {
@@ -2048,7 +2091,7 @@ export function createApp(
 
   /** GET /api/share/:token/qrcode — QR code SVG for share link */
   app.get('/api/share/:token/qrcode', async (req: Request, res: Response) => {
-    const token = shareManager.validate(req.params.token);
+    const token = shareManager.validate(req.params.token as string);
     if (!token) {
       res.status(404).send('Token invalid or expired');
       return;
@@ -2092,9 +2135,9 @@ export function createApp(
 
   /** DELETE /api/share/:token — Revoke a share */
   app.delete('/api/share/:token', (req: Request, res: Response) => {
-    const revoked = shareManager.revoke(req.params.token);
+    const revoked = shareManager.revoke(req.params.token as string);
     if (revoked) {
-      auditLog({ action: 'share:revoke', token: req.params.token });
+      auditLog({ action: 'share:revoke', token: req.params.token as string });
       res.json({ ok: true });
     } else {
       res.status(404).json({ error: 'Token not found' });
@@ -2211,7 +2254,7 @@ export function createApp(
 
   // Save edited file content (lightweight editing)
   app.put('/api/content/:id', async (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const filePath = req.query.path as string;
     const { content } = req.body as { content?: string };
     const forceOverwrite = req.headers['x-force-overwrite'] === 'true';
@@ -2421,7 +2464,7 @@ export function createApp(
 
   // Serve raw binary files (images, PDFs) with proper Content-Type
   app.get('/api/raw/:id', async (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const filePath = req.query.path as string;
 
     if (isNaN(projectId) || !filePath) {
@@ -2474,7 +2517,7 @@ export function createApp(
 
   // Reveal file in editor or file manager
   app.get('/api/reveal/:id', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = parseInt(req.params.id as string, 10);
     const filePath = req.query.path as string;
     const action = (req.query.action as string) || 'reveal';
 
@@ -2963,7 +3006,7 @@ export function createApp(
 
   // Search within a project
   app.get('/api/fts/:projectId', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(req.params.projectId as string, 10);
     const q = (req.query.q as string) || '';
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 100);
     const offset = parseInt(req.query.offset as string, 10) || 0;
@@ -2999,7 +3042,7 @@ export function createApp(
 
   // Trigger full index for a project
   app.post('/api/fts/:projectId/index', async (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(req.params.projectId as string, 10);
     if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
 
     try {
@@ -3018,7 +3061,7 @@ export function createApp(
 
   // Get index stats
   app.get('/api/fts/:projectId/stats', (req: Request, res: Response) => {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(req.params.projectId as string, 10);
     if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
     try {
       const stats = getIndexStats(projectId);
@@ -3072,9 +3115,9 @@ export function createApp(
   app.put('/api/plugins/:name/toggle', (req: Request, res: Response) => {
     const loader = getPluginLoader();
     const enabled = req.body?.enabled !== false;
-    const ok = loader.toggle(req.params.name, enabled);
+    const ok = loader.toggle(req.params.name as string, enabled);
     if (!ok) { res.status(404).json({ error: 'Plugin not found' }); return; }
-    res.json({ ok: true, name: req.params.name, enabled });
+    res.json({ ok: true, name: req.params.name as string, enabled });
   });
 
   app.post('/api/plugins/discover', async (_req: Request, res: Response) => {
@@ -3381,6 +3424,39 @@ export function createApp(
       res.json({ ok: true, key });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // --- AI session/message/search routes (Phase 2 redesign) ---
+  // Tree-structured multi-session management backed by SessionStore.
+  // Mounted before the error handler so all 5xx failures are caught.
+  registerAiSessionRoutes(app);
+  registerAiMessageRoutes(app);
+  registerAiSearchRoutes(app);
+  registerAiSkillRoutes(app);
+
+  // --- AI chat interrupt endpoint (Phase 3) ---
+  // Allows the frontend to cancel or inject into a running AgentLoop.
+  // The active InterruptQueue is registered by createAgentLoopHandler below.
+  app.post('/api/ai/chat/interrupt', (req: Request, res: Response) => {
+    const { session_id, type, message: injectMsg } = req.body ?? {};
+    if (!session_id || typeof session_id !== 'string') {
+      res.status(400).json({ error: 'session_id is required' });
+      return;
+    }
+    const queue = _activeInterruptQueues.get(session_id);
+    if (!queue) {
+      res.status(404).json({ error: 'No active session found' });
+      return;
+    }
+    if (type === 'cancel') {
+      queue.cancel();
+      res.json({ session_id, type: 'cancelled' });
+    } else if (type === 'inject' && injectMsg) {
+      queue.inject(String(injectMsg));
+      res.json({ session_id, type: 'injected' });
+    } else {
+      res.status(400).json({ error: 'type must be "cancel" or "inject" (with message)' });
     }
   });
 
@@ -3901,6 +3977,374 @@ export function createAIChatHandler(deps: {
         saveAiSession(sid, project_id, (agent as any).getHistory());
       } catch {
         /* non-fatal */
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      send('error', { message: t('ai.context.serviceError', { msg }) });
+    }
+
+    res.end();
+  };
+}
+
+/**
+ * Create POST /api/ai/chat handler using the new AgentLoop (Phase 3).
+ *
+ * This is the upgraded version of createAIChatHandler. Key differences:
+ *   - Uses AgentLoop (five-layer harness) instead of DocAgent (simple ReAct)
+ *   - Persists messages to the tree-structured ai_messages table via SessionStore
+ *   - Supports real-time steering (cancel/inject) via /api/ai/chat/interrupt
+ *   - Emits new SSE event types: tool_result, context_compacted
+ *   - Creates/loads sessions from ai_sessions table (multi-session support)
+ *
+ * The handler accepts the same AI dependencies as createAIChatHandler plus
+ * optional AgentLoop-specific deps. When AgentLoop is not available, callers
+ * should fall back to createAIChatHandler.
+ *
+ * Usage (in CLI start command):
+ *   const { AgentLoop, createPersistenceAdapter, ... } = await import('@doc77/ai');
+ *   app.post('/api/ai/chat', createAgentLoopHandler({ AiProvider, AgentLoop, ... }));
+ */
+export function createAgentLoopHandler(deps: {
+  AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => unknown;
+  AgentLoop: new (config: Record<string, unknown>) => {
+    run(sessionId: string, message: string, opts?: { noTools?: boolean }): AsyncIterable<{
+      type: string; content?: string; name?: string; id?: string; arguments?: string;
+      toolName?: string; output?: string; success?: boolean; elapsedMs?: number;
+      summary?: string; compactedCount?: number; finishReason?: string;
+      usage?: { prompt_tokens: number; completion_tokens: number };
+      message?: string; sessionId?: string;
+    }>;
+    interrupts: { cancel: () => void; inject: (msg: string) => void };
+  };
+  createPersistenceAdapter: (fns: Record<string, unknown>) => unknown;
+  getReadTools: () => unknown[];
+  getWriteTools?: () => unknown[];
+  writeFns?: AiWriteFns;
+}) {
+  const { AiProvider, AgentLoop, createPersistenceAdapter, getReadTools } = deps;
+  const aiRateLimiter = createRateLimiter();
+
+  return async (req: Request, res: Response) => {
+    const { message, project_id, session_id, context_file, regenerate_from, edit_from } = req.body;
+    console.error(
+      `[ai-loop] chat request: session=${session_id || 'new'}, project=${project_id}, ` +
+      `context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"` +
+      (regenerate_from ? `, regenerate_from=${regenerate_from}` : '') +
+      (edit_from ? `, edit_from=${edit_from}` : ''),
+    );
+
+    // ── Branch mutation validation ──
+    // regenerate_from / edit_from allow tree-structured branching. Both
+    // require an existing session_id. regenerate_from ignores `message`
+    // (it re-runs the model on the parent user message); edit_from
+    // requires a non-empty `message` (the edited text).
+    const isRegenerate = typeof regenerate_from === 'string' && regenerate_from.length > 0;
+    const isEdit = typeof edit_from === 'string' && edit_from.length > 0;
+    if ((isRegenerate || isEdit) && !session_id) {
+      res.status(400).json({ error: 'session_id is required for regenerate_from / edit_from' });
+      return;
+    }
+    if (isRegenerate && isEdit) {
+      res.status(400).json({ error: 'regenerate_from and edit_from are mutually exclusive' });
+      return;
+    }
+    if (!isRegenerate && !message) {
+      res.status(400).json({ error: 'message is required' });
+      return;
+    }
+    if (isEdit && !message) {
+      res.status(400).json({ error: 'message is required for edit_from' });
+      return;
+    }
+
+    // ── Decrypt AI config ──
+    const db = getConnection();
+    const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
+      { value: string } | undefined;
+    const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
+      { value: string } | undefined;
+    const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
+      { value: string } | undefined;
+    if (!tokenRow?.value) {
+      res.status(400).json({ error: t('api.ai.notConfiguredMessage'), code: 'AI_NOT_CONFIGURED' });
+      return;
+    }
+    let token = tokenRow.value;
+    if (token.startsWith('{')) {
+      try {
+        const encData = JSON.parse(token);
+        if (encData.iv && encData.tag && encData.ciphertext) {
+          const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
+            { pbkdf2_salt: string } | undefined;
+          if (authRow?.pbkdf2_salt) {
+            const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
+            token = crypto.decrypt(encData, encKey);
+          }
+        }
+      } catch { /* not encrypted */ }
+    }
+    const baseUrl = baseRow?.value || 'https://api.deepseek.com';
+    const model = modelRow?.value || 'deepseek-v4-pro';
+
+    // ── SSE setup ──
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const send = (event: string, data: unknown) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      // ── Create or load session from SessionStore ──
+      let sid = session_id as string | undefined;
+      if (!sid) {
+        // Create a new session in the DB
+        const session = createSession({
+          projectId: project_id ?? null,
+          title: message.slice(0, 50),
+          model,
+        });
+        sid = session.id;
+      } else {
+        // Verify the session exists; create if not found (e.g. stale client ID)
+        const existing = getSession(sid);
+        if (!existing) {
+          const session = createSession({
+            id: sid,
+            projectId: project_id ?? null,
+            title: message.slice(0, 50),
+            model,
+          });
+          sid = session.id;
+        }
+      }
+      send('session', { session_id: sid });
+
+      // ── Build the persistence adapter (bridges AgentLoop ↔ SessionStore) ──
+      const persistence = createPersistenceAdapter({
+        appendMessage: (sId: string, msg: Record<string, unknown>) => appendMessage(sId, msg as never),
+        getCurrentLeafId: (sId: string) => {
+          const s = getSession(sId);
+          return s?.currentLeafId ?? null;
+        },
+        getMessagePath: (sId: string, leafId?: string | null) => {
+          // Return as AiMessage-compatible array
+          const path = getMessagePath(sId, leafId);
+          return path.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            toolCalls: m.toolCalls,
+            toolCallId: m.toolCallId,
+            toolName: m.toolName,
+            parentId: m.parentId,
+          }));
+        },
+        addTokenUsage: (sId: string, input: number, output: number) => addTokenUsage(sId, input, output),
+        logToolCall: (entry: Record<string, unknown>) => logToolCall(entry as never),
+      });
+
+      // ── Build the provider ──
+      const provider = new AiProvider({ apiKey: token, baseUrl, model }) as InstanceType<typeof AiProvider>;
+
+      // ── Build the tool executor (same logic as createAIChatHandler) ──
+      let toolSessionId = sid;
+      const readProjectFileContent = (pid: number, filePath: string): string => {
+        if (!filePath) return 'Error: file_path is required';
+        const fileName = filePath.split('/').pop() || filePath;
+        if (isSensitiveFile(fileName))
+          return `Error: Access denied — "${fileName}" is a sensitive file`;
+        try {
+          const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+            { path: string } | undefined;
+          if (!project) return 'Error: Project not found';
+          const absPath = validatePath(project.path, filePath);
+          const content = readFile(absPath);
+          return content.length > 4000
+            ? content.slice(0, 4000) + `\n\n[... truncated, total ${content.length} chars]`
+            : content;
+        } catch (e: unknown) {
+          return `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+        }
+      };
+
+      const getRiskLevel = (): string => {
+        try {
+          const row = db.prepare("SELECT value FROM config WHERE key = 'ai.risk_level'").get() as
+            { value: string } | undefined;
+          return row?.value || 'medium';
+        } catch { return 'medium'; }
+      };
+
+      const executeTool = await createToolRouterExecutor({
+        project_id,
+        toolSessionId,
+        writeFns: deps.writeFns,
+        isSensitiveFile,
+        getRiskLevel,
+        scanDirectory,
+        readProjectFileContent,
+        validatePath,
+        db,
+        t: t as (key: string, params?: Record<string, unknown>) => string,
+      });
+
+      // ── Build tools ──
+      const readTools = getReadTools();
+      const writeTools = deps.writeFns ? (deps.getWriteTools?.() || []) : [];
+      const allTools = [...readTools, ...writeTools];
+
+      // ── Context file fast-path (same as createAIChatHandler) ──
+      let outgoing = message;
+      let noTools = false;
+      if (context_file && project_id) {
+        const content = readProjectFileContent(project_id, context_file as string);
+        if (!content.startsWith('Error:')) {
+          outgoing = `${message}\n\n---\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
+          noTools = true;
+        }
+      }
+
+      // ── Branch mutation setup (regenerate / edit-resend) ──
+      // Both modes reposition the session's current_leaf_id before running
+      // the loop, so the new message becomes a sibling of the original:
+      //
+      //   regenerate_from (assistant msg id):
+      //     1. Look up the message → its parentId is the user message
+      //     2. switchBranch(session, parentId) — leaf now points at the user msg
+      //     3. Run the loop with skipAppendUser=true — no new user message,
+      //        the loop creates a fresh assistant sibling
+      //
+      //   edit_from (user msg id):
+      //     1. Look up the original user message → its parentId
+      //     2. switchBranch(session, parentId) — leaf now points at the
+      //        grandparent, so the next appended user message becomes a
+      //        sibling of the original
+      //     3. Run the loop normally — it appends the edited user message
+      //        and generates a new assistant reply
+      let skipAppendUser = false;
+      if (isRegenerate && sid) {
+        const target = getMessage(regenerate_from as string);
+        if (!target || target.sessionId !== sid) {
+          send('error', { message: 'regenerate_from message not found in this session' });
+          return;
+        }
+        if (target.role !== 'assistant') {
+          send('error', { message: 'regenerate_from must target an assistant message' });
+          return;
+        }
+        // Leaf → the user message that prompted this assistant reply
+        if (target.parentId) {
+          switchBranch(sid, target.parentId);
+        }
+        skipAppendUser = true;
+        outgoing = ''; // not used when skipAppendUser is true
+      } else if (isEdit && sid) {
+        const target = getMessage(edit_from as string);
+        if (!target || target.sessionId !== sid) {
+          send('error', { message: 'edit_from message not found in this session' });
+          return;
+        }
+        if (target.role !== 'user') {
+          send('error', { message: 'edit_from must target a user message' });
+          return;
+        }
+        // Leaf → the parent of the original user message, so the new
+        // (edited) user message becomes a sibling at the same depth.
+        if (target.parentId) {
+          switchBranch(sid, target.parentId);
+        } else {
+          // Original was a root user message — reset the leaf so the new
+          // message also becomes a root sibling. switchBranch validates the
+          // message exists, so we use updateSession directly for the null
+          // case.
+          updateSession(sid, { currentLeafId: null });
+        }
+      }
+
+      // ── Inject project context for new sessions ──
+      let systemPrompt = t('ai.systemPrompt');
+      if (project_id && !context_file) {
+        try {
+          const root = scanDirectory(project_id, '');
+          const fileList = root.entries.slice(0, 30)
+            .map((e) => `${e.type === 'directory' ? '📁' : '📄'} ${e.name}`)
+            .join('\n');
+          const proj = db.prepare('SELECT name, path FROM projects WHERE id = ?').get(project_id) as
+            { name: string; path: string } | undefined;
+          systemPrompt += '\n\n' + t('ai.context.projectInfo', {
+            name: proj?.name || 'Unknown',
+            path: proj?.path || 'N/A',
+            fileList: fileList || t('ai.context.emptyDir'),
+          });
+        } catch { /* non-fatal */ }
+      }
+
+      // ── Create the AgentLoop ──
+      const loop = new AgentLoop({
+        provider,
+        model,
+        tools: allTools as never[],
+        executeTool,
+        maxSteps: 10,
+        systemPrompt,
+        persistence: persistence as never,
+        contextWindow: 8192,
+      });
+
+      // ── Register the interrupt queue for this session ──
+      _activeInterruptQueues.set(sid, {
+        cancel: () => loop.interrupts.cancel(),
+        inject: (msg: string) => loop.interrupts.inject(msg),
+      });
+
+      try {
+        // ── Run the loop and forward events as SSE ──
+        for await (const event of loop.run(sid, outgoing, { noTools, skipAppendUser })) {
+          switch (event.type) {
+            case 'session':
+              // Already sent above; skip
+              break;
+            case 'token':
+              send('token', { text: event.content });
+              break;
+            case 'tool_call_start':
+              send('tool_call', { name: event.name, arguments: '', status: 'executing' });
+              break;
+            case 'tool_call':
+              send('tool_call', { name: event.name, arguments: event.arguments, status: 'executing' });
+              break;
+            case 'tool_result':
+              // New Phase 3 event type — tool execution result
+              send('tool_result', {
+                name: event.toolName,
+                output: (event.output || '').slice(0, 500),
+                success: event.success,
+                elapsedMs: event.elapsedMs,
+              });
+              break;
+            case 'context_compacted':
+              // New Phase 3 event type — context was compressed
+              send('context_compacted', {
+                summary: event.summary,
+                compactedCount: event.compactedCount,
+              });
+              break;
+            case 'done':
+              send('done', { finishReason: event.finishReason, usage: event.usage });
+              break;
+            case 'error':
+              send('error', { message: event.message });
+              break;
+          }
+        }
+      } finally {
+        // ── Clean up: unregister the interrupt queue ──
+        _activeInterruptQueues.delete(sid);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
