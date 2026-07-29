@@ -30,6 +30,10 @@ window.GalleryLightbox = (function() {
     particleCanvas: null,
     particleCtx: null,
     particleAnimId: null,
+    // Transition control
+    transitionId: 0,
+    isTransitioning: false,
+    lastTransitionTime: 0,
   };
 
   /**
@@ -408,12 +412,42 @@ window.GalleryLightbox = (function() {
 
   // ═══════════ Transition Effects ═══════════
   function doTransition(direction) {
+    // 防抖：防止快速按键触发多个过渡
+    const now = Date.now();
+    if (now - state.lastTransitionTime < 300) {
+      return; // 忽略快速按键
+    }
+    state.lastTransitionTime = now;
+
+    // 递增过渡 ID，取消之前的过渡
+    const myId = ++state.transitionId;
+
+    // 取消任何现有的粒子动画
+    if (state.particleAnimId) {
+      cancelAnimationFrame(state.particleAnimId);
+      state.particleAnimId = null;
+    }
+
+    // 移除任何现有的粒子 canvas
+    const existingCanvas = document.getElementById('lb-particle-canvas');
+    if (existingCanvas) {
+      existingCanvas.remove();
+    }
+
+    state.isTransitioning = true;
+
     switch (state.transitionEffect) {
-      case 'crossfade': crossfadeKenBurns(direction); break;
-      case 'dissolve': particleTransition(direction); break;
-      case 'fade': fadeTransition(direction); break;
-      case 'slide': slideTransition(direction); break;
-      default: simpleTransition(direction); break;
+      case 'crossfade': crossfadeKenBurns(direction, myId); break;
+      case 'dissolve': particleTransition(direction, myId); break;
+      case 'fade': fadeTransition(direction, myId); break;
+      case 'slide': slideTransition(direction, myId); break;
+      default: simpleTransition(direction, myId); break;
+    }
+  }
+
+  function endTransition(myId) {
+    if (myId === state.transitionId) {
+      state.isTransitioning = false;
     }
   }
 
@@ -422,10 +456,10 @@ window.GalleryLightbox = (function() {
    * Uses only CSS opacity + transform (composited on GPU, zero per-frame JS).
    * Inspired by Apple Photos / Google Photos transitions.
    */
-  function crossfadeKenBurns(direction) {
+  function crossfadeKenBurns(direction, myId) {
     resetZoom();
     var img = document.getElementById('lb-image');
-    if (!img) { simpleTransition(direction); return; }
+    if (!img) { simpleTransition(direction, myId); return; }
 
     // Phase 1: fade current image out + slight zoom
     img.style.transition = 'opacity 0.28s ease, transform 0.28s ease';
@@ -433,6 +467,9 @@ window.GalleryLightbox = (function() {
     img.style.transform = 'scale(1.03)';
 
     setTimeout(function () {
+      // 检查是否已被取消
+      if (myId !== state.transitionId) return;
+
       // Switch to the next image
       nav(direction);
 
@@ -451,44 +488,58 @@ window.GalleryLightbox = (function() {
 
       // Clear the slow zoom after fade completes so manual zoom/pan works
       setTimeout(function () {
+        if (myId !== state.transitionId) return;
         img.style.transition = '';
+        endTransition(myId);
       }, 450);
     }, 280);
   }
 
-  function simpleTransition(direction) {
+  function simpleTransition(direction, myId) {
     resetZoom();
     nav(direction);
+    endTransition(myId);
   }
 
-  function fadeTransition(direction) {
+  function fadeTransition(direction, myId) {
     resetZoom();
     var img = document.getElementById('lb-image');
     if (img) { img.style.opacity = '0'; img.style.transition = 'opacity 0.3s'; }
     setTimeout(function() {
+      if (myId !== state.transitionId) return;
       nav(direction);
-      if (img) { img.style.opacity = '1'; setTimeout(function() { img.style.transition = ''; }, 350); }
+      if (img) { img.style.opacity = '1'; setTimeout(function() {
+        if (myId !== state.transitionId) return;
+        img.style.transition = '';
+        endTransition(myId);
+      }, 350); }
     }, 300);
   }
 
-  function slideTransition(direction) {
+  function slideTransition(direction, myId) {
     resetZoom();
     var img = document.getElementById('lb-image');
     if (img) { img.style.transform = 'translateX(' + (direction * 60) + 'px)'; img.style.opacity = '0'; img.style.transition = 'transform 0.3s, opacity 0.3s'; }
     setTimeout(function() {
+      if (myId !== state.transitionId) return;
       nav(direction);
       if (img) { img.style.transform = 'translateX(' + (-direction * 20) + 'px)'; img.style.opacity = '0.7'; }
       requestAnimationFrame(function() {
-        if (img) { img.style.transform = 'translateX(0)'; img.style.opacity = '1'; setTimeout(function() { img.style.transition = ''; }, 350); }
+        if (myId !== state.transitionId) return;
+        if (img) { img.style.transform = 'translateX(0)'; img.style.opacity = '1'; setTimeout(function() {
+          if (myId !== state.transitionId) return;
+          img.style.transition = '';
+          endTransition(myId);
+        }, 350); }
       });
     }, 300);
   }
 
-  function particleTransition(direction) {
+  function particleTransition(direction, myId) {
     resetZoom();
     var img = document.getElementById('lb-image');
     var area = document.getElementById('lightbox-content-area');
-    if (!img || !area) { simpleTransition(direction); return; }
+    if (!img || !area) { simpleTransition(direction, myId); return; }
 
     // Create canvas overlay
     var canvas = document.createElement('canvas');
@@ -534,7 +585,7 @@ window.GalleryLightbox = (function() {
 
     if (particles.length === 0) {
       canvas.remove();
-      simpleTransition(direction);
+      simpleTransition(direction, myId);
       return;
     }
 
@@ -543,6 +594,12 @@ window.GalleryLightbox = (function() {
     var dissolveDuration = 500;
 
     function animateDissolve(time) {
+      // 检查是否已被取消
+      if (myId !== state.transitionId) {
+        canvas.remove();
+        return;
+      }
+
       var elapsed = time - startTime;
       var progress = Math.min(1, elapsed / dissolveDuration);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -580,6 +637,13 @@ window.GalleryLightbox = (function() {
     }
 
     function animateRebuild(time) {
+      // 检查是否已被取消
+      if (myId !== state.transitionId) {
+        canvas.remove();
+        state.particleAnimId = null;
+        return;
+      }
+
       var elapsed = time - startTime;
       var progress = Math.min(1, elapsed / dissolveDuration);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -599,6 +663,7 @@ window.GalleryLightbox = (function() {
       } else {
         canvas.remove();
         state.particleAnimId = null;
+        endTransition(myId);
       }
     }
 

@@ -979,5 +979,8 @@
   "common.update.checkFailed": "检查更新失败",
   "common.update.downloading": "正在下载更新 ({percent}%)...",
   "common.update.downloaded": "更新已下载，重启后安装",
-  "common.update.restart": "重启并安装更新"
+  "common.update.restart": "重启并安装更新",
+  "common.pwa.install": "安装 Doc77 到桌面，离线也能使用",
+  "common.pwa.installBtn": "安装应用",
+  "common.pwa.offline": "离线模式 — 显示离线缓存内容"
 }

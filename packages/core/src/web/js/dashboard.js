@@ -11,9 +11,20 @@ async function load() {
   // Greeting
   updateGreeting();
 
+  // If no auth token and a password is set, wait for loginGate to handle auth.
+  // Otherwise we race: dashboard load → 401 → reload loop before login finishes.
+  var tok = sessionStorage.getItem('doc77-auth');
+  var legacyTok = tok === '1';
+  var hasLoginGate = !!document.getElementById('loginGate');
+
   // Load projects
   try {
     var r = await fetch('/api/projects');
+    // Don't show error on 401 when loginGate is active
+    if (r.status === 401 && hasLoginGate) {
+      return;
+    }
+    if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
     projects = await r.json();
     document.getElementById('projCount').textContent = projects.length;
     syncHeaderCounts();
@@ -23,8 +34,12 @@ async function load() {
     window.renderStats();
     window.renderRecent();
   } catch(e) {
-    document.getElementById('projGrid').innerHTML =
-      '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">' + t('web.dashboard.loadFailed') + '</div></div>';
+    var hasGate = !!document.getElementById('loginGate');
+    if (!hasGate) {
+      document.getElementById('projGrid').innerHTML =
+        '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">' + t('web.dashboard.loadFailed') + '</div></div>';
+    }
+    // If loginGate exists, it will handle auth; dashboard will refresh after login.
   }
 }
 

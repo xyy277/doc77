@@ -30,10 +30,17 @@
       // A 401 from a non-auth endpoint means the session expired/invalidated.
       if (resp.status === 401 && url.indexOf('/api/auth/') === -1) {
         sessionStorage.removeItem('doc77-auth');
-        // Avoid reload loops on pages that don't run the login gate.
-        if (typeof window.__doc77_noAuthReload === 'undefined' || !window.__doc77_noAuthReload) {
-          location.reload();
+        // If the login gate already exists, just let it handle the login flow
+        // instead of reloading — prevents reload loop when login gate & dashboard load race.
+        var hasLoginGate = document.getElementById('loginGate');
+        if (!hasLoginGate) {
+          // Avoid reload loops on pages that don't run the login gate.
+          if (typeof window.__doc77_noAuthReload === 'undefined' || !window.__doc77_noAuthReload) {
+            location.reload();
+          }
         }
+        // If loginGate exists, let the Login Gate IIFE is in charge of login flow.
+        // No reload needed — the gate is already visible to user.
       }
       return resp;
     });
@@ -908,9 +915,11 @@ async function regenerateRC(){
                 }
               }, 220);
 
-              // Remove gate after all animations
+              // Remove gate after all animations + reload dashboard
+              // (setupPwLegacy also sets the token; load() must run to populate dashboard)
               setTimeout(function() {
                 if (o) o.remove();
+                if (typeof window.load === 'function') window.load();
               }, 700);
             });
           } else {
@@ -977,9 +986,12 @@ async function regenerateRC(){
               }
             }, 220);
 
-            // Remove gate from DOM after all transitions finish
+            // Remove gate from DOM after all transitions finish + reload dashboard
+            // data: load() was called pre-login and 401'd silently. We MUST call
+            // load() after login succeeds so the dashboard populates correctly.
             setTimeout(function() {
               if (o) o.remove();
+              if (typeof window.load === 'function') window.load();
             }, 700);
           } else if (d2.legacyMigration) {
             // Legacy hash was detected — switch to setup form

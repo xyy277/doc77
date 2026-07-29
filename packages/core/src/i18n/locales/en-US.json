@@ -980,5 +980,8 @@
   "common.update.checkFailed": "Update check failed",
   "common.update.downloading": "Downloading update ({percent}%)...",
   "common.update.downloaded": "Update downloaded — restart to install",
-  "common.update.restart": "Restart & Install"
+  "common.update.restart": "Restart & Install",
+  "common.pwa.install": "Install Doc77 to your home screen for offline access",
+  "common.pwa.installBtn": "Install App",
+  "common.pwa.offline": "Offline mode — showing cached content"
 }
