@@ -1,4 +1,4 @@
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express, { type Request, type Response, type NextFunction, type Application } from 'express';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -133,7 +133,7 @@ export function createApp(
     off(event: string, listener: (p: unknown) => void): void;
     emit(event: string, payload: unknown): void;
   },
-) {
+): Application {
   const app = express();
 
   // Sync runtime bind/port to _serverInfo so share URL construction uses correct values
