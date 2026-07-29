@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'vitest';
+// @ts-expect-error - JS file without types
 import TempPreview from '../src/web/js/temp-preview.js';
 
 const { makeTempPath, isTempPath, classifyTempFile, sniffBinary, TEMP_TEXT_LIMIT } =

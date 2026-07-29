@@ -3469,7 +3469,7 @@ export function createApp(
   });
 
   // Cleanup on app close — share manager + mDNS publisher
-  app.on('close', () => {
+  (app as unknown as NodeJS.EventEmitter).on('close', () => {
     shareManager.destroy();
     mdnsService?.destroy();
   });
@@ -4008,7 +4008,7 @@ export function createAIChatHandler(deps: {
 export function createAgentLoopHandler(deps: {
   AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => unknown;
   AgentLoop: new (config: Record<string, unknown>) => {
-    run(sessionId: string, message: string, opts?: { noTools?: boolean }): AsyncIterable<{
+    run(sessionId: string, message: string, opts?: { noTools?: boolean; skipAppendUser?: boolean }): AsyncIterable<{
       type: string; content?: string; name?: string; id?: string; arguments?: string;
       toolName?: string; output?: string; success?: boolean; elapsedMs?: number;
       summary?: string; compactedCount?: number; finishReason?: string;

@@ -79,7 +79,8 @@ export function registerAiMessageRoutes(app: Express): void {
   // Direct children of a message — used to render the branch picker
   // (`[‹] 2/3 [›]`) when a message has multiple variants.
   app.get('/api/ai/sessions/:id/messages/:msgId/children', (req: Request, res: Response) => {
-    const { id: sessionId, msgId } = req.params;
+    const sessionId = req.params.id as string;
+    const msgId = req.params.msgId as string;
     try {
       const msg = getMessage(msgId);
       if (!msg || msg.sessionId !== sessionId) {
@@ -98,7 +99,8 @@ export function registerAiMessageRoutes(app: Express): void {
   // responses/regenerations at the same conversational position.
   // For a root message (no parent), returns just [self].
   app.get('/api/ai/sessions/:id/messages/:msgId/variants', (req: Request, res: Response) => {
-    const { id: sessionId, msgId } = req.params;
+    const sessionId = req.params.id as string;
+    const msgId = req.params.msgId as string;
     try {
       const msg = getMessage(msgId);
       if (!msg || msg.sessionId !== sessionId) {

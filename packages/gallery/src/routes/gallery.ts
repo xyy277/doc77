@@ -45,7 +45,7 @@ function computeSourceHash(
 /** GET /api/gallery/:projectId?path=&sort=name|date|size&order=asc|desc&offset=0&limit=100&types=image,video&paths= */
 export function createGalleryListHandler(thumbnailsDir: string) {
   return async (req: Request, res: Response): Promise<void> => {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(req.params.projectId as string, 10);
     const dirPath = (req.query.path as string) || '';
     const sort = (req.query.sort as string) || 'name';
     const order = (req.query.order as string) || 'asc';
@@ -177,7 +177,7 @@ export function createGalleryListHandler(thumbnailsDir: string) {
 /** GET /api/gallery/timeline/:projectId?path= */
 export function createTimelineHandler() {
   return (req: Request, res: Response): void => {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(req.params.projectId as string, 10);
     const dirPath = (req.query.path as string) || '';
 
     if (isNaN(projectId)) {

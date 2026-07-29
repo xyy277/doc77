@@ -56,10 +56,14 @@
     "tailwindcss": "^4.3.3"
   },
   "peerDependencies": {
-    "@doc77/mcp": "workspace:^"
+    "@doc77/mcp": "workspace:^",
+    "@doc77/ai": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@doc77/mcp": {
+      "optional": true
+    },
+    "@doc77/ai": {
       "optional": true
     }
   }

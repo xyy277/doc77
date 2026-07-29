@@ -140,11 +140,11 @@ function makeRealPersistence(): PersistenceAdapter {
         id: m.id,
         role: m.role,
         content: m.content,
-        parentId: m.parentId ?? undefined,
-        toolCalls: m.toolCalls ?? undefined,
-        toolCallId: m.toolCallId ?? undefined,
-        toolName: m.toolName ?? undefined,
-      })) as unknown as AiMessage[];
+        parentId: m.parentId ?? null,
+        toolCalls: m.toolCalls != null ? String(m.toolCalls) : null,
+        toolCallId: m.toolCallId ?? null,
+        toolName: m.toolName ?? null,
+      }));
     },
     addTokenUsage: () => {
       /* SessionStore tracks via appendMessage; no-op here */
@@ -618,7 +618,7 @@ describe('E2E: Context Compression (Phase 3)', () => {
     const compactedEvent = events.find((e) => e.type === 'context_compacted');
     expect(compactedEvent).toBeTruthy();
     if (compactedEvent) {
-      expect((compactedEvent as { compactedCount: number }).compactedCount).toBeGreaterThan(0);
+      expect((compactedEvent as unknown as { compactedCount: number }).compactedCount).toBeGreaterThan(0);
     }
   });
 

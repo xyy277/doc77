@@ -126,7 +126,7 @@ async function runChat(body: Record<string, unknown>): Promise<ChatResult> {
     send.call(res, chunk);
   };
 
-  await deps.handler({ body }, res);
+  await (deps.handler as (req: { body: Record<string, unknown> }, res: any) => Promise<void>)({ body }, res);
 
   const tokens = events
     .filter((e) => e.event === 'token')

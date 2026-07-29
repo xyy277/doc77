@@ -52,9 +52,7 @@ export function registerPrompts(server: McpServer): void {
 
   server.prompt(
     'summarize-project',
-    {
-      description: '生成项目摘要',
-    },
+    '生成项目摘要',
     async () => ({
       messages: [
         {

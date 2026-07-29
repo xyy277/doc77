@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
 // tabs.js is a UMD browser module; default import gives module.exports
+// @ts-expect-error - JS file without types
 import TabStore from '../src/web/js/tabs.js';
 
 const { createTabStore } = TabStore as {

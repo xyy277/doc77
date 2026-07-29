@@ -52,7 +52,7 @@ describe('Express Server', () => {
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/health`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.status).toBe('ok');
         expect(body.db).toBe('connected');
         expect(body.timestamp).toBeDefined();
@@ -63,7 +63,7 @@ describe('Express Server', () => {
       const app = createApp();
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/health`);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.version).toBeDefined();
       });
     });

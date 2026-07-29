@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -11,11 +11,12 @@ import {
   executeAiWriteTool,
   initI18n,
 } from '@doc77/core';
+import type { AiWriteFns } from '@doc77/core';
 
 beforeAll(() => initI18n('zh-CN'));
 import { createSession } from '../src/session.js';
 import { getPendingTasks, updateTaskStatus } from '../src/queue/index.js';
-import { moveFile, createFolder, deleteFile, batchOperations } from '../src/tools/write.js';
+import { writeFile, moveFile, createFolder, deleteFile, batchOperations } from '../src/tools/write.js';
 import { executeApprovedTasks } from '../src/transaction/executor.js';
 
 /**
@@ -44,7 +45,13 @@ describe('AI → MCP write integration', () => {
     const sessionId = createSession().id;
     ctx = { projectId, sessionId };
     deps = {
-      writeFns: { moveFile, createFolder, deleteFile, batchOperations },
+      writeFns: {
+        writeFile,
+        moveFile,
+        createFolder,
+        deleteFile,
+        batchOperations: batchOperations as unknown as AiWriteFns['batchOperations'],
+      },
       isSensitiveFile,
       getRiskLevel: () => 'high',
     };

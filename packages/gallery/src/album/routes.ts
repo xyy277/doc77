@@ -38,7 +38,7 @@ export function createAlbumCreateHandler() {
 
 export function createAlbumUpdateHandler() {
   return (req: Request, res: Response): void => {
-    const albumId = parseInt(req.params.albumId, 10);
+    const albumId = parseInt(req.params.albumId as string, 10);
     if (isNaN(albumId)) {
       res.status(400).json({ error: 'Invalid album id' });
       return;
@@ -58,7 +58,7 @@ export function createAlbumUpdateHandler() {
 
 export function createAlbumDeleteHandler() {
   return (req: Request, res: Response): void => {
-    const albumId = parseInt(req.params.albumId, 10);
+    const albumId = parseInt(req.params.albumId as string, 10);
     if (isNaN(albumId)) {
       res.status(400).json({ error: 'Invalid album id' });
       return;
@@ -78,7 +78,7 @@ export function createAlbumDeleteHandler() {
 
 export function createAlbumAddItemHandler() {
   return (req: Request, res: Response): void => {
-    const albumId = parseInt(req.params.albumId, 10);
+    const albumId = parseInt(req.params.albumId as string, 10);
     const { project_id, file_path } = req.body;
     if (isNaN(albumId) || !project_id || !file_path) {
       res.status(400).json({ error: 'albumId, project_id, and file_path are required' });
@@ -95,7 +95,7 @@ export function createAlbumAddItemHandler() {
 
 export function createAlbumItemsListHandler() {
   return (req: Request, res: Response): void => {
-    const albumId = parseInt(req.params.albumId, 10);
+    const albumId = parseInt(req.params.albumId as string, 10);
     if (isNaN(albumId)) {
       res.status(400).json({ error: 'Invalid album id' });
       return;
@@ -111,7 +111,7 @@ export function createAlbumItemsListHandler() {
 
 export function createAlbumRemoveItemHandler() {
   return (req: Request, res: Response): void => {
-    const albumId = parseInt(req.params.albumId, 10);
+    const albumId = parseInt(req.params.albumId as string, 10);
     const { project_id, file_path } = req.body;
     if (isNaN(albumId) || !project_id || !file_path) {
       res.status(400).json({ error: 'albumId, project_id, and file_path are required' });

@@ -7,7 +7,7 @@ import { getOrGenerateThumbnail } from '../thumbnail/cache.js';
 /** GET /api/thumbnails/:projectId?path=&size=grid|preview */
 export function createThumbnailHandler(opts: GalleryOptions) {
   return async (req: Request, res: Response): Promise<void> => {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(req.params.projectId as string, 10);
     const filePath = req.query.path as string;
     const size = (req.query.size as string) === 'preview' ? 'preview' : 'grid';
 

@@ -12,6 +12,7 @@ declare module 'sql.js' {
     bind(...params: unknown[]): void;
     step(): boolean;
     get(...params: unknown[]): unknown;
+    getAsObject(): Record<string, unknown>;
     run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
     free(): void;
     reset(): void;
@@ -20,6 +21,7 @@ declare module 'sql.js' {
     run(sql: string, params?: unknown[]): Database;
     exec(sql: string): Array<{ columns: string[]; values: unknown[][] }>;
     prepare(sql: string): Statement;
+    getRowsModified(): number;
     export(): Uint8Array;
     close(): void;
   }
@@ -39,13 +41,14 @@ declare module 'multicast-dns' {
   }
   interface Packet {
     questions?: Array<{ name: string; type: string }>;
-    answers?: Array<{ name: string; type: string; data: string | Buffer }>;
+    answers?: Array<{ name: string; type: string; data: unknown }>;
   }
   type MdnsCallback = (packet: Packet, rinfo: { address: string; port: number }) => void;
   class MulticastDNS {
     constructor(opts?: MdnsOptions);
     on(event: 'query' | 'response' | 'ready' | 'warning', cb: MdnsCallback | ((err: Error) => void)): this;
     query(questions: unknown, cb?: () => void): void;
+    respond(packet: Packet): void;
     destroy(): void;
   }
   export default function createMdns(opts?: MdnsOptions): MulticastDNS;
