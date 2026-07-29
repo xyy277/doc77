@@ -6,7 +6,7 @@
   <a href="https://github.com/xyy277/doc77/actions"><img src="https://github.com/xyy277/doc77/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/idoc77"><img src="https://img.shields.io/npm/v/idoc77" alt="npm"></a>
   <a href="https://github.com/xyy277/doc77/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg" alt="Node"></a>
   <a href="https://github.com/xyy277/doc77/blob/main/README.md"><img src="https://img.shields.io/badge/lang-en-red.svg" alt="English"></a>
   <a href="https://github.com/xyy277/doc77/blob/main/README.zh-CN.md"><img src="https://img.shields.io/badge/lang-zh--CN-green.svg" alt="简体中文"></a>
 </p>

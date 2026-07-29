@@ -6,7 +6,7 @@
   <a href="https://github.com/xyy277/doc77/actions"><img src="https://github.com/xyy277/doc77/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/idoc77"><img src="https://img.shields.io/npm/v/idoc77" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg" alt="Node"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/lang-en-red.svg" alt="English"></a>
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/lang-zh--CN-green.svg" alt="简体中文"></a>
 </p>
@@ -295,6 +295,65 @@ doc77/
 ├── README.md          # 英文 · English
 └── README.zh-CN.md    # 中文 · 简体中文
 ```
+
+## 参与开发
+
+欢迎参与 Doc77 的开发！下面是本地搭建与提交代码的完整流程。
+
+### 环境要求
+
+| 工具 | 版本 |
+|---|---|
+| Node.js | >= 22.x |
+| pnpm | >= 9.x（用 `npm i -g pnpm` 安装） |
+| Git | 任意较新版本 |
+
+### 本地搭建
+
+```bash
+git clone https://github.com/xyy277/doc77.git
+cd doc77
+pnpm install            # 安装依赖（首次会构建各 package 的 dist）
+pnpm build              # 构建全部 package
+```
+
+### 常用脚本
+
+| 命令 | 说明 |
+|---|---|
+| `pnpm dev` | 启动 `@doc77/core` 开发服务器（热重载，端口 27777） |
+| `pnpm dev:start` | 构建 CLI 及其依赖后启动完整应用（`--bind 0.0.0.0`，端口 27777） |
+| `pnpm dev:restart` | 等同于 `dev:start`，用于重启应用 |
+| `pnpm dev-electron` | 启动 Electron 桌面版开发模式 |
+| `pnpm build` | 构建全部 package 并同步版本号 |
+| `pnpm test` | 运行 Vitest 测试套件 |
+| `pnpm lint` | ESLint 检查 |
+| `pnpm format:check` | Prettier 格式检查 |
+| `pnpm check:i18n` | 校验中英文 i18n 文案键一致性 |
+
+### 分支与提交流程
+
+`main` 分支受 **GitHub Rulesets** 保护：
+
+- ❌ 禁止直接向 `main` 推送
+- ❌ 禁止 force push / 删除 `main`
+- ✅ 必须通过 Pull Request 合入
+- ✅ 合并前以下 CI 检查必须全部通过：`Lint & Format Check`、`Build`、`Test (Node 22 on ubuntu/macos/windows-latest)`
+- ✅ 建议 Squash merge 保持提交历史线性
+
+推荐工作流：
+
+1. 从 `main` 切出功能分支：`git checkout -b feat/your-feature`
+2. 本地自测：`pnpm lint && pnpm format:check && pnpm test`
+3. 提交（建议遵循 Conventional Commits，如 `fix(web): ...`、`feat(core): ...`）
+4. 推送分支：`git push -u origin feat/your-feature`
+5. 在 GitHub 开 PR 到 `main`，等 CI 全绿后合并
+
+### 代码规范
+
+- 详细约定见 [CLAUDE.md](CLAUDE.md)
+- TypeScript 严格模式，提交前确保 `pnpm build` 通过
+- i18n 文案需同步更新 `zh-CN.json` 与 `en-US.json`，并提交前跑 `pnpm check:i18n`
 
 ## 隐私与安全
 
