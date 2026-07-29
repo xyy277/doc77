@@ -19,12 +19,21 @@ window.GalleryLightbox = (function() {
     playing: false,
     playInterval: null,
     playSpeed: 4000,
-    // Transition effect
-    transitionEffect: (function(){ try { return localStorage.getItem('doc77-gallery-transition-effect') || 'dissolve'; } catch(e) { return 'dissolve'; } })(),
+    // Transition effect — 'crossfade' is the default (GPU-accelerated, Apple Photos style).
+    // One-time migration: users with the old 'dissolve' default are migrated to 'crossfade'.
+    transitionEffect: (function(){ try {
+      var saved = localStorage.getItem('doc77-gallery-transition-effect');
+      if (!saved || saved === 'dissolve') { localStorage.setItem('doc77-gallery-transition-effect', 'crossfade'); return 'crossfade'; }
+      return saved;
+    } catch(e) { return 'crossfade'; } })(),
     // Particle canvas
     particleCanvas: null,
     particleCtx: null,
     particleAnimId: null,
+    // Transition control
+    transitionId: 0,
+    isTransitioning: false,
+    lastTransitionTime: 0,
   };
 
   /**
@@ -49,6 +58,10 @@ window.GalleryLightbox = (function() {
     state.visible = false;
     stopSlideshow();
     resetZoom();
+    // Clean up any in-progress particle animation to prevent leaks
+    if (state.particleAnimId) { cancelAnimationFrame(state.particleAnimId); state.particleAnimId = null; }
+    var particleCanvas = document.getElementById('lb-particle-canvas');
+    if (particleCanvas) particleCanvas.remove();
     const lb = document.getElementById('galleryLightbox');
     if (lb) {
       lb.style.opacity = '0';
@@ -399,47 +412,134 @@ window.GalleryLightbox = (function() {
 
   // ═══════════ Transition Effects ═══════════
   function doTransition(direction) {
+    // 防抖：防止快速按键触发多个过渡
+    const now = Date.now();
+    if (now - state.lastTransitionTime < 300) {
+      return; // 忽略快速按键
+    }
+    state.lastTransitionTime = now;
+
+    // 递增过渡 ID，取消之前的过渡
+    const myId = ++state.transitionId;
+
+    // 取消任何现有的粒子动画
+    if (state.particleAnimId) {
+      cancelAnimationFrame(state.particleAnimId);
+      state.particleAnimId = null;
+    }
+
+    // 移除任何现有的粒子 canvas
+    const existingCanvas = document.getElementById('lb-particle-canvas');
+    if (existingCanvas) {
+      existingCanvas.remove();
+    }
+
+    state.isTransitioning = true;
+
     switch (state.transitionEffect) {
-      case 'dissolve': particleTransition(direction); break;
-      case 'fade': fadeTransition(direction); break;
-      case 'slide': slideTransition(direction); break;
-      default: simpleTransition(direction); break;
+      case 'crossfade': crossfadeKenBurns(direction, myId); break;
+      case 'dissolve': particleTransition(direction, myId); break;
+      case 'fade': fadeTransition(direction, myId); break;
+      case 'slide': slideTransition(direction, myId); break;
+      default: simpleTransition(direction, myId); break;
     }
   }
 
-  function simpleTransition(direction) {
-    resetZoom();
-    nav(direction);
+  function endTransition(myId) {
+    if (myId === state.transitionId) {
+      state.isTransitioning = false;
+    }
   }
 
-  function fadeTransition(direction) {
+  /**
+   * GPU-accelerated crossfade + Ken Burns slow zoom.
+   * Uses only CSS opacity + transform (composited on GPU, zero per-frame JS).
+   * Inspired by Apple Photos / Google Photos transitions.
+   */
+  function crossfadeKenBurns(direction, myId) {
+    resetZoom();
+    var img = document.getElementById('lb-image');
+    if (!img) { simpleTransition(direction, myId); return; }
+
+    // Phase 1: fade current image out + slight zoom
+    img.style.transition = 'opacity 0.28s ease, transform 0.28s ease';
+    img.style.opacity = '0';
+    img.style.transform = 'scale(1.03)';
+
+    setTimeout(function () {
+      // 检查是否已被取消
+      if (myId !== state.transitionId) return;
+
+      // Switch to the next image
+      nav(direction);
+
+      // Phase 2: start new image invisible + slightly larger
+      img.style.transition = 'none';
+      img.style.opacity = '0';
+      img.style.transform = 'scale(1.04)';
+
+      // Force reflow so the transition actually runs
+      void img.offsetWidth;
+
+      // Animate in: fade + slow Ken Burns zoom over 4s
+      img.style.transition = 'opacity 0.4s ease, transform 4s linear';
+      img.style.opacity = '1';
+      img.style.transform = 'scale(1)';
+
+      // Clear the slow zoom after fade completes so manual zoom/pan works
+      setTimeout(function () {
+        if (myId !== state.transitionId) return;
+        img.style.transition = '';
+        endTransition(myId);
+      }, 450);
+    }, 280);
+  }
+
+  function simpleTransition(direction, myId) {
+    resetZoom();
+    nav(direction);
+    endTransition(myId);
+  }
+
+  function fadeTransition(direction, myId) {
     resetZoom();
     var img = document.getElementById('lb-image');
     if (img) { img.style.opacity = '0'; img.style.transition = 'opacity 0.3s'; }
     setTimeout(function() {
+      if (myId !== state.transitionId) return;
       nav(direction);
-      if (img) { img.style.opacity = '1'; setTimeout(function() { img.style.transition = ''; }, 350); }
+      if (img) { img.style.opacity = '1'; setTimeout(function() {
+        if (myId !== state.transitionId) return;
+        img.style.transition = '';
+        endTransition(myId);
+      }, 350); }
     }, 300);
   }
 
-  function slideTransition(direction) {
+  function slideTransition(direction, myId) {
     resetZoom();
     var img = document.getElementById('lb-image');
     if (img) { img.style.transform = 'translateX(' + (direction * 60) + 'px)'; img.style.opacity = '0'; img.style.transition = 'transform 0.3s, opacity 0.3s'; }
     setTimeout(function() {
+      if (myId !== state.transitionId) return;
       nav(direction);
       if (img) { img.style.transform = 'translateX(' + (-direction * 20) + 'px)'; img.style.opacity = '0.7'; }
       requestAnimationFrame(function() {
-        if (img) { img.style.transform = 'translateX(0)'; img.style.opacity = '1'; setTimeout(function() { img.style.transition = ''; }, 350); }
+        if (myId !== state.transitionId) return;
+        if (img) { img.style.transform = 'translateX(0)'; img.style.opacity = '1'; setTimeout(function() {
+          if (myId !== state.transitionId) return;
+          img.style.transition = '';
+          endTransition(myId);
+        }, 350); }
       });
     }, 300);
   }
 
-  function particleTransition(direction) {
+  function particleTransition(direction, myId) {
     resetZoom();
     var img = document.getElementById('lb-image');
     var area = document.getElementById('lightbox-content-area');
-    if (!img || !area) { simpleTransition(direction); return; }
+    if (!img || !area) { simpleTransition(direction, myId); return; }
 
     // Create canvas overlay
     var canvas = document.createElement('canvas');
@@ -485,7 +585,7 @@ window.GalleryLightbox = (function() {
 
     if (particles.length === 0) {
       canvas.remove();
-      simpleTransition(direction);
+      simpleTransition(direction, myId);
       return;
     }
 
@@ -494,6 +594,12 @@ window.GalleryLightbox = (function() {
     var dissolveDuration = 500;
 
     function animateDissolve(time) {
+      // 检查是否已被取消
+      if (myId !== state.transitionId) {
+        canvas.remove();
+        return;
+      }
+
       var elapsed = time - startTime;
       var progress = Math.min(1, elapsed / dissolveDuration);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -531,6 +637,13 @@ window.GalleryLightbox = (function() {
     }
 
     function animateRebuild(time) {
+      // 检查是否已被取消
+      if (myId !== state.transitionId) {
+        canvas.remove();
+        state.particleAnimId = null;
+        return;
+      }
+
       var elapsed = time - startTime;
       var progress = Math.min(1, elapsed / dissolveDuration);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -550,6 +663,7 @@ window.GalleryLightbox = (function() {
       } else {
         canvas.remove();
         state.particleAnimId = null;
+        endTransition(myId);
       }
     }
 
@@ -616,7 +730,7 @@ window.GalleryLightbox = (function() {
       + '      <option value="2000">2s</option><option value="4000" selected>4s</option><option value="6000">6s</option><option value="10000">10s</option>'
       + '    </select>'
       + '    <select id="lb-effect-select" class="bg-black/30 text-white/80 text-xs rounded px-2 py-1 border border-white/20 focus:outline-none" onchange="GalleryLightbox.setTransitionEffect(this.value)" title="Transition">'
-      + '      <option value="dissolve">Particles</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="none">None</option>'
+      + '      <option value="crossfade">Crossfade</option><option value="dissolve">Particles</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="none">None</option>'
       + '    </select>'
       + '    <div class="w-px h-5 bg-white/20 mx-1"></div>'
       + '    <button class="text-white hover:text-doc77-300 p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-sm transition-all" title="Download">'

@@ -15,5 +15,11 @@ export default defineConfig({
     pool: 'forks',
     testTimeout: 60000,
     hookTimeout: 60000,
+    // Externalize native modules that vitest's SSR transform cannot handle
+    server: {
+      deps: {
+        external: ['sharp'],
+      },
+    },
   },
 });

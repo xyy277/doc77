@@ -2,16 +2,19 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { t } from '@doc77/core';
 
+/** Authorization scope for auto-approval of write operations. */
+export interface Authorization {
+  scope: 'all' | 'write' | 'delete';
+  granted_at: number;
+  duration_minutes: number; // 0 = session
+}
+
 /** Session-level agent configuration. */
 export interface SessionConfig {
   mode: 'manual' | 'auto';
   risk_level: 'low' | 'medium' | 'high';
   /** If set, write ops within scope are auto-approved until expiry. */
-  authorization?: {
-    scope: 'all' | 'write' | 'delete';
-    granted_at: number;
-    duration_minutes: number; // 0 = session
-  };
+  authorization?: Authorization;
 }
 
 const configStore = new Map<string, SessionConfig>();

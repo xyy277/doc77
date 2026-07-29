@@ -5,12 +5,12 @@
  *
  * ==========  OPT-IN (env-gated)  ============
  * Skipped entirely unless env vars are set:
- *   export DOC77_LLM_URL=http://172.22.128.66:8081/v1
- *   export DOC77_LLM_MODEL=qwen3.5-122b
+ *   export DOC77_LLM_URL=http://192.168.110.39:1234/v1
+ *   export DOC77_LLM_MODEL=qwen2.5-7b-instruct
  *   npx vitest run packages/ai/__tests__/live-e2e.test.ts
  *
  * ==========  LOCAL MODEL OPTIMIZATIONS  ======
- * - Timeout: 600s per case (Qwen 122B-A10B @ ~1.2-1.8 tok/s)
+ * - Timeout: 600s per case (兼容慢速本地模型)
  * - max_tokens: 4096 (model default, leaves room for reasoning_content)
  * - NO second system message (this model rejects multi-system-msg)
  * - Context injected into user message, NOT via addContext()
@@ -60,7 +60,7 @@ import {
 
 // ── Env gating ──────────────────────────────────────────────
 const LLM_URL = process.env.DOC77_LLM_URL;
-const LLM_MODEL = process.env.DOC77_LLM_MODEL || 'qwen3.5-122b';
+const LLM_MODEL = process.env.DOC77_LLM_MODEL || 'qwen2.5-7b-instruct';
 const suite = LLM_URL ? describe : describe.skip;
 
 // ── Constants ────────────────────────────────────────────────
@@ -126,7 +126,7 @@ async function runChat(body: Record<string, unknown>): Promise<ChatResult> {
     send.call(res, chunk);
   };
 
-  await deps.handler({ body }, res);
+  await (deps.handler as (req: { body: Record<string, unknown> }, res: any) => Promise<void>)({ body }, res);
 
   const tokens = events
     .filter((e) => e.event === 'token')

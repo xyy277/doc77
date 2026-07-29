@@ -4,6 +4,25 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { readFile, statFile, listDir, isSensitiveFile, validatePath } from '../src/fs/index.js';
 
+/**
+ * Check if the current process has privileges to create symlinks.
+ * On Windows, this requires administrator privileges or Developer Mode enabled.
+ * On Unix, it's always allowed (subject to filesystem permissions).
+ */
+function canCreateSymlinks(): boolean {
+  try {
+    const testLink = path.join(os.tmpdir(), `doc77-symlink-probe-${Date.now()}`);
+    const testTarget = path.join(os.tmpdir(), `doc77-symlink-target-${Date.now()}`);
+    fs.mkdirSync(testTarget, { recursive: true });
+    fs.symlinkSync(testTarget, testLink);
+    fs.rmSync(testLink, { force: true });
+    fs.rmSync(testTarget, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe('File system abstraction', () => {
   let testDir: string;
 
@@ -123,13 +142,24 @@ describe('File system abstraction', () => {
     });
 
     it('should resolve symlinks and reject if outside root', () => {
+      // Skip on Windows non-admin: symlink creation requires elevated privileges
+      if (process.platform === 'win32' && !canCreateSymlinks()) {
+        console.warn('Skipping symlink test: Windows requires admin privileges to create symlinks');
+        return;
+      }
       // Create a symlink inside testDir pointing outside
       const symlinkPath = path.join(testDir, 'escape-link');
-      fs.symlinkSync('/etc', symlinkPath);
+      const outsideTarget = process.platform === 'win32' ? 'C:\\Windows' : '/etc';
+      fs.symlinkSync(outsideTarget, symlinkPath);
       expect(() => validatePath(testDir, 'escape-link/passwd')).toThrow();
     });
 
     it('should accept paths when the project root itself is a symlink (macOS /var → /private/var)', () => {
+      // Skip on Windows non-admin: symlink creation requires elevated privileges
+      if (process.platform === 'win32' && !canCreateSymlinks()) {
+        console.warn('Skipping symlink test: Windows requires admin privileges to create symlinks');
+        return;
+      }
       // Reproduces the macOS os.tmpdir() symlink condition on any OS via an explicit symlink:
       // the root is a symlink to a real dir; validatePath must canonicalize the root before comparing.
       const realRoot = path.join(os.tmpdir(), `doc77-realroot-${Date.now()}`);

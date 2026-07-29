@@ -8,6 +8,13 @@
 <title data-i18n="web.index.title">Doc77 — Local Document Preview &amp; Management</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1e293b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Doc77">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
@@ -30,6 +37,10 @@
         <span class="gallery-logo-icon">77</span>
         <span data-i18n="web.index.gallery">Gallery</span>
       </button>
+      <a href="/ai" class="gallery-logo-btn" style="text-decoration:none" data-i18n-title="web.index.aiWorkspace" title="AI Workspace">
+        <span style="font-size:14px">🤖</span>
+        <span data-i18n="web.index.aiWorkspace">AI</span>
+      </a>
       <span class="header-status"><span class="header-dot pulse"></span><span data-i18n="web.index.status.running">Running</span></span>
       <span class="version-badge" id="versionBadge" data-i18n-title="web.index.status.loading" title="Loading...">--</span>
       <div class="header-actions">
@@ -260,6 +271,7 @@
 </div>
 
 <script src="js/common.js"></script>
+<script src="js/search.js"></script>
 <script src="js/stats.js"></script>
 <script src="js/favorites.js"></script>
 <script src="js/discover.js"></script>

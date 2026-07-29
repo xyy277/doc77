@@ -59,30 +59,33 @@ export function performShadowBackup(
         break;
       }
       case 'move_file': {
-        if (op.source && op.target) {
+        const src = op.source as string;
+        const tgt = op.target as string;
+        if (src && tgt) {
           undoLog.push({
             type: 'move_file',
-            source: op.source,
-            target: op.target,
+            source: src,
+            target: tgt,
           });
         }
         break;
       }
       case 'copy_file': {
         // Source is not modified; back up target if it exists
-        if (op.target) {
-          const absTarget = path.join(projectRoot, op.target);
+        const copyTarget = op.target as string;
+        if (copyTarget) {
+          const absTarget = path.join(projectRoot, copyTarget);
           if (fs.existsSync(absTarget)) {
-            const shadowName = `op${i}_${path.basename(op.target)}`;
+            const shadowName = `op${i}_${path.basename(copyTarget)}`;
             const shadowPath = path.join(shadowDir, shadowName);
             fs.copyFileSync(absTarget, shadowPath);
             undoLog.push({
               type: 'copy_file',
-              originalPath: op.target,
+              originalPath: copyTarget,
               shadowPath,
             });
           } else {
-            undoLog.push({ type: 'copy_file', originalPath: op.target });
+            undoLog.push({ type: 'copy_file', originalPath: copyTarget });
           }
         }
         break;
@@ -170,9 +173,18 @@ export function rollbackFromShadow(undoLog: UndoLog, projectRoot: string, shadow
   }
 
   // Clean up shadow directory
-  try {
-    fs.rmSync(shadowDir, { recursive: true, force: true });
-  } catch {
-    /* ignore */
+  // On Windows, file handles may linger briefly after rename/copy operations,
+  // causing rmSync to fail with EPERM. Retry with backoff to handle this.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      fs.rmSync(shadowDir, { recursive: true, force: true });
+      break;
+    } catch {
+      if (attempt < 2) {
+        // Brief pause before retry (only when actually retrying)
+        const start = Date.now();
+        while (Date.now() - start < 50 * (attempt + 1)) { /* busy-wait */ }
+      }
+    }
   }
 }

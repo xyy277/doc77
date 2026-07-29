@@ -1,13 +1,4 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src"],
-  "references": [
-    { "path": "../core" },
-    { "path": "../mcp" },
-    { "path": "../ai" }
-  ]
+  "include": ["src", "__tests__", "../../types/external-modules.d.ts"]
 }

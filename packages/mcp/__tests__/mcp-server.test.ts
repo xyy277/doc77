@@ -68,9 +68,9 @@ describe('MCP Read-only Tools', () => {
       const files = await listFilesImpl(projectId, '');
       const readme = files.find((f: { name: string }) => f.name === 'README.md');
       expect(readme).toBeDefined();
-      expect(readme.type).toBe('file');
-      expect(readme.size).toBeGreaterThan(0);
-      expect(readme.modified).toBeDefined();
+      expect(readme!.type).toBe('file');
+      expect(readme!.size).toBeGreaterThan(0);
+      expect(readme!.modified).toBeDefined();
     });
 
     it('should filter sensitive files', async () => {
@@ -270,7 +270,10 @@ describe('MCP Read-only Tools', () => {
       } catch {
         /* ignore */
       }
-      fs.rmSync(testDir2, { recursive: true, force: true });
+      // Guard against undefined testDir2 (e.g. when beforeEach fails before assignment)
+      if (testDir2) {
+        fs.rmSync(testDir2, { recursive: true, force: true });
+      }
     });
 
     it('should support depth=0 (unlimited recursion)', async () => {
@@ -318,7 +321,7 @@ describe('MCP Read-only Tools', () => {
 // Direct implementations for testing (bypass MCP protocol)
 import { scanDirectory } from '@doc77/core';
 import { readFile, validatePath, isSensitiveFile } from '@doc77/core';
-import { getConnection, registerProject } from '@doc77/core';
+import { getConnection } from '@doc77/core';
 import {
   listFiles as listFilesEnhanced,
   readFileContent as readFileContentEnhanced,

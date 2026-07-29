@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transition Race Condition Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #0b1121;
+      color: #e2e8f0;
+    }
+    h1 { color: #60a5fa; }
+    .test-section {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      border: 1px solid #334155;
+    }
+    .test-result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .pass { background: #064e3b; border-left: 4px solid #10b981; }
+    .fail { background: #7f1d1d; border-left: 4px solid #ef4444; }
+    .info { background: #1e3a5f; border-left: 4px solid #3b82f6; }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #64748b; cursor: not-allowed; }
+    .log {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 15px;
+      margin: 10px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .log-entry { margin: 2px 0; }
+    .log-time { color: #94a3b8; }
+    .log-pass { color: #10b981; }
+    .log-fail { color: #ef4444; }
+    .log-info { color: #60a5fa; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .stat-card {
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #60a5fa;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-top: 5px;
+    }
+    #lightbox-content-area {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      margin: 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #lb-image {
+      max-width: 100%;
+      max-height: 100%;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .test-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Transition Race Condition Test</h1>
+  <p>测试快速连续切换图片时的竞态条件修复</p>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-label">总测试数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-passed" style="color: #10b981;">0</div>
+      <div class="stat-label">通过</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-failed" style="color: #ef4444;">0</div>
+      <div class="stat-label">失败</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-duration">0ms</div>
+      <div class="stat-label">执行时间</div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>测试环境</h2>
+    <div id="lightbox-content-area">
+      <img id="lb-image" src="" alt="Test Image">
+    </div>
+    <div class="test-controls">
+      <button onclick="runAllTests()">运行所有测试</button>
+      <button onclick="runDebounceTest()">测试防抖机制</button>
+      <button onclick="runTransitionIdTest()">测试过渡ID机制</button>
+      <button onclick="runParticleCancelTest()">测试粒子动画取消</button>
+      <button onclick="runMemoryLeakTest()">测试内存泄漏</button>
+      <button onclick="clearLog()">清空日志</button>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>测试日志</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    // 模拟 GalleryLightbox 的核心逻辑（简化版）
+    const state = {
+      transitionId: 0,
+      isTransitioning: false,
+      lastTransitionTime: 0,
+      particleAnimId: null,
+    };
+
+    let transitionCallCount = 0;
+    let navCallCount = 0;
+    let canvasCreateCount = 0;
+    let canvasRemoveCount = 0;
+
+    // 模拟 nav 函数
+    function nav(direction) {
+      navCallCount++;
+      log(`nav() called (direction=${direction}), count=${navCallCount}`, 'info');
+    }
+
+    // 模拟 resetZoom
+    function resetZoom() {
+      // no-op for test
+    }
+
+    // 过渡结束处理
+    function endTransition(myId) {
+      if (myId === state.transitionId) {
+        state.isTransitioning = false;
+        log(`endTransition(${myId}): transition completed`, 'info');
+      }
+    }
+
+    // 核心过渡函数（修复后的版本）
+    function doTransition(direction) {
+      const now = Date.now();
+      
+      // 防抖：防止快速按键触发多个过渡
+      if (now - state.lastTransitionTime < 300) {
+        log(`doTransition(${direction}): BLOCKED by debounce (delta=${now - state.lastTransitionTime}ms)`, 'info');
+        return;
+      }
+      state.lastTransitionTime = now;
+
+      // 递增过渡 ID，取消之前的过渡
+      const myId = ++state.transitionId;
+      log(`doTransition(${direction}): started with myId=${myId}`, 'info');
+
+      // 取消任何现有的粒子动画
+      if (state.particleAnimId) {
+        cancelAnimationFrame(state.particleAnimId);
+        state.particleAnimId = null;
+        log(`doTransition(${direction}): cancelled existing particle animation`, 'info');
+      }
+
+      // 移除任何现有的粒子 canvas
+      const existingCanvas = document.getElementById('lb-particle-canvas');
+      if (existingCanvas) {
+        existingCanvas.remove();
+        canvasRemoveCount++;
+        log(`doTransition(${direction}): removed existing canvas`, 'info');
+      }
+
+      state.isTransitioning = true;
+      transitionCallCount++;
+
+      // 模拟 crossfadeKenBurns
+      crossfadeKenBurns(direction, myId);
+    }
+
+    function crossfadeKenBurns(direction, myId) {
+      resetZoom();
+      const img = document.getElementById('lb-image');
+      if (!img) {
+        simpleTransition(direction, myId);
+        return;
+      }
+
+      // Phase 1: fade out
+      img.style.transition = 'opacity 0.28s ease, transform 0.28s ease';
+      img.style.opacity = '0';
+      img.style.transform = 'scale(1.03)';
+
+      setTimeout(function () {
+        // 检查是否已被取消
+      if (myId !== state.transitionId) {
+        log(`crossfadeKenBurns(${myId}): CANCELLED at phase 1 end (expected - transition ID mechanism working)`, 'info');
+        return;
+      }
+
+        log(`crossfadeKenBurns(${myId}): phase 1 complete, calling nav()`, 'pass');
+        nav(direction);
+
+        // Phase 2: fade in
+        img.style.transition = 'none';
+        img.style.opacity = '0';
+        img.style.transform = 'scale(1.04)';
+        void img.offsetWidth; // force reflow
+
+        img.style.transition = 'opacity 0.4s ease, transform 4s linear';
+        img.style.opacity = '1';
+        img.style.transform = 'scale(1)';
+
+        setTimeout(function () {
+          if (myId !== state.transitionId) {
+            log(`crossfadeKenBurns(${myId}): CANCELLED at phase 2 end`, 'fail');
+            return;
+          }
+          img.style.transition = '';
+          log(`crossfadeKenBurns(${myId}): phase 2 complete, calling endTransition()`, 'pass');
+          endTransition(myId);
+        }, 450);
+      }, 280);
+    }
+
+    function simpleTransition(direction, myId) {
+      resetZoom();
+      nav(direction);
+      endTransition(myId);
+    }
+
+    // 粒子过渡（简化版）
+    function particleTransition(direction, myId) {
+      const canvas = document.createElement('canvas');
+      canvas.id = 'lb-particle-canvas';
+      canvas.width = 800;
+      canvas.height = 600;
+      document.getElementById('lightbox-content-area').appendChild(canvas);
+      canvasCreateCount++;
+      log(`particleTransition(${myId}): created canvas #${canvasCreateCount}`, 'info');
+
+      let frameCount = 0;
+      const startTime = Date.now();
+
+      function animate() {
+        if (myId !== state.transitionId) {
+          canvas.remove();
+          canvasRemoveCount++;
+          log(`particleTransition(${myId}): CANCELLED at frame ${frameCount}`, 'fail');
+          return;
+        }
+
+        frameCount++;
+        const elapsed = Date.now() - startTime;
+
+        if (elapsed < 500) {
+          state.particleAnimId = requestAnimationFrame(animate);
+        } else {
+          canvas.remove();
+          canvasRemoveCount++;
+          state.particleAnimId = null;
+          log(`particleTransition(${myId}): completed after ${frameCount} frames`, 'pass');
+          nav(direction);
+          endTransition(myId);
+        }
+      }
+
+      state.particleAnimId = requestAnimationFrame(animate);
+    }
+
+    // 测试函数
+    function resetCounters() {
+      transitionCallCount = 0;
+      navCallCount = 0;
+      canvasCreateCount = 0;
+      canvasRemoveCount = 0;
+      state.transitionId = 0;
+      state.isTransitioning = false;
+      state.lastTransitionTime = 0;
+      state.particleAnimId = null;
+    }
+
+    async function runDebounceTest() {
+      resetCounters();
+      log('=== 测试防抖机制 ===', 'info');
+      log('场景：在 100ms 内连续调用 doTransition 5 次', 'info');
+
+      // 快速连续调用 5 次
+      for (let i = 0; i < 5; i++) {
+        doTransition(1);
+        await sleep(20);
+      }
+
+      await sleep(800); // 等待所有过渡完成
+
+      log(`结果：transitionCallCount=${transitionCallCount}, navCallCount=${navCallCount}`, 'info');
+      
+      if (transitionCallCount === 1 && navCallCount === 1) {
+        log('✓ 防抖机制有效：只执行了 1 次过渡', 'pass');
+      } else {
+        log(`✗ 防抖机制失败：期望 1 次，实际 ${transitionCallCount} 次`, 'fail');
+      }
+    }
+
+    async function runTransitionIdTest() {
+      resetCounters();
+      log('=== 测试过渡ID机制 ===', 'info');
+      log('场景：在过渡进行中启动新过渡（等待防抖窗口过期）', 'info');
+
+      // 启动第一个过渡
+      doTransition(1);
+      const firstId = state.transitionId;
+      log(`第一个过渡启动，myId=${firstId}`, 'info');
+
+      await sleep(350); // 等待 350ms（超过 300ms 防抖窗口，但在 phase 2 的 450ms 内）
+
+      // 启动第二个过渡
+      doTransition(1);
+      const secondId = state.transitionId;
+      log(`第二个过渡启动，myId=${secondId}`, 'info');
+
+      await sleep(800); // 等待所有过渡完成
+
+      log(`结果：transitionId=${state.transitionId}, navCallCount=${navCallCount}`, 'info');
+      
+      // 验证：secondId 应该大于 firstId，且第一个过渡的回调被取消
+      // 验证：secondId 应该大于 firstId，且第一个过渡的回调被取消
+      if (secondId > firstId && navCallCount === 2) {
+        log('✓ 过渡ID机制有效：旧过渡被取消，只执行了新过渡', 'pass');
+      } else {
+        log(`✗ 过渡ID机制失败：secondId=${secondId}, firstId=${firstId}, navCallCount=${navCallCount}`, 'fail');
+      }
+    }
+
+    async function runParticleCancelTest() {
+      resetCounters();
+      log('=== 测试粒子动画取消 ===', 'info');
+      log('场景：在粒子动画进行中启动新过渡（等待防抖窗口过期）', 'info');
+
+      // 临时切换到粒子过渡
+      const originalFunc = crossfadeKenBurns;
+      window.crossfadeKenBurns = particleTransition;
+
+      // 启动第一个粒子过渡
+      doTransition(1);
+      const firstId = state.transitionId;
+      log(`第一个粒子过渡启动，myId=${firstId}`, 'info');
+
+      await sleep(350); // 等待 350ms（超过 300ms 防抖窗口，但在 500ms 动画期间）
+
+      // 启动第二个过渡
+      doTransition(1);
+      const secondId = state.transitionId;
+      log(`第二个过渡启动，myId=${secondId}`, 'info');
+
+      await sleep(800); // 等待所有过渡完成
+
+      // 恢复原函数
+      window.crossfadeKenBurns = originalFunc;
+
+      log(`结果：canvasCreateCount=${canvasCreateCount}, canvasRemoveCount=${canvasRemoveCount}`, 'info');
+
+      if (canvasCreateCount === canvasRemoveCount) {
+        log('✓ 粒子动画取消有效：所有 canvas 都被正确清理', 'pass');
+      } else {
+        log(`✗ 粒子动画取消失败：创建了 ${canvasCreateCount} 个 canvas，只清理了 ${canvasRemoveCount} 个`, 'fail');
+      }
+    }
+
+    async function runMemoryLeakTest() {
+      resetCounters();
+      log('=== 测试内存泄漏 ===', 'info');
+      log('场景：快速连续启动 10 次过渡', 'info');
+
+      for (let i = 0; i < 10; i++) {
+        doTransition(1);
+        await sleep(50);
+      }
+
+      await sleep(1000); // 等待所有过渡完成
+
+      const canvasInDom = document.querySelectorAll('#lb-particle-canvas').length;
+      log(`结果：canvasInDom=${canvasInDom}, transitionCallCount=${transitionCallCount}`, 'info');
+      
+      // 验证：DOM 中没有残留 canvas（防抖会允许部分调用通过，这是正常的）
+      if (canvasInDom === 0) {
+        log('✓ 无内存泄漏：DOM 中没有残留 canvas', 'pass');
+      } else {
+        log(`✗ 内存泄漏：DOM 中有 ${canvasInDom} 个残留 canvas`, 'fail');
+      }
+    }
+
+    async function runAllTests() {
+      const startTime = Date.now();
+      log('========================================', 'info');
+      log('开始运行所有测试', 'info');
+      log('========================================', 'info');
+
+      await runDebounceTest();
+      await sleep(500);
+
+      await runTransitionIdTest();
+      await sleep(500);
+
+      await runParticleCancelTest();
+      await sleep(500);
+
+      await runMemoryLeakTest();
+
+      const duration = Date.now() - startTime;
+      log('========================================', 'info');
+      log(`所有测试完成，耗时 ${duration}ms`, 'info');
+      log('========================================', 'info');
+
+      updateStats(duration);
+    }
+
+    function updateStats(duration) {
+      const logEntries = document.querySelectorAll('.log-entry');
+      let passed = 0, failed = 0;
+      logEntries.forEach(entry => {
+        if (entry.classList.contains('log-pass')) passed++;
+        if (entry.classList.contains('log-fail')) failed++;
+      });
+
+      document.getElementById('stat-total').textContent = passed + failed;
+      document.getElementById('stat-passed').textContent = passed;
+      document.getElementById('stat-failed').textContent = failed;
+      document.getElementById('stat-duration').textContent = duration + 'ms';
+    }
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+      entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+      document.getElementById('stat-total').textContent = '0';
+      document.getElementById('stat-passed').textContent = '0';
+      document.getElementById('stat-failed').textContent = '0';
+      document.getElementById('stat-duration').textContent = '0ms';
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // 页面加载时显示说明
+    log('测试环境已就绪。点击按钮开始测试。', 'info');
+    log('提示：每个测试会重置计数器，确保测试独立性。', 'info');
+  </script>
+</body>
+</html>

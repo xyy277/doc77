@@ -63,7 +63,7 @@ describe('API Endpoints', () => {
           body: JSON.stringify({ name: 'Test', path: projectDir }),
         });
         expect(res.status).toBe(201);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.id).toBeGreaterThan(0);
         expect(body.name).toBe('Test');
       });
@@ -91,7 +91,7 @@ describe('API Endpoints', () => {
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/projects`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body).toHaveLength(2);
       });
     });
@@ -104,7 +104,7 @@ describe('API Endpoints', () => {
           method: 'DELETE',
         });
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.removed).toBe(true);
       });
     });
@@ -117,7 +117,7 @@ describe('API Endpoints', () => {
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/tree/${p.id}`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.path).toBe('');
         expect(body.entries.length).toBeGreaterThan(0);
         expect(body.entries.some((e: { name: string }) => e.name === 'README.md')).toBe(true);
@@ -130,7 +130,7 @@ describe('API Endpoints', () => {
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/tree/${p.id}?path=docs`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.path).toBe('docs');
         expect(body.entries.some((e: { name: string }) => e.name === 'api.md')).toBe(true);
       });
@@ -152,7 +152,7 @@ describe('API Endpoints', () => {
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/content/${p.id}?path=README.md`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.type).toBe('markdown');
         expect(body.content).toContain('<h1');
       });
@@ -164,7 +164,7 @@ describe('API Endpoints', () => {
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/content/${p.id}?path=notes.txt`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.type).toBeDefined();
       });
     });
@@ -186,7 +186,7 @@ describe('API Endpoints', () => {
       await withServer(app, async (baseUrl) => {
         const res = await fetch(`${baseUrl}/api/reveal/${p.id}?path=README.md&action=reveal`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = (await res.json()) as any;
         expect(body.ok).toBe(true);
         expect(body.action).toBe('reveal');
       });

@@ -181,7 +181,7 @@ describe('Dashboard 2.0 API endpoints', () => {
     // Project 2 is not favorited yet
     const res = await fetch(`${baseUrl}/api/projects/2/favorite`, { method: 'PUT' });
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.id).toBe(2);
     expect(data.favorited).toBe(true);
 
@@ -195,7 +195,7 @@ describe('Dashboard 2.0 API endpoints', () => {
     // Project 1 is already favorited from setup
     const res = await fetch(`${baseUrl}/api/projects/1/favorite`, { method: 'PUT' });
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(data.id).toBe(1);
     expect(data.favorited).toBe(false);
   });
@@ -209,7 +209,7 @@ describe('Dashboard 2.0 API endpoints', () => {
     // Re-favorite project 1 first
     await fetch(`${baseUrl}/api/projects/1/favorite`, { method: 'PUT' });
     const res = await fetch(`${baseUrl}/api/projects`, { method: 'GET' });
-    const data = await res.json();
+    const data = (await res.json()) as any;
     const p1 = data.find((p: any) => p.id === 1);
     expect(p1.favorited).toBe(1);
   });
@@ -217,7 +217,7 @@ describe('Dashboard 2.0 API endpoints', () => {
   it('GET /api/discover returns discovered projects', async () => {
     const res = await fetch(`${baseUrl}/api/discover?path=/tmp&depth=1`);
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as any;
     expect(Array.isArray(data)).toBe(true);
   });
 

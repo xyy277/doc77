@@ -109,7 +109,7 @@ function runViaCmd(): Promise<string | null> {
   });
 }
 
-function winToWsl(winPath: string): string | null {
+function winToWsl(winPath: string): Promise<string | null> {
   return new Promise((resolve) => {
     execFile('wslpath', ['-u', winPath], { timeout: 5000 }, (err, stdout) => {
       if (err || !stdout) {

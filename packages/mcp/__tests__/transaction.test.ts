@@ -258,7 +258,7 @@ describe('Shadow Backup & Rollback', () => {
     fs.writeFileSync(file, 'original content');
 
     const shadowDir = path.join(testDir, '.shadow');
-    const undoLog: UndoLog[] = performShadowBackup(
+    const undoLog: UndoLog = performShadowBackup(
       [{ type: 'write_file', file_path: 'important.txt', content: 'new' }],
       testDir,
       shadowDir,
@@ -276,7 +276,7 @@ describe('Shadow Backup & Rollback', () => {
     fs.writeFileSync(file, 'original');
 
     const shadowDir = path.join(testDir, '.shadow');
-    const undoLog: UndoLog[] = performShadowBackup(
+    const undoLog: UndoLog = performShadowBackup(
       [{ type: 'write_file', file_path: 'data.txt', content: 'modified' }],
       testDir,
       shadowDir,

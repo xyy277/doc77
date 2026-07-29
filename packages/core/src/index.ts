@@ -80,10 +80,12 @@ export {
   createApp,
   createQueueApproveHandler,
   createAIChatHandler,
+  createAgentLoopHandler,
   setCapabilities,
 } from './server/app.js';
 export { executeAiWriteTool, isAiWriteTool } from './server/ai-tools.js';
 export type { AiWriteFns, AiWriteDeps, AiWriteCtx } from './server/ai-tools.js';
+export { setSkillEngine } from './server/routes/ai-skills.js';
 export { createEventsHandler } from './server/events.js';
 export {
   saveAiSession,
@@ -91,6 +93,39 @@ export {
   deleteAiSession,
   pruneAiSessions,
 } from './db/ai-sessions.js';
+
+// Session Store (new tree-structured session management)
+export {
+  createSession,
+  getSession,
+  updateSession,
+  deleteSession,
+  purgeSession,
+  listSessions,
+  appendMessage,
+  getMessage,
+  getMessagePath,
+  getSessionMessages,
+  getMessageChildren,
+  getBranchVariants,
+  switchBranch,
+  branchFromMessage,
+  logToolCall,
+  getToolLogs,
+  searchMessages,
+  addTokenUsage,
+  upsertSkill,
+  getEnabledSkills,
+  setSkillEnabled,
+} from './db/session-store.js';
+export type {
+  AiSession,
+  AiMessageRecord,
+  ToolLogRecord,
+  SearchMatch,
+  SessionStatus,
+  MessageRole,
+} from './db/session-store.js';
 
 // Auth
 export {

@@ -1,4 +1,4 @@
-import { getConnection, type DatabaseCompat } from '@doc77/core';
+import { getConnection } from '@doc77/core';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { validatePath } from '@doc77/core';

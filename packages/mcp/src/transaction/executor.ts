@@ -5,7 +5,7 @@ import { runPreflightCheck } from './preflight.js';
 import { performShadowBackup, rollbackFromShadow, type UndoLog } from './shadow.js';
 import { acquireProjectLock, releaseProjectLock } from './lock.js';
 import { safeMove } from './safeMove.js';
-import { checkFileSize, writeAuditLog } from './audit.js';
+import { writeAuditLog } from './audit.js';
 import { getEventBus } from '../event-bus.js';
 import { getSessionConfig } from '../tools/session.js';
 
@@ -59,7 +59,7 @@ export async function executeApprovedTasks(
     const config = getSessionConfig(pending.session_id);
     if (!config || config.mode !== 'auto') continue;
 
-    if (isOperationAutoApproved(config.riskLevel, pending.operation_type)) {
+    if (isOperationAutoApproved(config.risk_level, pending.operation_type)) {
       db.prepare(
         "UPDATE operation_queue SET status = 'approved', updated_at = datetime('now') WHERE id = ?",
       ).run(pending.id);
@@ -258,7 +258,13 @@ async function executeSingleOperation(
       const dest = path.join(projectRoot, op.target);
       const destDir = path.dirname(dest);
       if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
-      fs.copyFileSync(src, dest);
+      // Handle both files and directories (merged from former duplicate case)
+      const srcStat = fs.statSync(src);
+      if (srcStat.isDirectory()) {
+        fs.cpSync(src, dest, { recursive: true });
+      } else {
+        fs.copyFileSync(src, dest);
+      }
       break;
     }
     case 'delete_file': {
@@ -269,20 +275,6 @@ async function executeSingleOperation(
         fs.rmdirSync(absPath); // only empty dirs
       } else {
         fs.unlinkSync(absPath);
-      }
-      break;
-    }
-    case 'copy_file': {
-      if (!op.source || !op.target) throw new Error('source and target required');
-      const srcAbs = path.join(projectRoot, op.source as string);
-      const tgtAbs = path.join(projectRoot, op.target as string);
-      const tgtDir = path.dirname(tgtAbs);
-      if (!fs.existsSync(tgtDir)) fs.mkdirSync(tgtDir, { recursive: true });
-      const srcStat = fs.statSync(srcAbs);
-      if (srcStat.isDirectory()) {
-        fs.cpSync(srcAbs, tgtAbs, { recursive: true });
-      } else {
-        fs.copyFileSync(srcAbs, tgtAbs);
       }
       break;
     }

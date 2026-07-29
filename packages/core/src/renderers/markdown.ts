@@ -349,8 +349,8 @@ export function renderMarkdown(
   };
 
   // Generate heading IDs for anchor links (e.g. [跳至](#my-heading))
-  renderer.heading = ({ tokens, depth }: { tokens: { text: string }[]; depth: number }) => {
-    const text = tokens.map((t) => t.text).join('');
+  renderer.heading = ({ tokens, depth }: { tokens: unknown[]; depth: number }) => {
+    const text = tokens.map((t) => (t as { text?: string })?.text ?? '').join('');
     const id = text
       .toLowerCase()
       .replace(/[^\w一-鿿\s-]/g, '')
@@ -361,7 +361,6 @@ export function renderMarkdown(
   let html = marked.parse(content, {
     gfm: true,
     breaks: false,
-    headerIds: true,
     renderer,
   }) as string;
 

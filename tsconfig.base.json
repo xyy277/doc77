@@ -10,10 +10,22 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
-    "composite": true
+    "baseUrl": ".",
+    "paths": {
+      "@doc77/core": ["./packages/core/src/index.ts"],
+      "@doc77/core/*": ["./packages/core/src/*"],
+      "@doc77/mcp": ["./packages/mcp/src/index.ts"],
+      "@doc77/mcp/*": ["./packages/mcp/src/*"],
+      "@doc77/ai": ["./packages/ai/src/index.ts"],
+      "@doc77/ai/*": ["./packages/ai/src/*"],
+      "@doc77/gallery": ["./packages/gallery/src/index.ts"],
+      "@doc77/gallery/*": ["./packages/gallery/src/*"],
+      "@doc77/cli": ["./packages/cli/src/index.ts"],
+      "@doc77/cli/*": ["./packages/cli/src/*"],
+      "@doc77/sync": ["./packages/sync/src/index.ts"],
+      "@doc77/sync/*": ["./packages/sync/src/*"]
+    }
   },
   "exclude": ["node_modules", "dist"]
 }

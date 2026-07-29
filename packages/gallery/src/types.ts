@@ -4,11 +4,14 @@ export type ThumbnailSize = 'grid' | 'preview';
 /** Media type classification */
 export type MediaType = 'image' | 'video';
 
+/** Entry type — includes 'directory' for folder navigation in the grid */
+export type EntryType = MediaType | 'directory';
+
 /** Gallery entry returned by list API */
 export interface GalleryEntry {
   name: string;
   path: string;
-  type: MediaType;
+  type: EntryType;
   extension: string;
   size: number;
   modified: string;
@@ -19,6 +22,8 @@ export interface GalleryEntry {
   height: number | null;
   exif_date: string | null;
   duration: number | null;
+  /** Number of media items inside (directory only, null = not yet counted) */
+  entry_count?: number | null;
 }
 
 /** Gallery list response */

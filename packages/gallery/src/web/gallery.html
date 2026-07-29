@@ -553,16 +553,37 @@
                 var row = document.createElement('div');
                 row.className = 'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-doc77-100 dark:hover:bg-doc77-800 cursor-pointer transition-colors border border-transparent hover:border-doc77-200 dark:hover:border-doc77-700/50';
                 row.onclick = function() {
-                    if (state.selectMode) { toggleSelection(item.path || item.id, null); }
-                    else { window.GalleryLightbox.open(item, state.items, state.projectId); }
+                    if (state.selectMode) { toggleSelection(item.path || item.id, null); return; }
+                    // Directory: navigate into the folder
+                    if (item.type === 'directory') {
+                        state.currentView = 'folder';
+                        loadGallery(item.path);
+                        return;
+                    }
+                    window.GalleryLightbox.open(item, state.items, state.projectId);
                 };
-                var thumb = document.createElement('img');
-                thumb.src = item.thumbnail_url;
-                thumb.className = 'w-10 h-10 rounded object-cover bg-doc77-100 dark:bg-doc77-800 shrink-0';
-                thumb.loading = 'lazy';
+                var thumb;
+                if (item.type === 'directory') {
+                    // Folder icon instead of broken thumbnail
+                    thumb = document.createElement('div');
+                    thumb.className = 'w-10 h-10 rounded bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-center shrink-0';
+                    thumb.innerHTML = '<i class="ph-fill ph-folder text-yellow-500/80 text-xl"></i>';
+                } else {
+                    thumb = document.createElement('img');
+                    thumb.src = item.thumbnail_url;
+                    thumb.className = 'w-10 h-10 rounded object-cover bg-doc77-100 dark:bg-doc77-800 shrink-0';
+                    thumb.loading = 'lazy';
+                    thumb.onerror = function() {
+                        thumb.style.display = 'none';
+                        var ph = document.createElement('div');
+                        ph.className = 'w-10 h-10 rounded bg-doc77-100 dark:bg-doc77-800 flex items-center justify-center shrink-0';
+                        ph.innerHTML = '<i class="ph ph-image text-doc77-300 dark:text-doc77-600"></i>';
+                        row.insertBefore(ph, thumb);
+                    };
+                }
                 var info = document.createElement('div');
                 info.className = 'flex-1 min-w-0';
-                info.innerHTML = '<div class="text-sm text-doc77-900 dark:text-doc77-100 truncate">' + item.name + '</div><div class="text-xs text-doc77-500">' + (item.type === 'video' ? '🎬 ' : '') + formatSize(item.size) + '</div>';
+                info.innerHTML = '<div class="text-sm text-doc77-900 dark:text-doc77-100 truncate">' + item.name + '</div><div class="text-xs text-doc77-500">' + (item.type === 'video' ? '🎬 ' : '') + (item.type === 'directory' ? '📁 Folder' : formatSize(item.size)) + '</div>';
                 row.appendChild(thumb);
                 row.appendChild(info);
                 list.appendChild(row);
@@ -840,41 +861,124 @@
             el.classList.remove('text-doc77-600');
         }
 
-        // --- Folder Tree ---
+        // --- Folder Tree (lazy-loading, recursive) ---
 
         async function loadFolders() {
             try {
-                var resp = await fetch('/api/tree/' + state.projectId);
-                var data = await resp.json();
                 var folderList = document.getElementById('folder-list');
-                if (!folderList || !data.entries) return;
-                folderList.innerHTML = renderFolderItems(data.entries, '');
-                // Wire folder clicks
-                var folderLinks = folderList.querySelectorAll('a[data-path]');
-                for (var i = 0; i < folderLinks.length; i++) {
-                    (function(a) {
-                        a.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            state.currentView = 'folder';
-                            loadGallery(a.getAttribute('data-path'));
-                        });
-                    })(folderLinks[i]);
-                }
+                if (!folderList) return;
+                folderList.innerHTML = '<li class="px-2 py-1.5 text-doc77-400 dark:text-doc77-500 text-xs flex items-center gap-1"><i class="ph ph-circle-notch animate-spin text-xs"></i> Loading…</li>';
+                await loadFolderLevel('', folderList);
             } catch (e) {
-                // silently ignore — folders may not be available
+                var folderList = document.getElementById('folder-list');
+                if (folderList) folderList.innerHTML = '<li class="px-2 py-1.5 text-doc77-400 dark:text-doc77-500 text-xs">No folders</li>';
             }
         }
 
-        function renderFolderItems(entries, prefix) {
-            var html = '';
-            for (var i = 0; i < entries.length; i++) {
-                var entry = entries[i];
-                if (entry.type === 'directory') {
-                    var path = prefix ? prefix + '/' + entry.name : entry.name;
-                    html += '<li><a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-doc77-600 dark:text-doc77-300 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors" data-path="' + escAttr(path) + '"><i class="ph-fill ph-folder text-yellow-500/80"></i><span class="truncate">' + escHtml(entry.name) + '</span></a></li>';
-                }
+        // Fetch one level of directories and populate a <ul> container
+        async function loadFolderLevel(path, container) {
+            var params = new URLSearchParams();
+            params.set('path', path);
+            params.set('types', 'dir');
+            params.set('limit', '200');
+            params.set('sort', 'name');
+            params.set('order', 'asc');
+            var resp = await fetch('/api/gallery/' + state.projectId + '?' + params.toString());
+            var data = await resp.json();
+            var entries = (data && data.entries) || [];
+            container.innerHTML = '';
+            if (entries.length === 0) {
+                container.innerHTML = '<li class="px-2 py-1 text-doc77-400 dark:text-doc77-500 text-xs italic">Empty</li>';
+                return;
             }
-            return html || '<li class="px-2 py-1.5 text-doc77-400 dark:text-doc77-500 text-xs">No folders</li>';
+            for (var i = 0; i < entries.length; i++) {
+                container.appendChild(createFolderNode(entries[i], path));
+            }
+        }
+
+        // Build a single folder <li> with expand/collapse arrow + lazy-load children
+        function createFolderNode(entry, parentPath) {
+            var fullPath = parentPath ? parentPath + '/' + entry.name : entry.name;
+            var li = document.createElement('li');
+
+            var row = document.createElement('div');
+            row.className = 'flex items-center gap-1 px-2 py-1.5 rounded-md text-doc77-600 dark:text-doc77-300 hover:bg-doc77-100 dark:hover:bg-doc77-800 transition-colors group';
+            if (state.currentPath === fullPath) {
+                row.classList.add('bg-doc77-100', 'dark:bg-doc77-800', 'text-doc77-900', 'dark:text-doc77-100', 'font-medium');
+            }
+
+            // Expand/collapse arrow — click toggles children (lazy-loaded on first expand)
+            var arrow = document.createElement('button');
+            arrow.className = 'ph ph-caret-right text-doc77-400 dark:text-doc77-500 text-xs transition-transform duration-150 w-3 flex-shrink-0 hover:text-doc77-600 dark:hover:text-doc77-300 bg-transparent border-none cursor-pointer p-0 leading-none';
+            arrow.title = 'Expand';
+
+            // Folder link — click navigates into the folder (loads its contents in the grid)
+            var link = document.createElement('a');
+            link.href = '#';
+            link.className = 'flex items-center gap-2 flex-1 min-w-0';
+            link.dataset.path = fullPath;
+
+            var folderIcon = document.createElement('i');
+            folderIcon.className = 'ph-fill ph-folder text-yellow-500/80 text-sm flex-shrink-0';
+
+            var name = document.createElement('span');
+            name.className = 'truncate text-sm';
+            name.textContent = entry.name;
+
+            link.appendChild(folderIcon);
+            link.appendChild(name);
+            row.appendChild(arrow);
+            row.appendChild(link);
+            li.appendChild(row);
+
+            // Children container — populated lazily on first expand
+            var childUl = document.createElement('ul');
+            childUl.className = 'space-y-0.5 ml-3 border-l border-doc77-200 dark:border-doc77-800 pl-2 hidden';
+            li.appendChild(childUl);
+
+            var expanded = false;
+            var loaded = false;
+
+            // Arrow click: toggle expand/collapse (lazy-load on first expand)
+            arrow.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!loaded) {
+                    loaded = true;
+                    arrow.className = 'ph ph-circle-notch text-doc77-400 text-xs animate-spin w-3 flex-shrink-0 bg-transparent border-none cursor-pointer p-0 leading-none';
+                    loadFolderLevel(fullPath, childUl).then(function() {
+                        expanded = true;
+                        childUl.classList.remove('hidden');
+                        arrow.className = 'ph ph-caret-down text-doc77-400 dark:text-doc77-500 text-xs transition-transform duration-150 w-3 flex-shrink-0 bg-transparent border-none cursor-pointer p-0 leading-none';
+                    }).catch(function() {
+                        loaded = false;
+                        arrow.className = 'ph ph-caret-right text-doc77-400 dark:text-doc77-500 text-xs transition-transform duration-150 w-3 flex-shrink-0 bg-transparent border-none cursor-pointer p-0 leading-none';
+                    });
+                } else {
+                    expanded = !expanded;
+                    childUl.classList.toggle('hidden');
+                    arrow.className = expanded
+                        ? 'ph ph-caret-down text-doc77-400 dark:text-doc77-500 text-xs transition-transform duration-150 w-3 flex-shrink-0 bg-transparent border-none cursor-pointer p-0 leading-none'
+                        : 'ph ph-caret-right text-doc77-400 dark:text-doc77-500 text-xs transition-transform duration-150 w-3 flex-shrink-0 bg-transparent border-none cursor-pointer p-0 leading-none';
+                }
+            });
+
+            // Folder name click: navigate into the folder
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                state.currentView = 'folder';
+                loadGallery(fullPath);
+                // Highlight active folder
+                var allRows = document.querySelectorAll('#folder-list .folder-row-active');
+                for (var j = 0; j < allRows.length; j++) {
+                    allRows[j].classList.remove('bg-doc77-100', 'dark:bg-doc77-800', 'text-doc77-900', 'dark:text-doc77-100', 'font-medium');
+                    allRows[j].classList.add('text-doc77-600', 'dark:text-doc77-300');
+                    allRows[j].classList.remove('folder-row-active');
+                }
+                row.classList.add('bg-doc77-100', 'dark:bg-doc77-800', 'text-doc77-900', 'dark:text-doc77-100', 'font-medium', 'folder-row-active');
+            });
+
+            return li;
         }
 
         // --- Albums ---

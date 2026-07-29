@@ -5,7 +5,7 @@ import { readExif } from '../exif/reader.js';
 /** GET /api/exif/:projectId?path= */
 export function createExifHandler() {
   return async (req: Request, res: Response): Promise<void> => {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(req.params.projectId as string, 10);
     const filePath = req.query.path as string;
 
     if (isNaN(projectId) || !filePath) {

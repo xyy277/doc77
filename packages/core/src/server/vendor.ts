@@ -91,6 +91,18 @@ export const VENDOR_ASSETS: VendorAsset[] = [
     type: 'js',
     size: '~10KB',
   },
+  {
+    name: 'marked.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/marked@17.0.0/marked.min.js',
+    type: 'js',
+    size: '~40KB',
+  },
+  {
+    name: 'dompurify.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/dompurify@3.2.0/dist/purify.min.js',
+    type: 'js',
+    size: '~20KB',
+  },
 ];
 
 /**

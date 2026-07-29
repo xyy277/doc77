@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { isSensitiveFile } from '@doc77/core';
 import { executeAiWriteTool, isAiWriteTool } from '../src/server/ai-tools.js';
 import { initI18n } from '../src/i18n/index.js';

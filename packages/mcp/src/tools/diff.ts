@@ -4,7 +4,6 @@ import {
   t,
   getConnection,
   validatePath,
-  isSensitiveFile,
   isBinaryFile,
   readFile,
 } from '@doc77/core';

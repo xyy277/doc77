@@ -567,7 +567,7 @@ async function main() {
           }
           const resetResult = resetPasswordWithToken(result.resetToken!, newPw);
           if (resetResult.ok) {
-            console.log(t('cli.config.resetPwd.okWithRemaining', { remaining: result.remaining }));
+            console.log(t('cli.config.resetPwd.okWithRemaining', { remaining: result.remaining! }));
           } else {
             console.error(`❌ ${resetResult.error}`);
             process.exit(1);
