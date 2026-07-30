@@ -6,7 +6,7 @@
   <a href="https://github.com/xyy277/doc77/actions"><img src="https://github.com/xyy277/doc77/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/idoc77"><img src="https://img.shields.io/npm/v/idoc77" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg" alt="Node"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/lang-en-red.svg" alt="English"></a>
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/lang-zh--CN-green.svg" alt="简体中文"></a>
 </p>
@@ -294,6 +294,65 @@ doc77/
 ├── CLAUDE.md          # Project conventions
 └── README.md          # This file
 ```
+
+## Contributing
+
+Contributions are welcome! Here is the full local setup and submission flow.
+
+### Prerequisites
+
+| Tool | Version |
+|---|---|
+| Node.js | >= 22.x |
+| pnpm | >= 9.x (install with `npm i -g pnpm`) |
+| Git | any recent version |
+
+### Local Setup
+
+```bash
+git clone https://github.com/xyy277/doc77.git
+cd doc77
+pnpm install            # install dependencies (builds each package's dist on first run)
+pnpm build              # build all packages
+```
+
+### Common Scripts
+
+| Command | Description |
+|---|---|
+| `pnpm dev` | Start the `@doc77/core` dev server (hot reload, port 27777) |
+| `pnpm dev:start` | Build the CLI and its deps, then start the full app (`--bind 0.0.0.0`, port 27777) |
+| `pnpm dev:restart` | Same as `dev:start`, used to restart the app |
+| `pnpm dev-electron` | Start Electron desktop dev mode |
+| `pnpm build` | Build all packages and sync version numbers |
+| `pnpm test` | Run the Vitest test suite |
+| `pnpm lint` | ESLint check |
+| `pnpm format:check` | Prettier format check |
+| `pnpm check:i18n` | Verify zh-CN / en-US i18n key consistency |
+
+### Branching & Submission Flow
+
+The `main` branch is protected by **GitHub Rulesets**:
+
+- ❌ Direct push to `main` is forbidden
+- ❌ Force push / deletion of `main` is forbidden
+- ✅ Changes must be merged via Pull Request
+- ✅ Before merge, the following CI checks must all pass: `Lint & Format Check`, `Build`, `Test (Node 22 on ubuntu/macos/windows-latest)`
+- ✅ Squash merge is recommended to keep history linear
+
+Recommended workflow:
+
+1. Branch off `main`: `git checkout -b feat/your-feature`
+2. Self-test locally: `pnpm lint && pnpm format:check && pnpm test`
+3. Commit (Conventional Commits recommended, e.g. `fix(web): ...`, `feat(core): ...`)
+4. Push the branch: `git push -u origin feat/your-feature`
+5. Open a PR into `main` on GitHub, wait for CI to go green, then merge
+
+### Code Conventions
+
+- See [CLAUDE.md](CLAUDE.md) for detailed conventions
+- TypeScript strict mode; ensure `pnpm build` passes before committing
+- i18n strings must be updated in both `zh-CN.json` and `en-US.json`; run `pnpm check:i18n` before committing
 
 ## Privacy & Security
 
