@@ -60,3 +60,16 @@ export function initAutoUpdater(mainWindow: BrowserWindow | null): void {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 5000);
 }
+
+/**
+ * checkForUpdates — 供 tray 菜单"检查更新"项手动触发。
+ * dev 模式下 no-op（autoUpdater 需要 packaged build）。
+ */
+export async function checkForUpdates(): Promise<void> {
+  if (!app.isPackaged) return;
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch {
+    /* silently ignore */
+  }
+}

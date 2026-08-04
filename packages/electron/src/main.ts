@@ -7,9 +7,15 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { t } from './i18n';
-import { findAvailablePort, startServer, ServerProcess } from './server';
+import { findAvailablePort, startServer, ServerProcess, getInstalledEventBus, stopTunnel } from './server';
 import { createTray } from './tray';
-import { initAutoUpdater } from './updater';
+import { initAutoUpdater, checkForUpdates } from './updater';
+import { PendingFilesQueue, createPendingFilesQueue } from './pending-files';
+import {
+  ElectronNotificationDispatcher,
+  NotificationSubscriber,
+  showNotification,
+} from './notifications';
 
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
@@ -19,6 +25,17 @@ let server: ServerProcess | null = null;
 // tray reference is kept to prevent garbage collection of the system tray.
 let tray: Tray | null = null;
 let shuttingDown = false;
+
+// ═══ 待打开文件队列 ═══
+// 在 mainWindow 尚未就绪时（启动早期 / 窗口被销毁），handleFileOpen 把
+// 文件路径缓存到队列里，等窗口 ready 时按 FIFO drain。抽离为纯逻辑类
+// （见 ./pending-files.ts）以便单元测试。
+const pendingFiles: PendingFilesQueue = createPendingFilesQueue();
+
+// ═══ 通知订阅器 ═══
+// 订阅 mcp 事件总线（审批/任务执行/失败），转成桌面通知。事件总线
+// 由 server.ts 在 mcp 模块加载后缓存；未安装 mcp 时为 null，跳过订阅。
+let notificationSubscriber: NotificationSubscriber | null = null;
 
 // ═══ Window state persistence ═══
 const WINDOW_STATE_PATH = path.join(os.homedir(), '.doc77', 'window-state.json');
@@ -64,7 +81,11 @@ function createWindow(port: number): void {
 
   if (state.maximized) mainWindow.maximize();
   mainWindow.loadURL(`http://localhost:${port}`);
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+    // 窗口就绪：排空此前入队的待打开文件（启动期间双击的 .md 等）
+    drainPendingFiles();
+  });
 
   // Save window state on resize/move
   mainWindow.on('resize', saveWindowState);
@@ -131,14 +152,41 @@ async function boot(): Promise<void> {
   initAutoUpdater(mainWindow);
 
   const trayIconPath = path.join(__dirname, '..', 'assets', 'tray.png');
-  tray = createTray(trayIconPath, () => {
-    if (mainWindow?.isVisible()) {
-      mainWindow.hide();
-    } else {
-      mainWindow?.show();
-      mainWindow?.focus();
-    }
-  });
+  tray = createTray(
+    trayIconPath,
+    () => {
+      if (mainWindow?.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow?.show();
+        mainWindow?.focus();
+        // 从托盘恢复时也排空待打开文件队列（窗口可能被 hide 期间入队）
+        drainPendingFiles();
+      }
+    },
+    {
+      // 检查更新：直接调用 updater（无需经渲染进程绕一圈）
+      onCheckUpdates: () => {
+        void checkForUpdates();
+      },
+      // 设置：显示窗口并通知渲染进程打开设置页
+      onSettings: () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+        mainWindow?.webContents.send('shortcut:settings');
+      },
+    },
+  );
+
+  // ═══ 通知订阅器 ═══
+  // mcp 安装后 server.ts 已缓存事件总线；这里尝试 attach。未安装时
+  // getInstalledEventBus() 返回 null，订阅器保持 idle。
+  if (!notificationSubscriber) {
+    const dispatcher = new ElectronNotificationDispatcher(() => mainWindow);
+    notificationSubscriber = new NotificationSubscriber(dispatcher);
+    const bus = getInstalledEventBus();
+    if (bus) notificationSubscriber.attachEventBus(bus);
+  }
 }
 
 /** Surface boot failures instead of leaving a windowless zombie process. */
@@ -201,16 +249,54 @@ if (!gotLock) {
         mainWindow?.focus();
       }
     });
+
+    // Global shortcut: Ctrl+Shift+F — 触发前端搜索（渲染进程响应）
+    globalShortcut.register('CommandOrControl+Shift+F', () => {
+      mainWindow?.show();
+      mainWindow?.focus();
+      mainWindow?.webContents.send('shortcut:search');
+    });
+
+    // Global shortcut: Ctrl+Shift+S — 触发同步（渲染进程响应）
+    globalShortcut.register('CommandOrControl+Shift+S', () => {
+      mainWindow?.show();
+      mainWindow?.focus();
+      mainWindow?.webContents.send('shortcut:sync');
+    });
+
+    // Global shortcut: Ctrl+, — 打开设置（渲染进程响应）
+    globalShortcut.register('CommandOrControl+,', () => {
+      mainWindow?.show();
+      mainWindow?.focus();
+      mainWindow?.webContents.send('shortcut:settings');
+    });
   });
 }
 
 // File association: open files passed via command line (Windows) or open-file event (macOS)
 function handleFileOpen(filePath: string): void {
+  // 先入队，保持 FIFO 顺序（启动早期入队的旧文件先 drain，避免被新文件抢占）
+  pendingFiles.enqueue(filePath);
+  // 窗口未就绪：保留在队列里等 ready-to-show / 再次 show 时统一 drain
   if (!mainWindow || !server) return;
   mainWindow.show();
   mainWindow.focus();
-  // Navigate to preview with the file path
-  mainWindow.loadURL(`http://localhost:${server.port}/preview.html?file=${encodeURIComponent(filePath)}`);
+  drainPendingFiles();
+}
+
+/**
+ * drainPendingFiles — 把队列里待打开的文件按 FIFO 顺序导航到预览页。
+ * 仅在 mainWindow 与 server 都就绪时调用；否则保持入队状态等待下次。
+ * 连续 loadURL 会互相覆盖，最终展示队尾文件 —— 这是可接受的，因为
+ * 一个窗口只能显示一个文件，用户最近的操作即意图。
+ */
+function drainPendingFiles(): void {
+  if (!mainWindow || !server) return;
+  pendingFiles.drain((filePath) => {
+    mainWindow?.loadURL(
+      `http://localhost:${server?.port ?? 28888}/preview.html?file=${encodeURIComponent(filePath)}`,
+    );
+  });
 }
 
 // macOS: open-file event
@@ -223,9 +309,18 @@ app.on('before-quit', () => {
   shuttingDown = true;
   globalShortcut.unregisterAll();
   saveWindowState();
+  // 解绑通知订阅器，避免 EventEmitter 泄漏
+  notificationSubscriber?.detachEventBus();
+  notificationSubscriber = null;
+  // 清空待打开文件队列（退出时丢弃未处理的文件）
+  pendingFiles.clear();
   tray?.destroy();
   tray = null;
   server?.kill();
+  // T6: 退出前尝试停止隧道管理器，避免 cloudflared/ngrok 子进程变孤儿。
+  // T3 由另一 agent 实施，这里 fire-and-forget 调用 stop；
+  // core 不可用 / 未加载 / 无隧道管理器时安静跳过（见 server.ts stopTunnel）。
+  void stopTunnel();
 });
 
 app.on('window-all-closed', () => {

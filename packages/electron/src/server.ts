@@ -7,7 +7,40 @@ import * as os from 'os';
 import * as net from 'net';
 import * as http from 'http';
 import { pathToFileURL } from 'url';
+import type { DatabaseCompat } from '@doc77/core';
 import { bindCoreT, TFn } from './i18n';
+
+/** 事件总线最小契约 —— 与 core/events-handler MinimalBus 同构。 */
+export interface EventBus {
+  on(event: string, listener: (payload: unknown) => void): void;
+  off(event: string, listener: (payload: unknown) => void): void;
+}
+
+/** 当前已安装模块的事件总线（若有）；由 registerInstalledModules 缓存。 */
+let installedEventBus: EventBus | null = null;
+
+/** 取已安装 mcp 的事件总线，未安装时返回 null。供 notifications 模块订阅。 */
+export function getInstalledEventBus(): EventBus | null {
+  return installedEventBus;
+}
+
+/**
+ * stopTunnel — 退出前尝试停止 core 的隧道管理器。
+ *
+ * 必须用 dynamic import：electron 不能静态 require @doc77/core（ESM-only
+ * 依赖会让打包后的 app 启动崩溃，见 verify-no-static-core.cjs）。
+ * 若 core 不可用或 getTunnelManager 不存在，安静跳过（T3 由另一 agent
+ * 实施，这里只负责尽力调用 stop）。
+ */
+export async function stopTunnel(): Promise<void> {
+  try {
+    const core = await loadCore();
+    const mgr = (core as unknown as { getTunnelManager?: () => { stop: () => Promise<void> } }).getTunnelManager?.();
+    await mgr?.stop?.();
+  } catch {
+    // 隧道管理器不可用 / 未加载 —— 退出路径不可阻塞，安静跳过
+  }
+}
 
 const DB_PATH = path.join(os.homedir(), '.doc77', 'data.db');
 
@@ -36,12 +69,17 @@ interface CoreModule {
   }) => void;
   isEngineAvailable: () => Promise<boolean>;
   getConfig: (key: string) => string | undefined;
+  getConnection: () => DatabaseCompat;
+  registerAiRagRoutes: (app: ExpressLike, deps: { engine: unknown; db: DatabaseCompat }) => void;
+  registerPluginRoutes: (app: ExpressLike, deps: { db: DatabaseCompat; pluginDir: string }) => void;
 }
 
 /** Minimal express-app surface we need for post-createApp route registration. */
 interface ExpressLike {
-  post: (route: string, handler: unknown) => void;
-  get: (route: string, handler: unknown) => void;
+  get: (route: string, handler: any) => void;
+  post: (route: string, handler: any) => void;
+  put: (route: string, handler: any) => void;
+  delete: (route: string, handler: any) => void;
 }
 
 const dynamicImport = new Function('specifier', 'return import(specifier)') as (
@@ -69,6 +107,104 @@ async function loadInstalledModule(core: CoreModule, pkgName: string): Promise<a
 }
 
 /**
+ * 非 Electron 依赖的「路由挂载」纯函数 —— 镜像 cli/src/bin/doc77.ts:305-414，
+ * 把 sync / RAG / plugins / gallery 四组路由挂到 express app 上。
+ *
+ * 设计：模块对象由调用方 dynamic import 后注入（本函数自身不做任何 import），
+ * 因此可被 vitest 直接加载、用真实模块跑通挂载逻辑（而非复刻品）。
+ */
+export interface HttpRoutesDeps {
+  getConnection: () => DatabaseCompat;
+  getConfig: (key: string) => string | undefined;
+  thumbnailsDir: string;
+  pluginDir: string;
+  /**
+   * @doc77/sync 已加载则传，缺失 = 不挂载 sync 路由。
+   * 模块函数用 any 签名：调用方 dynamic import 得到的就是 any，测试方注入的
+   * 是具体实现 —— any 对两侧都兼容（详见 registerInstalledModules / 接线测试）。
+   */
+  sync?: {
+    createSyncEngine: () => unknown;
+    createSyncScheduler: (deps: any) => unknown;
+    registerSyncRoutes: (app: any, deps: any) => void;
+  };
+  /** @doc77/ai 已加载（提供 RagEngine）则传，缺失 = 不挂载 RAG 路由 */
+  rag?: {
+    RagEngine: new (deps: any) => unknown;
+    registerAiRagRoutes: (app: any, deps: any) => void;
+    /** 测试注入用：自定义嵌入函数；生产不传，走真实 embedder */
+    embedFn?: (texts: string[]) => Promise<number[][]>;
+  };
+  /** @doc77/core 的 registerPluginRoutes 存在则传 */
+  plugins?: {
+    registerPluginRoutes: (app: any, deps: any) => void;
+  };
+  /** @doc77/gallery 已加载则传 */
+  gallery?: {
+    registerGalleryRoutes: (app: any, deps: any) => Promise<unknown>;
+  };
+}
+
+export async function registerHttpRoutes(app: ExpressLike, deps: HttpRoutesDeps): Promise<void> {
+  // T8: sync routes（sync engine + scheduler）
+  if (deps.sync) {
+    try {
+      const db = deps.getConnection();
+      const engine = deps.sync.createSyncEngine();
+      const getProjectPath = (pid: number): string | null => {
+        const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+          | { path: string }
+          | undefined;
+        return row?.path || null;
+      };
+      const scheduler = deps.sync.createSyncScheduler({ engine, db, getProjectPath });
+      deps.sync.registerSyncRoutes(app, { engine, scheduler, db, getProjectPath });
+    } catch {
+      /* @doc77/sync 不可用 —— 静默跳过 */
+    }
+  }
+
+  // T10: RAG routes（索引/查询/清除）
+  if (deps.rag) {
+    try {
+      const db = deps.getConnection();
+      const provider = (deps.getConfig('ai.provider') as 'custom' | 'ollama') || 'custom';
+      const embedModel = deps.getConfig('ai.embed_model') || 'nomic-embed-text';
+      const ollamaUrl = deps.getConfig('ai.ollama_url') as string | undefined;
+      const ragEngine = new deps.rag.RagEngine({
+        db,
+        config: { embedder: { provider, embedModel, ollamaUrl } },
+        ...(deps.rag.embedFn ? { embedFn: deps.rag.embedFn } : {}),
+      });
+      deps.rag.registerAiRagRoutes(app, { engine: ragEngine, db });
+    } catch {
+      /* RAG 不可用 —— 需要 @doc77/ai */
+    }
+  }
+
+  // T11: plugin routes（安装/卸载/配置）
+  if (deps.plugins) {
+    try {
+      deps.plugins.registerPluginRoutes(app, {
+        db: deps.getConnection(),
+        pluginDir: deps.pluginDir,
+      });
+    } catch {
+      /* Plugin routes 不可用 */
+    }
+  }
+
+  // Gallery —— 与 cli 一致，best-effort 挂载
+  if (deps.gallery) {
+    try {
+      await deps.gallery.registerGalleryRoutes(app, { thumbnailsDir: deps.thumbnailsDir });
+    } catch {
+      /* Gallery init failed */
+    }
+  }
+}
+
+/**
  * Mirror of the CLI's optional-module registration (cli/src/bin/doc77.ts):
  * register MCP/AI routes for installed modules and publish capabilities so
  * the settings page stops offering the install button after a restart.
@@ -90,8 +226,11 @@ async function registerInstalledModules(core: CoreModule, app: ExpressLike): Pro
 
   if (mcp) {
     try {
+      const bus = mcp.getEventBus();
       app.post('/api/queue/approve', core.createQueueApproveHandler(mcp.executeApprovedTasks));
-      app.get('/api/events', core.createEventsHandler(mcp.getEventBus()));
+      app.get('/api/events', core.createEventsHandler(bus));
+      // 缓存事件总线，供 notifications 模块订阅（见 ./notifications.ts）
+      installedEventBus = bus as EventBus;
     } catch {
       /* keep booting without MCP routes */
     }
@@ -128,20 +267,49 @@ async function registerInstalledModules(core: CoreModule, app: ExpressLike): Pro
     /* engine probe failed — report unavailable */
   }
 
-  // Gallery — first-party feature loaded from workspace, not a one-click module.
-  let galleryAvailable = false;
+  // ── First-party feature routes: sync / RAG / plugins / gallery ──
+  // 镜像 cli/src/bin/doc77.ts:305-414。sync/plugins 由 workspace 包提供；
+  // RAG 需要已一键安装的 @doc77/ai（RagEngine），未安装则跳过。全部 best-effort。
+  let syncModule: any = null;
+  try {
+    syncModule = await dynamicImport('@doc77/sync');
+  } catch {
+    /* @doc77/sync 不可用 —— 跳过 sync 路由 */
+  }
+  let galleryModule: any = null;
   try {
     const gallery = await dynamicImport('@doc77/gallery');
-    if (gallery?.registerGalleryRoutes) {
-      const thumbnailsDir = path.join(os.homedir(), '.doc77', 'thumbnails');
-      await gallery.registerGalleryRoutes(app, { thumbnailsDir });
-      galleryAvailable = true;
-    }
+    if (gallery?.registerGalleryRoutes) galleryModule = gallery;
   } catch {
     /* gallery not built or unavailable */
   }
 
-  core.setCapabilities({ ai: !!ai, mcp: !!mcp, translate, gallery: galleryAvailable });
+  await registerHttpRoutes(app, {
+    getConnection: core.getConnection,
+    getConfig: core.getConfig,
+    thumbnailsDir: path.join(os.homedir(), '.doc77', 'thumbnails'),
+    pluginDir: path.join(os.homedir(), '.doc77', 'plugins'),
+    sync: syncModule
+      ? {
+          createSyncEngine: syncModule.createSyncEngine,
+          createSyncScheduler: syncModule.createSyncScheduler,
+          registerSyncRoutes: syncModule.registerSyncRoutes,
+        }
+      : undefined,
+    rag:
+      ai?.RagEngine && core.registerAiRagRoutes
+        ? {
+            RagEngine: ai.RagEngine,
+            registerAiRagRoutes: core.registerAiRagRoutes,
+          }
+        : undefined,
+    plugins: core.registerPluginRoutes
+      ? { registerPluginRoutes: core.registerPluginRoutes }
+      : undefined,
+    gallery: galleryModule ? { registerGalleryRoutes: galleryModule.registerGalleryRoutes } : undefined,
+  });
+
+  core.setCapabilities({ ai: !!ai, mcp: !!mcp, translate, gallery: !!galleryModule });
 }
 
 /** Find an available port starting from `start`, up to `start + 99`. */
