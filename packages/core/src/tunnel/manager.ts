@@ -17,6 +17,14 @@ export interface TunnelConfig {
   quickTunnel: boolean;
   tsFunnel: boolean;
   localPort: number;
+  /** 隧道访问策略：'open' | 'readonly' | 'password'（T3 新增） */
+  accessPolicy?: 'open' | 'readonly' | 'password';
+  /** T12: password 策略下的访问密码 */
+  password?: string;
+  /** T12: 允许的设备指纹列表（User-Agent + IP hash），空表示不限制 */
+  allowedDevices?: string[];
+  /** T12: 隧道 session TTL（分钟，默认 30） */
+  sessionTtlMinutes?: number;
 }
 
 export interface TunnelInfo {
@@ -41,6 +49,11 @@ export class TunnelManager {
 
   getStatus(): TunnelInfo {
     return { ...this.info };
+  }
+
+  /** @internal 仅用于测试：强制设置隧道状态，避免启动真实 cloudflared 子进程 */
+  __setStatusForTest(status: TunnelStatus): void {
+    this.info.status = status;
   }
 
   async start(config: TunnelConfig): Promise<TunnelInfo> {

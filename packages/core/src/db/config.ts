@@ -46,6 +46,8 @@ const DEFAULTS: Record<string, string> = {
   'export.share.ttl_hours': '24',
   'export.share.enabled': 'true',
   'share.host_override': '',
+  // 隧道安全策略：'open'（默认，配合认证门控）/ 'readonly'（禁止写操作）/ 'password'
+  'tunnel.access_policy': 'open',
 };
 
 /**

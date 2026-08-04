@@ -86,6 +86,11 @@ export {
 export { executeAiWriteTool, isAiWriteTool } from './server/ai-tools.js';
 export type { AiWriteFns, AiWriteDeps, AiWriteCtx } from './server/ai-tools.js';
 export { setSkillEngine } from './server/routes/ai-skills.js';
+export { registerAiRagRoutes } from './server/routes/ai-rag.js';
+export type { AiRagRouteDeps } from './server/routes/ai-rag.js';
+export { registerPluginRoutes } from './server/routes/plugin.js';
+export type { PluginRouteDeps } from './server/routes/plugin.js';
+export { PluginSandbox } from './plugin/sandbox.js';
 export { createEventsHandler } from './server/events.js';
 export {
   saveAiSession,

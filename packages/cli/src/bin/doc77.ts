@@ -317,9 +317,12 @@ async function main() {
 
       // Register AI-dependent routes (optional)
       try {
-        const { AiProvider, DocAgent, getReadTools, getWriteTools } = await import('@doc77/ai');
+        const { AiProvider, OllamaProvider, DocAgent, getReadTools, getWriteTools } = await import(
+          '@doc77/ai'
+        );
         const { createAIChatHandler } = await import('@doc77/core');
-        const aiDeps: Record<string, unknown> = { AiProvider, DocAgent, getReadTools };
+        // T4: 注入 AiProvider + OllamaProvider，handler 根据 ai.provider 配置选择构造哪个
+        const aiDeps: Record<string, unknown> = { AiProvider, OllamaProvider, DocAgent, getReadTools };
         // When MCP is installed, let the AI propose writes through the approval
         // queue by injecting its write functions + tool schemas.
         if (mcpAvailable) {
@@ -343,6 +346,71 @@ async function main() {
         } catch {
           /* Gallery init failed */
         }
+      }
+
+      // T8: Register sync routes (sync engine + scheduler)
+      try {
+        const { createSyncEngine, registerSyncRoutes, createSyncScheduler } = await import(
+          '@doc77/sync'
+        );
+        const { getConnection } = await import('@doc77/core');
+        const syncDb = getConnection();
+        const syncEngine = createSyncEngine();
+        const syncScheduler = createSyncScheduler({
+          engine: syncEngine,
+          db: syncDb,
+          getProjectPath: (pid: number) => {
+            const row = syncDb.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+              | { path: string }
+              | undefined;
+            return row?.path || null;
+          },
+        });
+        registerSyncRoutes(app, {
+          engine: syncEngine,
+          scheduler: syncScheduler,
+          db: syncDb,
+          getProjectPath: (pid: number) => {
+            const row = syncDb.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
+              | { path: string }
+              | undefined;
+            return row?.path || null;
+          },
+        });
+      } catch {
+        /* @doc77/sync not installed */
+      }
+
+      // T10: Register RAG routes (AI retrieval-augmented generation)
+      try {
+        const { RagEngine } = await import('@doc77/ai');
+        const { getConnection, getConfig, registerAiRagRoutes } = await import('@doc77/core');
+        const ragDb = getConnection();
+        // 从配置读取 provider + embed model
+        const provider = ((getConfig('ai.provider') as string) || 'custom') as 'custom' | 'ollama';
+        const embedModel = (getConfig('ai.embed_model') as string) || 'nomic-embed-text';
+        const ollamaUrl = getConfig('ai.ollama_url') as string | undefined;
+        const ragEngine = new RagEngine({
+          db: ragDb,
+          config: {
+            embedder: { provider, embedModel, ollamaUrl },
+          },
+        });
+        registerAiRagRoutes(app, { engine: ragEngine, db: ragDb });
+      } catch {
+        /* RAG not available — requires @doc77/ai */
+      }
+
+      // T11: Register plugin routes (install/configure/toggle)
+      try {
+        const { getConnection, registerPluginRoutes } = await import('@doc77/core');
+        const pluginDb = getConnection();
+        registerPluginRoutes(app, {
+          db: pluginDb,
+          pluginDir: path.join(os.homedir(), '.doc77', 'plugins'),
+        });
+      } catch {
+        /* Plugin routes not available */
       }
 
       // Inject capabilities into app
@@ -854,6 +922,93 @@ async function main() {
         }
         console.log(t('cli.discover.registerUsage'));
       }
+      break;
+    }
+
+    // T14: sync 子命令 — list/run/add/remove/status
+    case 'sync': {
+      const subcommand = args[1];
+      const { getConnection } = await import('@doc77/core');
+      const db = getConnection();
+      const resolveProject = (arg: string): number => {
+        if (/^\d+$/.test(arg)) return parseInt(arg, 10);
+        const row = db.prepare('SELECT id FROM projects WHERE name = ?').get(arg) as { id: number } | undefined;
+        if (!row) { console.error(`Project not found: ${arg}`); process.exit(1); }
+        return row.id;
+      };
+
+      if (subcommand === 'list') {
+        const configs = db.prepare('SELECT * FROM sync_configs').all() as Array<{ project_id: number; adapter_type: string; direction: string; interval_seconds: number; enabled: number }>;
+        if (configs.length === 0) { console.log('No sync configurations found.'); }
+        else {
+          console.log('Sync configurations:');
+          for (const c of configs) {
+            const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(c.project_id) as { name: string } | undefined;
+            console.log(`  [${c.enabled ? '✓' : '✗'}] ${project?.name || `#${c.project_id}`} — ${c.adapter_type} (${c.direction}), interval=${c.interval_seconds}s`);
+          }
+        }
+      } else if (subcommand === 'run') {
+        const projectId = resolveProject(args[2] || '');
+        const config = db.prepare('SELECT * FROM sync_configs WHERE project_id = ?').get(projectId);
+        const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
+        if (!config || !project) { console.error('No sync config or project not found'); process.exit(1); }
+        try {
+          const { createSyncEngine } = await import('@doc77/sync');
+          const engine = createSyncEngine();
+          const result = await engine.sync(projectId, project.path, config as any);
+          console.log(`Sync result: status=${result.status}, pushed=${result.pushed}, pulled=${result.pulled}`);
+          if (result.errors.length > 0) console.log('Errors:', result.errors.join('; '));
+        } catch (e: unknown) { console.error('Sync failed:', (e as Error).message); process.exit(1); }
+      } else if (subcommand === 'add') {
+        const projectId = resolveProject(args[2] || '');
+        const adapterType = args[3]; const configJson = args[4];
+        if (!adapterType || !configJson) { console.error('Usage: doc77 sync add <project> <adapter-type> <config-json>'); process.exit(1); }
+        db.prepare(`INSERT OR REPLACE INTO sync_configs (project_id, adapter_type, config_json, direction, interval_seconds, enabled) VALUES (?, ?, ?, 'bidirectional', 1800, 1)`).run(projectId, adapterType, configJson);
+        console.log(`Sync config added for project ${args[2]} (${adapterType})`);
+      } else if (subcommand === 'remove') {
+        const projectId = resolveProject(args[2] || '');
+        db.prepare('DELETE FROM sync_configs WHERE project_id = ?').run(projectId);
+        console.log(`Sync config removed for project ${args[2]}`);
+      } else if (subcommand === 'status') {
+        const projectId = resolveProject(args[2] || '');
+        const state = db.prepare('SELECT * FROM sync_state WHERE project_id = ?').get(projectId);
+        if (!state) { console.log(`No sync state for project ${args[2]}`); }
+        else { console.log('Sync state:', JSON.stringify(state, null, 2)); }
+      } else { console.error('Usage: doc77 sync <list|run|add|remove|status> [args]'); process.exit(1); }
+      break;
+    }
+
+    // T15: plugin 子命令 — list/install/remove/enable/disable
+    case 'plugin': {
+      const subcommand = args[1];
+      const { getConnection } = await import('@doc77/core');
+      const db = getConnection();
+
+      if (subcommand === 'list') {
+        const plugins = db.prepare('SELECT * FROM plugins ORDER BY installed_at DESC').all() as Array<{ name: string; version: string; type: string; enabled: number }>;
+        if (plugins.length === 0) { console.log('No plugins installed.'); }
+        else { console.log('Installed plugins:'); for (const p of plugins) { console.log(`  [${p.enabled ? '✓' : '✗'}] ${p.name} v${p.version} (${p.type})`); } }
+      } else if (subcommand === 'install') {
+        const name = args[2]; const version = args[3] || '1.0.0'; const type = args[4] || 'renderer';
+        if (!name) { console.error('Usage: doc77 plugin install <name> [version] [type]'); process.exit(1); }
+        db.prepare(`INSERT OR REPLACE INTO plugins (name, version, type, enabled, config_json, source) VALUES (?, ?, ?, 1, '{}', 'cli')`).run(name, version, type);
+        console.log(`Plugin installed: ${name} v${version} (${type})`);
+      } else if (subcommand === 'remove') {
+        const name = args[2]; if (!name) { console.error('Usage: doc77 plugin remove <name>'); process.exit(1); }
+        const result = db.prepare('DELETE FROM plugins WHERE name = ?').run(name);
+        if (result.changes === 0) { console.error(`Plugin not found: ${name}`); process.exit(1); }
+        console.log(`Plugin removed: ${name}`);
+      } else if (subcommand === 'enable') {
+        const name = args[2]; if (!name) { console.error('Usage: doc77 plugin enable <name>'); process.exit(1); }
+        const result = db.prepare('UPDATE plugins SET enabled = 1 WHERE name = ?').run(name);
+        if (result.changes === 0) { console.error(`Plugin not found: ${name}`); process.exit(1); }
+        console.log(`Plugin enabled: ${name}`);
+      } else if (subcommand === 'disable') {
+        const name = args[2]; if (!name) { console.error('Usage: doc77 plugin disable <name>'); process.exit(1); }
+        const result = db.prepare('UPDATE plugins SET enabled = 0 WHERE name = ?').run(name);
+        if (result.changes === 0) { console.error(`Plugin not found: ${name}`); process.exit(1); }
+        console.log(`Plugin disabled: ${name}`);
+      } else { console.error('Usage: doc77 plugin <list|install|remove|enable|disable> [args]'); process.exit(1); }
       break;
     }
 
