@@ -25,6 +25,14 @@ export default [
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', 'eslint.config.js', '*.config.ts', '*.config.js'],
+    ignores: [
+      '**/dist/**',
+      '**/dist.pre-build/**',
+      '**/dist.locked*/**',
+      '**/node_modules/**',
+      'eslint.config.js',
+      '*.config.ts',
+      '*.config.js',
+    ],
   },
 ];

@@ -51,3 +51,11 @@ scripts/start-test-server.ts
 *.tgz
 release/
 version.gen.ts
+
+# 构建临时产物（非标准 dist 命名，构建竞态/中断残留）
+dist.pre-build/
+dist.locked*/
+
+# 本机调试/验证 scratch 文件（仓库根）
+/tmp-*
+
