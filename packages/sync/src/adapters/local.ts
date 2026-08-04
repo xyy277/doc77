@@ -1,5 +1,8 @@
 /**
  * Local directory mirror adapter — sync to another local folder / network mount.
+ *
+ * T9 E2EE: 若 keyring 已 unlock，push 时加密文件内容，pull 时自动解密。
+ *          keyring 未 setup/unlock 时走明文（向后兼容）。
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -12,6 +15,8 @@ import type {
   PushResult,
   RemoteFileEntry,
 } from '../types.js';
+import { getKeyring } from '../crypto/keyring.js';
+import { maybeEncryptContent, maybeDecryptContent } from '../crypto/e2ee-helper.js';
 
 export interface LocalAdapterConfig extends AdapterConfig {
   type: 'local';
@@ -62,7 +67,11 @@ export class LocalAdapter implements SyncAdapter {
 
           const dir = path.dirname(localPath);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.copyFileSync(path.join(cfg.targetPath, remote.path), localPath);
+          // T9: pull 时检测加密格式并解密
+          const keyring = getKeyring();
+          const rawData = fs.readFileSync(path.join(cfg.targetPath, remote.path));
+          const content = maybeDecryptContent(rawData, keyring);
+          fs.writeFileSync(localPath, content);
           result.filesUpdated++;
         } catch (e: unknown) {
           result.errors.push(`${remote.path}: ${e instanceof Error ? e.message : 'copy failed'}`);
@@ -86,7 +95,11 @@ export class LocalAdapter implements SyncAdapter {
         } else {
           const dir = path.dirname(targetFile);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.copyFileSync(path.join(ctx.projectPath, change.path), targetFile);
+          // T9: push 时若 keyring 已 unlock 则加密，否则明文
+          const keyring = getKeyring();
+          const rawContent = fs.readFileSync(path.join(ctx.projectPath, change.path));
+          const output = maybeEncryptContent(rawContent, keyring);
+          fs.writeFileSync(targetFile, output);
           result.filesPushed++;
         }
       } catch (e: unknown) {

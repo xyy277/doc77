@@ -1,8 +1,4 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "."
-  },
-  "include": ["src/**/*", "../../types/external-modules.d.ts"]
+  "include": ["src/**/*", "__tests__/**/*", "../../types/external-modules.d.ts"]
 }

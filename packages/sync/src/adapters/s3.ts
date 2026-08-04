@@ -1,5 +1,7 @@
 /**
  * S3 sync adapter — AWS S3, MinIO, Cloudflare R2, Backblaze B2.
+ *
+ * T9 E2EE: 若 keyring 已 unlock，push 时加密文件内容，pull 时自动解密。
  */
 import {
   S3Client,
@@ -19,6 +21,8 @@ import type {
   PushResult,
   RemoteFileEntry,
 } from '../types.js';
+import { getKeyring } from '../crypto/keyring.js';
+import { maybeEncryptContent, maybeDecryptContent } from '../crypto/e2ee-helper.js';
 
 export interface S3AdapterConfig extends AdapterConfig {
   type: 's3';
@@ -125,7 +129,10 @@ export class S3Adapter implements SyncAdapter {
           const body = response.Body;
           if (body) {
             const bytes = await body.transformToByteArray();
-            fs.writeFileSync(localPath, Buffer.from(bytes));
+            // T9: pull 时检测加密格式并解密
+            const keyring = getKeyring();
+            const decrypted = maybeDecryptContent(Buffer.from(bytes), keyring);
+            fs.writeFileSync(localPath, decrypted);
             result.filesUpdated++;
           }
         } catch (e: unknown) {
@@ -154,11 +161,14 @@ export class S3Adapter implements SyncAdapter {
           } else {
             const localPath = path.join(ctx.projectPath, change.path);
             const body = fs.readFileSync(localPath);
+            // T9: push 时若 keyring 已 unlock 则加密
+            const keyring = getKeyring();
+            const output = maybeEncryptContent(body, keyring);
             await client.send(
               new PutObjectCommand({
                 Bucket: cfg.bucket,
                 Key: key,
-                Body: body,
+                Body: output,
                 Metadata: { 'doc77-mtime': new Date().toISOString() },
               }),
             );

@@ -39,8 +39,12 @@ export class GitAdapter implements SyncAdapter {
   }
 
   async pull(ctx: SyncContext): Promise<PullResult> {
-    const cfg = ctx.options as unknown as { gitConfig: GitAdapterConfig };
-    const gitConfig = (cfg.gitConfig || {}) as GitAdapterConfig;
+    // 兼容读取 adapterConfig（统一字段）或 gitConfig（旧字段）
+    const cfg = ctx.options as unknown as {
+      adapterConfig?: GitAdapterConfig;
+      gitConfig?: GitAdapterConfig;
+    };
+    const gitConfig = (cfg.adapterConfig || cfg.gitConfig || {}) as GitAdapterConfig;
     const git = this.getGit(ctx.projectPath, gitConfig);
     const result: PullResult = { filesUpdated: 0, filesDeleted: 0, errors: [] };
 
@@ -92,8 +96,12 @@ export class GitAdapter implements SyncAdapter {
   }
 
   async push(ctx: SyncContext): Promise<PushResult> {
-    const cfg = ctx.options as unknown as { gitConfig: GitAdapterConfig };
-    const gitConfig = (cfg.gitConfig || {}) as GitAdapterConfig;
+    // 兼容读取 adapterConfig（统一字段）或 gitConfig（旧字段）
+    const cfg = ctx.options as unknown as {
+      adapterConfig?: GitAdapterConfig;
+      gitConfig?: GitAdapterConfig;
+    };
+    const gitConfig = (cfg.adapterConfig || cfg.gitConfig || {}) as GitAdapterConfig;
     const git = this.getGit(ctx.projectPath, gitConfig);
     const result: PushResult = { filesPushed: 0, errors: [] };
 

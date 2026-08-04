@@ -1,5 +1,7 @@
 /**
  * WebDAV sync adapter — for NAS (Synology, Nextcloud, ownCloud).
+ *
+ * T9 E2EE: 若 keyring 已 unlock，push 时加密文件内容，pull 时自动解密。
  */
 import { createClient, type WebDAVClient } from 'webdav';
 import * as fs from 'node:fs';
@@ -13,6 +15,8 @@ import type {
   PushResult,
   RemoteFileEntry,
 } from '../types.js';
+import { getKeyring } from '../crypto/keyring.js';
+import { maybeEncryptContent, maybeDecryptContent } from '../crypto/e2ee-helper.js';
 
 export interface WebDAVAdapterConfig extends AdapterConfig {
   type: 'webdav';
@@ -99,7 +103,10 @@ export class WebDAVAdapter implements SyncAdapter {
           const dir = path.dirname(localPath);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
           const content = await client.getFileContents(path.posix.join(remotePath, remote.path));
-          fs.writeFileSync(localPath, content as Buffer);
+          // T9: pull 时检测加密格式并解密
+          const keyring = getKeyring();
+          const decrypted = maybeDecryptContent(Buffer.from(content as Uint8Array), keyring);
+          fs.writeFileSync(localPath, decrypted);
           result.filesUpdated++;
         } catch (e: unknown) {
           result.errors.push(`${remote.path}: ${e instanceof Error ? e.message : 'download failed'}`);
@@ -132,7 +139,10 @@ export class WebDAVAdapter implements SyncAdapter {
             }
             const localPath = path.join(ctx.projectPath, change.path);
             const content = fs.readFileSync(localPath);
-            await client.putFileContents(remoteFilePath, content, { overwrite: true });
+            // T9: push 时若 keyring 已 unlock 则加密
+            const keyring = getKeyring();
+            const output = maybeEncryptContent(content, keyring);
+            await client.putFileContents(remoteFilePath, output, { overwrite: true });
             result.filesPushed++;
           }
         } catch (e: unknown) {
