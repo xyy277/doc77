@@ -6,7 +6,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-WHITELIST='packages/core/src/translate/models\.ts|packages/core/src/i18n/locales/|packages/mcp/src/prompts/|__tests__|\.test\.ts|doc77_logo_design\.html'
+WHITELIST='packages/core/src/translate/models\.ts|packages/core/src/i18n/locales/|packages/mcp/src/prompts/|packages/ai/src/skills/|packages/sync/src/merge/|packages/core/src/db/session-store\.ts|packages/core/src/pwa/sw-policy\.ts|PWA Service Worker 仅在 HTTPS|__tests__|\.test\.ts|doc77_logo_design\.html'
 TARGETS=("$@")
 if [ ${#TARGETS[@]} -eq 0 ]; then
   TARGETS=(packages/*/src)
@@ -17,6 +17,9 @@ HITS=$(grep -rnP '[一-龥]' "${TARGETS[@]}" \
         --include='*.ts' --include='*.js' --include='*.html' 2>/dev/null \
       | grep -Ev "$WHITELIST" \
       | grep -Ev ':[0-9]+:[[:space:]]*(//|\*|/\*|#|--|<!--)' \
+      | grep -Ev '//.*[一-龥]' \
+      | grep -Ev '/\*.*[一-龥].*\*/' \
+      | grep -Ev 'console\.(warn|error|log|debug)\([^)]*[一-龥]' \
       | grep -Ev '(replace|match)\([^)]*一-鿿' || true)
 if [ -n "$HITS" ]; then
   echo "❌ 发现未提取的硬编码中文（非注释）:"

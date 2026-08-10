@@ -448,7 +448,21 @@ function switchSettingsTab(tab) {
       (window.__doc77_caps_mcp ? (
       settingToggle('MCP stdio','transport.mcp_stdio_enabled') +
       settingToggle('MCP HTTP','transport.mcp_http_enabled') +
-      settingRow(t('common.settings.mcpPort'),'transport.mcp_http_port','number','8899')) : '');
+      settingRow(t('common.settings.mcpPort'),'transport.mcp_http_port','number','8899')) : '') +
+      '<div class="section-title" style="margin-top:16px">' + t('common.pwa.httpsRequired') + '</div>' +
+      (function () {
+        // 与 shouldRegisterSW 同步：检测当前协议是否支持 PWA 离线
+        var sw = (typeof shouldRegisterSW === 'function')
+          ? shouldRegisterSW(location.protocol, location.hostname)
+          : { allowed: true };
+        var style = 'font-size:11px;line-height:1.6;padding:8px 12px;border-radius:6px;margin-top:4px;';
+        if (sw.allowed) {
+          style += 'color:var(--text-muted);background:var(--bg-code);';
+        } else {
+          style += 'color:var(--danger);background:var(--danger-light-bg, rgba(239,68,68,0.08));';
+        }
+        return '<div style="' + style + '">' + t('common.pwa.httpsRequiredDesc') + '</div>';
+      })();
   } else if (tab === 'ai') {
     if (!window.__doc77_caps_ai) {
       var electronInstall = (window.doc77) ?
@@ -1188,26 +1202,49 @@ function escHtml(s) {
 //══════════ PWA: Service Worker + Offline + Install ══════════
 
 // --- Service Worker Registration ---
+// 浏览器安全限制：SW 仅在 HTTPS 或 localhost 下可注册。
+// LAN IP（如 192.168.x.x）走 HTTP 时 register 会抛错，这里提前检测并 graceful skip。
+//
+// 注意：本内联逻辑与 packages/core/src/pwa/sw-policy.ts 中的
+// shouldRegisterServiceWorker 保持同步，修改时请一并更新。
+function shouldRegisterSW(protocol, hostname) {
+  if (protocol === 'https:') return { allowed: true };
+  var safeHostnames = { 'localhost': 1, '127.0.0.1': 1, '::1': 1 };
+  if (safeHostnames[hostname]) return { allowed: true };
+  return {
+    allowed: false,
+    reason: 'PWA Service Worker 仅在 HTTPS 或 localhost 下可注册。当前通过 HTTP + LAN IP 访问，已跳过 SW 注册。请使用 localhost 或通过 HTTPS 隧道访问以启用离线能力。',
+  };
+}
+
 (function registerSW() {
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js').then(function (reg) {
-        // 检查更新
-        reg.addEventListener('updatefound', function () {
-          var newWorker = reg.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', function () {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // 新版本可用，提示刷新
-              if (window.toast) toast('Doc77 updated. Refresh to apply.', 'info');
-            }
-          });
-        });
-      }).catch(function () {
-        // SW 注册失败，静默忽略
-      });
-    });
+  if (!('serviceWorker' in navigator)) return;
+
+  // 协议检测：非 HTTPS 且非 localhost 时跳过注册，避免控制台报错
+  var check = shouldRegisterSW(location.protocol, location.hostname);
+  if (!check.allowed) {
+    console.warn('[PWA] ' + check.reason);
+    return;
   }
+
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').then(function (reg) {
+      // 检查更新
+      reg.addEventListener('updatefound', function () {
+        var newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', function () {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // 新版本可用，提示刷新
+            if (window.toast) toast('Doc77 updated. Refresh to apply.', 'info');
+          }
+        });
+      });
+    }).catch(function (err) {
+      // SW 注册失败，输出警告便于排查，但不抛错
+      console.warn('[PWA] Service Worker 注册失败:', err && err.message ? err.message : err);
+    });
+  });
 })();
 
 // --- Offline Detection + Banner ---

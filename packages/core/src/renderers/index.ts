@@ -77,6 +77,10 @@ const EXTENSION_MAP: Record<string, string> = {
   '.gitignore': 'code',
   '.dockerignore': 'code',
   '.editorconfig': 'code',
+
+  // T5: CSV → table 渲染（非纯文本）
+  '.csv': 'table',
+  '.tsv': 'table',
   Dockerfile: 'code',
   Makefile: 'code',
 };
@@ -176,6 +180,7 @@ export const FORMAT_SIZE_LIMITS: Record<string, number> = {
   mermaid: 5 * 1024 * 1024,
   code: 5 * 1024 * 1024,
   text: 5 * 1024 * 1024,
+  table: 10 * 1024 * 1024, // T5: CSV/TSV
   docx: 50 * 1024 * 1024,
   xlsx: 10 * 1024 * 1024,
   pdf: 0, // unlimited — served via raw/stream
@@ -184,6 +189,9 @@ export const FORMAT_SIZE_LIMITS: Record<string, number> = {
 
 /**
  * Determine the appropriate renderer type for a given filename.
+ *
+ * 同步版本：仅查 EXTENSION_MAP，不调用插件 loader。
+ * 适用于无法 await 的路径（如 SSR 预渲染、流式响应中继）。
  */
 export function getRendererForFile(filename: string): string {
   // Check for exact match first (e.g., Dockerfile, Makefile)
@@ -198,6 +206,42 @@ export function getRendererForFile(filename: string): string {
 
   const ext = basename.slice(dotIndex).toLowerCase();
   return EXTENSION_MAP[ext] || 'text';
+}
+
+/**
+ * T5: async 版本 — 先查 EXTENSION_MAP，未命中再查插件 loader。
+ *
+ * 返回值约定：
+ * - 内置渲染器类型（如 'markdown'、'code'、'table'）—— 直接走内置 switch
+ * - `plugin:<name>` —— 走 app.ts 渲染 switch 的 plugin 分支，调用插件实例的 render()
+ * - `'text'` —— 默认纯文本兜底
+ *
+ * @param filename 文件名
+ * @param findRendererFn 可选的插件查找函数（注入以避免循环依赖 core→plugin→core）
+ */
+export async function getRendererForFileAsync(
+  filename: string,
+  findRendererFn?: (ext: string) => Promise<{ name: string } | null>,
+): Promise<string> {
+  // 先走内置 EXTENSION_MAP（含 T5 新增的 .csv → 'table'）
+  const builtin = getRendererForFile(filename);
+  if (builtin !== 'text') return builtin;
+
+  // 内置未命中 → 查插件 loader
+  const basename = filename.split('/').pop() || filename;
+  const dotIndex = basename.lastIndexOf('.');
+  if (dotIndex === -1) return 'text';
+  const ext = basename.slice(dotIndex).toLowerCase();
+
+  if (findRendererFn) {
+    try {
+      const plugin = await findRendererFn(ext);
+      if (plugin?.name) return `plugin:${plugin.name}`;
+    } catch {
+      // 插件加载失败不阻塞，回退到 text
+    }
+  }
+  return 'text';
 }
 
 /**

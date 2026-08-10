@@ -95,6 +95,21 @@ export function runMigrations(db?: DatabaseCompat): void {
 
   // Migrate old ai_chat_sessions data into new ai_sessions + ai_messages tables
   migrateOldAiChatSessions(conn);
+
+  // v10: sync_keyring — 持久化 sync 模块的 masterKey 信封（密码与恢复码各包裹一次同一 masterKey）
+  // 表结构：salt（密钥派生盐）、wrapped_master_by_password（密码包裹的 masterKey）、
+  // wrapped_master_by_recovery（恢复码包裹的同一 masterKey）、recovery_code_hash（恢复码 SHA-256 校验值）、
+  // version（协议版本号，供未来迁移使用）。单行设计 id=1。
+  conn.exec(SYNC_KEYRING_SCHEMA_SQL);
+
+  // v11: RAG 向量块存储 — T10 RAG 模块
+  // embedding 存为 BLOB（Float32Array 的 Buffer），查询时全量扫描计算余弦相似度
+  // 不使用 FTS5（FTS5 是关键词搜索，非向量搜索）
+  conn.exec(RAG_CHUNKS_SCHEMA_SQL);
+
+  // v12: 插件持久化 — T11 插件沙箱 + API 路由
+  // 存储 enable/disable 状态、配置 JSON、安装元数据
+  conn.exec(PLUGINS_SCHEMA_SQL);
 }
 
 const SCHEMA_SQL = `
@@ -584,6 +599,65 @@ CREATE TABLE IF NOT EXISTS ai_context_compactions (
   summary TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (session_id) REFERENCES ai_sessions(id) ON DELETE CASCADE
+);
+`;
+
+/**
+ * v10: sync_keyring — sync 模块的 masterKey 信封持久化表。
+ *
+ * 设计要点：
+ * - 单行表（id=1）：整个进程共享一个 sync keyring 实例
+ * - masterKey 由 setup() 随机生成，分别用密码和恢复码派生 wrapKey 后 AES-GCM 加密
+ * - salt 同时用于密码派生与恢复码派生（不同用途通过 info 字符串区分，或共用同一 scrypt 盐）
+ * - recovery_code_hash 用于在 unlockWithRecovery 时快速校验恢复码是否正确
+ * - version 字段支持未来协议升级（如更换 KDF 算法）
+ */
+const SYNC_KEYRING_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS sync_keyring (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  salt TEXT NOT NULL,
+  wrapped_master_by_password TEXT NOT NULL,
+  wrapped_master_by_recovery TEXT NOT NULL,
+  recovery_code_hash TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
+/**
+ * v11: RAG 向量块存储 — T10 RAG 模块。
+ * embedding 存为 BLOB（Float32Array 的 Buffer），查询时全量扫描计算余弦相似度。
+ */
+const RAG_CHUNKS_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS rag_chunks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  file_path TEXT NOT NULL,
+  chunk_index INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  embedding BLOB NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_project ON rag_chunks(project_id, file_path);
+`;
+
+/**
+ * v12: 插件持久化 — T11 插件沙箱 + API 路由。
+ * 存储 enable/disable 状态、配置 JSON、安装来源、版本兼容信息。
+ */
+const PLUGINS_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS plugins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  version TEXT NOT NULL,
+  type TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  config_json TEXT NOT NULL DEFAULT '{}',
+  source TEXT,
+  installed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `;
 

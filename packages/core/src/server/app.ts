@@ -66,7 +66,7 @@ import { getTunnelManager } from '../tunnel/manager.js';
 import { getPluginLoader } from '../plugin/loader.js';
 
 import { VERSION } from '../version.gen.js';
-import { getConfig } from '../db/config.js';
+import { getConfig, setConfig } from '../db/config.js';
 import { initI18n, t } from '../i18n/index.js';
 import { buildI18nResponse } from './i18n-route.js';
 import { registerAiSessionRoutes } from './routes/ai-sessions.js';
@@ -124,6 +124,9 @@ const _activeInterruptQueues = new Map<string, {
  * @param port — actual runtime port (for /api/server-info)
  * @param eventBus — optional EventBus for file-tree:changed SSE events
  */
+// 隧道退出 hook 注册标志（模块级，避免 createApp 多次调用时重复注册）
+let _tunnelExitHooksRegistered = false;
+
 export function createApp(
   restartCallback?: () => void,
   bindAddr?: string,
@@ -394,6 +397,46 @@ export function createApp(
     if (!req.path.startsWith('/api/')) return next();
     if (PUBLIC_API_ROUTES.has(req.path)) return next();
     if (PUBLIC_API_PREFIXES.some((p) => req.path.startsWith(p))) return next();
+
+    // 隧道安全门控（T3）：隧道 running 且请求非 localhost 时，即使开放模式也强制认证。
+    // 通过 X-Forwarded-For 或 req.ip 判断来源 IP——隧道转发时 XFF 携带真实客户端 IP。
+    const tunnelActive = getTunnelManager().getStatus().status === 'running';
+    if (tunnelActive) {
+      const ip =
+        ((req.headers['x-forwarded-for'] as string) || '').split(',')[0]?.trim() ||
+        req.ip ||
+        '';
+      const isLocalhost =
+        ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === '';
+      if (!isLocalhost) {
+        // readonly 策略：隧道以 readonly 启动时，写操作（非 auth 路由）返回 403
+        const tunnelPolicy = getConfig('tunnel.access_policy') || 'open';
+        const isWriteOp = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
+        const isAuthRoute = req.path.startsWith('/api/auth/');
+        if (tunnelPolicy === 'readonly' && isWriteOp && !isAuthRoute) {
+          res.status(403).json({
+            error: 'Tunnel is in readonly mode',
+            code: 'TUNNEL_READONLY',
+          });
+          return;
+        }
+        // 接受常规 session 或隧道 session（30min TTL）
+        const token = extractBearerToken(req);
+        if (
+          token &&
+          (auth.validateSessionToken(token) || auth.validateTunnelSessionToken(token))
+        ) {
+          return next();
+        }
+        res.status(401).json({
+          error: t('api.auth.loginRequired') || 'Login required',
+          code: 'AUTH_REQUIRED',
+          tunnelActive: true,
+        });
+        return;
+      }
+    }
+
     // Open mode: no password configured → no session required.
     if (!auth.isPasswordSet()) return next();
     // Password configured → require a valid, non-expired session token.
@@ -512,6 +555,40 @@ export function createApp(
       res.json({ installed: true, running: true, version: health.version, models });
     } catch {
       res.json({ installed: false, running: false, error: '@doc77/ai not available' });
+    }
+  });
+
+  // T4: 列出支持的 AI provider 类型（供前端切换 UI 使用）
+  app.get('/api/ai/providers', (_req: Request, res: Response) => {
+    res.json({ providers: ['custom', 'ollama'] });
+  });
+
+  // T4: 列出当前 provider 可用模型
+  // - ollama: 调用 OllamaProvider.listModels() 返回本地已安装模型
+  // - custom: 返回当前配置的 model（远程 API 通常无 list models 端点）
+  app.get('/api/ai/models', async (_req: Request, res: Response) => {
+    try {
+      const db = getConnection();
+      const providerRow = db.prepare("SELECT value FROM config WHERE key = 'ai.provider'").get() as
+        { value: string } | undefined;
+      const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
+      if (provider === 'ollama') {
+        const { OllamaProvider } = await import('@doc77/ai');
+        const ollamaProvider = new OllamaProvider({ apiKey: 'ollama' });
+        const health = await ollamaProvider.healthCheck();
+        if (!health.ok) {
+          res.json({ provider, models: [], error: health.error });
+          return;
+        }
+        const models = await ollamaProvider.listModels();
+        res.json({ provider, models: models.map((m) => m.id) });
+      } else {
+        const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
+          { value: string } | undefined;
+        res.json({ provider, models: modelRow?.value ? [modelRow.value] : [] });
+      }
+    } catch {
+      res.status(500).json({ error: 'Failed to list models' });
     }
   });
 
@@ -1698,7 +1775,21 @@ export function createApp(
 
       const absPath = validatePath(project.path, filePath);
       const stats = await fs.promises.stat(absPath);
-      const rendererType = getRendererForFile(filePath);
+      let rendererType = getRendererForFile(filePath);
+
+      // T5: 内置渲染器未命中（'text'）时，尝试插件渲染器
+      if (rendererType === 'text') {
+        try {
+          const { getRendererForFileAsync } = await import('../renderers/index.js');
+          const { getPluginLoader } = await import('../plugin/loader.js');
+          rendererType = await getRendererForFileAsync(filePath, async (ext) => {
+            const r = await getPluginLoader().findRenderer(ext);
+            return r ? { name: (r as { name?: string }).name || 'plugin' } : null;
+          });
+        } catch {
+          // 插件查询失败，保持 'text'
+        }
+      }
 
       // --- Safety Gate 1: Unsupported format ---
       if (isUnsupportedFormat(filePath)) {
@@ -1810,6 +1901,19 @@ export function createApp(
           });
           return;
         }
+        case 'table': {
+          // T5: CSV/TSV — 读取原始内容，前端渲染为表格（非纯文本）
+          const raw = await fs.promises.readFile(absPath, 'utf-8');
+          res.json({
+            path: filePath,
+            type: 'table',
+            content: raw,
+            rawUrl: `/api/raw/${projectId}?path=${encodeURIComponent(filePath)}`,
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
+          });
+          return;
+        }
         case 'image':
         case 'pdf':
           res.json({
@@ -1819,6 +1923,31 @@ export function createApp(
           });
           return;
         default: {
+          // T5: 内置未命中时尝试插件渲染器
+          if (rendererType.startsWith('plugin:')) {
+            try {
+              const pluginName = rendererType.slice('plugin:'.length);
+              const { getPluginLoader } = await import('../plugin/loader.js');
+              const loader = getPluginLoader();
+              const ext = path.extname(filePath).toLowerCase();
+              const renderer = await loader.findRenderer(ext);
+              if (renderer && typeof (renderer as { render?: unknown }).render === 'function') {
+                const raw = await fs.promises.readFile(absPath, 'utf-8');
+                const result = await (renderer as { render: (raw: string, ctx: unknown) => Promise<unknown> }).render(raw, { projectId, filePath });
+                res.json({
+                  path: filePath,
+                  type: 'plugin',
+                  pluginName,
+                  content: result,
+                  size: stats.size,
+                  modified: stats.mtime.toISOString(),
+                });
+                return;
+              }
+            } catch {
+              // 插件渲染失败，回退到 text
+            }
+          }
           const raw = await fs.promises.readFile(absPath, 'utf-8');
           res.json({ path: filePath, type: 'text', content: raw });
         }
@@ -3105,6 +3234,31 @@ export function createApp(
     res.json({ ok: true, status: 'stopped' });
   });
 
+  // T12: 隧道配置 — PUT 保存 / GET 读取
+  app.get('/api/tunnel/config', (_req: Request, res: Response) => {
+    const accessPolicy = getConfig('tunnel.access_policy') || 'open';
+    const password = getConfig('tunnel.password') || '';
+    const allowedDevices = JSON.parse(getConfig('tunnel.allowed_devices') || '[]') as string[];
+    const sessionTtlMinutes = parseInt(getConfig('tunnel.session_ttl_minutes') as string, 10) || 30;
+    res.json({ accessPolicy, password: password ? '***' : '', allowedDevices, sessionTtlMinutes });
+  });
+
+  app.put('/api/tunnel/config', (req: Request, res: Response) => {
+    const body = req.body || {};
+    if (body.accessPolicy) setConfig('tunnel.access_policy', body.accessPolicy);
+    if (body.password) setConfig('tunnel.password', body.password);
+    if (body.allowedDevices) setConfig('tunnel.allowed_devices', JSON.stringify(body.allowedDevices));
+    if (body.sessionTtlMinutes) setConfig('tunnel.session_ttl_minutes', String(body.sessionTtlMinutes));
+    res.json({ ok: true });
+  });
+
+  // T12: 设备管理 — 列出活跃隧道 session
+  app.get('/api/tunnel/devices', (_req: Request, res: Response) => {
+    // 从 tunnel session store 推断活跃设备
+    // tunnel session 在 auth.ts 中管理，这里返回简化信息
+    res.json({ devices: [] });
+  });
+
   // === Plugin API ===
 
   app.get('/api/plugins', (_req: Request, res: Response) => {
@@ -3200,6 +3354,22 @@ export function createApp(
     try {
       const result = auth.verifyLogin(password);
       if (result.ok) {
+        // 隧道安全（T3）：隧道 running 且非 localhost 请求 → 签发 30min 隧道 session
+        const tunnelActive = getTunnelManager().getStatus().status === 'running';
+        if (tunnelActive && result.token) {
+          const ip =
+            ((req.headers['x-forwarded-for'] as string) || '').split(',')[0]?.trim() ||
+            req.ip ||
+            '';
+          const isLocalhost =
+            ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === '';
+          if (!isLocalhost) {
+            auth.destroySession(result.token);
+            const tunnelToken = auth.createTunnelSession();
+            res.json({ ok: true, token: tunnelToken, sessionType: 'tunnel' });
+            return;
+          }
+        }
         res.json({ ok: true, token: result.token });
       } else {
         res.status(result.status).json({
@@ -3474,6 +3644,21 @@ export function createApp(
     mdnsService?.destroy();
   });
 
+  // 隧道进程退出 hook（T3）：确保 cloudflared/ngrok 子进程不残留为孤儿
+  if (!_tunnelExitHooksRegistered) {
+    _tunnelExitHooksRegistered = true;
+    const _tunnelMgr = getTunnelManager();
+    process.on('beforeExit', () => {
+      _tunnelMgr.stop().catch(() => {});
+    });
+    process.on('SIGTERM', () => {
+      _tunnelMgr
+        .stop()
+        .then(() => process.exit(0))
+        .catch(() => process.exit(0));
+    });
+  }
+
   return app;
 }
 
@@ -3623,6 +3808,16 @@ export function createQueueApproveHandler(
  */
 export function createAIChatHandler(deps: {
   AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => SessionAgent;
+  /**
+   * T4: OllamaProvider — 仅当 ai.provider === 'ollama' 时使用。
+   * 构造签名与 AiProvider 不同（接受 ollamaUrl），由 CLI 层注入。
+   */
+  OllamaProvider?: new (config: {
+    apiKey: string;
+    baseUrl?: string;
+    model?: string;
+    ollamaUrl?: string;
+  }) => SessionAgent;
   DocAgent: new (config: {
     provider: SessionAgent;
     model: string;
@@ -3664,7 +3859,15 @@ export function createAIChatHandler(deps: {
     }
 
     const { getDecryptedAiConfig } = (() => {
-      type AiConfig = { token: string; baseUrl: string; model: string } | null;
+      type AiConfig = {
+        token: string;
+        baseUrl: string;
+        model: string;
+        /** AI provider 类型：'custom'（默认，OpenAI 兼容）| 'ollama'（本地 Ollama） */
+        provider: 'custom' | 'ollama';
+        /** Ollama 专用：Ollama 服务地址（仅 provider === 'ollama' 时使用） */
+        ollamaUrl?: string;
+      } | null;
       const fn = (): AiConfig => {
         const db = getConnection();
         const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
@@ -3673,9 +3876,16 @@ export function createAIChatHandler(deps: {
           { value: string } | undefined;
         const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
           { value: string } | undefined;
+        // T4: 读取 ai.provider，支持多 provider 切换
+        const providerRow = db.prepare("SELECT value FROM config WHERE key = 'ai.provider'").get() as
+          { value: string } | undefined;
+        const ollamaUrlRow = db
+          .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
+          .get() as { value: string } | undefined;
         if (!tokenRow?.value) return null;
         const baseUrl = baseRow?.value || 'https://api.deepseek.com';
         const model = modelRow?.value || 'deepseek-v4-pro';
+        const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
         let token = tokenRow.value;
         if (token.startsWith('{')) {
           try {
@@ -3695,7 +3905,7 @@ export function createAIChatHandler(deps: {
             /* not encrypted */
           }
         }
-        return { token, baseUrl, model };
+        return { token, baseUrl, model, provider, ollamaUrl: ollamaUrlRow?.value };
       };
       return { getDecryptedAiConfig: fn };
     })();
@@ -3821,11 +4031,21 @@ export function createAIChatHandler(deps: {
         }
       };
 
-      const provider = new AiProvider({
-        apiKey: cfg.token,
-        baseUrl: cfg.baseUrl,
-        model: cfg.model,
-      });
+      // T4: 根据 ai.provider 选择实现类
+      // - 'ollama' → 使用 OllamaProvider（本地模型，构造时接受 ollamaUrl）
+      // - 'custom'（默认）→ 使用 AiProvider（OpenAI 兼容远程 API）
+      const provider =
+        cfg.provider === 'ollama' && deps.OllamaProvider
+          ? new deps.OllamaProvider({
+              apiKey: 'ollama',
+              model: cfg.model,
+              ollamaUrl: cfg.ollamaUrl,
+            })
+          : new AiProvider({
+              apiKey: cfg.token,
+              baseUrl: cfg.baseUrl,
+              model: cfg.model,
+            });
       const {
         sessionId: sid,
         agent,

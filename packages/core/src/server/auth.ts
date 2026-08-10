@@ -191,6 +191,54 @@ export function destroySession(token: string | undefined | null): boolean {
   return authSessions.delete(token);
 }
 
+// ---------------------------------------------------------------------------
+// 隧道专用 session store（T3 新增）
+// ---------------------------------------------------------------------------
+// 隧道激活时，非 localhost 请求必须携带有效 session。为限制暴露窗口，
+// 隧道 session 使用 30 分钟滑动 TTL，与主 session store（12h）分离。
+// 登录路由在「隧道 running + 非 localhost」场景下签发隧道 session 而非常规 session。
+const AUTH_TUNNEL_SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const tunnelAuthSessions = new Map<string, { expiresAt: number }>();
+
+function sweepExpiredTunnelSessions(now = Date.now()): void {
+  for (const [tok, entry] of tunnelAuthSessions) {
+    if (now > entry.expiresAt) tunnelAuthSessions.delete(tok);
+  }
+}
+
+/** 创建隧道专用 session，返回 opaque bearer token（30min TTL）。 */
+export function createTunnelSession(): string {
+  sweepExpiredTunnelSessions();
+  const token = randomBytes(32).toString('hex');
+  tunnelAuthSessions.set(token, { expiresAt: Date.now() + AUTH_TUNNEL_SESSION_TTL_MS });
+  return token;
+}
+
+/** 校验隧道 session token，成功则刷新滑动 TTL。 */
+export function validateTunnelSessionToken(token: string | undefined | null): boolean {
+  if (!token) return false;
+  sweepExpiredTunnelSessions();
+  const entry = tunnelAuthSessions.get(token);
+  if (!entry) return false;
+  if (Date.now() > entry.expiresAt) {
+    tunnelAuthSessions.delete(token);
+    return false;
+  }
+  entry.expiresAt = Date.now() + AUTH_TUNNEL_SESSION_TTL_MS;
+  return true;
+}
+
+/** 注销隧道 session。 */
+export function destroyTunnelSession(token: string | undefined | null): boolean {
+  if (!token) return false;
+  return tunnelAuthSessions.delete(token);
+}
+
+/** 清空所有隧道 session（凭据变更或隧道停止时调用）。 */
+export function revokeAllTunnelSessions(): void {
+  tunnelAuthSessions.clear();
+}
+
 /**
  * Invalidate every outstanding session token. Call after any credential change
  * (password change/reset, force-reset) so that stolen or stale tokens stop

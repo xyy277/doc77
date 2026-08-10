@@ -60,3 +60,15 @@ export { getSkillMetaTool, executeSkillMetaTool } from './skills/meta-tool.js';
 
 // Tools
 export { getReadTools, getWriteTools } from './tools.js';
+
+// T10: RAG 模块
+export { RagEngine } from './rag/index.js';
+export type { RagEngineConfig, RagEngineDeps, IndexedDocument, IndexResult } from './rag/index.js';
+export { chunkDocument } from './rag/chunker.js';
+export type { ChunkOptions, TextChunk } from './rag/chunker.js';
+export { createEmbedder } from './rag/embedder.js';
+export type { EmbedderConfig, EmbedFn } from './rag/embedder.js';
+export { VectorStore, cosineSimilarity } from './rag/vector-store.js';
+export type { VectorRecord, VectorStoreDeps } from './rag/vector-store.js';
+export { Retriever } from './rag/retriever.js';
+export type { RetrievalResult, RetrieverDeps } from './rag/retriever.js';

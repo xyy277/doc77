@@ -44,6 +44,10 @@ export interface SyncOptions {
   ignorePatterns: string[];
   conflictStrategy: 'ask' | 'local' | 'remote';
   dryRun: boolean;
+  /** 适配器配置（统一字段 — webdav/s3/local 适配器读取此字段） */
+  adapterConfig?: AdapterConfig;
+  /** git 适配器兼容字段（值与 adapterConfig 相同，git.ts 优先读 adapterConfig） */
+  gitConfig?: AdapterConfig;
 }
 
 /** Sync context passed to adapters */

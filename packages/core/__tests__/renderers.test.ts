@@ -4,7 +4,7 @@ import { renderMermaid } from '../src/renderers/mermaid.js';
 import { renderPdf } from '../src/renderers/pdf.js';
 import { renderImage } from '../src/renderers/image.js';
 import { renderCode } from '../src/renderers/code.js';
-import { getRendererForFile } from '../src/renderers/index.js';
+import { getRendererForFile, getRendererForFileAsync } from '../src/renderers/index.js';
 
 describe('Markdown renderer', () => {
   it('should render headings', () => {
@@ -280,5 +280,54 @@ describe('Renderer dispatcher', () => {
 
   it('should return text fallback for unknown types', () => {
     expect(getRendererForFile('data.bin')).toBe('text');
+  });
+});
+
+/**
+ * T5 验收：渲染器派发修复
+ * - .csv 文件返回非 'text' 的渲染类型（'table'）
+ * - async 版本调用插件 loader 发现 mock 渲染器
+ */
+describe('T5 — renderer dispatch + plugin loader', () => {
+  it('.csv 文件返回 table 渲染类型（非 text）', () => {
+    expect(getRendererForFile('data.csv')).toBe('table');
+    expect(getRendererForFile('data.tsv')).toBe('table');
+  });
+
+  it('getRendererForFileAsync 内置命中时不调用插件 loader', async () => {
+    // .md 内置命中，不应调用 findRendererFn
+    let called = false;
+    const result = await getRendererForFileAsync('readme.md', async () => {
+      called = true;
+      return null;
+    });
+    expect(result).toBe('markdown');
+    expect(called).toBe(false);
+  });
+
+  it('getRendererForFileAsync 内置未命中时调用插件 loader，返回 plugin:name', async () => {
+    // .xyz 不在内置 map，应调用 findRendererFn
+    const result = await getRendererForFileAsync('a.xyz', async (ext) => {
+      expect(ext).toBe('.xyz');
+      return { name: 'mock' };
+    });
+    expect(result).toBe('plugin:mock');
+  });
+
+  it('getRendererForFileAsync 插件未注册时回退到 text', async () => {
+    const result = await getRendererForFileAsync('a.unknown', async () => null);
+    expect(result).toBe('text');
+  });
+
+  it('getRendererForFileAsync 插件 loader 抛错时优雅回退到 text', async () => {
+    const result = await getRendererForFileAsync('a.fail', async () => {
+      throw new Error('plugin load failed');
+    });
+    expect(result).toBe('text');
+  });
+
+  it('getRendererForFileAsync 无 findRendererFn 时回退到 text', async () => {
+    const result = await getRendererForFileAsync('a.xyz');
+    expect(result).toBe('text');
   });
 });
