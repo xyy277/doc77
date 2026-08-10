@@ -8,11 +8,7 @@
  *   4. Auto-Compact — LLM-driven or structural summary (threshold-gated)
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  ContextManager,
-  estimateTokens,
-  estimateMessagesTokens,
-} from '../src/context-manager.js';
+import { ContextManager, estimateTokens, estimateMessagesTokens } from '../src/context-manager.js';
 import type { AiMessage } from '../src/provider/index.js';
 
 describe('estimateTokens', () => {
@@ -142,7 +138,11 @@ describe('ContextManager', () => {
         { role: 'assistant', content: 'recent answer' },
       ];
 
-      const { messages: result, summary, compactedCount } = await cm.autoCompact(messages, {
+      const {
+        messages: result,
+        summary,
+        compactedCount,
+      } = await cm.autoCompact(messages, {
         maxTokens: 100,
         keepLastN: 2,
       });

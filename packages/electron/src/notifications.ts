@@ -40,10 +40,7 @@ export interface EventBus {
 
 /** 支持的事件名白名单 —— 仅订阅实际存在的事件。 */
 export type NotificationEvent =
-  | 'task:approved'
-  | 'task:executed'
-  | 'task:failed'
-  | 'file-tree:changed';
+  'task:approved' | 'task:executed' | 'task:failed' | 'file-tree:changed';
 
 /** 事件→通知文案的纯函数映射。抽离以便测试。 */
 export function buildNotification(
@@ -72,7 +69,8 @@ export function buildNotification(
     }
     case 'task:failed': {
       const taskId = String(p.task_id ?? '');
-      const err = typeof p.error_message === 'string' ? p.error_message : t('notification.unknownError');
+      const err =
+        typeof p.error_message === 'string' ? p.error_message : t('notification.unknownError');
       return {
         title: t('notification.failed.title'),
         body: t('notification.failed.body', { taskId, err }),
@@ -97,10 +95,7 @@ export interface NotificationLike {
 }
 
 /** Notification 构造器签名（Electron Notification 的子集）。 */
-export type NotificationCtor = new (options: {
-  title: string;
-  body: string;
-}) => NotificationLike;
+export type NotificationCtor = new (options: { title: string; body: string }) => NotificationLike;
 
 /** 浏览器窗口的最小形态：仅需要 webContents.send 用于点击通知后 IPC 通知渲染进程。 */
 export interface WindowLike {
@@ -118,10 +113,7 @@ export class ElectronNotificationDispatcher implements NotificationDispatcher {
   private readonly getWindow: () => WindowLike | null;
   private readonly NotificationCtor: NotificationCtor | null;
 
-  constructor(
-    getWindow: () => WindowLike | null,
-    NotificationCtor?: NotificationCtor | null,
-  ) {
+  constructor(getWindow: () => WindowLike | null, NotificationCtor?: NotificationCtor | null) {
     this.getWindow = getWindow;
     if (NotificationCtor !== undefined) {
       this.NotificationCtor = NotificationCtor;

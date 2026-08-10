@@ -65,9 +65,8 @@ export function registerSyncRoutes(app: AppRouter, deps: SyncRouteDeps): void {
       res.status(400).json({ error: 'Invalid projectId' });
       return;
     }
-    const config = db
-      .prepare('SELECT * FROM sync_configs WHERE project_id = ?')
-      .get(projectId) as SyncConfig | undefined;
+    const config = db.prepare('SELECT * FROM sync_configs WHERE project_id = ?').get(projectId) as
+      SyncConfig | undefined;
     if (!config) {
       res.status(404).json({ error: 'No sync config for this project' });
       return;
@@ -146,9 +145,8 @@ export function registerSyncRoutes(app: AppRouter, deps: SyncRouteDeps): void {
       res.status(404).json({ error: 'Project not found' });
       return;
     }
-    const config = db
-      .prepare('SELECT * FROM sync_configs WHERE project_id = ?')
-      .get(projectId) as SyncConfig | undefined;
+    const config = db.prepare('SELECT * FROM sync_configs WHERE project_id = ?').get(projectId) as
+      SyncConfig | undefined;
     if (!config) {
       res.status(404).json({ error: 'No sync config for this project' });
       return;
@@ -215,9 +213,7 @@ export function registerSyncRoutes(app: AppRouter, deps: SyncRouteDeps): void {
     }
     const limit = parseInt(req.query.limit as string, 10) || 50;
     const logs = db
-      .prepare(
-        'SELECT * FROM sync_log WHERE project_id = ? ORDER BY created_at DESC LIMIT ?',
-      )
+      .prepare('SELECT * FROM sync_log WHERE project_id = ? ORDER BY created_at DESC LIMIT ?')
       .all(projectId, limit);
     res.json({ logs });
   });
@@ -229,9 +225,8 @@ export function registerSyncRoutes(app: AppRouter, deps: SyncRouteDeps): void {
       res.status(400).json({ error: 'Invalid projectId' });
       return;
     }
-    const config = db
-      .prepare('SELECT * FROM sync_configs WHERE project_id = ?')
-      .get(projectId) as SyncConfig | undefined;
+    const config = db.prepare('SELECT * FROM sync_configs WHERE project_id = ?').get(projectId) as
+      SyncConfig | undefined;
     if (!config) {
       res.status(404).json({ error: 'No sync config for this project' });
       return;
@@ -260,8 +255,7 @@ export function registerSyncRoutes(app: AppRouter, deps: SyncRouteDeps): void {
     }
     // 从 sync_state 读取上次同步的冲突信息
     const state = db.prepare('SELECT * FROM sync_state WHERE project_id = ?').get(projectId) as
-      | { total_conflicts: number; last_error: string | null }
-      | undefined;
+      { total_conflicts: number; last_error: string | null } | undefined;
     const conflictCount = state?.total_conflicts || 0;
     // 返回冲突摘要（详细冲突信息存在 sync_log 中）
     res.json({

@@ -43,7 +43,8 @@ afterAll(() => {
 
 describe('T10 — chunker 分块器', () => {
   it('按段落分块', () => {
-    const text = '这是第一段的内容，有足够长度来独立成块。\n\n这是第二段的内容，也有足够长度。\n\n这是第三段的内容，同样足够长。';
+    const text =
+      '这是第一段的内容，有足够长度来独立成块。\n\n这是第二段的内容，也有足够长度。\n\n这是第三段的内容，同样足够长。';
     const chunks = chunkDocument(text, { maxChunkSize: 25, minChunkSize: 1 });
     expect(chunks.length).toBeGreaterThanOrEqual(2);
     expect(chunks[0].content).toContain('第一段');
@@ -115,7 +116,8 @@ describe('T10 — RagEngine 索引 + 查询（mock embed）', () => {
     const result = await engine.indexDocument({
       projectId: 1,
       filePath: 'test.md',
-      content: '人工智能是计算机科学的一个分支。\n\n机器学习是人工智能的子领域。\n\n深度学习使用神经网络。',
+      content:
+        '人工智能是计算机科学的一个分支。\n\n机器学习是人工智能的子领域。\n\n深度学习使用神经网络。',
     });
     expect(result.chunkCount).toBeGreaterThan(0);
     expect(result.vectorCount).toBeGreaterThan(0);
@@ -154,15 +156,26 @@ describe('T10 — RAG 路由', () => {
     };
     const engine = new RagEngine({
       db,
-      config: { embedder: { provider: 'custom', embedModel: 'mock' }, chunkOptions: { minChunkSize: 1 } },
+      config: {
+        embedder: { provider: 'custom', embedModel: 'mock' },
+        chunkOptions: { minChunkSize: 1 },
+      },
       embedFn: mockEmbed,
     });
 
     // 简易路由器
-    const routes: Array<{ method: string; pattern: RegExp; paramNames: string[]; handler: (req: any, res: any) => void }> = [];
+    const routes: Array<{
+      method: string;
+      pattern: RegExp;
+      paramNames: string[];
+      handler: (req: any, res: any) => void;
+    }> = [];
     const addRoute = (method: string, p: string, h: any) => {
       const paramNames: string[] = [];
-      const regexStr = p.replace(/:([^/]+)/g, (_, n) => { paramNames.push(n); return '([^/]+)'; });
+      const regexStr = p.replace(/:([^/]+)/g, (_, n) => {
+        paramNames.push(n);
+        return '([^/]+)';
+      });
       routes.push({ method, pattern: new RegExp(`^${regexStr}$`), paramNames, handler: h });
     };
     const app = {
@@ -183,7 +196,9 @@ describe('T10 — RAG 路由', () => {
         if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
           const chunks: Buffer[] = [];
           for await (const c of req) chunks.push(Buffer.from(c));
-          try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch {}
+          try {
+            body = JSON.parse(Buffer.concat(chunks).toString());
+          } catch {}
         }
         // 正确解析 params
         const params: Record<string, string> = {};
@@ -193,8 +208,14 @@ describe('T10 — RAG 路由', () => {
         const reqLike = { params, query: {}, body, method: req.method, path: url.pathname };
         const resLike = {
           _status: 200,
-          status(code: number) { this._status = code; return this; },
-          json(data: unknown) { res.writeHead(this._status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); },
+          status(code: number) {
+            this._status = code;
+            return this;
+          },
+          json(data: unknown) {
+            res.writeHead(this._status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
+          },
         };
         await route.handler(reqLike, resLike);
         return;

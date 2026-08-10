@@ -65,7 +65,14 @@ export class PluginLoader {
   /**
    * Get all discovered plugins.
    */
-  list(): Array<{ name: string; displayName: string; type: string; version: string; enabled: boolean; loaded: boolean }> {
+  list(): Array<{
+    name: string;
+    displayName: string;
+    type: string;
+    version: string;
+    enabled: boolean;
+    loaded: boolean;
+  }> {
     return Array.from(this.plugins.values()).map((p) => ({
       name: p.manifest.name,
       displayName: p.manifest.displayName,
@@ -89,7 +96,9 @@ export class PluginLoader {
   /**
    * Get all active renderer plugins.
    */
-  async getRenderers(): Promise<Array<{ plugin: RendererPlugin; extensions: string[]; priority: number }>> {
+  async getRenderers(): Promise<
+    Array<{ plugin: RendererPlugin; extensions: string[]; priority: number }>
+  > {
     const renderers: Array<{ plugin: RendererPlugin; extensions: string[]; priority: number }> = [];
     for (const [name, p] of this.plugins) {
       if (p.manifest.type !== 'renderer' || !p.enabled) continue;

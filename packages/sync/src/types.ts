@@ -140,4 +140,3 @@ export interface SyncState {
   total_pulled: number;
   total_conflicts: number;
 }
-

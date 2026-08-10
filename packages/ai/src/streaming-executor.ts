@@ -34,10 +34,7 @@ export interface ToolResult {
   errorMessage?: string;
 }
 
-export type ToolExecutorFn = (
-  name: string,
-  args: Record<string, unknown>,
-) => Promise<string>;
+export type ToolExecutorFn = (name: string, args: Record<string, unknown>) => Promise<string>;
 
 /**
  * Set of tool names that are read-only and safe to run concurrently.
@@ -76,10 +73,7 @@ export class StreamingToolExecutor {
   private totalEnqueued = 0;
   private resolveResults?: () => void;
 
-  constructor(
-    executeTool: ToolExecutorFn,
-    opts: StreamingExecutorOptions = {},
-  ) {
+  constructor(executeTool: ToolExecutorFn, opts: StreamingExecutorOptions = {}) {
     this.executeTool = executeTool;
     this.maxConcurrency = opts.maxConcurrency ?? 4;
     this.isReadOnly = opts.isReadOnly ?? ((name) => READ_ONLY_TOOLS.has(name));

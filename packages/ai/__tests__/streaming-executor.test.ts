@@ -64,12 +64,15 @@ describe('StreamingToolExecutor', () => {
 
   it('executes multiple read-only tools concurrently', async () => {
     const executionOrder: string[] = [];
-    const executor = new StreamingToolExecutor(async (name) => {
-      executionOrder.push(`start:${name}`);
-      await new Promise((r) => setTimeout(r, 50));
-      executionOrder.push(`end:${name}`);
-      return `done:${name}`;
-    }, { maxConcurrency: 3 });
+    const executor = new StreamingToolExecutor(
+      async (name) => {
+        executionOrder.push(`start:${name}`);
+        await new Promise((r) => setTimeout(r, 50));
+        executionOrder.push(`end:${name}`);
+        return `done:${name}`;
+      },
+      { maxConcurrency: 3 },
+    );
 
     executor.enqueue({ id: 'tc1', name: 'list_files', argsStr: '{}' });
     executor.enqueue({ id: 'tc2', name: 'read_file', argsStr: '{}' });
@@ -88,12 +91,15 @@ describe('StreamingToolExecutor', () => {
 
   it('serializes write tools (one at a time)', async () => {
     const executionOrder: string[] = [];
-    const executor = new StreamingToolExecutor(async (name) => {
-      executionOrder.push(`start:${name}`);
-      await new Promise((r) => setTimeout(r, 30));
-      executionOrder.push(`end:${name}`);
-      return `done:${name}`;
-    }, { maxConcurrency: 3 });
+    const executor = new StreamingToolExecutor(
+      async (name) => {
+        executionOrder.push(`start:${name}`);
+        await new Promise((r) => setTimeout(r, 30));
+        executionOrder.push(`end:${name}`);
+        return `done:${name}`;
+      },
+      { maxConcurrency: 3 },
+    );
 
     // Two write tools — should NOT run concurrently
     executor.enqueue({ id: 'tc1', name: 'write_file', argsStr: '{}' });

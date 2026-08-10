@@ -668,16 +668,16 @@ CREATE TABLE IF NOT EXISTS plugins (
  */
 function migrateOldAiChatSessions(db: DatabaseCompat): void {
   // Check if old table exists
-  const oldTable = db.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name='ai_chat_sessions'"
-  ).get();
+  const oldTable = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ai_chat_sessions'")
+    .get();
   if (!oldTable) return;
 
   // Pre-fetch valid project ids so we don't violate the ai_sessions FK
   // constraint (project_id REFERENCES projects(id)). Old sessions may
   // reference projects that were deleted.
   const validProjectIds = new Set(
-    (db.prepare('SELECT id FROM projects').all() as Array<{ id: number }>).map(r => r.id),
+    (db.prepare('SELECT id FROM projects').all() as Array<{ id: number }>).map((r) => r.id),
   );
 
   // Disable FK enforcement for the duration of the migration. Some legacy
@@ -686,17 +686,32 @@ function migrateOldAiChatSessions(db: DatabaseCompat): void {
   // fresh, so the only remaining FK is session_id → ai_sessions which we
   // always satisfy. Disabling here is belt-and-suspenders to avoid a
   // single bad row aborting the whole migration.
-  try { db.prepare('PRAGMA foreign_keys = OFF').run(); } catch { /* ignore */ }
+  try {
+    db.prepare('PRAGMA foreign_keys = OFF').run();
+  } catch {
+    /* ignore */
+  }
 
-  const oldSessions = db.prepare('SELECT session_id, project_id, messages, updated_at FROM ai_chat_sessions').all() as
-    Array<{ session_id: string; project_id: number | null; messages: string; updated_at: string }>;
+  const oldSessions = db
+    .prepare('SELECT session_id, project_id, messages, updated_at FROM ai_chat_sessions')
+    .all() as Array<{
+    session_id: string;
+    project_id: number | null;
+    messages: string;
+    updated_at: string;
+  }>;
 
   for (const old of oldSessions) {
     // Skip if already migrated (session exists in new table)
     const existing = db.prepare('SELECT id FROM ai_sessions WHERE id = ?').get(old.session_id);
     if (existing) continue;
 
-    let messages: Array<{ role?: string; content?: string; tool_calls?: unknown[]; tool_call_id?: string }>;
+    let messages: Array<{
+      role?: string;
+      content?: string;
+      tool_calls?: unknown[];
+      tool_call_id?: string;
+    }>;
     try {
       messages = JSON.parse(old.messages);
     } catch {
@@ -705,18 +720,17 @@ function migrateOldAiChatSessions(db: DatabaseCompat): void {
     if (!Array.isArray(messages) || messages.length === 0) continue;
 
     // Null out project_id if it references a deleted project (FK safety)
-    const safeProjectId = old.project_id != null && validProjectIds.has(old.project_id)
-      ? old.project_id
-      : null;
+    const safeProjectId =
+      old.project_id != null && validProjectIds.has(old.project_id) ? old.project_id : null;
 
     // Create new session
     db.prepare(
       `INSERT OR IGNORE INTO ai_sessions (id, project_id, title, status, created_at, updated_at)
-       VALUES (?, ?, ?, 'archived', ?, ?)`
+       VALUES (?, ?, ?, 'archived', ?, ?)`,
     ).run(
       old.session_id,
       safeProjectId,
-      messages.find(m => m.role === 'user')?.content?.slice(0, 50) || 'Migrated Session',
+      messages.find((m) => m.role === 'user')?.content?.slice(0, 50) || 'Migrated Session',
       old.updated_at,
       old.updated_at,
     );
@@ -732,7 +746,7 @@ function migrateOldAiChatSessions(db: DatabaseCompat): void {
 
       db.prepare(
         `INSERT INTO ai_messages (id, session_id, parent_id, role, content, raw_json, tool_calls, tool_call_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       ).run(
         msgId,
         old.session_id,
@@ -748,16 +762,24 @@ function migrateOldAiChatSessions(db: DatabaseCompat): void {
 
     // Set current_leaf_id to last message
     if (parentId) {
-      db.prepare('UPDATE ai_sessions SET current_leaf_id = ? WHERE id = ?')
-        .run(parentId, old.session_id);
+      db.prepare('UPDATE ai_sessions SET current_leaf_id = ? WHERE id = ?').run(
+        parentId,
+        old.session_id,
+      );
     }
     // Update message count
-    db.prepare('UPDATE ai_sessions SET message_count = ? WHERE id = ?')
-      .run(messages.length, old.session_id);
+    db.prepare('UPDATE ai_sessions SET message_count = ? WHERE id = ?').run(
+      messages.length,
+      old.session_id,
+    );
   }
 
   // Re-enable FK enforcement (was disabled at the top of this function).
-  try { db.prepare('PRAGMA foreign_keys = ON').run(); } catch { /* ignore */ }
+  try {
+    db.prepare('PRAGMA foreign_keys = ON').run();
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Simple UUID v4 generator (no external dependency) */

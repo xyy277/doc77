@@ -255,8 +255,9 @@ export function revokeAllSessions(): void {
  */
 export function isPasswordSet(): boolean {
   try {
-    const row = getConnection().prepare('SELECT password_hash FROM user_auth WHERE id = 1').get() as
-      { password_hash: string | null } | undefined;
+    const row = getConnection()
+      .prepare('SELECT password_hash FROM user_auth WHERE id = 1')
+      .get() as { password_hash: string | null } | undefined;
     return !!row?.password_hash;
   } catch {
     // DB not ready — fail closed for safety on routes that check, but most

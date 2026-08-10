@@ -58,11 +58,16 @@ export class S3Adapter implements SyncAdapter {
       const result = await client.send(
         new ListObjectsV2Command({ Bucket: cfg.bucket, Prefix: cfg.prefix || '', MaxKeys: 1 }),
       );
-      return { ok: true, message: `Connected to bucket "${cfg.bucket}". KeyCount: ${result.KeyCount ?? 0}` };
+      return {
+        ok: true,
+        message: `Connected to bucket "${cfg.bucket}". KeyCount: ${result.KeyCount ?? 0}`,
+      };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Connection failed';
-      if (msg.includes('AccessDenied')) return { ok: false, message: 'Access denied — check credentials' };
-      if (msg.includes('NoSuchBucket')) return { ok: false, message: `Bucket "${cfg.bucket}" not found` };
+      if (msg.includes('AccessDenied'))
+        return { ok: false, message: 'Access denied — check credentials' };
+      if (msg.includes('NoSuchBucket'))
+        return { ok: false, message: `Bucket "${cfg.bucket}" not found` };
       return { ok: false, message: msg };
     }
   }
@@ -97,7 +102,9 @@ export class S3Adapter implements SyncAdapter {
         }
         continuationToken = result.NextContinuationToken;
       } while (continuationToken);
-    } catch { /* empty */ }
+    } catch {
+      /* empty */
+    }
 
     return entries;
   }
@@ -116,7 +123,8 @@ export class S3Adapter implements SyncAdapter {
           let needsUpdate = true;
           if (fs.existsSync(localPath)) {
             const stat = fs.statSync(localPath);
-            if (stat.mtime.getTime() >= new Date(remote.lastModified).getTime()) needsUpdate = false;
+            if (stat.mtime.getTime() >= new Date(remote.lastModified).getTime())
+              needsUpdate = false;
           }
           if (!needsUpdate) continue;
 
@@ -136,7 +144,9 @@ export class S3Adapter implements SyncAdapter {
             result.filesUpdated++;
           }
         } catch (e: unknown) {
-          result.errors.push(`${remote.path}: ${e instanceof Error ? e.message : 'download failed'}`);
+          result.errors.push(
+            `${remote.path}: ${e instanceof Error ? e.message : 'download failed'}`,
+          );
         }
       }
     } catch (e: unknown) {
@@ -193,4 +203,3 @@ export class S3Adapter implements SyncAdapter {
     });
   }
 }
-

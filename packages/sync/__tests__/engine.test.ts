@@ -22,7 +22,10 @@ import type { SyncConfig } from '../src/types.js';
 /** 创建临时目录 */
 function makeTmp(prefix: string): string {
   return fs.mkdtempSync(
-    path.join(os.tmpdir(), `doc77-t1-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    path.join(
+      os.tmpdir(),
+      `doc77-t1-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    ),
   );
 }
 
@@ -292,8 +295,20 @@ describe('state.ts — scanLocal + compareRemote', () => {
 
   it('compareRemote 本地有远程无 → toPush', () => {
     const local = [
-      { path: 'a.txt', type: 'added' as const, mtime: '2026-01-01T00:00:00.000Z', hash: 'h1', size: 1 },
-      { path: 'b.txt', type: 'added' as const, mtime: '2026-01-01T00:00:00.000Z', hash: 'h2', size: 1 },
+      {
+        path: 'a.txt',
+        type: 'added' as const,
+        mtime: '2026-01-01T00:00:00.000Z',
+        hash: 'h1',
+        size: 1,
+      },
+      {
+        path: 'b.txt',
+        type: 'added' as const,
+        mtime: '2026-01-01T00:00:00.000Z',
+        hash: 'h2',
+        size: 1,
+      },
     ];
     const remote = [{ path: 'c.txt', size: 1, lastModified: '2026-01-01T00:00:00.000Z' }];
 
@@ -306,7 +321,13 @@ describe('state.ts — scanLocal + compareRemote', () => {
 
   it('compareRemote hash 相同 → 跳过', () => {
     const local = [
-      { path: 'a.txt', type: 'added' as const, mtime: '2026-01-01T00:00:00.000Z', hash: 'same', size: 1 },
+      {
+        path: 'a.txt',
+        type: 'added' as const,
+        mtime: '2026-01-01T00:00:00.000Z',
+        hash: 'same',
+        size: 1,
+      },
     ];
     const remote = [
       { path: 'a.txt', size: 1, lastModified: '2026-01-01T00:00:00.000Z', hash: 'same' },
@@ -319,7 +340,13 @@ describe('state.ts — scanLocal + compareRemote', () => {
 
   it('compareRemote hash 不同 → toPush + conflicts', () => {
     const local = [
-      { path: 'a.txt', type: 'added' as const, mtime: '2026-01-01T00:00:00.000Z', hash: 'local-hash', size: 1 },
+      {
+        path: 'a.txt',
+        type: 'added' as const,
+        mtime: '2026-01-01T00:00:00.000Z',
+        hash: 'local-hash',
+        size: 1,
+      },
     ];
     const remote = [
       { path: 'a.txt', size: 1, lastModified: '2026-01-01T00:00:00.000Z', hash: 'remote-hash' },

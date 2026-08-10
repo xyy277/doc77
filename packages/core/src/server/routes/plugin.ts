@@ -57,7 +57,9 @@ export function registerPluginRoutes(app: PluginAppRouter, deps: PluginRouteDeps
 
   // ── GET /api/plugins — 列出已安装插件 ──
   app.get('/api/plugins', (_req: Req, res: Res) => {
-    const rows = db.prepare('SELECT * FROM plugins ORDER BY installed_at DESC').all() as PluginRow[];
+    const rows = db
+      .prepare('SELECT * FROM plugins ORDER BY installed_at DESC')
+      .all() as PluginRow[];
     res.json({
       plugins: rows.map((r) => ({
         name: r.name,
@@ -124,8 +126,7 @@ export function registerPluginRoutes(app: PluginAppRouter, deps: PluginRouteDeps
   app.get('/api/plugins/:name/config', (req: Req, res: Res) => {
     const name = req.params.name;
     const row = db.prepare('SELECT config_json FROM plugins WHERE name = ?').get(name) as
-      | { config_json: string }
-      | undefined;
+      { config_json: string } | undefined;
     if (!row) {
       res.status(404).json({ error: 'Plugin not found' });
       return;

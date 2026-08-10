@@ -72,8 +72,7 @@ export class SkillEngine {
   private builtinSkillsDir: string;
 
   constructor(opts?: { builtinSkillsDir?: string }) {
-    this.builtinSkillsDir =
-      opts?.builtinSkillsDir || path.join(__dirname, 'builtin', 'skills');
+    this.builtinSkillsDir = opts?.builtinSkillsDir || path.join(__dirname, 'builtin', 'skills');
   }
 
   /**
@@ -235,7 +234,9 @@ export class SkillEngine {
           try {
             const content = fs.readFileSync(path.join(refDir, entry.name), 'utf-8');
             refs.push(`\n### Reference: ${entry.name}\n${content}`);
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
       }
       return refs.join('\n');

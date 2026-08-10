@@ -46,14 +46,21 @@ describe('SessionStore — session CRUD', () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `doc77-sess-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `doc77-sess-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
     await initDatabase(path.join(testDir, 'data.db'));
     runMigrations();
   });
 
   afterEach(() => {
-    try { closeConnection(); } catch { /* ignore */ }
+    try {
+      closeConnection();
+    } catch {
+      /* ignore */
+    }
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -109,9 +116,9 @@ describe('SessionStore — session CRUD', () => {
 
     const active = listSessions({ status: 'active', limit: 100 });
     const archived = listSessions({ status: 'archived', limit: 100 });
-    expect(active.some(s => s.title === 'active-1')).toBe(true);
-    expect(active.every(s => s.status === 'active')).toBe(true);
-    expect(archived.some(s => s.title === 'archived-1')).toBe(true);
+    expect(active.some((s) => s.title === 'active-1')).toBe(true);
+    expect(active.every((s) => s.status === 'active')).toBe(true);
+    expect(archived.some((s) => s.title === 'archived-1')).toBe(true);
   });
 
   it('lists pinned sessions first when sorting', () => {
@@ -120,8 +127,8 @@ describe('SessionStore — session CRUD', () => {
     updateSession(s2.id, { pinned: true });
 
     const list = listSessions({ limit: 100 });
-    const pinnedIdx = list.findIndex(s => s.title === 'pinned');
-    const unpinnedIdx = list.findIndex(s => s.title === 'unpinned');
+    const pinnedIdx = list.findIndex((s) => s.title === 'pinned');
+    const unpinnedIdx = list.findIndex((s) => s.title === 'unpinned');
     expect(pinnedIdx).toBeLessThanOrEqual(unpinnedIdx);
   });
 });
@@ -131,7 +138,10 @@ describe('SessionStore — message tree', () => {
   let sessionId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `doc77-msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `doc77-msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
     await initDatabase(path.join(testDir, 'data.db'));
     runMigrations();
@@ -140,13 +150,21 @@ describe('SessionStore — message tree', () => {
   });
 
   afterEach(() => {
-    try { closeConnection(); } catch { /* ignore */ }
+    try {
+      closeConnection();
+    } catch {
+      /* ignore */
+    }
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
   it('appends messages as a linear chain (parent → child)', () => {
     const u1 = appendMessage(sessionId, { role: 'user', content: 'hello', parentId: null });
-    const a1 = appendMessage(sessionId, { role: 'assistant', content: 'hi there', parentId: u1.id });
+    const a1 = appendMessage(sessionId, {
+      role: 'assistant',
+      content: 'hi there',
+      parentId: u1.id,
+    });
 
     expect(u1.parentId).toBeNull();
     expect(a1.parentId).toBe(u1.id);
@@ -163,7 +181,7 @@ describe('SessionStore — message tree', () => {
     const u2 = appendMessage(sessionId, { role: 'user', content: 'q2', parentId: a.id });
 
     const path = getMessagePath(sessionId);
-    expect(path.map(m => m.content)).toEqual(['q', 'a', 'q2']);
+    expect(path.map((m) => m.content)).toEqual(['q', 'a', 'q2']);
   });
 
   it('getMessage retrieves a single message by id', () => {
@@ -194,7 +212,10 @@ describe('SessionStore — branching', () => {
   let sessionId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `doc77-br-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `doc77-br-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
     await initDatabase(path.join(testDir, 'data.db'));
     runMigrations();
@@ -203,19 +224,31 @@ describe('SessionStore — branching', () => {
   });
 
   afterEach(() => {
-    try { closeConnection(); } catch { /* ignore */ }
+    try {
+      closeConnection();
+    } catch {
+      /* ignore */
+    }
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
   it('creates sibling messages (branch variants) with the same parent', () => {
     const userMsg = appendMessage(sessionId, { role: 'user', content: 'question', parentId: null });
-    const a1 = appendMessage(sessionId, { role: 'assistant', content: 'answer v1', parentId: userMsg.id });
-    const a2 = appendMessage(sessionId, { role: 'assistant', content: 'answer v2', parentId: userMsg.id });
+    const a1 = appendMessage(sessionId, {
+      role: 'assistant',
+      content: 'answer v1',
+      parentId: userMsg.id,
+    });
+    const a2 = appendMessage(sessionId, {
+      role: 'assistant',
+      content: 'answer v2',
+      parentId: userMsg.id,
+    });
 
     // Both assistants are children of the same user message
     const children = getMessageChildren(userMsg.id);
     expect(children).toHaveLength(2);
-    expect(children.map(c => c.content).sort()).toEqual(['answer v1', 'answer v2']);
+    expect(children.map((c) => c.content).sort()).toEqual(['answer v1', 'answer v2']);
   });
 
   it('getBranchVariants returns all siblings including the message itself', () => {
@@ -265,7 +298,10 @@ describe('SessionStore — tool logs + token usage', () => {
   let sessionId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `doc77-tool-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `doc77-tool-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
     await initDatabase(path.join(testDir, 'data.db'));
     runMigrations();
@@ -274,7 +310,11 @@ describe('SessionStore — tool logs + token usage', () => {
   });
 
   afterEach(() => {
-    try { closeConnection(); } catch { /* ignore */ }
+    try {
+      closeConnection();
+    } catch {
+      /* ignore */
+    }
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -328,7 +368,10 @@ describe('SessionStore — search', () => {
   let sessionId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `doc77-search-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `doc77-search-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
     await initDatabase(path.join(testDir, 'data.db'));
     runMigrations();
@@ -337,24 +380,42 @@ describe('SessionStore — search', () => {
   });
 
   afterEach(() => {
-    try { closeConnection(); } catch { /* ignore */ }
+    try {
+      closeConnection();
+    } catch {
+      /* ignore */
+    }
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
   it('searches messages by content keyword', () => {
-    appendMessage(sessionId, { role: 'user', content: 'How do I configure authentication?', parentId: null });
-    appendMessage(sessionId, { role: 'assistant', content: 'You can set up auth in the settings panel.', parentId: null });
+    appendMessage(sessionId, {
+      role: 'user',
+      content: 'How do I configure authentication?',
+      parentId: null,
+    });
+    appendMessage(sessionId, {
+      role: 'assistant',
+      content: 'You can set up auth in the settings panel.',
+      parentId: null,
+    });
 
     const results = searchMessages('authentication', { limit: 20 });
     expect(results.length).toBeGreaterThanOrEqual(1);
     // SearchMatch uses `snippet` (not `content`) — it may contain the
     // matched excerpt with FTS5 highlighting or the raw text via LIKE.
-    expect(results.some(r => (r.snippet || '').toLowerCase().includes('authentication'))).toBe(true);
+    expect(results.some((r) => (r.snippet || '').toLowerCase().includes('authentication'))).toBe(
+      true,
+    );
   });
 
   it('searches across multiple sessions', () => {
     const s2 = createSession({});
-    appendMessage(sessionId, { role: 'user', content: 'unique-searchable-term-xyz', parentId: null });
+    appendMessage(sessionId, {
+      role: 'user',
+      content: 'unique-searchable-term-xyz',
+      parentId: null,
+    });
     appendMessage(s2.id, { role: 'user', content: 'unique-searchable-term-xyz', parentId: null });
 
     const results = searchMessages('unique-searchable-term-xyz', { limit: 20 });

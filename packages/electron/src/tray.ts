@@ -12,11 +12,7 @@ export interface TrayActions {
   onSettings?: () => void;
 }
 
-export function createTray(
-  iconPath: string,
-  onClick: () => void,
-  actions: TrayActions = {},
-): Tray {
+export function createTray(iconPath: string, onClick: () => void, actions: TrayActions = {}): Tray {
   const icon = nativeImage.createFromPath(iconPath);
   const tray = new Tray(icon.resize({ width: 16, height: 16 }));
   tray.setToolTip('Doc77');

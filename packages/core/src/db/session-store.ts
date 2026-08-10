@@ -40,13 +40,13 @@ export interface AiMessageRecord {
   role: MessageRole;
   content: string;
   rawJson: string | null;
-  toolCalls: string | null;      // JSON string of tool_calls array
+  toolCalls: string | null; // JSON string of tool_calls array
   toolCallId: string | null;
   toolName: string | null;
   reasoning: string | null;
   tokenCount: number | null;
   finishReason: string | null;
-  metadata: string;              // JSON string
+  metadata: string; // JSON string
   createdAt: string;
 }
 
@@ -112,11 +112,26 @@ export function updateSession(
   const db = getConnection();
   const sets: string[] = [];
   const params: unknown[] = [];
-  if (fields.title !== undefined) { sets.push('title = ?'); params.push(fields.title); }
-  if (fields.status !== undefined) { sets.push('status = ?'); params.push(fields.status); }
-  if (fields.pinned !== undefined) { sets.push('pinned = ?'); params.push(fields.pinned ? 1 : 0); }
-  if (fields.model !== undefined) { sets.push('model = ?'); params.push(fields.model); }
-  if (fields.currentLeafId !== undefined) { sets.push('current_leaf_id = ?'); params.push(fields.currentLeafId); }
+  if (fields.title !== undefined) {
+    sets.push('title = ?');
+    params.push(fields.title);
+  }
+  if (fields.status !== undefined) {
+    sets.push('status = ?');
+    params.push(fields.status);
+  }
+  if (fields.pinned !== undefined) {
+    sets.push('pinned = ?');
+    params.push(fields.pinned ? 1 : 0);
+  }
+  if (fields.model !== undefined) {
+    sets.push('model = ?');
+    params.push(fields.model);
+  }
+  if (fields.currentLeafId !== undefined) {
+    sets.push('current_leaf_id = ?');
+    params.push(fields.currentLeafId);
+  }
   if (sets.length === 0) return;
   sets.push("updated_at = datetime('now')");
   params.push(id);
@@ -141,14 +156,16 @@ export function purgeSession(id: string): void {
 /**
  * List sessions with optional filters.
  */
-export function listSessions(opts: {
-  projectId?: number;
-  status?: SessionStatus;
-  search?: string;
-  pinnedOnly?: boolean;
-  limit?: number;
-  offset?: number;
-} = {}): AiSession[] {
+export function listSessions(
+  opts: {
+    projectId?: number;
+    status?: SessionStatus;
+    search?: string;
+    pinnedOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {},
+): AiSession[] {
   const db = getConnection();
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -167,7 +184,9 @@ export function listSessions(opts: {
     conditions.push('pinned = 1');
   }
   if (opts.search) {
-    conditions.push('(title LIKE ? OR id IN (SELECT session_id FROM ai_messages WHERE content LIKE ?))');
+    conditions.push(
+      '(title LIKE ? OR id IN (SELECT session_id FROM ai_messages WHERE content LIKE ?))',
+    );
     params.push(`%${opts.search}%`, `%${opts.search}%`);
   }
 
@@ -175,9 +194,11 @@ export function listSessions(opts: {
   const limit = opts.limit ?? 50;
   const offset = opts.offset ?? 0;
 
-  const rows = db.prepare(
-    `SELECT * FROM ai_sessions ${where} ORDER BY pinned DESC, updated_at DESC LIMIT ? OFFSET ?`,
-  ).all(...params, limit, offset) as Record<string, unknown>[];
+  const rows = db
+    .prepare(
+      `SELECT * FROM ai_sessions ${where} ORDER BY pinned DESC, updated_at DESC LIMIT ? OFFSET ?`,
+    )
+    .all(...params, limit, offset) as Record<string, unknown>[];
 
   return rows.map(rowToSession);
 }
@@ -237,9 +258,9 @@ export function appendMessage(
   ).run(id, sessionId);
 
   if (msg.role === 'tool' || msg.toolCalls) {
-    db.prepare(
-      `UPDATE ai_sessions SET tool_call_count = tool_call_count + 1 WHERE id = ?`,
-    ).run(sessionId);
+    db.prepare(`UPDATE ai_sessions SET tool_call_count = tool_call_count + 1 WHERE id = ?`).run(
+      sessionId,
+    );
   }
 
   return getMessage(id)!;
@@ -286,9 +307,9 @@ export function getMessagePath(sessionId: string, leafId?: string | null): AiMes
  */
 export function getSessionMessages(sessionId: string): AiMessageRecord[] {
   const db = getConnection();
-  const rows = db.prepare(
-    'SELECT * FROM ai_messages WHERE session_id = ? ORDER BY created_at',
-  ).all(sessionId) as Record<string, unknown>[];
+  const rows = db
+    .prepare('SELECT * FROM ai_messages WHERE session_id = ? ORDER BY created_at')
+    .all(sessionId) as Record<string, unknown>[];
   return rows.map(rowToMessage);
 }
 
@@ -297,9 +318,9 @@ export function getSessionMessages(sessionId: string): AiMessageRecord[] {
  */
 export function getMessageChildren(parentId: string): AiMessageRecord[] {
   const db = getConnection();
-  const rows = db.prepare(
-    'SELECT * FROM ai_messages WHERE parent_id = ? ORDER BY created_at',
-  ).all(parentId) as Record<string, unknown>[];
+  const rows = db
+    .prepare('SELECT * FROM ai_messages WHERE parent_id = ? ORDER BY created_at')
+    .all(parentId) as Record<string, unknown>[];
   return rows.map(rowToMessage);
 }
 
@@ -353,13 +374,17 @@ export function branchFromMessage(
 
   // Link new session as child of source
   const db = getConnection();
-  db.prepare('UPDATE ai_sessions SET parent_session_id = ? WHERE id = ?')
-    .run(sourceSessionId, newSession.id);
+  db.prepare('UPDATE ai_sessions SET parent_session_id = ? WHERE id = ?').run(
+    sourceSessionId,
+    newSession.id,
+  );
 
   // Set the new session's current_leaf_id to the branch point
   // (the user will continue the conversation from here)
-  db.prepare('UPDATE ai_sessions SET current_leaf_id = ? WHERE id = ?')
-    .run(fromMessageId, newSession.id);
+  db.prepare('UPDATE ai_sessions SET current_leaf_id = ? WHERE id = ?').run(
+    fromMessageId,
+    newSession.id,
+  );
 
   return getSession(newSession.id)!;
 }
@@ -381,20 +406,22 @@ export function logToolCall(entry: {
   approvedBy?: string | null;
 }): number {
   const db = getConnection();
-  const result = db.prepare(
-    `INSERT INTO ai_tool_logs (session_id, message_id, tool_name, input_json, output_json, elapsed_ms, success, error_message, approved_by)
+  const result = db
+    .prepare(
+      `INSERT INTO ai_tool_logs (session_id, message_id, tool_name, input_json, output_json, elapsed_ms, success, error_message, approved_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    entry.sessionId,
-    entry.messageId ?? null,
-    entry.toolName,
-    entry.input != null ? JSON.stringify(entry.input) : null,
-    entry.output != null ? JSON.stringify(entry.output) : null,
-    entry.elapsedMs ?? null,
-    entry.success === false ? 0 : 1,
-    entry.errorMessage ?? null,
-    entry.approvedBy ?? null,
-  );
+    )
+    .run(
+      entry.sessionId,
+      entry.messageId ?? null,
+      entry.toolName,
+      entry.input != null ? JSON.stringify(entry.input) : null,
+      entry.output != null ? JSON.stringify(entry.output) : null,
+      entry.elapsedMs ?? null,
+      entry.success === false ? 0 : 1,
+      entry.errorMessage ?? null,
+      entry.approvedBy ?? null,
+    );
   return result.lastInsertRowid as number;
 }
 
@@ -403,9 +430,9 @@ export function logToolCall(entry: {
  */
 export function getToolLogs(sessionId: string, limit = 100): ToolLogRecord[] {
   const db = getConnection();
-  const rows = db.prepare(
-    'SELECT * FROM ai_tool_logs WHERE session_id = ? ORDER BY created_at DESC LIMIT ?',
-  ).all(sessionId, limit) as Record<string, unknown>[];
+  const rows = db
+    .prepare('SELECT * FROM ai_tool_logs WHERE session_id = ? ORDER BY created_at DESC LIMIT ?')
+    .all(sessionId, limit) as Record<string, unknown>[];
   return rows.map(rowToToolLog);
 }
 
@@ -415,11 +442,14 @@ export function getToolLogs(sessionId: string, limit = 100): ToolLogRecord[] {
  * Search message content across all sessions.
  * Uses FTS5 when available, otherwise degrades to LIKE.
  */
-export function searchMessages(query: string, opts: {
-  sessionId?: string;
-  projectId?: number;
-  limit?: number;
-} = {}): SearchMatch[] {
+export function searchMessages(
+  query: string,
+  opts: {
+    sessionId?: string;
+    projectId?: number;
+    limit?: number;
+  } = {},
+): SearchMatch[] {
   const db = getConnection();
   const limit = opts.limit ?? 20;
 
@@ -447,20 +477,26 @@ function searchMessagesFts5(
     params.push(opts.projectId);
   }
 
-  const rows = db.prepare(
-    `SELECT m.id, m.session_id, m.role, m.content, m.created_at, s.title as session_title
+  const rows = db
+    .prepare(
+      `SELECT m.id, m.session_id, m.role, m.content, m.created_at, s.title as session_title
      FROM ai_messages_fts
      JOIN ai_messages m ON m.rowid = ai_messages_fts.rowid
      JOIN ai_sessions s ON s.id = m.session_id
      WHERE ${conditions.join(' AND ')}
      ORDER BY m.created_at DESC
      LIMIT ?`,
-  ).all(...params, limit) as Array<{
-    id: string; session_id: string; role: string; content: string;
-    created_at: string; session_title: string;
+    )
+    .all(...params, limit) as Array<{
+    id: string;
+    session_id: string;
+    role: string;
+    content: string;
+    created_at: string;
+    session_title: string;
   }>;
 
-  return rows.map(r => ({
+  return rows.map((r) => ({
     sessionId: r.session_id,
     messageId: r.id,
     role: r.role as MessageRole,
@@ -488,19 +524,25 @@ function searchMessagesLike(
     params.push(opts.projectId);
   }
 
-  const rows = db.prepare(
-    `SELECT m.id, m.session_id, m.role, m.content, m.created_at, s.title as session_title
+  const rows = db
+    .prepare(
+      `SELECT m.id, m.session_id, m.role, m.content, m.created_at, s.title as session_title
      FROM ai_messages m
      JOIN ai_sessions s ON s.id = m.session_id
      WHERE ${conditions.join(' AND ')}
      ORDER BY m.created_at DESC
      LIMIT ?`,
-  ).all(...params, limit) as Array<{
-    id: string; session_id: string; role: string; content: string;
-    created_at: string; session_title: string;
+    )
+    .all(...params, limit) as Array<{
+    id: string;
+    session_id: string;
+    role: string;
+    content: string;
+    created_at: string;
+    session_title: string;
   }>;
 
-  return rows.map(r => ({
+  return rows.map((r) => ({
     sessionId: r.session_id,
     messageId: r.id,
     role: r.role as MessageRole,
@@ -565,11 +607,18 @@ export function upsertSkill(skill: {
  * List all enabled skills.
  */
 export function getEnabledSkills(): Array<{
-  id: string; source: string; description: string; globs: string[] | null; alwaysApply: boolean;
+  id: string;
+  source: string;
+  description: string;
+  globs: string[] | null;
+  alwaysApply: boolean;
 }> {
   const db = getConnection();
-  const rows = db.prepare('SELECT * FROM ai_skills WHERE enabled = 1').all() as Record<string, unknown>[];
-  return rows.map(r => ({
+  const rows = db.prepare('SELECT * FROM ai_skills WHERE enabled = 1').all() as Record<
+    string,
+    unknown
+  >[];
+  return rows.map((r) => ({
     id: r.id as string,
     source: r.source as string,
     description: r.description as string,
@@ -583,8 +632,10 @@ export function getEnabledSkills(): Array<{
  */
 export function setSkillEnabled(id: string, enabled: boolean): void {
   const db = getConnection();
-  db.prepare('UPDATE ai_skills SET enabled = ?, updated_at = datetime(\'now\') WHERE id = ?')
-    .run(enabled ? 1 : 0, id);
+  db.prepare("UPDATE ai_skills SET enabled = ?, updated_at = datetime('now') WHERE id = ?").run(
+    enabled ? 1 : 0,
+    id,
+  );
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -657,7 +708,7 @@ function sanitizeFtsQuery(q: string): string {
   const sanitized = q.replace(/[;{}()\\]/g, ' ').trim();
   if (!sanitized) return '""';
   const words = sanitized.split(/\s+/).filter(Boolean);
-  return words.map(w => `"${w}"*`).join(' OR ');
+  return words.map((w) => `"${w}"*`).join(' OR ');
 }
 
 /**

@@ -7,7 +7,13 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { t } from './i18n';
-import { findAvailablePort, startServer, ServerProcess, getInstalledEventBus, stopTunnel } from './server';
+import {
+  findAvailablePort,
+  startServer,
+  ServerProcess,
+  getInstalledEventBus,
+  stopTunnel,
+} from './server';
 import { createTray } from './tray';
 import { initAutoUpdater, checkForUpdates } from './updater';
 import { PendingFilesQueue, createPendingFilesQueue } from './pending-files';
@@ -39,13 +45,21 @@ let notificationSubscriber: NotificationSubscriber | null = null;
 
 // ═══ Window state persistence ═══
 const WINDOW_STATE_PATH = path.join(os.homedir(), '.doc77', 'window-state.json');
-interface WindowState { x?: number; y?: number; width: number; height: number; maximized?: boolean }
+interface WindowState {
+  x?: number;
+  y?: number;
+  width: number;
+  height: number;
+  maximized?: boolean;
+}
 
 function loadWindowState(): WindowState {
   try {
     const data = fs.readFileSync(WINDOW_STATE_PATH, 'utf-8');
     return JSON.parse(data);
-  } catch { return { width: 1280, height: 800 }; }
+  } catch {
+    return { width: 1280, height: 800 };
+  }
 }
 
 function saveWindowState(): void {

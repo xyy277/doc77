@@ -196,7 +196,9 @@ describe('AgentLoop', () => {
 
     // Should emit the error event
     expect(events.find((e) => e.type === 'error')).toBeTruthy();
-    expect((events.find((e) => e.type === 'error') as { message: string }).message).toContain('API connection lost');
+    expect((events.find((e) => e.type === 'error') as { message: string }).message).toContain(
+      'API connection lost',
+    );
 
     // Should persist partial assistant content with error finish reason
     const appendCalls = calls.filter((c) => c.method === 'appendMessage');
@@ -204,7 +206,9 @@ describe('AgentLoop', () => {
       (c) => (c.args as { msg: { role: string } }).msg.role === 'assistant',
     );
     expect(assistantCall).toBeTruthy();
-    expect((assistantCall!.args as { msg: { finishReason: string } }).msg.finishReason).toBe('error');
+    expect((assistantCall!.args as { msg: { finishReason: string } }).msg.finishReason).toBe(
+      'error',
+    );
   });
 
   it('respects maxSteps limit', async () => {

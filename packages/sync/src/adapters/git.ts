@@ -150,7 +150,9 @@ export class GitAdapter implements SyncAdapter {
           await git2.pull('origin', gitConfig.branch || 'main', { '--rebase': null });
           await git2.push(gitConfig.remoteName || 'origin', gitConfig.branch || 'main');
         } catch (e2: unknown) {
-          result.errors.push('Push failed after rebase: ' + (e2 instanceof Error ? e2.message : 'unknown'));
+          result.errors.push(
+            'Push failed after rebase: ' + (e2 instanceof Error ? e2.message : 'unknown'),
+          );
         }
       } else {
         result.errors.push(msg);
@@ -178,4 +180,3 @@ export class GitAdapter implements SyncAdapter {
     }
   }
 }
-

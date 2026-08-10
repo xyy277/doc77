@@ -11,8 +11,8 @@ const SALT_LENGTH = 32;
 export interface EncryptedPayload {
   version: 1;
   algorithm: 'aes-256-gcm';
-  iv: string;       // Base64
-  tag: string;      // Base64
+  iv: string; // Base64
+  tag: string; // Base64
   ciphertext: string; // Base64
 }
 
@@ -85,7 +85,9 @@ export function encryptFile(content: Buffer, masterKey: Buffer): EncryptedFile {
  * Decrypt a file: unwrap fileKey with masterKey, then decrypt content.
  */
 export function decryptFile(file: EncryptedFile, masterKey: Buffer): Buffer {
-  const wrappedKey: EncryptedPayload = JSON.parse(Buffer.from(file.encryptedKey, 'base64').toString());
+  const wrappedKey: EncryptedPayload = JSON.parse(
+    Buffer.from(file.encryptedKey, 'base64').toString(),
+  );
   const fileKey = decrypt(wrappedKey, masterKey);
   return decrypt(file, fileKey);
 }

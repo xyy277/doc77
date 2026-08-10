@@ -28,10 +28,18 @@ beforeAll(async () => {
   runMigrations();
 
   // 简易路由器
-  const routes: Array<{ method: string; pattern: RegExp; paramNames: string[]; handler: (req: any, res: any) => void }> = [];
+  const routes: Array<{
+    method: string;
+    pattern: RegExp;
+    paramNames: string[];
+    handler: (req: any, res: any) => void;
+  }> = [];
   const addRoute = (method: string, p: string, h: any) => {
     const paramNames: string[] = [];
-    const regexStr = p.replace(/:([^/]+)/g, (_, n) => { paramNames.push(n); return '([^/]+)'; });
+    const regexStr = p.replace(/:([^/]+)/g, (_, n) => {
+      paramNames.push(n);
+      return '([^/]+)';
+    });
     routes.push({ method, pattern: new RegExp(`^${regexStr}$`), paramNames, handler: h });
   };
   const app = {
@@ -40,7 +48,10 @@ beforeAll(async () => {
     put: (p: string, h: any) => addRoute('PUT', p, h),
     delete: (p: string, h: any) => addRoute('DELETE', p, h),
   };
-  registerPluginRoutes(app as any, { db: getConnection(), pluginDir: path.join(testDir, 'plugins') });
+  registerPluginRoutes(app as any, {
+    db: getConnection(),
+    pluginDir: path.join(testDir, 'plugins'),
+  });
 
   server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', 'http://localhost');
@@ -52,15 +63,25 @@ beforeAll(async () => {
       if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
         const chunks: Buffer[] = [];
         for await (const c of req) chunks.push(Buffer.from(c));
-        try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch {}
+        try {
+          body = JSON.parse(Buffer.concat(chunks).toString());
+        } catch {}
       }
       const params: Record<string, string> = {};
-      route.paramNames.forEach((name, i) => { params[name] = decodeURIComponent(match[i + 1]); });
+      route.paramNames.forEach((name, i) => {
+        params[name] = decodeURIComponent(match[i + 1]);
+      });
       const reqLike = { params, query: {}, body, method: req.method, path: url.pathname };
       const resLike = {
         _status: 200,
-        status(code: number) { this._status = code; return this; },
-        json(data: unknown) { res.writeHead(this._status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); },
+        status(code: number) {
+          this._status = code;
+          return this;
+        },
+        json(data: unknown) {
+          res.writeHead(this._status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data));
+        },
       };
       await route.handler(reqLike, resLike);
       return;
@@ -80,7 +101,9 @@ beforeAll(async () => {
 
 afterAll(() => {
   server?.close();
-  try { closeConnection(); } catch {}
+  try {
+    closeConnection();
+  } catch {}
   fs.rmSync(testDir, { recursive: true, force: true });
 });
 

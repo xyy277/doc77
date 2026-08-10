@@ -22,9 +22,7 @@ describe('packages/electron/package.json — fileAssociations', () => {
   });
 
   it('fileAssociations 包含 md 扩展名', () => {
-    const mdAssoc = pkg.build.fileAssociations.find((a: { ext: string[] }) =>
-      a.ext.includes('md'),
-    );
+    const mdAssoc = pkg.build.fileAssociations.find((a: { ext: string[] }) => a.ext.includes('md'));
     expect(mdAssoc).toBeDefined();
     expect(mdAssoc.name).toBe('Markdown');
   });

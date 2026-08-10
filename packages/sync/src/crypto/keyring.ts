@@ -104,7 +104,9 @@ export class Keyring {
     if (!db) return false;
     try {
       const row = db
-        .prepare('SELECT salt, wrapped_master_by_password, wrapped_master_by_recovery, recovery_code_hash, version FROM sync_keyring WHERE id = ?')
+        .prepare(
+          'SELECT salt, wrapped_master_by_password, wrapped_master_by_recovery, recovery_code_hash, version FROM sync_keyring WHERE id = ?',
+        )
         .get(KEYRING_ROW_ID) as PersistedKeyringRow | undefined;
       if (!row) return false;
       this.saltBase64 = row.salt;
@@ -255,7 +257,12 @@ export class Keyring {
    * 仅在 DB 可用时生效。masterKey 永远不持久化明文。
    */
   private saveToDB(): void {
-    if (!this.saltBase64 || !this.wrappedMasterByPassword || !this.wrappedMasterByRecovery || !this.recoveryCodeHash) {
+    if (
+      !this.saltBase64 ||
+      !this.wrappedMasterByPassword ||
+      !this.wrappedMasterByRecovery ||
+      !this.recoveryCodeHash
+    ) {
       return;
     }
     const db = tryGetDb();

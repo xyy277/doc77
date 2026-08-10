@@ -11,8 +11,18 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { initDatabase, closeConnection, runMigrations, getConnection } from '@doc77/core';
-import { createSyncEngine, getKeyring, __resetKeyringForTest, encryptFile, decryptFile } from '../src/index.js';
-import { maybeEncryptContent, maybeDecryptContent, isEncryptedContent } from '../src/crypto/e2ee-helper.js';
+import {
+  createSyncEngine,
+  getKeyring,
+  __resetKeyringForTest,
+  encryptFile,
+  decryptFile,
+} from '../src/index.js';
+import {
+  maybeEncryptContent,
+  maybeDecryptContent,
+  isEncryptedContent,
+} from '../src/crypto/e2ee-helper.js';
 import type { Keyring } from '../src/crypto/keyring.js';
 
 let testDir: string;

@@ -317,12 +317,16 @@ async function main() {
 
       // Register AI-dependent routes (optional)
       try {
-        const { AiProvider, OllamaProvider, DocAgent, getReadTools, getWriteTools } = await import(
-          '@doc77/ai'
-        );
+        const { AiProvider, OllamaProvider, DocAgent, getReadTools, getWriteTools } =
+          await import('@doc77/ai');
         const { createAIChatHandler } = await import('@doc77/core');
         // T4: 注入 AiProvider + OllamaProvider，handler 根据 ai.provider 配置选择构造哪个
-        const aiDeps: Record<string, unknown> = { AiProvider, OllamaProvider, DocAgent, getReadTools };
+        const aiDeps: Record<string, unknown> = {
+          AiProvider,
+          OllamaProvider,
+          DocAgent,
+          getReadTools,
+        };
         // When MCP is installed, let the AI propose writes through the approval
         // queue by injecting its write functions + tool schemas.
         if (mcpAvailable) {
@@ -350,9 +354,8 @@ async function main() {
 
       // T8: Register sync routes (sync engine + scheduler)
       try {
-        const { createSyncEngine, registerSyncRoutes, createSyncScheduler } = await import(
-          '@doc77/sync'
-        );
+        const { createSyncEngine, registerSyncRoutes, createSyncScheduler } =
+          await import('@doc77/sync');
         const { getConnection } = await import('@doc77/core');
         const syncDb = getConnection();
         const syncEngine = createSyncEngine();
@@ -361,8 +364,7 @@ async function main() {
           db: syncDb,
           getProjectPath: (pid: number) => {
             const row = syncDb.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-              | { path: string }
-              | undefined;
+              { path: string } | undefined;
             return row?.path || null;
           },
         });
@@ -372,8 +374,7 @@ async function main() {
           db: syncDb,
           getProjectPath: (pid: number) => {
             const row = syncDb.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-              | { path: string }
-              | undefined;
+              { path: string } | undefined;
             return row?.path || null;
           },
         });
@@ -932,38 +933,68 @@ async function main() {
       const db = getConnection();
       const resolveProject = (arg: string): number => {
         if (/^\d+$/.test(arg)) return parseInt(arg, 10);
-        const row = db.prepare('SELECT id FROM projects WHERE name = ?').get(arg) as { id: number } | undefined;
-        if (!row) { console.error(`Project not found: ${arg}`); process.exit(1); }
+        const row = db.prepare('SELECT id FROM projects WHERE name = ?').get(arg) as
+          { id: number } | undefined;
+        if (!row) {
+          console.error(`Project not found: ${arg}`);
+          process.exit(1);
+        }
         return row.id;
       };
 
       if (subcommand === 'list') {
-        const configs = db.prepare('SELECT * FROM sync_configs').all() as Array<{ project_id: number; adapter_type: string; direction: string; interval_seconds: number; enabled: number }>;
-        if (configs.length === 0) { console.log('No sync configurations found.'); }
-        else {
+        const configs = db.prepare('SELECT * FROM sync_configs').all() as Array<{
+          project_id: number;
+          adapter_type: string;
+          direction: string;
+          interval_seconds: number;
+          enabled: number;
+        }>;
+        if (configs.length === 0) {
+          console.log('No sync configurations found.');
+        } else {
           console.log('Sync configurations:');
           for (const c of configs) {
-            const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(c.project_id) as { name: string } | undefined;
-            console.log(`  [${c.enabled ? '✓' : '✗'}] ${project?.name || `#${c.project_id}`} — ${c.adapter_type} (${c.direction}), interval=${c.interval_seconds}s`);
+            const project = db
+              .prepare('SELECT name FROM projects WHERE id = ?')
+              .get(c.project_id) as { name: string } | undefined;
+            console.log(
+              `  [${c.enabled ? '✓' : '✗'}] ${project?.name || `#${c.project_id}`} — ${c.adapter_type} (${c.direction}), interval=${c.interval_seconds}s`,
+            );
           }
         }
       } else if (subcommand === 'run') {
         const projectId = resolveProject(args[2] || '');
         const config = db.prepare('SELECT * FROM sync_configs WHERE project_id = ?').get(projectId);
-        const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
-        if (!config || !project) { console.error('No sync config or project not found'); process.exit(1); }
+        const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+          { path: string } | undefined;
+        if (!config || !project) {
+          console.error('No sync config or project not found');
+          process.exit(1);
+        }
         try {
           const { createSyncEngine } = await import('@doc77/sync');
           const engine = createSyncEngine();
           const result = await engine.sync(projectId, project.path, config as any);
-          console.log(`Sync result: status=${result.status}, pushed=${result.pushed}, pulled=${result.pulled}`);
+          console.log(
+            `Sync result: status=${result.status}, pushed=${result.pushed}, pulled=${result.pulled}`,
+          );
           if (result.errors.length > 0) console.log('Errors:', result.errors.join('; '));
-        } catch (e: unknown) { console.error('Sync failed:', (e as Error).message); process.exit(1); }
+        } catch (e: unknown) {
+          console.error('Sync failed:', (e as Error).message);
+          process.exit(1);
+        }
       } else if (subcommand === 'add') {
         const projectId = resolveProject(args[2] || '');
-        const adapterType = args[3]; const configJson = args[4];
-        if (!adapterType || !configJson) { console.error('Usage: doc77 sync add <project> <adapter-type> <config-json>'); process.exit(1); }
-        db.prepare(`INSERT OR REPLACE INTO sync_configs (project_id, adapter_type, config_json, direction, interval_seconds, enabled) VALUES (?, ?, ?, 'bidirectional', 1800, 1)`).run(projectId, adapterType, configJson);
+        const adapterType = args[3];
+        const configJson = args[4];
+        if (!adapterType || !configJson) {
+          console.error('Usage: doc77 sync add <project> <adapter-type> <config-json>');
+          process.exit(1);
+        }
+        db.prepare(
+          `INSERT OR REPLACE INTO sync_configs (project_id, adapter_type, config_json, direction, interval_seconds, enabled) VALUES (?, ?, ?, 'bidirectional', 1800, 1)`,
+        ).run(projectId, adapterType, configJson);
         console.log(`Sync config added for project ${args[2]} (${adapterType})`);
       } else if (subcommand === 'remove') {
         const projectId = resolveProject(args[2] || '');
@@ -972,9 +1003,15 @@ async function main() {
       } else if (subcommand === 'status') {
         const projectId = resolveProject(args[2] || '');
         const state = db.prepare('SELECT * FROM sync_state WHERE project_id = ?').get(projectId);
-        if (!state) { console.log(`No sync state for project ${args[2]}`); }
-        else { console.log('Sync state:', JSON.stringify(state, null, 2)); }
-      } else { console.error('Usage: doc77 sync <list|run|add|remove|status> [args]'); process.exit(1); }
+        if (!state) {
+          console.log(`No sync state for project ${args[2]}`);
+        } else {
+          console.log('Sync state:', JSON.stringify(state, null, 2));
+        }
+      } else {
+        console.error('Usage: doc77 sync <list|run|add|remove|status> [args]');
+        process.exit(1);
+      }
       break;
     }
 
@@ -985,30 +1022,69 @@ async function main() {
       const db = getConnection();
 
       if (subcommand === 'list') {
-        const plugins = db.prepare('SELECT * FROM plugins ORDER BY installed_at DESC').all() as Array<{ name: string; version: string; type: string; enabled: number }>;
-        if (plugins.length === 0) { console.log('No plugins installed.'); }
-        else { console.log('Installed plugins:'); for (const p of plugins) { console.log(`  [${p.enabled ? '✓' : '✗'}] ${p.name} v${p.version} (${p.type})`); } }
+        const plugins = db
+          .prepare('SELECT * FROM plugins ORDER BY installed_at DESC')
+          .all() as Array<{ name: string; version: string; type: string; enabled: number }>;
+        if (plugins.length === 0) {
+          console.log('No plugins installed.');
+        } else {
+          console.log('Installed plugins:');
+          for (const p of plugins) {
+            console.log(`  [${p.enabled ? '✓' : '✗'}] ${p.name} v${p.version} (${p.type})`);
+          }
+        }
       } else if (subcommand === 'install') {
-        const name = args[2]; const version = args[3] || '1.0.0'; const type = args[4] || 'renderer';
-        if (!name) { console.error('Usage: doc77 plugin install <name> [version] [type]'); process.exit(1); }
-        db.prepare(`INSERT OR REPLACE INTO plugins (name, version, type, enabled, config_json, source) VALUES (?, ?, ?, 1, '{}', 'cli')`).run(name, version, type);
+        const name = args[2];
+        const version = args[3] || '1.0.0';
+        const type = args[4] || 'renderer';
+        if (!name) {
+          console.error('Usage: doc77 plugin install <name> [version] [type]');
+          process.exit(1);
+        }
+        db.prepare(
+          `INSERT OR REPLACE INTO plugins (name, version, type, enabled, config_json, source) VALUES (?, ?, ?, 1, '{}', 'cli')`,
+        ).run(name, version, type);
         console.log(`Plugin installed: ${name} v${version} (${type})`);
       } else if (subcommand === 'remove') {
-        const name = args[2]; if (!name) { console.error('Usage: doc77 plugin remove <name>'); process.exit(1); }
+        const name = args[2];
+        if (!name) {
+          console.error('Usage: doc77 plugin remove <name>');
+          process.exit(1);
+        }
         const result = db.prepare('DELETE FROM plugins WHERE name = ?').run(name);
-        if (result.changes === 0) { console.error(`Plugin not found: ${name}`); process.exit(1); }
+        if (result.changes === 0) {
+          console.error(`Plugin not found: ${name}`);
+          process.exit(1);
+        }
         console.log(`Plugin removed: ${name}`);
       } else if (subcommand === 'enable') {
-        const name = args[2]; if (!name) { console.error('Usage: doc77 plugin enable <name>'); process.exit(1); }
+        const name = args[2];
+        if (!name) {
+          console.error('Usage: doc77 plugin enable <name>');
+          process.exit(1);
+        }
         const result = db.prepare('UPDATE plugins SET enabled = 1 WHERE name = ?').run(name);
-        if (result.changes === 0) { console.error(`Plugin not found: ${name}`); process.exit(1); }
+        if (result.changes === 0) {
+          console.error(`Plugin not found: ${name}`);
+          process.exit(1);
+        }
         console.log(`Plugin enabled: ${name}`);
       } else if (subcommand === 'disable') {
-        const name = args[2]; if (!name) { console.error('Usage: doc77 plugin disable <name>'); process.exit(1); }
+        const name = args[2];
+        if (!name) {
+          console.error('Usage: doc77 plugin disable <name>');
+          process.exit(1);
+        }
         const result = db.prepare('UPDATE plugins SET enabled = 0 WHERE name = ?').run(name);
-        if (result.changes === 0) { console.error(`Plugin not found: ${name}`); process.exit(1); }
+        if (result.changes === 0) {
+          console.error(`Plugin not found: ${name}`);
+          process.exit(1);
+        }
         console.log(`Plugin disabled: ${name}`);
-      } else { console.error('Usage: doc77 plugin <list|install|remove|enable|disable> [args]'); process.exit(1); }
+      } else {
+        console.error('Usage: doc77 plugin <list|install|remove|enable|disable> [args]');
+        process.exit(1);
+      }
       break;
     }
 

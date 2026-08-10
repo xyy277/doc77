@@ -35,7 +35,9 @@ export function getInstalledEventBus(): EventBus | null {
 export async function stopTunnel(): Promise<void> {
   try {
     const core = await loadCore();
-    const mgr = (core as unknown as { getTunnelManager?: () => { stop: () => Promise<void> } }).getTunnelManager?.();
+    const mgr = (
+      core as unknown as { getTunnelManager?: () => { stop: () => Promise<void> } }
+    ).getTunnelManager?.();
     await mgr?.stop?.();
   } catch {
     // 隧道管理器不可用 / 未加载 —— 退出路径不可阻塞，安静跳过
@@ -153,8 +155,7 @@ export async function registerHttpRoutes(app: ExpressLike, deps: HttpRoutesDeps)
       const engine = deps.sync.createSyncEngine();
       const getProjectPath = (pid: number): string | null => {
         const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-          | { path: string }
-          | undefined;
+          { path: string } | undefined;
         return row?.path || null;
       };
       const scheduler = deps.sync.createSyncScheduler({ engine, db, getProjectPath });
@@ -306,7 +307,9 @@ async function registerInstalledModules(core: CoreModule, app: ExpressLike): Pro
     plugins: core.registerPluginRoutes
       ? { registerPluginRoutes: core.registerPluginRoutes }
       : undefined,
-    gallery: galleryModule ? { registerGalleryRoutes: galleryModule.registerGalleryRoutes } : undefined,
+    gallery: galleryModule
+      ? { registerGalleryRoutes: galleryModule.registerGalleryRoutes }
+      : undefined,
   });
 
   core.setCapabilities({ ai: !!ai, mcp: !!mcp, translate, gallery: !!galleryModule });

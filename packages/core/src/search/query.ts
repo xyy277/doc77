@@ -31,10 +31,12 @@ function sanitizeFtsQuery(q: string): string {
   // If no explicit operators, wrap each word with * for prefix matching
   if (!/\b(AND|OR|NOT)\b/.test(sanitized) && !sanitized.includes('"')) {
     const words = sanitized.split(/\s+/).filter(Boolean);
-    sanitized = words.map((w) => {
-      if (w.startsWith('"') || w.includes('*')) return w;
-      return `"${w}"*`;
-    }).join(' OR ');
+    sanitized = words
+      .map((w) => {
+        if (w.startsWith('"') || w.includes('*')) return w;
+        return `"${w}"*`;
+      })
+      .join(' OR ');
   }
   return sanitized;
 }
@@ -55,7 +57,11 @@ function extractLikeTerms(q: string): string[] {
  * Build a LIKE-based WHERE clause for fallback search.
  * Matches if any term appears in title OR content.
  */
-function buildLikeWhereClause(terms: string[], projectId: number, pathFilter?: string): { sql: string; params: unknown[] } {
+function buildLikeWhereClause(
+  terms: string[],
+  projectId: number,
+  pathFilter?: string,
+): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
   const clauses: string[] = ['project_id = ?'];
   params.push(projectId);
@@ -85,7 +91,10 @@ function buildLikeWhereClause(terms: string[], projectId: number, pathFilter?: s
 function generateSnippets(content: string, query: string, maxSnippets = 3): string[] {
   const snippets: string[] = [];
   const lowerContent = content.toLowerCase();
-  const terms = query.replace(/["]/g, '').split(/\s+/).filter((t) => t.length > 1 && !['AND', 'OR', 'NOT'].includes(t.toUpperCase()));
+  const terms = query
+    .replace(/["]/g, '')
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !['AND', 'OR', 'NOT'].includes(t.toUpperCase()));
 
   for (const term of terms) {
     const lowerTerm = term.toLowerCase();
@@ -185,7 +194,9 @@ function searchWithFts5(
   }>;
 
   // Get mtime from meta
-  const metaStmt = conn.prepare('SELECT file_mtime FROM search_index_meta WHERE project_id = ? AND file_path = ?');
+  const metaStmt = conn.prepare(
+    'SELECT file_mtime FROM search_index_meta WHERE project_id = ? AND file_path = ?',
+  );
 
   const results: SearchResult[] = rows.map((row) => {
     const meta = metaStmt.get(projectId, row.file_path) as { file_mtime: string } | undefined;
@@ -230,7 +241,9 @@ function searchWithLike(
   }>;
 
   // Get mtime from meta
-  const metaStmt = conn.prepare('SELECT file_mtime FROM search_index_meta WHERE project_id = ? AND file_path = ?');
+  const metaStmt = conn.prepare(
+    'SELECT file_mtime FROM search_index_meta WHERE project_id = ? AND file_path = ?',
+  );
 
   const results: SearchResult[] = rows.map((row) => {
     const meta = metaStmt.get(projectId, row.file_path) as { file_mtime: string } | undefined;
@@ -257,7 +270,9 @@ function finalizeSearchResponse(
   results: SearchResult[],
 ): SearchResponse {
   const statsRow = conn
-    .prepare('SELECT COUNT(*) as count, MAX(indexed_at) as last_indexed FROM search_index_meta WHERE project_id = ?')
+    .prepare(
+      'SELECT COUNT(*) as count, MAX(indexed_at) as last_indexed FROM search_index_meta WHERE project_id = ?',
+    )
     .get(projectId) as { count: number; last_indexed: string | null } | undefined;
 
   return {
@@ -278,13 +293,28 @@ export function searchAll(
   query: string,
   options: { limit?: number } = {},
   db?: DatabaseCompat,
-): { query: string; groups: Array<{ project_id: number; project_name: string; total: number; results: SearchResult[] }> } {
+): {
+  query: string;
+  groups: Array<{
+    project_id: number;
+    project_name: string;
+    total: number;
+    results: SearchResult[];
+  }>;
+} {
   const conn = db ?? getConnection();
   const { limit = 10 } = options;
 
-  const projects = conn.prepare('SELECT id, name FROM projects ORDER BY last_opened DESC').all() as Array<{ id: number; name: string }>;
+  const projects = conn
+    .prepare('SELECT id, name FROM projects ORDER BY last_opened DESC')
+    .all() as Array<{ id: number; name: string }>;
 
-  const groups: Array<{ project_id: number; project_name: string; total: number; results: SearchResult[] }> = [];
+  const groups: Array<{
+    project_id: number;
+    project_name: string;
+    total: number;
+    results: SearchResult[];
+  }> = [];
 
   for (const proj of projects) {
     const result = searchProject(proj.id, query, { limit }, conn);

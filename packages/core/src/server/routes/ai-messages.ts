@@ -122,9 +122,7 @@ export function registerAiMessageRoutes(app: Express): void {
   // (default 100, max 500). Ordered newest-first.
   app.get('/api/ai/sessions/:id/tool-logs', (req: Request, res: Response) => {
     const sessionId = req.params.id as string;
-    const limit = req.query.limit != null
-      ? Math.min(Number(req.query.limit) || 100, 500)
-      : 100;
+    const limit = req.query.limit != null ? Math.min(Number(req.query.limit) || 100, 500) : 100;
     try {
       if (!getSession(sessionId)) {
         res.status(404).json({ error: 'Session not found' });
@@ -148,13 +146,10 @@ export function registerAiMessageRoutes(app: Express): void {
   //
   // Until then, the frontend should fall back to calling
   // POST /api/ai/chat with a `regenerate_from` parameter.
-  app.post(
-    '/api/ai/sessions/:id/messages/:msgId/regenerate',
-    (_req: Request, res: Response) => {
-      res.status(501).json({
-        error: 'regenerate not yet implemented',
-        hint: 'Use POST /api/ai/chat with regenerate_from parameter (Phase 3)',
-      });
-    },
-  );
+  app.post('/api/ai/sessions/:id/messages/:msgId/regenerate', (_req: Request, res: Response) => {
+    res.status(501).json({
+      error: 'regenerate not yet implemented',
+      hint: 'Use POST /api/ai/chat with regenerate_from parameter (Phase 3)',
+    });
+  });
 }

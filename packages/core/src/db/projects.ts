@@ -55,7 +55,9 @@ export function listProjects(): Project[] {
     .prepare(
       'SELECT id, name, path, obsidian_mode, tags, created_at, last_opened FROM projects ORDER BY name',
     )
-    .all() as Array<Omit<Project, 'obsidian_mode' | 'tags'> & { obsidian_mode: number; tags: string }>;
+    .all() as Array<
+    Omit<Project, 'obsidian_mode' | 'tags'> & { obsidian_mode: number; tags: string }
+  >;
   return rows.map((r) => ({
     ...r,
     obsidian_mode: !!r.obsidian_mode,

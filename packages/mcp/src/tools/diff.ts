@@ -1,12 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import {
-  t,
-  getConnection,
-  validatePath,
-  isBinaryFile,
-  readFile,
-} from '@doc77/core';
+import { t, getConnection, validatePath, isBinaryFile, readFile } from '@doc77/core';
 
 /**
  * Compare two files and return a unified diff.

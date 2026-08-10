@@ -50,7 +50,15 @@ export { threeWayMerge, resolveConflicts } from './merge/diff3.js';
 export type { MergeResult, MergeChunk } from './merge/diff3.js';
 
 // Crypto (E2EE)
-export { encrypt, decrypt, encryptFile, decryptFile, deriveKey, generateSalt, generateRecoveryCode } from './crypto/encrypt.js';
+export {
+  encrypt,
+  decrypt,
+  encryptFile,
+  decryptFile,
+  deriveKey,
+  generateSalt,
+  generateRecoveryCode,
+} from './crypto/encrypt.js';
 export type { EncryptedPayload, EncryptedFile } from './crypto/encrypt.js';
 export { Keyring, getKeyring, __resetKeyringForTest } from './crypto/keyring.js';
 export type { KeyringState } from './crypto/keyring.js';
@@ -68,4 +76,3 @@ export { detectConflicts, resolveConflict } from './conflict.js';
 export type { ConflictStrategy, Resolution } from './conflict.js';
 export { aiResolveConflict, buildConflictPrompt } from './merge/ai-assist.js';
 export type { AiConflictContext, AiResolution, AiChatFn } from './merge/ai-assist.js';
-

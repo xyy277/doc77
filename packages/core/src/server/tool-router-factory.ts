@@ -83,8 +83,7 @@ export async function createToolRouterExecutor(
   const router = new ToolRouter({
     isSensitiveFile: deps.isSensitiveFile,
     getRiskLevel: () => deps.getRiskLevel() as 'low' | 'medium' | 'high',
-    formatMessage: (key: string, params?: Record<string, unknown>) =>
-      deps.t(key, params),
+    formatMessage: (key: string, params?: Record<string, unknown>) => deps.t(key, params),
   }) as ToolRouterInstance;
 
   // ── Register read-tool handlers ──
@@ -112,9 +111,9 @@ export async function createToolRouterExecutor(
       const filePath = args.file_path as string;
       if (!filePath) return 'Error: file_path is required';
       try {
-        const project = deps.db.prepare('SELECT path FROM projects WHERE id = ?').get(
-          ctx.projectId,
-        ) as { path: string } | undefined;
+        const project = deps.db
+          .prepare('SELECT path FROM projects WHERE id = ?')
+          .get(ctx.projectId) as { path: string } | undefined;
         if (!project) return 'Error: Project not found';
         const absPath = deps.validatePath(project.path, filePath);
         const stats = statSync(absPath);
@@ -136,7 +135,9 @@ export async function createToolRouterExecutor(
       return JSON.stringify(results);
     },
   };
-  (router as unknown as { registerAll: (h: Record<string, ToolHandler>) => void }).registerAll(readHandlers);
+  (router as unknown as { registerAll: (h: Record<string, ToolHandler>) => void }).registerAll(
+    readHandlers,
+  );
 
   // ── Register write-tool handlers ──
   // These delegate to executeAiWriteTool, which enqueues a pending task in
@@ -150,18 +151,16 @@ export async function createToolRouterExecutor(
       getRiskLevel: deps.getRiskLevel,
     };
     const writeHandlers: Record<string, ToolHandler> = {
-      write_file: async (args, ctx) =>
-        executeAiWriteTool('write_file', args, ctx, writeDeps),
-      move_file: async (args, ctx) =>
-        executeAiWriteTool('move_file', args, ctx, writeDeps),
-      create_folder: async (args, ctx) =>
-        executeAiWriteTool('create_folder', args, ctx, writeDeps),
-      delete_file: async (args, ctx) =>
-        executeAiWriteTool('delete_file', args, ctx, writeDeps),
+      write_file: async (args, ctx) => executeAiWriteTool('write_file', args, ctx, writeDeps),
+      move_file: async (args, ctx) => executeAiWriteTool('move_file', args, ctx, writeDeps),
+      create_folder: async (args, ctx) => executeAiWriteTool('create_folder', args, ctx, writeDeps),
+      delete_file: async (args, ctx) => executeAiWriteTool('delete_file', args, ctx, writeDeps),
       batch_operations: async (args, ctx) =>
         executeAiWriteTool('batch_operations', args, ctx, writeDeps),
     };
-    (router as unknown as { registerAll: (h: Record<string, ToolHandler>) => void }).registerAll(writeHandlers);
+    (router as unknown as { registerAll: (h: Record<string, ToolHandler>) => void }).registerAll(
+      writeHandlers,
+    );
   }
 
   // ── Return the executeTool closure ──

@@ -16,7 +16,13 @@ import type { AiWriteFns } from '@doc77/core';
 beforeAll(() => initI18n('zh-CN'));
 import { createSession } from '../src/session.js';
 import { getPendingTasks, updateTaskStatus } from '../src/queue/index.js';
-import { writeFile, moveFile, createFolder, deleteFile, batchOperations } from '../src/tools/write.js';
+import {
+  writeFile,
+  moveFile,
+  createFolder,
+  deleteFile,
+  batchOperations,
+} from '../src/tools/write.js';
 import { executeApprovedTasks } from '../src/transaction/executor.js';
 
 /**

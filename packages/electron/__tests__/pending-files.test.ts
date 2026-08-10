@@ -132,8 +132,6 @@ describe('handleFileOpen 等价流程（集成）', () => {
     q.drain((f) => navigated.push(`http://localhost:${serverPort}/preview.html?file=${f}`));
 
     expect(q.size).toBe(0);
-    expect(navigated).toEqual([
-      'http://localhost:28888/preview.html?file=startup.md',
-    ]);
+    expect(navigated).toEqual(['http://localhost:28888/preview.html?file=startup.md']);
   });
 });

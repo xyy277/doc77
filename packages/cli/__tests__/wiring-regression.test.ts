@@ -45,11 +45,7 @@ import {
 import { RagEngine } from '@doc77/ai';
 
 // 相对源码导入（CLI 未声明 @doc77/sync 依赖，使用相对路径直接加载当前源码）：
-import {
-  createSyncEngine,
-  registerSyncRoutes,
-  createSyncScheduler,
-} from '../../sync/src/index.js';
+import { createSyncEngine, registerSyncRoutes, createSyncScheduler } from '../../sync/src/index.js';
 // Electron 真实挂载函数（registerInstalledModules 内部调用同一个纯函数）：
 import { registerHttpRoutes } from '../../electron/src/server.js';
 
@@ -82,8 +78,7 @@ beforeAll(async () => {
   const syncEngine = createSyncEngine();
   const getProjectPath = (pid: number): string | null => {
     const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-      | { path: string }
-      | undefined;
+      { path: string } | undefined;
     return row?.path || null;
   };
   const syncScheduler = createSyncScheduler({ engine: syncEngine, db, getProjectPath });
@@ -125,8 +120,7 @@ beforeAll(async () => {
   // ───────────────────────────────────────────────────────────────────────
   const electronApp = createApp();
   let galleryModule:
-    | { registerGalleryRoutes: (app: any, deps: any) => Promise<unknown> }
-    | undefined;
+    { registerGalleryRoutes: (app: any, deps: any) => Promise<unknown> } | undefined;
   try {
     const gallery = await import('@doc77/gallery');
     if (gallery?.registerGalleryRoutes) {

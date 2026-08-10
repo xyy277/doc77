@@ -112,14 +112,14 @@ export class VectorStore {
     const rows = this.db
       .prepare('SELECT * FROM rag_chunks WHERE project_id = ?')
       .all(projectId) as Array<{
-        id: number;
-        project_id: number;
-        file_path: string;
-        chunk_index: number;
-        content: string;
-        embedding: Buffer;
-        created_at: string;
-      }>;
+      id: number;
+      project_id: number;
+      file_path: string;
+      chunk_index: number;
+      content: string;
+      embedding: Buffer;
+      created_at: string;
+    }>;
 
     const scored = rows.map((row) => {
       const embedding = bufferToEmbedding(row.embedding);

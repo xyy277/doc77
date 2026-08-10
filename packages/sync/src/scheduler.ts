@@ -35,10 +35,10 @@ export class SyncScheduler {
     this.engine = deps.engine;
     this.db = deps.db;
     this.getProjectPath =
-      deps.getProjectPath || ((pid: number) => {
+      deps.getProjectPath ||
+      ((pid: number) => {
         const row = this.db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-          | { path: string }
-          | undefined;
+          { path: string } | undefined;
         return row?.path || null;
       });
     this.onSyncResult = deps.onSyncResult;

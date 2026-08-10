@@ -43,11 +43,15 @@ export class WebDAVAdapter implements SyncAdapter {
     try {
       const client = this.getClient(cfg);
       const items = await client.getDirectoryContents(cfg.remotePath || '/', { deep: false });
-      return { ok: true, message: `Connected. ${Array.isArray(items) ? items.length : 0} items in root.` };
+      return {
+        ok: true,
+        message: `Connected. ${Array.isArray(items) ? items.length : 0} items in root.`,
+      };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Connection failed';
       if (msg.includes('401')) return { ok: false, message: 'Authentication failed (401)' };
-      if (msg.includes('ECONNREFUSED') || msg.includes('timeout')) return { ok: false, message: 'Cannot reach server' };
+      if (msg.includes('ECONNREFUSED') || msg.includes('timeout'))
+        return { ok: false, message: 'Cannot reach server' };
       return { ok: false, message: msg };
     }
   }
@@ -73,7 +77,9 @@ export class WebDAVAdapter implements SyncAdapter {
           });
         }
       }
-    } catch { /* empty */ }
+    } catch {
+      /* empty */
+    }
 
     return entries;
   }
@@ -109,7 +115,9 @@ export class WebDAVAdapter implements SyncAdapter {
           fs.writeFileSync(localPath, decrypted);
           result.filesUpdated++;
         } catch (e: unknown) {
-          result.errors.push(`${remote.path}: ${e instanceof Error ? e.message : 'download failed'}`);
+          result.errors.push(
+            `${remote.path}: ${e instanceof Error ? e.message : 'download failed'}`,
+          );
         }
       }
     } catch (e: unknown) {
@@ -159,7 +167,9 @@ export class WebDAVAdapter implements SyncAdapter {
   private async ensureRemoteDir(client: WebDAVClient, dirPath: string): Promise<void> {
     try {
       await client.createDirectory(dirPath, { recursive: true });
-    } catch { /* may already exist */ }
+    } catch {
+      /* may already exist */
+    }
   }
 
   private shouldIgnore(filePath: string, patterns: string[]): boolean {
@@ -170,4 +180,3 @@ export class WebDAVAdapter implements SyncAdapter {
     });
   }
 }
-

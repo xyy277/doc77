@@ -61,7 +61,8 @@ export class LocalAdapter implements SyncAdapter {
           let needsUpdate = true;
           if (fs.existsSync(localPath)) {
             const stat = fs.statSync(localPath);
-            if (stat.mtime.getTime() >= new Date(remote.lastModified).getTime()) needsUpdate = false;
+            if (stat.mtime.getTime() >= new Date(remote.lastModified).getTime())
+              needsUpdate = false;
           }
           if (!needsUpdate) continue;
 
@@ -124,7 +125,8 @@ export class LocalAdapter implements SyncAdapter {
           entries.push({ path: rel, size: stat.size, lastModified: stat.mtime.toISOString() });
         }
       }
-    } catch { /* permission etc. */ }
+    } catch {
+      /* permission etc. */
+    }
   }
 }
-

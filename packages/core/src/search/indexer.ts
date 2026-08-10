@@ -9,20 +9,74 @@ import { getConnection, type DatabaseCompat } from '../db/connection.js';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const TEXT_EXTENSIONS = new Set([
-  '.md', '.mdx', '.txt', '.text', '.markdown',
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
-  '.py', '.rb', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.hpp',
-  '.json', '.yaml', '.yml', '.toml', '.ini', '.env', '.conf', '.cfg',
-  '.html', '.htm', '.xml', '.svg', '.css', '.scss', '.less',
-  '.sh', '.bash', '.zsh', '.ps1', '.bat',
-  '.sql', '.graphql', '.proto', '.csv', '.log',
-  '.gitignore', '.editorconfig', '.prettierrc',
+  '.md',
+  '.mdx',
+  '.txt',
+  '.text',
+  '.markdown',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.py',
+  '.rb',
+  '.go',
+  '.rs',
+  '.java',
+  '.c',
+  '.cpp',
+  '.h',
+  '.hpp',
+  '.json',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.ini',
+  '.env',
+  '.conf',
+  '.cfg',
+  '.html',
+  '.htm',
+  '.xml',
+  '.svg',
+  '.css',
+  '.scss',
+  '.less',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.ps1',
+  '.bat',
+  '.sql',
+  '.graphql',
+  '.proto',
+  '.csv',
+  '.log',
+  '.gitignore',
+  '.editorconfig',
+  '.prettierrc',
 ]);
 
 const IGNORE_DIRS = new Set([
-  'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out',
-  '.next', '.nuxt', '__pycache__', '.venv', 'venv', '.idea', '.vs',
-  'coverage', '.cache', '.doc77',
+  'node_modules',
+  '.git',
+  '.svn',
+  '.hg',
+  'dist',
+  'build',
+  'out',
+  '.next',
+  '.nuxt',
+  '__pycache__',
+  '.venv',
+  'venv',
+  '.idea',
+  '.vs',
+  'coverage',
+  '.cache',
+  '.doc77',
 ]);
 
 export function isTextFile(filePath: string): boolean {
@@ -89,16 +143,22 @@ export function indexFile(
     if (meta && meta.file_hash === hash) return false; // unchanged
 
     // Delete old entry
-    conn.prepare('DELETE FROM file_content_fts WHERE project_id = ? AND file_path = ?')
+    conn
+      .prepare('DELETE FROM file_content_fts WHERE project_id = ? AND file_path = ?')
       .run(projectId, relativePath);
 
     // Insert new
     const title = extractTitle(content, relativePath);
-    conn.prepare('INSERT INTO file_content_fts (project_id, file_path, title, content) VALUES (?, ?, ?, ?)')
+    conn
+      .prepare(
+        'INSERT INTO file_content_fts (project_id, file_path, title, content) VALUES (?, ?, ?, ?)',
+      )
       .run(projectId, relativePath, title, content);
 
     // Upsert meta
-    conn.prepare(`
+    conn
+      .prepare(
+        `
       INSERT INTO search_index_meta (project_id, file_path, file_hash, file_mtime, file_size, indexed_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(project_id, file_path) DO UPDATE SET
@@ -106,7 +166,9 @@ export function indexFile(
         file_mtime = excluded.file_mtime,
         file_size = excluded.file_size,
         indexed_at = excluded.indexed_at
-    `).run(projectId, relativePath, hash, mtime, stat.size);
+    `,
+      )
+      .run(projectId, relativePath, hash, mtime, stat.size);
 
     return true;
   } catch {
@@ -123,9 +185,11 @@ export function removeFileFromIndex(
   db?: DatabaseCompat,
 ): void {
   const conn = db ?? getConnection();
-  conn.prepare('DELETE FROM file_content_fts WHERE project_id = ? AND file_path = ?')
+  conn
+    .prepare('DELETE FROM file_content_fts WHERE project_id = ? AND file_path = ?')
     .run(projectId, relativePath);
-  conn.prepare('DELETE FROM search_index_meta WHERE project_id = ? AND file_path = ?')
+  conn
+    .prepare('DELETE FROM search_index_meta WHERE project_id = ? AND file_path = ?')
     .run(projectId, relativePath);
 }
 
@@ -168,7 +232,11 @@ export async function fullIndex(
       }
       conn.exec('COMMIT');
     } catch {
-      try { conn.exec('ROLLBACK'); } catch { /* ignore */ }
+      try {
+        conn.exec('ROLLBACK');
+      } catch {
+        /* ignore */
+      }
       progress.errors += batch.length;
     }
 
@@ -197,7 +265,9 @@ export async function fullIndex(
 export function getIndexStats(projectId: number, db?: DatabaseCompat) {
   const conn = db ?? getConnection();
   const row = conn
-    .prepare('SELECT COUNT(*) as count, MAX(indexed_at) as last_indexed FROM search_index_meta WHERE project_id = ?')
+    .prepare(
+      'SELECT COUNT(*) as count, MAX(indexed_at) as last_indexed FROM search_index_meta WHERE project_id = ?',
+    )
     .get(projectId) as { count: number; last_indexed: string | null } | undefined;
   return {
     totalFiles: row?.count ?? 0,
@@ -219,6 +289,8 @@ function walkDir(root: string, dir: string): string[] {
         results.push(path.relative(root, fullPath).replace(/\\/g, '/'));
       }
     }
-  } catch { /* permission denied etc. */ }
+  } catch {
+    /* permission denied etc. */
+  }
   return results;
 }

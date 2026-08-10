@@ -5,12 +5,7 @@
 export type PluginType = 'renderer' | 'adapter' | 'theme' | 'tool' | 'widget';
 
 export type PluginPermission =
-  | 'read-files'
-  | 'write-files'
-  | 'network'
-  | 'ai'
-  | 'clipboard'
-  | 'notifications';
+  'read-files' | 'write-files' | 'network' | 'ai' | 'clipboard' | 'notifications';
 
 export interface PluginManifest {
   name: string;

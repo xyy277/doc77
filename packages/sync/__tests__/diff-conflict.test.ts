@@ -47,7 +47,13 @@ describe('T13 — computeDiff', () => {
 describe('T13 — detectConflicts', () => {
   it('识别双向修改的文件为冲突', () => {
     const localChanges: FileChange[] = [
-      { path: 'a.md', type: 'modified', mtime: '2026-07-31T10:00:00Z', hash: 'local-hash', size: 100 },
+      {
+        path: 'a.md',
+        type: 'modified',
+        mtime: '2026-07-31T10:00:00Z',
+        hash: 'local-hash',
+        size: 100,
+      },
       { path: 'b.md', type: 'added', mtime: '2026-07-31T10:00:00Z', hash: 'local-hash', size: 50 },
     ];
     const remoteFiles = [
@@ -75,13 +81,19 @@ describe('T13 — resolveConflict', () => {
   };
 
   it("strategy='local' 返回本地版本", () => {
-    const result = resolveConflict(conflict, 'local', { local: 'local content', remote: 'remote content' });
+    const result = resolveConflict(conflict, 'local', {
+      local: 'local content',
+      remote: 'remote content',
+    });
     expect(result.resolved).toBe(true);
     expect(result.mergedContent).toBe('local content');
   });
 
   it("strategy='remote' 返回远程版本", () => {
-    const result = resolveConflict(conflict, 'remote', { local: 'local content', remote: 'remote content' });
+    const result = resolveConflict(conflict, 'remote', {
+      local: 'local content',
+      remote: 'remote content',
+    });
     expect(result.resolved).toBe(true);
     expect(result.mergedContent).toBe('remote content');
   });

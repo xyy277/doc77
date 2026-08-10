@@ -79,7 +79,12 @@ function parseSimpleYaml(yaml: string): SkillFrontmatter {
     const trimmedValue = rawValue.trim();
 
     // Block scalar: >- or | (folded/literal multiline)
-    if (trimmedValue === '>-' || trimmedValue === '>' || trimmedValue === '|' || trimmedValue === '|-') {
+    if (
+      trimmedValue === '>-' ||
+      trimmedValue === '>' ||
+      trimmedValue === '|' ||
+      trimmedValue === '|-'
+    ) {
       const isFolded = trimmedValue.startsWith('>');
       const bodyLines: string[] = [];
       i++;
@@ -103,7 +108,13 @@ function parseSimpleYaml(yaml: string): SkillFrontmatter {
       const items: string[] = [];
       i++;
       while (i < lines.length && lines[i].trim().startsWith('- ')) {
-        items.push(lines[i].trim().slice(2).trim().replace(/^["']|["']$/g, ''));
+        items.push(
+          lines[i]
+            .trim()
+            .slice(2)
+            .trim()
+            .replace(/^["']|["']$/g, ''),
+        );
         i++;
       }
       result[key] = items;
@@ -130,8 +141,10 @@ function parseScalar(value: string): string | boolean | number {
   if (/^-?\d+$/.test(value)) return parseInt(value, 10);
   if (/^-?\d+\.\d+$/.test(value)) return parseFloat(value);
   // Quoted string
-  if ((value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
     return value.slice(1, -1);
   }
   return value;

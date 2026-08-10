@@ -29,7 +29,9 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  try { closeConnection(); } catch {}
+  try {
+    closeConnection();
+  } catch {}
   fs.rmSync(testDir, { recursive: true, force: true });
 });
 

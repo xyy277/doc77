@@ -45,7 +45,11 @@ export type AgentEvent =
   | { type: 'tool_result'; toolName: string; output: string; success: boolean; elapsedMs: number }
   | { type: 'context_compacted'; summary: string; compactedCount: number }
   | { type: 'skill_activated'; name: string }
-  | { type: 'done'; finishReason: string; usage?: { prompt_tokens: number; completion_tokens: number } }
+  | {
+      type: 'done';
+      finishReason: string;
+      usage?: { prompt_tokens: number; completion_tokens: number };
+    }
   | { type: 'error'; message: string };
 
 /**
@@ -55,17 +59,20 @@ export type AgentEvent =
  */
 export interface PersistenceAdapter {
   /** Append a message to the session's message tree. Returns the new message ID. */
-  appendMessage(sessionId: string, msg: {
-    role: 'system' | 'user' | 'assistant' | 'tool';
-    content: string;
-    parentId?: string | null;
-    toolCalls?: unknown[] | null;
-    toolCallId?: string | null;
-    toolName?: string | null;
-    tokenCount?: number | null;
-    finishReason?: string | null;
-    metadata?: Record<string, unknown>;
-  }): string;
+  appendMessage(
+    sessionId: string,
+    msg: {
+      role: 'system' | 'user' | 'assistant' | 'tool';
+      content: string;
+      parentId?: string | null;
+      toolCalls?: unknown[] | null;
+      toolCallId?: string | null;
+      toolName?: string | null;
+      tokenCount?: number | null;
+      finishReason?: string | null;
+      metadata?: Record<string, unknown>;
+    },
+  ): string;
   /** Get the current leaf message ID for a session. */
   getCurrentLeafId(sessionId: string): string | null;
   /** Get the message path (root → leaf) as AiMessage[]. */
@@ -170,7 +177,10 @@ export class AgentLoop {
 
     // Ensure there's a system prompt at the start
     if (messages.length === 0 || messages[0].role !== 'system') {
-      messages.unshift({ role: 'system', content: this.systemPrompt || 'You are a helpful assistant.' });
+      messages.unshift({
+        role: 'system',
+        content: this.systemPrompt || 'You are a helpful assistant.',
+      });
     }
 
     // ── Append the user message (skipped for regenerate) ──
@@ -316,7 +326,11 @@ export class AgentLoop {
         }
         lastMsgId = this.persistence.appendMessage(sessionId, assistantMsgPayload);
         if (streamUsage) {
-          this.persistence.addTokenUsage(sessionId, streamUsage.prompt_tokens || 0, streamUsage.completion_tokens || 0);
+          this.persistence.addTokenUsage(
+            sessionId,
+            streamUsage.prompt_tokens || 0,
+            streamUsage.completion_tokens || 0,
+          );
         }
       }
 
@@ -340,7 +354,11 @@ export class AgentLoop {
             sessionId,
             toolName: result.toolName,
             input: (() => {
-              try { return JSON.parse(result.argsStr); } catch { return result.argsStr; }
+              try {
+                return JSON.parse(result.argsStr);
+              } catch {
+                return result.argsStr;
+              }
             })(),
             output: result.output.slice(0, 1000),
             elapsedMs: result.elapsedMs,
@@ -404,9 +422,17 @@ export class AgentLoop {
 export function createPersistenceAdapter(fns: {
   appendMessage: (sessionId: string, msg: Record<string, unknown>) => { id: string };
   getCurrentLeafId: (sessionId: string) => string | null;
-  getMessagePath: (sessionId: string, leafId?: string | null) => Array<{
-    id: string; role: string; content: string; toolCalls?: string | null;
-    toolCallId?: string | null; toolName?: string | null; parentId?: string | null;
+  getMessagePath: (
+    sessionId: string,
+    leafId?: string | null,
+  ) => Array<{
+    id: string;
+    role: string;
+    content: string;
+    toolCalls?: string | null;
+    toolCallId?: string | null;
+    toolName?: string | null;
+    parentId?: string | null;
   }>;
   addTokenUsage: (sessionId: string, inputTokens: number, outputTokens: number) => void;
   logToolCall: (entry: Record<string, unknown>) => number;

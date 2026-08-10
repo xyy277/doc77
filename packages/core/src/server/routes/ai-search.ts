@@ -30,12 +30,8 @@ export function registerAiSearchRoutes(app: Express): void {
     }
 
     const sessionId = (req.query.session_id as string | undefined) || undefined;
-    const projectId = req.query.project_id != null
-      ? Number(req.query.project_id)
-      : undefined;
-    const limit = req.query.limit != null
-      ? Math.min(Number(req.query.limit) || 20, 100)
-      : 20;
+    const projectId = req.query.project_id != null ? Number(req.query.project_id) : undefined;
+    const limit = req.query.limit != null ? Math.min(Number(req.query.limit) || 20, 100) : 20;
 
     // Validate project_id if provided
     if (req.query.project_id != null && !Number.isFinite(projectId)) {

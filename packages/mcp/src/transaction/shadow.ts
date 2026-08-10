@@ -183,7 +183,9 @@ export function rollbackFromShadow(undoLog: UndoLog, projectRoot: string, shadow
       if (attempt < 2) {
         // Brief pause before retry (only when actually retrying)
         const start = Date.now();
-        while (Date.now() - start < 50 * (attempt + 1)) { /* busy-wait */ }
+        while (Date.now() - start < 50 * (attempt + 1)) {
+          /* busy-wait */
+        }
       }
     }
   }

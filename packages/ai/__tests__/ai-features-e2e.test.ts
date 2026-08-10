@@ -81,7 +81,10 @@ class MockProvider {
     }
   }
 
-  async chat(): Promise<{ message: AiMessage; usage?: { prompt_tokens: number; completion_tokens: number } }> {
+  async chat(): Promise<{
+    message: AiMessage;
+    usage?: { prompt_tokens: number; completion_tokens: number };
+  }> {
     // Used by ContextManager.autoCompact — return a canned summary
     return {
       message: { role: 'assistant', content: 'Summary: user discussed files and tools.' },
@@ -107,7 +110,10 @@ let projectId: number;
 let projDir: string;
 
 beforeEach(async () => {
-  testDir = path.join(os.tmpdir(), `doc77-feat-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  testDir = path.join(
+    os.tmpdir(),
+    `doc77-feat-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   fs.mkdirSync(testDir, { recursive: true });
   dbPath = path.join(testDir, 'data.db');
   projDir = path.join(testDir, 'proj');
@@ -618,7 +624,9 @@ describe('E2E: Context Compression (Phase 3)', () => {
     const compactedEvent = events.find((e) => e.type === 'context_compacted');
     expect(compactedEvent).toBeTruthy();
     if (compactedEvent) {
-      expect((compactedEvent as unknown as { compactedCount: number }).compactedCount).toBeGreaterThan(0);
+      expect(
+        (compactedEvent as unknown as { compactedCount: number }).compactedCount,
+      ).toBeGreaterThan(0);
     }
   });
 

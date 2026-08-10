@@ -90,7 +90,11 @@ export class TunnelManager {
       this.process.kill('SIGTERM');
       // Force kill after 5s
       const proc = this.process;
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 5000);
+      setTimeout(() => {
+        try {
+          proc.kill('SIGKILL');
+        } catch {}
+      }, 5000);
       this.process = null;
     }
     this.info.status = 'stopped';
@@ -101,7 +105,9 @@ export class TunnelManager {
   private async startCloudflare(config: TunnelConfig): Promise<void> {
     const bin = await this.findBinary('cloudflared');
     if (!bin) {
-      throw new Error('cloudflared not found. Install: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/');
+      throw new Error(
+        'cloudflared not found. Install: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/',
+      );
     }
 
     let args: string[];
@@ -172,7 +178,9 @@ export class TunnelManager {
 
     this.process.stdout?.on('data', onData);
     this.process.stderr?.on('data', onData);
-    this.process.on('exit', () => { this.info.status = 'stopped'; });
+    this.process.on('exit', () => {
+      this.info.status = 'stopped';
+    });
 
     await new Promise((r) => setTimeout(r, 3000));
   }
@@ -210,7 +218,12 @@ export class TunnelManager {
 
   private async findBinary(name: string): Promise<string | null> {
     // 1. Check ~/.doc77/bin/
-    const localBin = path.join(os.homedir(), '.doc77', 'bin', name + (process.platform === 'win32' ? '.exe' : ''));
+    const localBin = path.join(
+      os.homedir(),
+      '.doc77',
+      'bin',
+      name + (process.platform === 'win32' ? '.exe' : ''),
+    );
     if (fs.existsSync(localBin)) return localBin;
 
     // 2. Check PATH

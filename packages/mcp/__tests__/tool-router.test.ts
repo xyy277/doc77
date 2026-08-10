@@ -25,11 +25,13 @@ import {
 
 // ── Helpers ──
 
-function makeRouter(opts: {
-  riskLevel?: 'low' | 'medium' | 'high';
-  sensitiveFiles?: Set<string>;
-  handlers?: Record<string, ToolHandler>;
-} = {}) {
+function makeRouter(
+  opts: {
+    riskLevel?: 'low' | 'medium' | 'high';
+    sensitiveFiles?: Set<string>;
+    handlers?: Record<string, ToolHandler>;
+  } = {},
+) {
   const sensitive = opts.sensitiveFiles ?? new Set(['.env', 'secret.key']);
   const router = new ToolRouter({
     isSensitiveFile: (name: string) => sensitive.has(name),
@@ -82,7 +84,9 @@ describe('Tool annotations', () => {
   it('classifyBatchOps: delete_file makes batch destructive', () => {
     expect(classifyBatchOps([{ type: 'move_file' }])).toBe('write');
     expect(classifyBatchOps([{ type: 'delete_file' }])).toBe('destructive');
-    expect(classifyBatchOps([{ type: 'create_folder' }, { type: 'delete_file' }])).toBe('destructive');
+    expect(classifyBatchOps([{ type: 'create_folder' }, { type: 'delete_file' }])).toBe(
+      'destructive',
+    );
     expect(classifyBatchOps([])).toBe('write');
   });
 });
@@ -106,7 +110,11 @@ describe('ToolRouter permission gate', () => {
         write_file: async () => 'should not reach',
       },
     });
-    const result = await router.execute('write_file', { file_path: 'test.txt', content: 'hi' }, CTX);
+    const result = await router.execute(
+      'write_file',
+      { file_path: 'test.txt', content: 'hi' },
+      CTX,
+    );
     expect(result.success).toBe(false);
     expect(result.denied).toBe(true);
     expect(result.denialReason).toBe('risk_level');
@@ -119,7 +127,11 @@ describe('ToolRouter permission gate', () => {
         write_file: async () => 'queued: task_123',
       },
     });
-    const result = await router.execute('write_file', { file_path: 'test.txt', content: 'hi' }, CTX);
+    const result = await router.execute(
+      'write_file',
+      { file_path: 'test.txt', content: 'hi' },
+      CTX,
+    );
     expect(result.success).toBe(true);
     expect(result.denied).toBe(false);
     expect(result.output).toContain('task_123');
@@ -157,11 +169,19 @@ describe('ToolRouter permission gate', () => {
         delete_file: async () => 'should not reach',
       },
     });
-    const writeResult = await router.execute('write_file', { file_path: '.env', content: 'SECRET=1' }, CTX);
+    const writeResult = await router.execute(
+      'write_file',
+      { file_path: '.env', content: 'SECRET=1' },
+      CTX,
+    );
     expect(writeResult.denied).toBe(true);
     expect(writeResult.denialReason).toBe('sensitive_file');
 
-    const deleteResult = await router.execute('delete_file', { file_path: 'config/secret.key' }, CTX);
+    const deleteResult = await router.execute(
+      'delete_file',
+      { file_path: 'config/secret.key' },
+      CTX,
+    );
     expect(deleteResult.denied).toBe(true);
     expect(deleteResult.denialReason).toBe('sensitive_file');
   });
@@ -175,7 +195,12 @@ describe('ToolRouter permission gate', () => {
     });
     const result = await router.execute(
       'batch_operations',
-      { operations: [{ type: 'create_folder', folder_path: 'a' }, { type: 'delete_file', file_path: 'b.txt' }] },
+      {
+        operations: [
+          { type: 'create_folder', folder_path: 'a' },
+          { type: 'delete_file', file_path: 'b.txt' },
+        ],
+      },
       CTX,
     );
     // batch with delete_file → effective permission 'destructive' → requires 'high'
@@ -192,7 +217,12 @@ describe('ToolRouter permission gate', () => {
     });
     const result = await router.execute(
       'batch_operations',
-      { operations: [{ type: 'create_folder', folder_path: 'a' }, { type: 'move_file', source: 'b', target: 'c' }] },
+      {
+        operations: [
+          { type: 'create_folder', folder_path: 'a' },
+          { type: 'move_file', source: 'b', target: 'c' },
+        ],
+      },
       CTX,
     );
     expect(result.success).toBe(true);
@@ -222,7 +252,9 @@ describe('ToolRouter handler dispatch', () => {
   it('catches handler errors and returns them as failed results', async () => {
     const router = makeRouter({
       handlers: {
-        read_file: async () => { throw new Error('disk failure'); },
+        read_file: async () => {
+          throw new Error('disk failure');
+        },
       },
     });
     const result = await router.execute('read_file', { file_path: 'x.txt' }, CTX);
@@ -235,7 +267,10 @@ describe('ToolRouter handler dispatch', () => {
   it('returns elapsedMs for every call', async () => {
     const router = makeRouter({
       handlers: {
-        list_files: async () => { await new Promise(r => setTimeout(r, 10)); return 'done'; },
+        list_files: async () => {
+          await new Promise((r) => setTimeout(r, 10));
+          return 'done';
+        },
       },
     });
     const result = await router.execute('list_files', {}, CTX);
@@ -261,12 +296,12 @@ describe('ToolRouter executeBatch', () => {
       handlers: {
         list_files: async (args) => {
           callOrder.push(`list:${args.dir_path}`);
-          await new Promise(r => setTimeout(r, 20));
+          await new Promise((r) => setTimeout(r, 20));
           return `listed ${args.dir_path}`;
         },
         read_file: async (args) => {
           callOrder.push(`read:${args.file_path}`);
-          await new Promise(r => setTimeout(r, 5));
+          await new Promise((r) => setTimeout(r, 5));
           return `read ${args.file_path}`;
         },
       },
@@ -284,7 +319,7 @@ describe('ToolRouter executeBatch', () => {
     expect(results[1].output).toBe('read b.txt');
     expect(results[2].output).toBe('listed /c');
     // All succeeded
-    expect(results.every(r => r.success)).toBe(true);
+    expect(results.every((r) => r.success)).toBe(true);
   });
 
   it('executes write tools serially in arrival order', async () => {

@@ -62,7 +62,7 @@ export function registerAiSessionRoutes(app: Express): void {
   // ── GET /api/ai/sessions — 列出会话 ──────────────────────
   app.get('/api/ai/sessions', (req: Request, res: Response) => {
     const projectId = req.query.project_id != null ? Number(req.query.project_id) : undefined;
-    const status = (req.query.status as string | undefined) as SessionStatus | undefined;
+    const status = req.query.status as string | undefined as SessionStatus | undefined;
     const search = req.query.q as string | undefined;
     const pinnedOnly = req.query.pinned === '1' || req.query.pinned === 'true';
     const limit = req.query.limit != null ? Math.min(Number(req.query.limit) || 50, 200) : 50;

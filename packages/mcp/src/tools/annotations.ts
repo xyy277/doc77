@@ -134,10 +134,7 @@ const RISK_RANK: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
  * Check whether a given risk level satisfies the tool's requirement.
  * `medium` satisfies tools requiring `low` or `medium`; `high` satisfies all.
  */
-export function riskLevelPermits(
-  current: RiskLevel,
-  required: RiskLevel,
-): boolean {
+export function riskLevelPermits(current: RiskLevel, required: RiskLevel): boolean {
   return RISK_RANK[current] >= RISK_RANK[required];
 }
 
@@ -168,9 +165,7 @@ export function isDestructive(name: string): boolean {
  * contained operation types. A batch containing any delete_file op is
  * classified as 'destructive'; otherwise 'write'.
  */
-export function classifyBatchOps(
-  ops: Array<{ type?: string }>,
-): ToolPermission {
+export function classifyBatchOps(ops: Array<{ type?: string }>): ToolPermission {
   if (!Array.isArray(ops)) return 'write';
   for (const op of ops) {
     if (op?.type === 'delete_file') return 'destructive';

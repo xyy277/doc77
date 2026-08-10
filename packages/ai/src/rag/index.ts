@@ -73,9 +73,7 @@ export class RagEngine {
     const embeddings = await this.embedFn(texts);
 
     if (embeddings.length !== chunks.length) {
-      throw new Error(
-        `Embedding count mismatch: ${embeddings.length} != ${chunks.length} chunks`,
-      );
+      throw new Error(`Embedding count mismatch: ${embeddings.length} != ${chunks.length} chunks`);
     }
 
     // 批量存储

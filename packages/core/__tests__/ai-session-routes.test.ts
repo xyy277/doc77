@@ -13,11 +13,7 @@ import { initDatabase, closeConnection } from '../src/db/connection.js';
 import { runMigrations } from '../src/db/migrations.js';
 import { createApp } from '../src/server/app.js';
 import { registerProject } from '../src/db/projects.js';
-import {
-  createSession,
-  appendMessage,
-  type AiSession,
-} from '../src/db/session-store.js';
+import { createSession, appendMessage, type AiSession } from '../src/db/session-store.js';
 
 async function withServer(
   app: ReturnType<typeof createApp>,
@@ -55,7 +51,10 @@ describe('AI Session Routes (Phase 2)', () => {
   let dbPath: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `doc77-ai-routes-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(
+      os.tmpdir(),
+      `doc77-ai-routes-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
     fs.mkdirSync(testDir, { recursive: true });
     dbPath = path.join(testDir, 'data.db');
     await initDatabase(dbPath);
@@ -170,7 +169,11 @@ describe('AI Session Routes (Phase 2)', () => {
         expect((allBody as { sessions: AiSession[] }).sessions).toHaveLength(2);
 
         // Filter: only archived
-        const { body: archivedBody } = await json(baseUrl, 'GET', '/api/ai/sessions?status=archived');
+        const { body: archivedBody } = await json(
+          baseUrl,
+          'GET',
+          '/api/ai/sessions?status=archived',
+        );
         const archived = (archivedBody as { sessions: AiSession[] }).sessions;
         expect(archived).toHaveLength(1);
         expect(archived[0].title).toBe('Archived');
@@ -285,7 +288,11 @@ describe('AI Session Routes (Phase 2)', () => {
 
       const app = createApp();
       await withServer(app, async (baseUrl) => {
-        const { status, body } = await json(baseUrl, 'GET', `/api/ai/sessions/${session.id}/messages`);
+        const { status, body } = await json(
+          baseUrl,
+          'GET',
+          `/api/ai/sessions/${session.id}/messages`,
+        );
         expect(status).toBe(200);
         const messages = (body as { messages: unknown[] }).messages;
         expect(messages).toHaveLength(2);
@@ -310,7 +317,11 @@ describe('AI Session Routes (Phase 2)', () => {
 
       const app = createApp();
       await withServer(app, async (baseUrl) => {
-        const { status, body } = await json(baseUrl, 'GET', `/api/ai/sessions/${session.id}/messages/path`);
+        const { status, body } = await json(
+          baseUrl,
+          'GET',
+          `/api/ai/sessions/${session.id}/messages/path`,
+        );
         expect(status).toBe(200);
         const path = (body as { path: { id: string }[] }).path;
         expect(path).toHaveLength(3);
@@ -334,7 +345,11 @@ describe('AI Session Routes (Phase 2)', () => {
       const app = createApp();
       await withServer(app, async (baseUrl) => {
         // Default path goes through m2b (current leaf after last append)
-        const { body: defaultBody } = await json(baseUrl, 'GET', `/api/ai/sessions/${session.id}/messages/path`);
+        const { body: defaultBody } = await json(
+          baseUrl,
+          'GET',
+          `/api/ai/sessions/${session.id}/messages/path`,
+        );
         const defaultPath = (defaultBody as { path: { id: string }[] }).path;
         expect(defaultPath.map((m) => m.id)).toEqual([m1.id, m2b.id]);
 
@@ -365,7 +380,9 @@ describe('AI Session Routes (Phase 2)', () => {
           `/api/ai/sessions/${session.id}/messages/${m2a.id}/variants`,
         );
         expect(status).toBe(200);
-        const variants = (body as { variants: { id: string; content: string }[]; currentIndex: number }).variants;
+        const variants = (
+          body as { variants: { id: string; content: string }[]; currentIndex: number }
+        ).variants;
         expect(variants).toHaveLength(2);
         expect(variants.map((v) => v.content).sort()).toEqual(['A1', 'A2']);
       });
@@ -383,14 +400,23 @@ describe('AI Session Routes (Phase 2)', () => {
       await withServer(app, async (baseUrl) => {
         // Initially current leaf is m2b (last appended)
         // Switch to m2a
-        const { status, body } = await json(baseUrl, 'POST', `/api/ai/sessions/${session.id}/switch-branch`, {
-          leaf_message_id: m2a.id,
-        });
+        const { status, body } = await json(
+          baseUrl,
+          'POST',
+          `/api/ai/sessions/${session.id}/switch-branch`,
+          {
+            leaf_message_id: m2a.id,
+          },
+        );
         expect(status).toBe(200);
         expect((body as { session: AiSession }).session.currentLeafId).toBe(m2a.id);
 
         // Verify path now goes through m2a
-        const { body: pathBody } = await json(baseUrl, 'GET', `/api/ai/sessions/${session.id}/messages/path`);
+        const { body: pathBody } = await json(
+          baseUrl,
+          'GET',
+          `/api/ai/sessions/${session.id}/messages/path`,
+        );
         const path = (pathBody as { path: { id: string }[] }).path;
         expect(path.map((m) => m.id)).toEqual([m1.id, m2a.id]);
       });
@@ -410,10 +436,15 @@ describe('AI Session Routes (Phase 2)', () => {
 
       const app = createApp();
       await withServer(app, async (baseUrl) => {
-        const { status, body } = await json(baseUrl, 'POST', `/api/ai/sessions/${session.id}/branch`, {
-          from_message_id: m1.id,
-          title: 'Branched Session',
-        });
+        const { status, body } = await json(
+          baseUrl,
+          'POST',
+          `/api/ai/sessions/${session.id}/branch`,
+          {
+            from_message_id: m1.id,
+            title: 'Branched Session',
+          },
+        );
         expect(status).toBe(201);
         const branched = (body as { session: AiSession }).session;
         expect(branched.id).not.toBe(session.id);
@@ -503,7 +534,11 @@ describe('AI Session Routes (Phase 2)', () => {
 
       const app = createApp();
       await withServer(app, async (baseUrl) => {
-        const { status, body } = await json(baseUrl, 'GET', `/api/ai/sessions/${session.id}/tool-logs`);
+        const { status, body } = await json(
+          baseUrl,
+          'GET',
+          `/api/ai/sessions/${session.id}/tool-logs`,
+        );
         expect(status).toBe(200);
         const logs = (body as { logs: { toolName: string; success: boolean }[] }).logs;
         expect(logs).toHaveLength(1);

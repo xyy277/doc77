@@ -182,7 +182,8 @@ export class ContextManager {
     // Build a structural placeholder for removed content
     const snipNotice: AiMessage = {
       role: 'system',
-      content: `[Context Snip] ${removed} earlier message(s) removed to save context. ` +
+      content:
+        `[Context Snip] ${removed} earlier message(s) removed to save context. ` +
         `Key topics from removed messages: ${this.extractTopics(nonSystemMsgs.slice(0, removed))}`,
     };
 
@@ -211,7 +212,8 @@ export class ContextManager {
         const dirCount = lines.filter((l) => l.includes('📁')).length;
         return {
           ...msg,
-          content: `[Directory listing: ${fileCount} files, ${dirCount} directories]\n` +
+          content:
+            `[Directory listing: ${fileCount} files, ${dirCount} directories]\n` +
             lines.slice(0, 20).join('\n') +
             `\n... ${lines.length - 20} more entries omitted`,
         };
@@ -223,7 +225,9 @@ export class ContextManager {
         if (compressed.length < content.length * 0.8) {
           return {
             ...msg,
-            content: compressed + `\n\n[... whitespace compacted, ${content.length - compressed.length} chars saved]`,
+            content:
+              compressed +
+              `\n\n[... whitespace compacted, ${content.length - compressed.length} chars saved]`,
           };
         }
       }

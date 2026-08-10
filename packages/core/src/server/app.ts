@@ -112,10 +112,13 @@ function getServerInfo() {
  * Populated by createAgentLoopHandler when an AgentLoop starts, cleared
  * when it finishes. The /api/ai/chat/interrupt endpoint reads from this map.
  */
-const _activeInterruptQueues = new Map<string, {
-  cancel: () => void;
-  inject: (msg: string) => void;
-}>();
+const _activeInterruptQueues = new Map<
+  string,
+  {
+    cancel: () => void;
+    inject: (msg: string) => void;
+  }
+>();
 
 /**
  * Create and configure the Express application.
@@ -319,10 +322,13 @@ export function createApp(
   if (webDir) {
     const iconsDir = path.join(webDir, 'icons');
     if (fs.existsSync(iconsDir)) {
-      app.use('/icons', express.static(iconsDir, {
-        maxAge: '7d',
-        immutable: true,
-      }));
+      app.use(
+        '/icons',
+        express.static(iconsDir, {
+          maxAge: '7d',
+          immutable: true,
+        }),
+      );
     }
   }
 
@@ -342,7 +348,8 @@ export function createApp(
   // Electron: bundled in resources/vendor/ (via extraResources).
   // CLI / dev: ~/.doc77/vendor/ (populated by `doc77 vendor-install`).
   const vendorDir = process.env.DOC77_ELECTRON
-    ? process.env.DOC77_VENDOR_DIR || path.join((process as NodeJS.Process & { resourcesPath?: string }).resourcesPath!, 'vendor')
+    ? process.env.DOC77_VENDOR_DIR ||
+      path.join((process as NodeJS.Process & { resourcesPath?: string }).resourcesPath!, 'vendor')
     : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
   app.use('/vendor', express.static(vendorDir, { fallthrough: true, dotfiles: 'allow' }));
 
@@ -403,9 +410,7 @@ export function createApp(
     const tunnelActive = getTunnelManager().getStatus().status === 'running';
     if (tunnelActive) {
       const ip =
-        ((req.headers['x-forwarded-for'] as string) || '').split(',')[0]?.trim() ||
-        req.ip ||
-        '';
+        ((req.headers['x-forwarded-for'] as string) || '').split(',')[0]?.trim() || req.ip || '';
       const isLocalhost =
         ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === '';
       if (!isLocalhost) {
@@ -422,10 +427,7 @@ export function createApp(
         }
         // 接受常规 session 或隧道 session（30min TTL）
         const token = extractBearerToken(req);
-        if (
-          token &&
-          (auth.validateSessionToken(token) || auth.validateTunnelSessionToken(token))
-        ) {
+        if (token && (auth.validateSessionToken(token) || auth.validateTunnelSessionToken(token))) {
           return next();
         }
         res.status(401).json({
@@ -1049,12 +1051,16 @@ export function createApp(
             // Security: use execFileSync (no shell) and pass folderName as a
             // single argv element to prevent command injection. The previous
             // template-string form allowed RCE via a crafted folderName.
-            return execFileSync('find', [root, '-maxdepth', '4', '-type', 'd', '-name', folderName], {
-              timeout: 4000,
-              encoding: 'utf-8',
-              maxBuffer: 1024 * 1024,
-              stdio: ['ignore', 'pipe', 'ignore'],
-            }).trim();
+            return execFileSync(
+              'find',
+              [root, '-maxdepth', '4', '-type', 'd', '-name', folderName],
+              {
+                timeout: 4000,
+                encoding: 'utf-8',
+                maxBuffer: 1024 * 1024,
+                stdio: ['ignore', 'pipe', 'ignore'],
+              },
+            ).trim();
           } catch (e: unknown) {
             // execFileSync throws on non-zero exit, but stdout may still have results
             const err = e as { stdout?: string; stderr?: string };
@@ -1933,7 +1939,9 @@ export function createApp(
               const renderer = await loader.findRenderer(ext);
               if (renderer && typeof (renderer as { render?: unknown }).render === 'function') {
                 const raw = await fs.promises.readFile(absPath, 'utf-8');
-                const result = await (renderer as { render: (raw: string, ctx: unknown) => Promise<unknown> }).render(raw, { projectId, filePath });
+                const result = await (
+                  renderer as { render: (raw: string, ctx: unknown) => Promise<unknown> }
+                ).render(raw, { projectId, filePath });
                 res.json({
                   path: filePath,
                   type: 'plugin',
@@ -2558,7 +2566,11 @@ export function createApp(
         } catch {}
 
         // 12. Incremental FTS index update
-        try { indexFile(projectId, project.path, filePath); } catch { /* non-critical */ }
+        try {
+          indexFile(projectId, project.path, filePath);
+        } catch {
+          /* non-critical */
+        }
 
         res.json({ ok: true, size: newStats.size, modified: newStats.mtime.toISOString() });
       } catch (writeErr: unknown) {
@@ -3141,8 +3153,14 @@ export function createApp(
     const offset = parseInt(req.query.offset as string, 10) || 0;
     const pathFilter = (req.query.path as string) || undefined;
 
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
-    if (!q || q.length < 1) { res.status(400).json({ error: 'q parameter is required' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
+    if (!q || q.length < 1) {
+      res.status(400).json({ error: 'q parameter is required' });
+      return;
+    }
 
     try {
       const result = searchProject(projectId, q, { limit, offset, pathFilter });
@@ -3158,7 +3176,10 @@ export function createApp(
     const q = (req.query.q as string) || '';
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 10, 50);
 
-    if (!q || q.length < 1) { res.status(400).json({ error: 'q parameter is required' }); return; }
+    if (!q || q.length < 1) {
+      res.status(400).json({ error: 'q parameter is required' });
+      return;
+    }
 
     try {
       const result = searchAll(q, { limit });
@@ -3172,12 +3193,19 @@ export function createApp(
   // Trigger full index for a project
   app.post('/api/fts/:projectId/index', async (req: Request, res: Response) => {
     const projectId = parseInt(req.params.projectId as string, 10);
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
 
     try {
       const db = getConnection();
-      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as { path: string } | undefined;
-      if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+      const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+        { path: string } | undefined;
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
 
       // Run indexing in background, respond immediately
       res.json({ status: 'indexing', message: 'Full index started in background' });
@@ -3191,7 +3219,10 @@ export function createApp(
   // Get index stats
   app.get('/api/fts/:projectId/stats', (req: Request, res: Response) => {
     const projectId = parseInt(req.params.projectId as string, 10);
-    if (isNaN(projectId)) { res.status(400).json({ error: 'Invalid project id' }); return; }
+    if (isNaN(projectId)) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
     try {
       const stats = getIndexStats(projectId);
       res.json(stats);
@@ -3247,8 +3278,10 @@ export function createApp(
     const body = req.body || {};
     if (body.accessPolicy) setConfig('tunnel.access_policy', body.accessPolicy);
     if (body.password) setConfig('tunnel.password', body.password);
-    if (body.allowedDevices) setConfig('tunnel.allowed_devices', JSON.stringify(body.allowedDevices));
-    if (body.sessionTtlMinutes) setConfig('tunnel.session_ttl_minutes', String(body.sessionTtlMinutes));
+    if (body.allowedDevices)
+      setConfig('tunnel.allowed_devices', JSON.stringify(body.allowedDevices));
+    if (body.sessionTtlMinutes)
+      setConfig('tunnel.session_ttl_minutes', String(body.sessionTtlMinutes));
     res.json({ ok: true });
   });
 
@@ -3270,7 +3303,10 @@ export function createApp(
     const loader = getPluginLoader();
     const enabled = req.body?.enabled !== false;
     const ok = loader.toggle(req.params.name as string, enabled);
-    if (!ok) { res.status(404).json({ error: 'Plugin not found' }); return; }
+    if (!ok) {
+      res.status(404).json({ error: 'Plugin not found' });
+      return;
+    }
     res.json({ ok: true, name: req.params.name as string, enabled });
   });
 
@@ -3877,8 +3913,9 @@ export function createAIChatHandler(deps: {
         const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
           { value: string } | undefined;
         // T4: 读取 ai.provider，支持多 provider 切换
-        const providerRow = db.prepare("SELECT value FROM config WHERE key = 'ai.provider'").get() as
-          { value: string } | undefined;
+        const providerRow = db
+          .prepare("SELECT value FROM config WHERE key = 'ai.provider'")
+          .get() as { value: string } | undefined;
         const ollamaUrlRow = db
           .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
           .get() as { value: string } | undefined;
@@ -4228,12 +4265,26 @@ export function createAIChatHandler(deps: {
 export function createAgentLoopHandler(deps: {
   AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => unknown;
   AgentLoop: new (config: Record<string, unknown>) => {
-    run(sessionId: string, message: string, opts?: { noTools?: boolean; skipAppendUser?: boolean }): AsyncIterable<{
-      type: string; content?: string; name?: string; id?: string; arguments?: string;
-      toolName?: string; output?: string; success?: boolean; elapsedMs?: number;
-      summary?: string; compactedCount?: number; finishReason?: string;
+    run(
+      sessionId: string,
+      message: string,
+      opts?: { noTools?: boolean; skipAppendUser?: boolean },
+    ): AsyncIterable<{
+      type: string;
+      content?: string;
+      name?: string;
+      id?: string;
+      arguments?: string;
+      toolName?: string;
+      output?: string;
+      success?: boolean;
+      elapsedMs?: number;
+      summary?: string;
+      compactedCount?: number;
+      finishReason?: string;
       usage?: { prompt_tokens: number; completion_tokens: number };
-      message?: string; sessionId?: string;
+      message?: string;
+      sessionId?: string;
     }>;
     interrupts: { cancel: () => void; inject: (msg: string) => void };
   };
@@ -4249,9 +4300,9 @@ export function createAgentLoopHandler(deps: {
     const { message, project_id, session_id, context_file, regenerate_from, edit_from } = req.body;
     console.error(
       `[ai-loop] chat request: session=${session_id || 'new'}, project=${project_id}, ` +
-      `context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"` +
-      (regenerate_from ? `, regenerate_from=${regenerate_from}` : '') +
-      (edit_from ? `, edit_from=${edit_from}` : ''),
+        `context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"` +
+        (regenerate_from ? `, regenerate_from=${regenerate_from}` : '') +
+        (edit_from ? `, edit_from=${edit_from}` : ''),
     );
 
     // ── Branch mutation validation ──
@@ -4298,11 +4349,16 @@ export function createAgentLoopHandler(deps: {
           const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
             { pbkdf2_salt: string } | undefined;
           if (authRow?.pbkdf2_salt) {
-            const encKey = crypto.deriveKey('doc77-config-key', Buffer.from(authRow.pbkdf2_salt, 'hex'));
+            const encKey = crypto.deriveKey(
+              'doc77-config-key',
+              Buffer.from(authRow.pbkdf2_salt, 'hex'),
+            );
             token = crypto.decrypt(encData, encKey);
           }
         }
-      } catch { /* not encrypted */ }
+      } catch {
+        /* not encrypted */
+      }
     }
     const baseUrl = baseRow?.value || 'https://api.deepseek.com';
     const model = modelRow?.value || 'deepseek-v4-pro';
@@ -4346,7 +4402,8 @@ export function createAgentLoopHandler(deps: {
 
       // ── Build the persistence adapter (bridges AgentLoop ↔ SessionStore) ──
       const persistence = createPersistenceAdapter({
-        appendMessage: (sId: string, msg: Record<string, unknown>) => appendMessage(sId, msg as never),
+        appendMessage: (sId: string, msg: Record<string, unknown>) =>
+          appendMessage(sId, msg as never),
         getCurrentLeafId: (sId: string) => {
           const s = getSession(sId);
           return s?.currentLeafId ?? null;
@@ -4364,12 +4421,15 @@ export function createAgentLoopHandler(deps: {
             parentId: m.parentId,
           }));
         },
-        addTokenUsage: (sId: string, input: number, output: number) => addTokenUsage(sId, input, output),
+        addTokenUsage: (sId: string, input: number, output: number) =>
+          addTokenUsage(sId, input, output),
         logToolCall: (entry: Record<string, unknown>) => logToolCall(entry as never),
       });
 
       // ── Build the provider ──
-      const provider = new AiProvider({ apiKey: token, baseUrl, model }) as InstanceType<typeof AiProvider>;
+      const provider = new AiProvider({ apiKey: token, baseUrl, model }) as InstanceType<
+        typeof AiProvider
+      >;
 
       // ── Build the tool executor (same logic as createAIChatHandler) ──
       let toolSessionId = sid;
@@ -4397,7 +4457,9 @@ export function createAgentLoopHandler(deps: {
           const row = db.prepare("SELECT value FROM config WHERE key = 'ai.risk_level'").get() as
             { value: string } | undefined;
           return row?.value || 'medium';
-        } catch { return 'medium'; }
+        } catch {
+          return 'medium';
+        }
       };
 
       const executeTool = await createToolRouterExecutor({
@@ -4415,7 +4477,7 @@ export function createAgentLoopHandler(deps: {
 
       // ── Build tools ──
       const readTools = getReadTools();
-      const writeTools = deps.writeFns ? (deps.getWriteTools?.() || []) : [];
+      const writeTools = deps.writeFns ? deps.getWriteTools?.() || [] : [];
       const allTools = [...readTools, ...writeTools];
 
       // ── Context file fast-path (same as createAIChatHandler) ──
@@ -4491,17 +4553,23 @@ export function createAgentLoopHandler(deps: {
       if (project_id && !context_file) {
         try {
           const root = scanDirectory(project_id, '');
-          const fileList = root.entries.slice(0, 30)
+          const fileList = root.entries
+            .slice(0, 30)
             .map((e) => `${e.type === 'directory' ? '📁' : '📄'} ${e.name}`)
             .join('\n');
-          const proj = db.prepare('SELECT name, path FROM projects WHERE id = ?').get(project_id) as
-            { name: string; path: string } | undefined;
-          systemPrompt += '\n\n' + t('ai.context.projectInfo', {
-            name: proj?.name || 'Unknown',
-            path: proj?.path || 'N/A',
-            fileList: fileList || t('ai.context.emptyDir'),
-          });
-        } catch { /* non-fatal */ }
+          const proj = db
+            .prepare('SELECT name, path FROM projects WHERE id = ?')
+            .get(project_id) as { name: string; path: string } | undefined;
+          systemPrompt +=
+            '\n\n' +
+            t('ai.context.projectInfo', {
+              name: proj?.name || 'Unknown',
+              path: proj?.path || 'N/A',
+              fileList: fileList || t('ai.context.emptyDir'),
+            });
+        } catch {
+          /* non-fatal */
+        }
       }
 
       // ── Create the AgentLoop ──
@@ -4536,7 +4604,11 @@ export function createAgentLoopHandler(deps: {
               send('tool_call', { name: event.name, arguments: '', status: 'executing' });
               break;
             case 'tool_call':
-              send('tool_call', { name: event.name, arguments: event.arguments, status: 'executing' });
+              send('tool_call', {
+                name: event.name,
+                arguments: event.arguments,
+                status: 'executing',
+              });
               break;
             case 'tool_result':
               // New Phase 3 event type — tool execution result

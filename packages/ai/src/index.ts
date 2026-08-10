@@ -26,11 +26,7 @@ export type { AgentConfig, AgentResponse } from './agent/index.js';
 
 // Agent Loop (Phase 3 redesign — five-layer harness)
 export { AgentLoop, createPersistenceAdapter } from './agent/loop.js';
-export type {
-  AgentEvent,
-  AgentLoopConfig,
-  PersistenceAdapter,
-} from './agent/loop.js';
+export type { AgentEvent, AgentLoopConfig, PersistenceAdapter } from './agent/loop.js';
 
 // Context Manager (Phase 3 — four-layer compression pipeline)
 export { ContextManager, estimateTokens, estimateMessagesTokens } from './context-manager.js';

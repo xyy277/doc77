@@ -38,10 +38,7 @@ import {
 } from './annotations.js';
 
 /** A single tool handler function. Returns the string the LLM sees. */
-export type ToolHandler = (
-  args: Record<string, unknown>,
-  ctx: ToolContext,
-) => Promise<string>;
+export type ToolHandler = (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;
 
 /** Per-invocation context passed to every handler. */
 export interface ToolContext {
@@ -260,11 +257,7 @@ export class ToolRouter {
     const worker = async () => {
       while (cursor < items.length) {
         const current = items[cursor++];
-        results[current.idx] = await this.execute(
-          current.call.name,
-          current.call.args,
-          ctx,
-        );
+        results[current.idx] = await this.execute(current.call.name, current.call.args, ctx);
       }
     };
     const workerCount = Math.min(maxConcurrency, items.length);
@@ -289,10 +282,7 @@ export class ToolRouter {
    * Check whether any path in the tool args matches the sensitive-file
    * predicate. Returns the first sensitive path found, or null.
    */
-  private findSensitivePath(
-    name: string,
-    args: Record<string, unknown>,
-  ): string | null {
+  private findSensitivePath(name: string, args: Record<string, unknown>): string | null {
     const paths = this.extractPaths(name, args);
     for (const p of paths) {
       if (p && this.deps.isSensitiveFile(this.basename(p))) {
@@ -303,16 +293,18 @@ export class ToolRouter {
   }
 
   /** Extract all filesystem paths a tool call touches. */
-  private extractPaths(
-    name: string,
-    args: Record<string, unknown>,
-  ): string[] {
+  private extractPaths(name: string, args: Record<string, unknown>): string[] {
     if (name === 'batch_operations') {
       const ops = (args.operations as Array<Record<string, unknown>>) || [];
       return ops.flatMap((op) => this.extractPaths(op.type as string, op));
     }
     const fields: string[] = [];
-    if (name === 'write_file' || name === 'delete_file' || name === 'get_file_info' || name === 'read_file') {
+    if (
+      name === 'write_file' ||
+      name === 'delete_file' ||
+      name === 'get_file_info' ||
+      name === 'read_file'
+    ) {
       fields.push('file_path');
     } else if (name === 'move_file') {
       fields.push('source', 'target');

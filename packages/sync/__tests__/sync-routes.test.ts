@@ -28,10 +28,21 @@ let baseUrl: string;
  * 简易路由器：模拟 Express 的 get/post/put。
  * 把路由存到数组，在 http server 中按 method+path 匹配。
  */
-function createSimpleApp(): AppRouter & { handle: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<boolean> } {
-  const routes: Array<{ method: string; pattern: RegExp; paramNames: string[]; handler: (req: RequestLike, res: ResponseLike) => void }> = [];
+function createSimpleApp(): AppRouter & {
+  handle: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<boolean>;
+} {
+  const routes: Array<{
+    method: string;
+    pattern: RegExp;
+    paramNames: string[];
+    handler: (req: RequestLike, res: ResponseLike) => void;
+  }> = [];
 
-  const addRoute = (method: string, pathStr: string, handler: (req: RequestLike, res: ResponseLike) => void) => {
+  const addRoute = (
+    method: string,
+    pathStr: string,
+    handler: (req: RequestLike, res: ResponseLike) => void,
+  ) => {
     // 将 :param 转为正则捕获组
     const paramNames: string[] = [];
     const regexStr = pathStr.replace(/:([^/]+)/g, (_, name) => {
@@ -76,13 +87,18 @@ function createSimpleApp(): AppRouter & { handle: (req: http.IncomingMessage, re
         }
 
         const query: Record<string, unknown> = {};
-        url.searchParams.forEach((v, k) => { query[k] = v; });
+        url.searchParams.forEach((v, k) => {
+          query[k] = v;
+        });
 
         const reqLike: RequestLike = { params, query, body, method, path: pathname };
         // `_status` 是运行时私有字段（非 ResponseLike 接口成员），
         // 不在对象字面量中初始化 —— json() 在未 set 时默认回退 200，行为不变。
         const resLike: ResponseLike & { _status?: number } = {
-          status(code) { (this as unknown as { _status?: number })._status = code; return this; },
+          status(code) {
+            (this as unknown as { _status?: number })._status = code;
+            return this;
+          },
           json(data) {
             const code = (this as unknown as { _status: number })._status || 200;
             res.writeHead(code, { 'Content-Type': 'application/json' });
@@ -119,8 +135,7 @@ beforeAll(async () => {
     db,
     getProjectPath: (pid: number) => {
       const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-        | { path: string }
-        | undefined;
+        { path: string } | undefined;
       return row?.path || null;
     },
   });
@@ -132,24 +147,25 @@ beforeAll(async () => {
     db,
     getProjectPath: (pid: number) => {
       const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as
-        | { path: string }
-        | undefined;
+        { path: string } | undefined;
       return row?.path || null;
     },
   });
 
   await new Promise<void>((resolve) => {
-    server = http.createServer(async (req, res) => {
-      const handled = await app.handle(req, res);
-      if (!handled) {
-        res.writeHead(404);
-        res.end('Not Found');
-      }
-    }).listen(0, () => {
-      const addr = server.address() as { port: number };
-      baseUrl = `http://127.0.0.1:${addr.port}`;
-      resolve();
-    });
+    server = http
+      .createServer(async (req, res) => {
+        const handled = await app.handle(req, res);
+        if (!handled) {
+          res.writeHead(404);
+          res.end('Not Found');
+        }
+      })
+      .listen(0, () => {
+        const addr = server.address() as { port: number };
+        baseUrl = `http://127.0.0.1:${addr.port}`;
+        resolve();
+      });
   });
 });
 
@@ -191,7 +207,9 @@ describe('T8 — 同步路由', () => {
 
     const getRes = await fetch(`${baseUrl}/api/sync/configs/1`);
     expect(getRes.status).toBe(200);
-    const getBody = (await getRes.json()) as { config: { adapter_type: string; direction: string } };
+    const getBody = (await getRes.json()) as {
+      config: { adapter_type: string; direction: string };
+    };
     expect(getBody.config.adapter_type).toBe('local');
     expect(getBody.config.direction).toBe('push');
   });

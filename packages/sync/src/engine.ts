@@ -47,11 +47,7 @@ export class SyncEngine {
       ignorePatterns?: string[];
     };
     const dir = direction || config.direction;
-    const ignorePatterns = adapterConfig.ignorePatterns || [
-      'node_modules/',
-      '.git/',
-      '*.tmp',
-    ];
+    const ignorePatterns = adapterConfig.ignorePatterns || ['node_modules/', '.git/', '*.tmp'];
 
     const ctx: SyncContext = {
       projectId,
@@ -78,9 +74,7 @@ export class SyncEngine {
         remoteFiles = await adapter.listRemote(adapterConfig);
       } catch (e: unknown) {
         // listRemote 失败不阻塞 push（如远端为空桶/目录尚未创建）
-        result.errors.push(
-          `listRemote warning: ${e instanceof Error ? e.message : 'unknown'}`,
-        );
+        result.errors.push(`listRemote warning: ${e instanceof Error ? e.message : 'unknown'}`);
       }
       ctx.remoteFiles = remoteFiles;
 
@@ -116,9 +110,7 @@ export class SyncEngine {
 
       if (result.errors.length > 0 && result.status === 'success') {
         // listRemote 警告不算硬错误，仅真实错误才标记 status
-        const realErrors = result.errors.filter(
-          (e) => !e.startsWith('listRemote warning:'),
-        );
+        const realErrors = result.errors.filter((e) => !e.startsWith('listRemote warning:'));
         if (realErrors.length > 0) result.status = 'error';
       }
     } catch (e: unknown) {

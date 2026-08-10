@@ -67,7 +67,7 @@ export function registerAiSkillRoutes(app: Express): void {
       return;
     }
     const skills = _skillEngine.listSkills();
-    const skill = skills.find((s) => s.name === req.params.id as string);
+    const skill = skills.find((s) => s.name === (req.params.id as string));
     if (!skill) {
       res.status(404).json({ error: 'Skill not found' });
       return;
