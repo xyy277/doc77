@@ -78,10 +78,10 @@ jobs:
       - name: Pack and publish (topological order)
         run: |
           mkdir -p /tmp/tgz
-          for pkg in @doc77/core @doc77/mcp @doc77/ai @doc77/cli idoc77; do
+          for pkg in @doc77/core @doc77/sync @doc77/mcp @doc77/ai @doc77/cli idoc77; do
             pnpm --filter "$pkg" pack --pack-destination /tmp/tgz
           done
-          for tgz in /tmp/tgz/doc77-core-*.tgz /tmp/tgz/doc77-mcp-*.tgz /tmp/tgz/doc77-ai-*.tgz /tmp/tgz/doc77-cli-*.tgz /tmp/tgz/idoc77-*.tgz; do
+          for tgz in /tmp/tgz/doc77-core-*.tgz /tmp/tgz/doc77-sync-*.tgz /tmp/tgz/doc77-mcp-*.tgz /tmp/tgz/doc77-ai-*.tgz /tmp/tgz/doc77-cli-*.tgz /tmp/tgz/idoc77-*.tgz; do
             npm publish "$tgz" --access public --tag ${{ steps.dist_tag.outputs.tag }}
           done
         env:

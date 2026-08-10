@@ -1,6 +1,6 @@
 {
   "name": "@doc77/electron",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "Doc77 Desktop — Electron desktop app for local document preview",
   "author": "xyy277 <907507646@qq.com>",
   "license": "MIT",
@@ -20,31 +20,44 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["md", "mdx", "markdown"],
+        "ext": [
+          "md",
+          "mdx",
+          "markdown"
+        ],
         "name": "Markdown",
         "description": "Markdown document",
         "role": "Editor"
       },
       {
-        "ext": ["txt"],
+        "ext": [
+          "txt"
+        ],
         "name": "Plain Text",
         "description": "Plain text document",
         "role": "Editor"
       },
       {
-        "ext": ["pdf"],
+        "ext": [
+          "pdf"
+        ],
         "name": "PDF",
         "description": "Portable Document Format",
         "role": "Viewer"
       },
       {
-        "ext": ["json"],
+        "ext": [
+          "json"
+        ],
         "name": "JSON",
         "description": "JSON data file",
         "role": "Editor"
       },
       {
-        "ext": ["yaml", "yml"],
+        "ext": [
+          "yaml",
+          "yml"
+        ],
         "name": "YAML",
         "description": "YAML data file",
         "role": "Editor"

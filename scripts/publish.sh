@@ -21,45 +21,51 @@ cd "$ROOT"
 # 格式: "pkg:dep1,dep2,..."
 declare -A DEPS_OF=(               # 谁依赖谁（反转依赖：下游 → 上游）
   [core]=""
+  [sync]="core"
   [mcp]="core"
   [ai]="core,mcp"
   [cli]="core,mcp,ai"
   [doc77]="cli"
 )
 declare -A DOWNSTREAM=(            # 谁被谁依赖（上游 → 下游）
-  [core]="mcp,ai,cli,doc77"
+  [core]="sync,mcp,ai,cli,doc77"
+  [sync]=""
   [mcp]="ai,cli,doc77"
   [ai]="cli,doc77"
   [cli]="doc77"
   [doc77]=""
 )
-PUBLISH_ORDER=(core mcp ai cli doc77)   # 拓扑序
+PUBLISH_ORDER=(core sync mcp ai cli doc77)   # 拓扑序
 
 # === 参数解析 ===
 DRY_RUN=false
+NO_BUMP=false
 BUMP="patch"
 declare -a TARGETS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=true; shift ;;
+    --no-bump) NO_BUMP=true; shift ;;
     --all)     TARGETS=("${PUBLISH_ORDER[@]}"); shift ;;
     --bump)    BUMP="$2"; shift 2 ;;
     patch|minor|major) BUMP="$1"; shift ;;
-    core|mcp|ai|cli|doc77)   TARGETS+=("$1"); shift ;;
+    core|sync|mcp|ai|cli|doc77)   TARGETS+=("$1"); shift ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
 
 if [[ ${#TARGETS[@]} -eq 0 ]]; then
-  echo "Usage: bash scripts/publish.sh [--all|--dry-run] [--bump patch|minor|major] [core] [mcp] [ai] [cli] [doc77]"
+  echo "Usage: bash scripts/publish.sh [--all|--dry-run] [--no-bump] [--bump patch|minor|major] [core] [sync] [mcp] [ai] [cli] [doc77]"
   echo ""
   echo "Examples:"
   echo "  bash scripts/publish.sh core              # 仅发布 core"
   echo "  bash scripts/publish.sh mcp patch         # 发布 mcp (自动含 core)"
   echo "  bash scripts/publish.sh cli minor         # 发布 cli (minor)"
+  echo "  bash scripts/publish.sh sync              # 发布 sync (自动含 core)"
   echo "  bash scripts/publish.sh doc77             # 仅发布 idoc77 伞包"
   echo "  bash scripts/publish.sh --all patch       # 全部发布"
+  echo "  bash scripts/publish.sh --no-bump core    # 版本已在 workspace 同步，不 bump"
   echo "  bash scripts/publish.sh --dry-run core    # 预览"
   exit 1
 fi
@@ -108,7 +114,11 @@ if $DRY_RUN; then
   echo "[DRY RUN] 不会实际发布"
   for pkg in "${PUBLISH_LIST[@]}"; do
     local_ver=$(node -p "require('./packages/$pkg/package.json').version")
-    echo "  $pkg: $local_ver → $(node -pe "const v=require('./packages/$pkg/package.json').version.split('.').map(Number);const b='$BUMP';if(b==='major'){v[0]++;v[1]=0;v[2]=0}else if(b==='minor'){v[1]++;v[2]=0}else{v[2]++}v.join('.')")"
+    if $NO_BUMP; then
+      echo "  $pkg: $local_ver (no-bump)"
+    else
+      echo "  $pkg: $local_ver → $(node -pe "const v=require('./packages/$pkg/package.json').version.split('.').map(Number);const b='$BUMP';if(b==='major'){v[0]++;v[1]=0;v[2]=0}else if(b==='minor'){v[1]++;v[2]=0}else{v[2]++}v.join('.')")"
+    fi
   done
   exit 0
 fi
@@ -130,8 +140,10 @@ for pkg in "${PUBLISH_LIST[@]}"; do
 
   cd "$ROOT/packages/$pkg"
 
-  # Bump version
-  new_ver=$(npm version "$BUMP" --no-git-tag-version 2>&1)
+  # Bump version (--no-bump 时版本已在 workspace 统一同步，跳过)
+  if ! $NO_BUMP; then
+    new_ver=$(npm version "$BUMP" --no-git-tag-version 2>&1)
+  fi
   echo "  版本: $(node -p "require('./package.json').version")"
 
   # Publish

@@ -4,6 +4,22 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-10] — `1.1.0`
+
+### 全包 (`1.1.0`)
+
+**Added**
+- Sync: three-way merge（三向合并）引擎、E2EE（End-to-End Encryption）加密适配器（Git / WebDAV / S3）、conflict 检测与 AI 辅助合并、定时调度器、keyring 密钥管理
+- AI: RAG（Retrieval-Augmented Generation）引擎 — chunker / embedder / retriever / vector-store，Provider 动态切换
+- Core: plugin 沙箱（vm 隔离 + renderer takeover）、tunnel 配置与设备管理 + 强制远程认证、PWA SW 策略、csv/tsv 表格渲染、DB migrations
+- Web: sync / tunnel / plugin / conflict / encryption 设置面板，i18n 扩展（+92 keys，共 1074 keys）
+- Electron: 系统通知、待处理文件（pending-files）、文件关联（file associations）、接线 sync/rag/plugin 路由
+- CLI: wiring-regression 接线回归测试（真实服务器启动 + 真实 fetch 验证）
+
+**Security**
+- tunnel 强制远程认证（forced remote auth）
+- Sync E2EE 适配器 + keyring 加密存储
+
 ## [2026-07-24] — `1.0.8`
 
 ### 全包 (`1.0.8`)
