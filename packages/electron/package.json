@@ -10,15 +10,6 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "build": {
-    "appId": "com.doc77.desktop",
-    "productName": "Doc77",
-    "files": [
-      "dist/**/*",
-      "assets/**/*",
-      "package.json"
-    ]
-  },
   "scripts": {
     "build:main": "tsc -p tsconfig.main.json",
     "build:preload": "tsc -p tsconfig.preload.json",
