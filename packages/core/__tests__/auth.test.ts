@@ -215,6 +215,48 @@ describe('Force reset', () => {
     expect(loginResult.ok).toBe(true);
     expect(loginResult.status).toBe(200);
   });
+
+  it('should clear all sensitive config but keep non-sensitive keys', () => {
+    const db = getConnection();
+    db.prepare(
+      "INSERT OR REPLACE INTO config (key, value) VALUES ('ai.token', 'wrapped-token')",
+    ).run();
+    db.prepare(
+      "INSERT OR REPLACE INTO config (key, value) VALUES ('ai.base_url', 'wrapped-url')",
+    ).run();
+    db.prepare(
+      "INSERT OR REPLACE INTO config (key, value) VALUES ('translate.apikey', 'wrapped-key')",
+    ).run();
+    db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES ('server.port', '27777')").run();
+    db.prepare(
+      "INSERT OR REPLACE INTO config (key, value) VALUES ('locale.language', 'zh-CN')",
+    ).run();
+
+    forceResetPassword('electron');
+
+    const keys = (db.prepare('SELECT key FROM config').all() as { key: string }[]).map(
+      (r) => r.key,
+    );
+    expect(keys).not.toContain('ai.token');
+    expect(keys).not.toContain('ai.base_url');
+    expect(keys).not.toContain('translate.apikey');
+    expect(keys).toContain('server.port');
+    expect(keys).toContain('locale.language');
+  });
+
+  it('should invalidate pending recovery reset tokens after force reset', () => {
+    const codes = setupPasswordWithDEK('token-test-pw');
+    expect(codes).not.toBeNull();
+    const verified = verifyRecoveryCode(codes!.plaintexts[0]);
+    expect(verified.ok).toBe(true);
+    expect(verified.resetToken).toBeDefined();
+
+    forceResetPassword();
+
+    const result = resetPasswordWithToken(verified.resetToken!, 'new-password');
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('RESET_TOKEN_INVALID');
+  });
 });
 
 describe('Legacy mode detection', () => {
