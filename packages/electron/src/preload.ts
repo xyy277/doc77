@@ -9,6 +9,12 @@ contextBridge.exposeInMainWorld('doc77', {
   getPort: (): Promise<number> => ipcRenderer.invoke('getPort'),
   platform: process.platform,
 
+  reset: {
+    /** Ask the main process to force-reset auth (native dialog confirmation). */
+    forceReset: (): Promise<{ ok: boolean; cancelled?: boolean; error?: string }> =>
+      ipcRenderer.invoke('auth:forceReset'),
+  },
+
   update: {
     checkForUpdates: (): Promise<void> => ipcRenderer.invoke('update:check'),
     downloadUpdate: (): Promise<void> => ipcRenderer.invoke('update:download'),

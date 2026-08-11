@@ -11,6 +11,12 @@ import { findAvailablePort, startServer, ServerProcess } from './server';
 import { createTray } from './tray';
 import { initAutoUpdater } from './updater';
 
+// Main is compiled to CommonJS but core's deps are ESM-only — core may only
+// be loaded via dynamic import (see server.ts loadCore).
+const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+  specifier: string,
+) => Promise<any>;
+
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 
@@ -171,6 +177,32 @@ ipcMain.handle('dialog:openDirectory', async () => {
 
 // IPC: get server port
 ipcMain.handle('getPort', () => server?.port ?? 28888);
+
+// Force reset — last-resort unlock when password AND recovery codes are
+// lost. Gated twice: the IPC channel exists only inside Electron (a web/LAN
+// client never reaches it), and this native dialog requires a deliberate
+// confirmation before wiping auth state.
+ipcMain.handle('auth:forceReset', async () => {
+  if (!mainWindow) return { ok: false, error: 'no_window' };
+  const choice = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: t('electron.dialog.forceResetTitle'),
+    message: t('electron.dialog.forceResetTitle'),
+    detail: t('electron.dialog.forceResetBody'),
+    buttons: [t('electron.dialog.forceResetCancel'), t('electron.dialog.forceResetConfirm')],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  if (choice.response !== 1) return { ok: false, cancelled: true };
+  try {
+    const core = await dynamicImport('@doc77/core');
+    core.forceResetPassword('electron');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+});
 
 // Single instance lock
 const gotLock = app.requestSingleInstanceLock();
