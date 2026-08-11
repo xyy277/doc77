@@ -902,9 +902,12 @@ export function regenerateRecoveryCodes(
 // ---------------------------------------------------------------------------
 
 /**
- * Wipes all authentication state — password, DEK, recovery codes, salts.
- * Also clears encrypted config values (AI token, base URL, model).
- * Calling this effectively factory-resets the auth system.
+ * Wipes all authentication state — password, DEK, recovery codes, salts —
+ * and clears every sensitive config value (token/secret/apikey-class keys,
+ * plus ai.base_url / ai.model), so the app returns to the initial-setup
+ * state. Also drops any in-flight recovery-code reset state. Non-sensitive
+ * config and document data are kept. Calling this effectively
+ * factory-resets the auth system.
  */
 export function forceResetPassword(source = 'cli'): void {
   const db = getConnection();
@@ -929,8 +932,9 @@ export function forceResetPassword(source = 'cli'): void {
   `,
   ).run();
 
-  // Clear ALL sensitive config values (AI token, API keys, etc.) — not just
-  // hardcoded keys, so future sensitive configs are covered automatically.
+  // Clear all sensitive config values. isSensitiveKey covers token/secret/
+  // apikey-class keys automatically; ai.base_url / ai.model don't match its
+  // word list, so they're kept explicitly as legacy keys.
   const rows = db.prepare('SELECT key FROM config').all() as { key: string }[];
   const legacyKeys = ['ai.base_url', 'ai.model'];
   const sensitive = rows
