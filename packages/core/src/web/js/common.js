@@ -945,7 +945,13 @@ async function regenerateRC(){
       };
     } else {
       // Normal login
-      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">' + t('common.login.tagline') + '</div></div><input id="loginPass" type="password" placeholder="' + t('common.login.enterPassword') + '" class="login-gate-input" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="login-gate-btn">' + t('common.login.unlock') + '</button><div id="loginError" class="login-gate-error"></div><a href="javascript:showForgotPassword()" class="login-gate-link">' + t('common.login.forgotPassword') + '</a></div>';
+      // Force-reset entry is Electron-only: the IPC bridge (window.doc77)
+      // exists only inside the desktop app, so web/LAN clients never see it.
+      var isElectron = typeof window.doc77 !== 'undefined' && !!window.doc77.reset;
+      var forceResetLink = isElectron
+        ? '<a href="javascript:showForceReset()" class="login-gate-link">' + t('common.login.forgotEverything') + '</a>'
+        : '';
+      o.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">' + t('common.login.tagline') + '</div></div><input id="loginPass" type="password" placeholder="' + t('common.login.enterPassword') + '" class="login-gate-input" onkeydown="if(event.key===\'Enter\')unlock()"><button onclick="unlock()" class="login-gate-btn">' + t('common.login.unlock') + '</button><div id="loginError" class="login-gate-error"></div><a href="javascript:showForgotPassword()" class="login-gate-link">' + t('common.login.forgotPassword') + '</a>' + forceResetLink + '</div>';
       window.unlock = async function() {
         var p = document.getElementById("loginPass").value;
         var e = document.getElementById("loginError");
@@ -1098,6 +1104,45 @@ async function doReset(){
       setTimeout(function() { location.reload(); }, 600);
     } else { e.style.display="block"; e.textContent = d.error || t('common.auth.resetFailed'); if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
   } catch(ex) { e.style.display="block"; e.textContent = t('common.login.networkError', {message: ex.message}); if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; } }
+}
+
+//══════════ Force Reset Flow (Electron only) ══════════
+async function showForceReset(){
+  var h = document.getElementById("loginGate");
+  if(!h) return;
+  h.innerHTML = '<div class="login-gate-card"><div class="login-gate-brand"><div class="login-gate-brand-row"><img src="/assets/favicon.svg" alt="Doc77"><span class="login-gate-brand-name">Doc77</span></div><div class="login-gate-brand-desc">' + t('common.login.forceResetTitle') + '</div></div>' +
+    '<div style="font-size:12px;color:var(--danger);line-height:1.6;margin-bottom:10px">' + t('common.login.forceResetDescWipe') + '</div>' +
+    '<div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px">' + t('common.login.forceResetDescKeep') + '</div>' +
+    '<input id="forceResetConfirm" type="text" placeholder="' + t('common.login.forceResetTypeConfirm') + '" class="login-gate-input login-gate-mono-input" autocomplete="off">' +
+    '<button onclick="doForceReset()" class="login-gate-btn">' + t('common.login.forceResetBtn') + '</button>' +
+    '<div id="forceResetError" class="login-gate-error"></div>' +
+    '<a href="javascript:location.reload()" class="login-gate-link">' + t('common.login.backToLogin') + '</a></div>';
+}
+
+async function doForceReset(){
+  var c = document.getElementById("forceResetConfirm").value.trim();
+  var e = document.getElementById("forceResetError");
+  var btn = document.querySelector('.login-gate-btn');
+  if(c !== 'yes-i-know'){ e.style.display="block"; e.textContent=t('common.login.forceResetTypeConfirm'); return; }
+  e.style.display = 'none';
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    var d = await window.doc77.reset.forceReset();
+    if(d && d.ok){
+      e.style.display="block"; e.textContent=t('common.login.forceResetDone');
+      showLoading(t('common.login.forceResetDone'));
+      setTimeout(function(){ location.reload(); }, 800);
+    } else if(d && d.cancelled){
+      e.style.display="block"; e.textContent=t('common.login.forceResetCancelled');
+      if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+    } else {
+      e.style.display="block"; e.textContent=t('common.login.forceResetFailed') + ((d && d.error) || '');
+      if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+    }
+  } catch(ex){
+    e.style.display="block"; e.textContent=t('common.login.networkError', {message: ex.message});
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
 }
 
 //══════════ Recovery Codes Modal ══════════

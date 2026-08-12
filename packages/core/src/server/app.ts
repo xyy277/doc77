@@ -3554,7 +3554,7 @@ export function createApp(
           }
         }
       }
-      auth.forceResetPassword();
+      auth.forceResetPassword('web');
       res.json({ ok: true, message: t('api.auth.securityCleared') });
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
