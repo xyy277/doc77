@@ -364,4 +364,4 @@ pnpm build              # 构建全部 package
 
 ## 开源协议
 
-[MIT License](LICENSE)
+Doc77 采用 [MIT License](LICENSE) 开源协议——可自由使用、修改与分发。完整条款见 [LICENSE](LICENSE) 文件。
