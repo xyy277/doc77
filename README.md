@@ -363,4 +363,4 @@ Recommended workflow:
 
 ## License
 
-[MIT License](LICENSE)
+Doc77 is released under the [MIT License](LICENSE) — free to use, modify, and distribute. See the [LICENSE](LICENSE) file for the full text.
