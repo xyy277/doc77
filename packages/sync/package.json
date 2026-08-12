@@ -1,6 +1,6 @@
 {
   "name": "@doc77/sync",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Doc77 Sync Engine — multi-protocol file synchronization (Git, WebDAV, S3)",
   "type": "module",
   "main": "./dist/index.cjs",

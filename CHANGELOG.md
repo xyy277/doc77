@@ -4,6 +4,18 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-12] — `1.1.1`
+
+### 全包 (`1.1.1`)
+
+**Added**
+- Electron: 登录门禁强制重设（Force Reset）— 同时忘记密码与 recovery code 时，经 IPC + 原生对话框双重确认重置认证，清除全部敏感配置（token / API key 类），保留文档与项目数据
+- Core: `forceResetPassword()` 清除范围扩展至全部敏感 config（`isSensitiveKey` + legacy `ai.base_url`/`ai.model`），新增 in-memory reset-state 清理与 `source` 审计参数（`cli` / `electron` / `web`）
+- LICENSE: 新增 MIT 许可证，修复 README license badge 死链
+
+**Security**
+- Force reset 通道仅限 Electron 进程内（IPC），LAN / web 客户端无法触发；重置后撤销全部会话并清空 DEK 缓存
+
 ## [2026-08-10] — `1.1.0`
 
 ### 全包 (`1.1.0`)
