@@ -189,24 +189,26 @@
   /**
    * Wire up action buttons for the currently rendered messages.
    * Uses event delegation on #aiMessages.
+   *
+   * IMPORTANT: this must NEVER replace the #aiMessages node. ai-chat-tabs
+   * caches that element in `MSGS` at init; replacing it (e.g. via
+   * cloneNode + replaceChild, as this function once did) detaches the
+   * cached node and silently freezes all subsequent renders.
    */
+  var _actionsRoot = null;
   function wireActions(tab) {
-    var root = document.getElementById('aiMessages');
-    if (!root) return;
-    // Remove any previous handler by cloning — simplest way to avoid
-    // duplicate listeners across re-renders.
-    var fresh = root.cloneNode(true);
-    root.parentNode.replaceChild(fresh, root);
-    fresh.addEventListener('click', function (e) {
+    if (_actionsRoot) return; // bound once — delegation survives re-renders
+    _actionsRoot = document.getElementById('aiMessages');
+    if (!_actionsRoot) return;
+    _actionsRoot.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-act]');
       if (!btn) return;
       var msgEl = btn.closest('[data-msg]');
       if (!msgEl) return;
-      var msgId = msgEl.dataset.msg;
-      var msg = findMessage(tab, msgId);
+      var active = (window.aiChatTabs && window.aiChatTabs.getActive()) || tab;
+      var msg = findMessage(active, msgEl.dataset.msg);
       if (!msg) return;
-      var act = btn.dataset.act;
-      handleAction(tab, msg, act, btn);
+      handleAction(active, msg, btn.dataset.act, btn);
     });
   }
 

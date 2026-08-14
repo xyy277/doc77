@@ -387,7 +387,10 @@ export function createApp(
     '/api/mobile/info',
     '/api/ai/ollama/status',
   ]);
-  const PUBLIC_API_PREFIXES = ['/api/share/'];
+  // /api/thumbnails/ is public because <img> tags cannot carry the
+  // Authorization header; thumbnails are low-sensitivity (same exposure as
+  // the unauthenticated static /thumbnails path).
+  const PUBLIC_API_PREFIXES = ['/api/share/', '/api/thumbnails/'];
 
   function extractBearerToken(req: Request): string | null {
     const h = req.headers['authorization'];

@@ -5,6 +5,7 @@ import type { Application } from 'express';
 import type { GalleryOptions } from '../types.js';
 import { createGalleryListHandler, createTimelineHandler } from './gallery.js';
 import { createExifHandler } from './exif.js';
+import { createThumbnailHandler } from './thumbnail.js';
 import {
   createAlbumListHandler,
   createAlbumCreateHandler,
@@ -29,6 +30,9 @@ export async function registerGalleryRoutes(app: Application, opts: GalleryOptio
   app.get('/api/exif/:projectId', (req, res, next) => {
     exif(req, res).catch(next);
   });
+  // On-demand thumbnail endpoint — gallery list API references
+  // /api/thumbnails/:projectId?path=&size= for every entry's thumbnail_url.
+  app.get('/api/thumbnails/:projectId', createThumbnailHandler(opts));
 
   // --- Static thumbnail serving ---
   // Thumbnails are generated eagerly by the gallery list API and served as static files
