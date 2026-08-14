@@ -4,6 +4,26 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-14] — `1.1.3`
+
+### 全包 (`1.1.3`)
+
+**Fixed**
+- Web: Service Worker 不再拦截非 GET 请求 — `cache.put` 对非 GET 响应抛异常曾导致新建文件/文件夹/重命名/删除误报 `503 offline`（文件实际已创建）；`CACHE_VERSION` bump 至 `doc77-v2` 清除旧 shell 缓存
+- Web: 预览复制内容改为复制**原始 Markdown**（走 `/api/raw`，此前复制渲染 JSON/HTML）
+- Web: 重命名弹框预填当前文件名（`promptDialog` 读取 `defaultValue`）
+- Web: 目录树刷新改为增量 diff 渲染 — 展开状态与选中高亮保留，仅增删改变化的行
+- Web: 新建/重命名/删除 — 取消不再误弹成功 toast；创建后自动定位新节点；重命名/删除同步迁移或关闭打开的 tab
+- Core: `/api/raw` MIME map 补 `md`/`markdown`/`txt`
+
+**Added**
+- Core: chokidar 文件监听（`server/watcher.ts`）— 外部改动（git / webdav / 编辑器 / agent 写入）→ `file-tree:changed` SSE 事件；按目录 300ms 去抖合并，paths 上限 50 防事件风暴
+- Core: 事件总线移至 core（globalThis 单例）— 修复 Electron 双 core 副本事件断裂；`/api/events` 无条件注册（不再依赖 MCP 安装）
+- Web: SSE 驱动目录树自动局部刷新；外部删除打开中的文件 → 关闭 Tab + 提示；外部修改 → 横幅 + 手动重载（保存仍走 409 乐观并发）
+- Docs: `docs/analysis/spec-status-2026-08-14.md`（11 份 spec 核对报告）+ README Sync 章节（git/webdav/s3/local 使用指南）
+
+---
+
 ## [2026-08-14] — `1.1.2`
 
 ### 全包 (`1.1.2`)
