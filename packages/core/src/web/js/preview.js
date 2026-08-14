@@ -1283,41 +1283,81 @@ function toggleAutoScroll() {
 }
 
 // Feature 6a: Copy content FAB
+// Inline styles shipped with the copied HTML so the paste keeps reasonable
+// formatting in Word / rich-text editors (values mirror .doc-content in
+// app.css). The class-based styles are not inlined element-by-element.
+var DOC_COPY_STYLES =
+  '.doc-content{color:#1e293b;font-family:Inter,system-ui,sans-serif;line-height:1.75}' +
+  '.doc-content h1{font-size:1.875rem;font-weight:700;padding-bottom:.75rem;margin-bottom:1.5rem;border-bottom:1px solid #e2e8f0}' +
+  '.doc-content h2{font-size:1.25rem;font-weight:600;margin-top:2rem;margin-bottom:1rem}' +
+  '.doc-content h3{font-size:1.1rem;font-weight:600;margin-top:1.5rem;margin-bottom:.75rem}' +
+  '.doc-content p{margin-bottom:1rem;line-height:1.75}' +
+  '.doc-content ul,.doc-content ol{padding-left:1.25rem;margin-bottom:1.5rem}' +
+  '.doc-content li{margin:.5rem 0}' +
+  '.doc-content table{border-collapse:collapse;width:100%;margin:1.5rem 0;font-size:.875rem}' +
+  '.doc-content th,.doc-content td{border:1px solid #e2e8f0;padding:.5rem .75rem;text-align:left}' +
+  '.doc-content th{background:#f8fafc;font-weight:600}' +
+  '.doc-content blockquote{border-left:3px solid #cbd5e1;padding-left:1rem;margin:1rem 0;color:#64748b}' +
+  '.doc-content code{background:#f1f5f9;padding:.125rem .375rem;border-radius:.25rem;font-size:.875em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}' +
+  '.doc-content pre{background:#1e293b;color:#e2e8f0;padding:.75rem 1rem;border-radius:.5rem;overflow-x:auto;margin:1rem 0}' +
+  '.doc-content pre code{background:transparent;padding:0}' +
+  '.doc-content img{max-width:100%;height:auto}' +
+  '.doc-content hr{border:none;border-top:1px solid #e2e8f0;margin:1rem 0}';
+
 function copyDocumentContent() {
   if (!currentFile) { toast(t('web.preview.openDocFirst'), 'error'); return; }
   var btn = document.getElementById('copyContentBtn');
   if (!btn) return;
   var origHTML = btn.innerHTML;
-  // Fetch raw content from server
-  fetch('/api/content/' + pid + '?path=' + encodeURIComponent(currentFile))
-    .then(function(r) { if (!r.ok) throw new Error('fetch failed'); return r.text(); })
-    .then(function(raw) {
-      return navigator.clipboard ? navigator.clipboard.writeText(raw).then(function() { return raw; }) : Promise.reject('no clipboard');
-    })
-    .then(function() {
-      btn.innerHTML = '✓';
-      toast(t('web.preview.copySuccess'), 'success');
-      setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
-    })
-    .catch(function() {
-      // Fallback: copy rendered text from DOM
-      var docContent = document.getElementById('docContent') || document.querySelector('.doc-content');
-      var text = docContent ? (docContent.textContent || '') : '';
-      if (text && navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(function() {
-          btn.innerHTML = '✓';
-          toast(t('web.preview.copySuccess'), 'success');
-          setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
-        }).catch(function() { toast(t('web.preview.copyFailed'), 'error'); });
-      } else if (text) {
-        fallbackCopy(text);
-        btn.innerHTML = '✓';
-        toast(t('web.preview.copySuccess'), 'success');
-        setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
-      } else {
-        toast(t('web.preview.copyFailed'), 'error');
-      }
+  // Copy the rendered HTML from the DOM (never the raw /api/content JSON
+  // response body), so pasting into rich-text targets keeps formatting.
+  var docEl = document.getElementById('docContent');
+  if (!docEl || !docEl.innerHTML) { toast(t('web.preview.copyFailed'), 'error'); return; }
+  var wrap = document.createElement('div');
+  wrap.className = 'doc-content';
+  wrap.appendChild(docEl.cloneNode(true)); // clone — do not disturb the page
+  var html = '<style>' + DOC_COPY_STYLES + '</style>' + wrap.outerHTML;
+  var text = wrap.innerText || wrap.textContent || '';
+  var onOk = function() {
+    btn.innerHTML = '✓';
+    toast(t('web.preview.copySuccess'), 'success');
+    setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
+  };
+  var onFail = function() { toast(t('web.preview.copyFailed'), 'error'); };
+  if (navigator.clipboard && window.ClipboardItem) {
+    navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      }),
+    ]).then(onOk).catch(function() {
+      if (fallbackCopyRich(html, text)) onOk(); else onFail();
     });
+  } else if (fallbackCopyRich(html, text)) {
+    onOk();
+  } else {
+    onFail();
+  }
+}
+
+// Rich-text copy fallback for non-secure contexts (e.g. http://LAN) where
+// navigator.clipboard is unavailable. Returns true on success.
+function fallbackCopyRich(html, text) {
+  var d = document.createElement('div');
+  d.setAttribute('contenteditable', 'true');
+  d.style.cssText = 'position:fixed;left:-9999px;top:0;';
+  d.innerHTML = html;
+  document.body.appendChild(d);
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  var range = document.createRange();
+  range.selectNodeContents(d);
+  sel.addRange(range);
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* ignore */ }
+  sel.removeAllRanges();
+  document.body.removeChild(d);
+  return ok;
 }
 
 // Feature 7: AI Summary
