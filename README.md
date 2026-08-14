@@ -164,6 +164,61 @@ Common config keys:
 | `doc77 lock status` | View active project locks |
 | `doc77 lock release <project_id>` | Manually release a project lock |
 
+### Sync (Git / WebDAV / S3 / Local)
+
+Doc77 can sync a project folder with a remote source: Git remote, WebDAV (NAS),
+S3-compatible object storage (MinIO / R2 / B2), or another local directory.
+Sync is bidirectional, supports automatic scheduling, conflict detection with
+three-way merge + AI assistance, and optional end-to-end encryption.
+
+#### CLI
+
+```bash
+# Add a sync configuration (config JSON depends on adapter type)
+doc77 sync add <project> <adapter-type> <config-json>
+
+# List / run / remove / inspect configurations
+doc77 sync list
+doc77 sync run <project>
+doc77 sync remove <project>
+doc77 sync status <project>
+```
+
+Adapter config examples:
+
+```jsonc
+// Git — remoteUrl + auth method
+{ "type": "git", "remoteUrl": "git@github.com:user/docs.git",
+  "branch": "main", "remoteName": "origin", "authMethod": "ssh",
+  "commitPrefix": "[doc77-sync]", "autoCommit": true, "pullStrategy": "merge" }
+
+// WebDAV (NAS)
+{ "type": "webdav", "endpoint": "https://nas.example.com/dav",
+  "username": "user", "password": "secret", "remotePath": "/doc77",
+  "ignorePatterns": ["*.tmp"] }
+
+// S3-compatible (MinIO / R2 / B2)
+{ "type": "s3", "endpoint": "https://s3.example.com", "region": "auto",
+  "bucket": "my-docs", "prefix": "notes", "accessKeyId": "AKIA...",
+  "secretAccessKey": "...", "ignorePatterns": [] }
+
+// Local mirror directory
+{ "type": "local", "targetPath": "/mnt/backup/docs" }
+```
+
+For HTTPS / token auth use `"authMethod": "https"` (or `"token"`) and pass the
+token in `"token"`. SSH auth relies on your local `~/.ssh` keys.
+
+#### Web UI
+
+Open **Settings → Sync** for a project: pick the adapter type, paste the
+config JSON, choose direction and sync interval, then **Test Connection**
+before saving. The panel shows sync state, history and conflicts; conflicts
+open a three-way merge view with optional AI-suggested resolution.
+
+> Note: changes synced in from Git / WebDAV are detected by the built-in file
+> watcher, so the file tree refreshes automatically without a manual reload.
+
 ### Offline Support
 
 ```bash
