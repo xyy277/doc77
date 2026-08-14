@@ -512,6 +512,34 @@
     <script src="/gallery/js/gallery-lightbox.js"></script>
 
     <script>
+        // ── Auth token wrapper ──
+        // This page is standalone (does not load core's common.js, which is the
+        // only place that attaches the Authorization header in core pages).
+        // Wrap fetch so every /api request carries the session token; 401
+        // redirects to the login gate, which returns here after sign-in.
+        (function () {
+            var _orig = window.fetch;
+            window.fetch = function (input, init) {
+                init = init || {};
+                var url = typeof input === 'string' ? input : (input && input.url) || '';
+                if (url.charAt(0) === '/' || url.indexOf(location.origin) === 0) {
+                    var tok = sessionStorage.getItem('doc77-auth');
+                    if (tok && tok !== '1') {
+                        init.headers = init.headers || {};
+                        if (init.headers instanceof Headers) {
+                            if (!init.headers.has('Authorization')) init.headers.set('Authorization', 'Bearer ' + tok);
+                        } else if (!init.headers['Authorization']) {
+                            init.headers['Authorization'] = 'Bearer ' + tok;
+                        }
+                    }
+                }
+                return _orig.call(this, input, init).then(function (r) {
+                    if (r.status === 401 && url.indexOf('/api/auth/') === -1) { location.href = '/'; }
+                    return r;
+                });
+            };
+        })();
+
         // --- State Management ---
         let state = {
             projectId: null,
@@ -686,8 +714,10 @@
             params.set('sort', state.sortBy);
             params.set('order', state.sortOrder);
 
-            // Filter by media type for videos view
-            var types = 'image,video';
+            // Filter by media type for videos view. dirs are always included
+            // (main view) so folder cards appear in the grid and are clickable
+            // into subdirectories; the videos view stays media-only.
+            var types = 'image,video,dir';
             if (state.currentView === 'videos') types = 'video';
             params.set('types', types);
 
@@ -715,6 +745,10 @@
                             }
                             if (state.selectMode) {
                                 toggleSelection(item.path || item.id, null);
+                            } else if (item.type === 'directory') {
+                                // Folder card: navigate into the subdirectory
+                                state.currentView = 'folder';
+                                loadGallery(item.path);
                             } else {
                                 window.GalleryLightbox.open(item, state.items, state.projectId);
                             }
