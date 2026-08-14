@@ -1,36 +1,6 @@
-import { EventEmitter } from 'node:events';
-
 /**
- * Internal Event Bus — shared EventEmitter for cross-package communication.
- *
- * Events:
- * - task:queued    → { task_id, project_id, session_id, operation_type }
- * - task:executing → { task_id, project_id }
- * - task:executed  → { task_id, project_id, result }
- * - task:failed    → { task_id, project_id, error_message, rolled_back }
- * - task:approved  → { task_id, approved_by }
- * - task:rejected  → { task_id, rejected_by }
+ * 事件总线 — 自 v1.1.2 起由 @doc77/core 提供 globalThis 单例
+ * （Electron 双 core 副本场景必须共享同一实例，见 core/server/event-bus.ts），
+ * 此处仅 re-export，保持 mcp 既有导入路径（index.ts / executor.ts）不变。
  */
-
-let _eventBus: EventEmitter | null = null;
-
-/**
- * Get or create the shared EventBus instance.
- */
-export function getEventBus(): EventEmitter {
-  if (!_eventBus) {
-    _eventBus = new EventEmitter();
-    _eventBus.setMaxListeners(100);
-  }
-  return _eventBus;
-}
-
-/**
- * Reset the event bus (for testing).
- */
-export function resetEventBus(): void {
-  if (_eventBus) {
-    _eventBus.removeAllListeners();
-  }
-  _eventBus = null;
-}
+export { getEventBus, resetEventBus } from '@doc77/core';

@@ -288,29 +288,15 @@ async function main() {
           if (!spawnFailed) process.exit(0);
         });
       };
-      // Try to load EventBus before creating the app so CRUD endpoints can emit events
-      let eventBus:
-        | {
-            on(event: string, listener: (p: unknown) => void): void;
-            off(event: string, listener: (p: unknown) => void): void;
-            emit(event: string, payload: unknown): void;
-          }
-        | undefined;
-      try {
-        const mcpEvents = await import('@doc77/mcp');
-        eventBus = mcpEvents.getEventBus();
-      } catch {
-        /* MCP not installed — file-tree:changed events won't be emitted */
-      }
-      const app = createApp(restartServer, bindAddr, port, eventBus);
+      // 事件总线由 core 提供（globalThis 单例），SSE 通道（/api/events）已由
+      // createApp 无条件注册，此处不再需要预加载 MCP 的 EventBus
+      const app = createApp(restartServer, bindAddr, port);
 
       // Register MCP-dependent routes (optional)
       try {
         const { executeApprovedTasks } = await import('@doc77/mcp');
-        const { createQueueApproveHandler, createEventsHandler } = await import('@doc77/core');
+        const { createQueueApproveHandler } = await import('@doc77/core');
         app.post('/api/queue/approve', createQueueApproveHandler(executeApprovedTasks));
-        // Push write-task lifecycle events (executed/failed) to the browser.
-        if (eventBus) app.get('/api/events', createEventsHandler(eventBus));
       } catch {
         /* MCP not installed */
       }
@@ -424,6 +410,15 @@ async function main() {
           gallery: galleryAvailable,
         });
       } catch {}
+
+      // 启动文件监听：外部改动（git / webdav / 编辑器）→ file-tree:changed SSE
+      // 尽力而为：watcher 启动失败不阻断服务器启动
+      try {
+        const { startFileWatcher } = await import('@doc77/core');
+        startFileWatcher({ debounceMs: 300 });
+      } catch {
+        /* file watcher unavailable — 降级为手动刷新 */
+      }
 
       const server = http.createServer(app);
 

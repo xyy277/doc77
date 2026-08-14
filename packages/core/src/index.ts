@@ -92,6 +92,15 @@ export { registerPluginRoutes } from './server/routes/plugin.js';
 export type { PluginRouteDeps } from './server/routes/plugin.js';
 export { PluginSandbox } from './plugin/sandbox.js';
 export { createEventsHandler } from './server/events.js';
+export { getEventBus, resetEventBus } from './server/event-bus.js';
+export {
+  startFileWatcher,
+  stopFileWatcher,
+  watchProject,
+  stopWatching,
+  isWatcherRunning,
+  watcherReady,
+} from './server/watcher.js';
 export {
   saveAiSession,
   loadAiSession,

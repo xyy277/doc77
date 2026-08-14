@@ -43,6 +43,9 @@ import {
 import { getOrCreateSession, resetSession, type SessionAgent } from './sessions.js';
 import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.js';
 import { createToolRouterExecutor } from './tool-router-factory.js';
+import { getEventBus } from './event-bus.js';
+import { createEventsHandler } from './events.js';
+import { watchProject, stopWatching } from './watcher.js';
 import { createRateLimiter } from './rate-limit.js';
 import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import {
@@ -125,7 +128,9 @@ const _activeInterruptQueues = new Map<
  * @param restartCallback — if provided, enables POST /api/restart endpoint
  * @param bindAddr — actual runtime bind address (for /api/server-info)
  * @param port — actual runtime port (for /api/server-info)
- * @param eventBus — optional EventBus for file-tree:changed SSE events
+ *
+ * SSE 推送（GET /api/events）自 v1.1.2 起无条件注册，事件总线由 core 的
+ * globalThis 单例提供（见 ./event-bus.ts），不再依赖 MCP 是否安装。
  */
 // 隧道退出 hook 注册标志（模块级，避免 createApp 多次调用时重复注册）
 let _tunnelExitHooksRegistered = false;
@@ -134,11 +139,6 @@ export function createApp(
   restartCallback?: () => void,
   bindAddr?: string,
   port?: number,
-  eventBus?: {
-    on(event: string, listener: (p: unknown) => void): void;
-    off(event: string, listener: (p: unknown) => void): void;
-    emit(event: string, payload: unknown): void;
-  },
 ): Application {
   const app = express();
 
@@ -898,6 +898,7 @@ export function createApp(
       const resolved = resolveProjectPath(projectPath);
       const finalTags = tags || detectProjectTags(resolved);
       const project = registerProject(name, resolved, Boolean(obsidian_mode), finalTags);
+      watchProject(project.id); // 接入文件监听（watcher 未启动时为 no-op）
       res.status(201).json(project);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -916,6 +917,7 @@ export function createApp(
       res.status(404).json({ error: 'Project not found' });
       return;
     }
+    stopWatching(id); // 停止该项目的文件监听
     res.json({ removed: true });
   });
 
@@ -1368,11 +1370,16 @@ export function createApp(
       throw new Error('Name is too long (max 255 bytes)');
   }
 
-  // Emit file-tree:changed event if EventBus is available
-  function emitTreeChanged(projectId: number, dirPath: string, opType: string): void {
-    if (!eventBus) return;
+  // Emit file-tree:changed event on the shared event bus（无条件，见 ./event-bus.ts）
+  // paths 为受影响的具体相对路径，供前端精确匹配打开的 tab
+  function emitTreeChanged(
+    projectId: number,
+    dirPath: string,
+    opType: string,
+    paths: string[],
+  ): void {
     try {
-      eventBus.emit('file-tree:changed', { projectId, path: dirPath, opType });
+      getEventBus().emit('file-tree:changed', { projectId, path: dirPath, opType, paths });
     } catch {
       /* best-effort */
     }
@@ -1404,7 +1411,7 @@ export function createApp(
       }
       fs.writeFileSync(absPath, '', 'utf8');
       clearCache(projectId, dirPath);
-      emitTreeChanged(projectId, dirPath, 'create_file');
+      emitTreeChanged(projectId, dirPath, 'create_file', [dirPath ? dirPath + '/' + name : name]);
       res.json({ path: dirPath ? dirPath + '/' + name : name, type: 'file', size: 0 });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -1448,7 +1455,7 @@ export function createApp(
       }
       fs.mkdirSync(absPath, { recursive: true });
       clearCache(projectId, dirPath);
-      emitTreeChanged(projectId, dirPath, 'create_folder');
+      emitTreeChanged(projectId, dirPath, 'create_folder', [dirPath ? dirPath + '/' + name : name]);
       res.json({ path: dirPath ? dirPath + '/' + name : name, type: 'directory' });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -1513,7 +1520,10 @@ export function createApp(
       const newRelPath = parentDir === '.' ? newName : parentDir + '/' + newName;
       const newParent = path.dirname(newRelPath);
       clearCache(projectId, newParent === '.' ? '' : newParent);
-      emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'rename');
+      emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'rename', [
+        oldPath,
+        newRelPath,
+      ]);
       res.json({ oldPath, newPath: newRelPath });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -1588,7 +1598,7 @@ export function createApp(
 
       const parentDir = path.dirname(targetPath);
       clearCache(projectId, parentDir === '.' ? '' : parentDir);
-      emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'delete');
+      emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'delete', [targetPath]);
       res.json({ path: targetPath, movedToTrash });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -2631,6 +2641,9 @@ export function createApp(
 
       // Map extension to MIME type
       const mimeTypes: Record<string, string> = {
+        '.md': 'text/markdown',
+        '.markdown': 'text/markdown',
+        '.txt': 'text/plain',
         '.html': 'text/html',
         '.htm': 'text/html',
         '.png': 'image/png',
@@ -3697,6 +3710,10 @@ export function createApp(
         .catch(() => process.exit(0));
     });
   }
+
+  // SSE 推送通道：无条件注册（自 v1.1.2 起不再依赖 MCP 是否安装），
+  // 转发 task:executed / task:failed / file-tree:changed 事件
+  app.get('/api/events', createEventsHandler());
 
   return app;
 }
