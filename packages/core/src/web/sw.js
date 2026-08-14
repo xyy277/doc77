@@ -3,13 +3,16 @@
  * 策略:
  *   App Shell (HTML/CSS/JS): Cache First + 后台更新
  *   Vendor 资产: Cache First (长期)
- *   API 文档内容: Stale While Revalidate + IndexedDB
+ *   API 文档内容: Stale While Revalidate + IndexedDB（策略见 js/sw-policy.js）
  *   缩略图: Cache First + LRU
  *   分享页 /s/: Network First
  */
 'use strict';
 
-var CACHE_VERSION = 'doc77-v1';
+// 加载拦截策略纯函数（同文件同时被 vitest 单元测试复用）
+importScripts('/js/sw-policy.js');
+
+var CACHE_VERSION = 'doc77-v2';
 var CACHE_SHELL = CACHE_VERSION + '-shell';
 var CACHE_VENDOR = CACHE_VERSION + '-vendor';
 var CACHE_API = CACHE_VERSION + '-api';
@@ -23,6 +26,7 @@ var SHELL_ASSETS = [
   '/js/common.js',
   '/js/dashboard.js',
   '/js/preview.js',
+  '/js/sw-policy.js',
   '/assets/favicon.svg',
   '/assets/logo.svg',
   '/assets/logo-dark.svg',
@@ -76,8 +80,20 @@ self.addEventListener('fetch', function (event) {
   }
 
   // API 文档内容: Stale While Revalidate + IndexedDB 离线
-  if (url.pathname.indexOf('/api/content/') === 0 ||
-      url.pathname.indexOf('/api/tree/') === 0) {
+  // 策略细节见 js/sw-policy.js：
+  //   - 刷新类请求 (x-doc77-fresh) → 网络优先，避免渲染 SWR 旧数据
+  //   - 非 GET (POST/PUT/DELETE) → 直接透传。cache.put 对非 GET 响应抛
+  //     TypeError（Cache API 规范），会被 staleWhileRevalidateAPI 的 catch
+  //     合成 503 {"error":"offline"}——曾导致新建/重命名/删除误报失败
+  if (swPolicy.shouldIntercept(url.pathname)) {
+    if (swPolicy.isFreshRequest(event.request.headers)) {
+      event.respondWith(fetch(event.request));
+      return;
+    }
+    if (!swPolicy.isGetMethod(event.request.method)) {
+      event.respondWith(fetch(event.request));
+      return;
+    }
     event.respondWith(staleWhileRevalidateAPI(event.request));
     return;
   }

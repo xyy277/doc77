@@ -69,6 +69,7 @@ interface CoreModule {
     translate: boolean;
     gallery: boolean;
   }) => void;
+  startFileWatcher: (opts?: { debounceMs?: number }) => void;
   isEngineAvailable: () => Promise<boolean>;
   getConfig: (key: string) => string | undefined;
   getConnection: () => DatabaseCompat;
@@ -229,8 +230,8 @@ async function registerInstalledModules(core: CoreModule, app: ExpressLike): Pro
     try {
       const bus = mcp.getEventBus();
       app.post('/api/queue/approve', core.createQueueApproveHandler(mcp.executeApprovedTasks));
-      app.get('/api/events', core.createEventsHandler(bus));
-      // 缓存事件总线，供 notifications 模块订阅（见 ./notifications.ts）
+      // SSE 通道（/api/events）已由 core 的 createApp 无条件注册；mcp 的
+      // getEventBus 现为 core globalThis 单例的 re-export，同一实例
       installedEventBus = bus as EventBus;
     } catch {
       /* keep booting without MCP routes */
@@ -387,6 +388,12 @@ export async function startServer(port: number, uiLocale?: string): Promise<Serv
 
   const app = createApp(undefined, effectiveBind, effectivePort);
   await registerInstalledModules(core, app as unknown as ExpressLike);
+  // 启动文件监听（外部改动 → file-tree:changed SSE）；尽力而为，失败不阻断
+  try {
+    core.startFileWatcher({ debounceMs: 300 });
+  } catch {
+    /* file watcher unavailable — 降级为手动刷新 */
+  }
   const server = http.createServer(app);
 
   return new Promise((resolve, reject) => {

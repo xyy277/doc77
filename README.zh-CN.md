@@ -164,6 +164,59 @@ doc77 start --bind 0.0.0.0           # 或允许局域网访问
 | `doc77 lock status` | 查看活跃的项目锁 |
 | `doc77 lock release <project_id>` | 手动释放项目锁 |
 
+### 同步（Git / WebDAV / S3 / 本地目录）
+
+Doc77 可将项目文件夹与远端源双向同步：Git 远程仓库、WebDAV（NAS）、
+S3 兼容对象存储（MinIO / R2 / B2）或另一个本地目录。支持定时自动同步、
+冲突检测（三路合并 + AI 辅助解决）与端到端加密（可选）。
+
+#### CLI
+
+```bash
+# 添加同步配置（config JSON 依适配器类型而定）
+doc77 sync add <project> <adapter-type> <config-json>
+
+# 查看 / 执行 / 删除 / 查看状态
+doc77 sync list
+doc77 sync run <project>
+doc77 sync remove <project>
+doc77 sync status <project>
+```
+
+适配器配置示例：
+
+```jsonc
+// Git — remoteUrl + 认证方式
+{ "type": "git", "remoteUrl": "git@github.com:user/docs.git",
+  "branch": "main", "remoteName": "origin", "authMethod": "ssh",
+  "commitPrefix": "[doc77-sync]", "autoCommit": true, "pullStrategy": "merge" }
+
+// WebDAV（NAS）
+{ "type": "webdav", "endpoint": "https://nas.example.com/dav",
+  "username": "user", "password": "secret", "remotePath": "/doc77",
+  "ignorePatterns": ["*.tmp"] }
+
+// S3 兼容对象存储（MinIO / R2 / B2）
+{ "type": "s3", "endpoint": "https://s3.example.com", "region": "auto",
+  "bucket": "my-docs", "prefix": "notes", "accessKeyId": "AKIA...",
+  "secretAccessKey": "...", "ignorePatterns": [] }
+
+// 本地镜像目录
+{ "type": "local", "targetPath": "/mnt/backup/docs" }
+```
+
+HTTPS / token 认证使用 `"authMethod": "https"`（或 `"token"`）并在 `"token"`
+中传入；SSH 认证依赖本机 `~/.ssh` 密钥。
+
+#### Web UI
+
+进入 **设置 → Sync**：选择适配器类型、粘贴 config JSON、设置同步方向与
+间隔，保存前可先 **Test Connection** 测试连接。面板展示同步状态、历史与
+冲突；冲突可打开三路合并视图，并可选 AI 建议的合并结果。
+
+> 提示：Git / WebDAV 同步进来的变更会被内置文件监听器检测到，目录树
+> 自动局部刷新，无需手动刷新。
+
 ### 离线支持
 
 ```bash

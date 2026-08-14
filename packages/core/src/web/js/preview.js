@@ -93,13 +93,80 @@ function initTaskEvents() {
     });
     taskEventSrc.addEventListener('file-tree:changed', function(e){
       var d = {}; try { d = JSON.parse(e.data); } catch(_){}
-      if (d.projectId == pid) {
-        refreshSubtree(d.path || '');
+      if (d.projectId != pid) return;
+      var opType = d.opType || 'mixed';
+      var paths = d.paths || [];
+      // 匹配打开中的 tab：精确命中 paths；delete 时按目录前缀匹配
+      var affected = tabStore.list()
+        .filter(function(tab) {
+          if (TempPreview.isTempPath(tab.path)) return false;
+          if (paths.indexOf(tab.path) !== -1) return true;
+          if (opType === 'delete' && d.path && (tab.path === d.path || tab.path.indexOf(d.path + '/') === 0)) return true;
+          return false;
+        })
+        .map(function(tab) { return tab.path; });
+      if (opType === 'delete') {
+        affected.forEach(function(tabPath) {
+          closeTab(tabPath);
+          toast(t('web.preview.toast.fileDeletedExternal', {name: basename(tabPath)}), 'info');
+        });
+      } else if (opType === 'modify' || opType === 'mixed') {
+        affected.forEach(function(tabPath) { markExternalModified(tabPath); });
       }
+      refreshSubtree(d.path || '');
     });
     taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
   } catch(_){}
 }
+//══════════ 外部修改横幅 ══════════
+// 当前打开中的文件被外部修改（watcher/SSE 检测）→ 横幅提示 + 手动重载，
+// 不自动重载（避免打断编辑）；保存仍走 X-Expected-Modified + 409 乐观并发
+var externallyModified = {}; // path -> true
+
+function markExternalModified(path) {
+  externallyModified[path] = true;
+  updateExternalModifiedBanner();
+}
+
+function getExternalModifiedBanner() {
+  var b = document.getElementById('externalModifiedBanner');
+  if (b) return b;
+  b = document.createElement('div');
+  b.id = 'externalModifiedBanner';
+  b.className = 'hidden flex items-center gap-2 px-3 py-1.5 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-b border-amber-200 dark:border-amber-800';
+  b.innerHTML = '<span>⚠️ ' + t('web.preview.edit.externalModified') + '</span>' +
+    '<button class="ml-auto px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-800" onclick="reloadDocAfterExternalChange()">' + t('web.preview.externalModified.reload') + '</button>' +
+    '<button class="px-2 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-800" onclick="dismissExternalModified()" title="✕">✕</button>';
+  var host = document.getElementById('contentArea');
+  if (host) host.insertBefore(b, host.firstChild);
+  return b;
+}
+
+// 按当前激活 tab 的标记状态显隐横幅（切换 tab / 关闭 tab / 空状态时重新计算）
+function updateExternalModifiedBanner() {
+  var b = document.getElementById('externalModifiedBanner');
+  if (!b) return;
+  var show = !!activeTabPath && !!externallyModified[activeTabPath];
+  b.classList.toggle('hidden', !show);
+}
+
+// 重新加载：丢弃未保存编辑（走既有 dirty 确认）→ 清缓存 → 重新拉取
+function reloadDocAfterExternalChange() {
+  if (!activeTabPath) return;
+  var path = activeTabPath;
+  if (editMode) doExitEdit(true);
+  delete paneCache[path];
+  delete tabDataCache[path];
+  delete externallyModified[path];
+  activateTab(path, {silent: true});
+}
+
+// 忽略外部修改（仅清除标记，不重载）
+function dismissExternalModified() {
+  if (activeTabPath) delete externallyModified[activeTabPath];
+  updateExternalModifiedBanner();
+}
+
 // 在聊天区追加一条居中的任务回执（若聊天区存在）
 function appendTaskReceipt(text) {
   var msgs = document.getElementById('chatMessages'); if (!msgs) return;
@@ -130,7 +197,8 @@ function applyCapabilities() {
   // Fetch capabilities first (non-blocking, apply when ready)
   fetch('/api/capabilities').then(function(r){ return r.json(); }).then(function(c){
     CAPABILITIES = c; applyCapabilities();
-    if (CAPABILITIES.mcp) initTaskEvents();
+    // SSE 通道自 v1.1.2 起无条件注册（不再依赖 MCP），initTaskEvents 内部有 EventSource 可用性判断
+    initTaskEvents();
   }).catch(function(){});
   // Preload editor module in background
   if (window.EditorCore) window.EditorCore.load();
@@ -296,42 +364,144 @@ async function loadTree(dirPath) {
     if (!fld.length && !fls.length) tree.innerHTML = '' + t('web.preview.emptyDir') + '';
   } catch(e) { tree.innerHTML = '' + t('web.preview.loadFailed') + ''; }
 }
-function refreshTree() { loadTree(''); }
+// 刷新类请求：携带 x-doc77-fresh 标记，SW 见该标记直接网络优先，
+// 避免 Stale-While-Revalidate 渲染到旧目录数据
+function freshFetch(url, opts) {
+  opts = opts || {};
+  var headers = new Headers(opts.headers || {});
+  headers.set('x-doc77-fresh', '1');
+  opts.headers = headers;
+  return fetch(url, opts);
+}
 
-// Incremental tree refresh — only reload the affected directory subtree
-function refreshSubtree(dirPath) {
-  if (!dirPath || dirPath === '') {
-    // Root level: reload root entries into #tree
-    var tree = document.getElementById('tree');
-    fetch('/api/tree/' + pid + '?path=').then(function(r) { return r.json(); }).then(function(d) {
-      tree.innerHTML = '';
-      var fld = d.entries.filter(function(e) { return e.type === 'directory'; });
-      var fls = d.entries.filter(function(e) { return e.type === 'file'; });
-      fld.concat(fls).forEach(function(e) { tree.appendChild(makeNode(e, '')); });
-      if (!fld.length && !fls.length) tree.innerHTML = '' + t('web.preview.emptyDir') + '';
-    }).catch(function() {});
+// 从容器 DOM 读取现有行（供 diff 对照）；目录行以跟随的 .ml-4 wrapper 判定
+function entriesFromDom(container) {
+  var out = [];
+  container.querySelectorAll(':scope > [data-name]').forEach(function(row) {
+    var isDir = !!(row.nextElementSibling && row.nextElementSibling.classList.contains('ml-4'));
+    out.push({
+      name: row.dataset.name,
+      type: isDir ? 'directory' : (row.dataset.type || 'file'),
+      size: parseInt(row.dataset.size, 10) || 0,
+      modified: row.dataset.modified || ''
+    });
+  });
+  return out;
+}
+
+// 移除单行（目录连同其子节点 wrapper 一起移除，保留其余行）
+function removeTreeRow(container, name) {
+  var row = container.querySelector(':scope > [data-name="' + CSS.escape(name) + '"]');
+  if (!row) return;
+  var wrapper = row.nextElementSibling;
+  if (wrapper && wrapper.classList.contains('ml-4')) wrapper.remove();
+  row.remove();
+}
+
+/**
+ * 增量应用目录 diff（保留未变化行的 DOM 节点 → 展开状态与选中高亮不丢）：
+ *   removed → 移除行（含目录 wrapper）
+ *   updated → 文件大小/类型变化时替换行；目录无可视变化则跳过
+ *   added   → 按服务端顺序插入（锚定后续已存在的行或子目录折叠按钮之前）
+ * 注：已存在的行不做重排——移动行会牵动其子 wrapper，且重命名导致排序变化
+ * 属罕见场景，由下次手动刷新兜底。
+ */
+function applyDiff(container, oldEntries, newEntries, basePath) {
+  var diff = Doc77TreeDiff.diffEntries(oldEntries, newEntries);
+
+  // 清理遗留占位（空目录提示等非行元素）
+  container.querySelectorAll(':scope > :not([data-name]):not(.ml-4):not(.tree-collapse-btn)')
+    .forEach(function(el) { el.remove(); });
+
+  diff.removed.forEach(function(name) { removeTreeRow(container, name); });
+
+  if (!newEntries.length) {
+    // 目录被清空：根容器显示空占位；子目录容器保留折叠按钮
+    var hasRows = container.querySelector(':scope > [data-name]');
+    if (!hasRows) {
+      if (container.classList.contains('ml-4')) {
+        var cb = container.querySelector('.tree-collapse-btn');
+        var empty = document.createElement('div');
+        empty.className = 'text-slate-600 text-xs py-1 pl-2';
+        empty.textContent = t('web.preview.emptyDir');
+        container.insertBefore(empty, cb);
+      } else {
+        container.innerHTML = '<div class="text-slate-600 text-xs py-1 pl-2">' + t('web.preview.emptyDir') + '</div>';
+      }
+    }
     return;
   }
-  // Find the expanded wrapper for this directory
-  var dirRow = document.querySelector('#tree [data-path="' + CSS.escape(dirPath) + '"]');
-  if (!dirRow) return;
-  var wrapper = dirRow.nextElementSibling;
-  if (!wrapper || !wrapper.classList.contains('ml-4') || wrapper.classList.contains('hidden')) return;
-  // Reload children into the wrapper
-  fetch('/api/tree/' + pid + '?path=' + encodeURIComponent(dirPath)).then(function(r) { return r.json(); }).then(function(d) {
-    // Clear existing children but keep collapse button
-    var collapseBtn = wrapper.querySelector('.tree-collapse-btn');
-    wrapper.innerHTML = '';
-    var fld = d.entries.filter(function(e) { return e.type === 'directory'; });
-    var fls = d.entries.filter(function(e) { return e.type === 'file'; });
-    if (!fld.length && !fls.length) {
-      wrapper.innerHTML = '<div class="text-slate-600 text-xs py-1 pl-2">' + t('web.preview.emptyDir') + '</div>';
-    } else {
-      fld.concat(fls).forEach(function(e) { wrapper.appendChild(makeNode(e, dirPath)); });
+
+  var rows = {};
+  container.querySelectorAll(':scope > [data-name]').forEach(function(row) { rows[row.dataset.name] = row; });
+
+  for (var i = 0; i < newEntries.length; i++) {
+    var entry = newEntries[i];
+    var row = rows[entry.name];
+    if (row) {
+      var typeChanged = (row.dataset.type === 'directory') !== (entry.type === 'directory');
+      var sizeChanged = !typeChanged && entry.type !== 'directory' && String(row.dataset.size) !== String(entry.size || '');
+      if (typeChanged || sizeChanged) {
+        var frag = makeNode(entry, basePath);
+        var newRow = frag.firstElementChild;
+        if (row.nextElementSibling && row.nextElementSibling.classList.contains('ml-4')) {
+          row.nextElementSibling.remove(); // 目录→文件：旧 wrapper 一并移除
+        }
+        row.replaceWith(frag);
+        rows[entry.name] = newRow;
+      }
+      // 目录行无可视变化（展开状态、闭包全部保留）；文件 size 未变也无须替换
+      continue;
     }
-    // Re-append collapse button
-    if (collapseBtn) wrapper.appendChild(collapseBtn);
-  }).catch(function() {});
+    // added：插入到后续已存在行之前；无后续行时锚定折叠按钮（子目录容器）或末尾
+    var frag = makeNode(entry, basePath);
+    var newRow = frag.firstElementChild;
+    var ref = null;
+    for (var j = i + 1; j < newEntries.length; j++) {
+      if (rows[newEntries[j].name]) { ref = rows[newEntries[j].name]; break; }
+    }
+    if (!ref) ref = container.querySelector('.tree-collapse-btn');
+    container.insertBefore(frag, ref);
+    rows[entry.name] = newRow;
+  }
+}
+
+// 根目录局部刷新：diff 现有行，保留展开状态与选中高亮
+function refreshTree() {
+  var tree = document.getElementById('tree');
+  freshFetch('/api/tree/' + pid + '?path=')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      applyDiff(tree, entriesFromDom(tree), d.entries || [], '');
+    })
+    .catch(function() { toast(t('web.preview.loadFailed'), 'error'); });
+}
+
+// 增量刷新受影响目录：目标行未渲染时向上找最近已渲染的祖先容器，
+// 覆盖"折叠/未加载的目录被外部删除"场景；全部未渲染则由懒加载自然拿新数据
+function refreshSubtree(dirPath) {
+  if (!dirPath || dirPath === '') { refreshTree(); return; }
+  var cur = dirPath, container = null;
+  while (cur) {
+    var row = document.querySelector('#tree [data-path="' + CSS.escape(cur) + '"]');
+    if (row) {
+      var wrapper = row.nextElementSibling;
+      if (wrapper && wrapper.classList.contains('ml-4')) { container = wrapper; break; }
+      // 行存在但未加载子内容（折叠/未展开）：继续向上找最近已渲染的祖先
+    }
+    var idx = cur.lastIndexOf('/');
+    cur = idx === -1 ? '' : cur.slice(0, idx);
+  }
+  if (!container) {
+    if (cur === '') refreshTree(); // 目标及其祖先均未渲染：检查根目录
+    return;
+  }
+  freshFetch('/api/tree/' + pid + '?path=' + encodeURIComponent(dirPath))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      applyDiff(container, entriesFromDom(container), d.entries || [], dirPath);
+    })
+    .catch(function() {});
 }
 function applyFilter() {
   var q = document.getElementById('fileFilter').value.toLowerCase();
@@ -345,11 +515,14 @@ function makeNode(entry, parentPath) {
   var row = document.createElement('div');
   row.dataset.name = entry.name;
   row.dataset.path = childPath;
+  row.dataset.type = entry.type;
+  row.dataset.size = entry.size || '';
+  row.dataset.modified = entry.modified || '';
   row.className = 'flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-colors text-sm hover:bg-slate-800 text-slate-300';
   row.innerHTML = '<span class="w-4 shrink-0 text-center text-slate-500 text-xs">' + (isDir?'▸':'') + '</span>' +
     '<span class="' + (isDir?'text-blue-400':'text-slate-400') + ' shrink-0">' + (isDir?'📁':iconFor(entry.name)) + '</span>' +
     '<span class="truncate flex-1 tree-name">' + entry.name + '</span>' +
-    (entry.size ? '<span class="text-[10px] text-slate-500 shrink-0">' + fmtSize(entry.size) + '</span>' : '');
+    (entry.size ? '<span class="text-[10px] text-slate-500 shrink-0 tree-size">' + fmtSize(entry.size) + '</span>' : '');
   frag.appendChild(row);
 
   if (isDir) {
@@ -713,6 +886,7 @@ function activateTab(path, opts) {
     tabStore.noteRendered(path); // touch LRU
     mountPane(cached, path);
     afterActivate(path, tabDataCache[path] || { type: 'text', content: '' });
+    updateExternalModifiedBanner();
     return;
   }
   // 需要渲染：先显示骨架
@@ -730,9 +904,11 @@ function activateTab(path, opts) {
     }
     mountPane(pane, path);
     afterActivate(path, d);
+    updateExternalModifiedBanner();
   }).catch(function() {
     if (activeTabPath !== path) return;
     host.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 gap-2"><span class="text-4xl">⚠️</span><p class="text-sm">' + t('web.preview.fileLoadFailed') + '</p></div>';
+    updateExternalModifiedBanner();
   });
 }
 
@@ -755,6 +931,7 @@ function closeTab(path) {
   if (editMode && isCurrent) doExitEdit(true);
   var r = tabStore.close(path);
   releaseTab(path);
+  delete externallyModified[path];
   renderTabBar(); saveTabsState();
   if (r.active) { activeTabPath = null; activateTab(r.active, {silent: true}); }
   else showEmptyState();
@@ -784,6 +961,7 @@ function showEmptyState() {
   renderBreadcrumb(null);
   syncTreeActive(null);
   saveTabsState();
+  updateExternalModifiedBanner();
 }
 
 /** 渲染 tab 栏。 */
@@ -1282,81 +1460,50 @@ function toggleAutoScroll() {
   autoScrollRAF = requestAnimationFrame(step);
 }
 
-// Feature 6a: Copy content FAB
-// Inline styles shipped with the copied HTML so the paste keeps reasonable
-// formatting in Word / rich-text editors (values mirror .doc-content in
-// app.css). The class-based styles are not inlined element-by-element.
-var DOC_COPY_STYLES =
-  '.doc-content{color:#1e293b;font-family:Inter,system-ui,sans-serif;line-height:1.75}' +
-  '.doc-content h1{font-size:1.875rem;font-weight:700;padding-bottom:.75rem;margin-bottom:1.5rem;border-bottom:1px solid #e2e8f0}' +
-  '.doc-content h2{font-size:1.25rem;font-weight:600;margin-top:2rem;margin-bottom:1rem}' +
-  '.doc-content h3{font-size:1.1rem;font-weight:600;margin-top:1.5rem;margin-bottom:.75rem}' +
-  '.doc-content p{margin-bottom:1rem;line-height:1.75}' +
-  '.doc-content ul,.doc-content ol{padding-left:1.25rem;margin-bottom:1.5rem}' +
-  '.doc-content li{margin:.5rem 0}' +
-  '.doc-content table{border-collapse:collapse;width:100%;margin:1.5rem 0;font-size:.875rem}' +
-  '.doc-content th,.doc-content td{border:1px solid #e2e8f0;padding:.5rem .75rem;text-align:left}' +
-  '.doc-content th{background:#f8fafc;font-weight:600}' +
-  '.doc-content blockquote{border-left:3px solid #cbd5e1;padding-left:1rem;margin:1rem 0;color:#64748b}' +
-  '.doc-content code{background:#f1f5f9;padding:.125rem .375rem;border-radius:.25rem;font-size:.875em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}' +
-  '.doc-content pre{background:#1e293b;color:#e2e8f0;padding:.75rem 1rem;border-radius:.5rem;overflow-x:auto;margin:1rem 0}' +
-  '.doc-content pre code{background:transparent;padding:0}' +
-  '.doc-content img{max-width:100%;height:auto}' +
-  '.doc-content hr{border:none;border-top:1px solid #e2e8f0;margin:1rem 0}';
-
+// Feature 6a: Copy content FAB — 复制原始 Markdown 源码
+// 走 /api/raw（该接口不在 SW 缓存范围内，返回文件源码而非渲染 JSON），
+// 与编辑模式的 raw fetch（/api/raw/:id?path=…&t=…）保持一致。
 function copyDocumentContent() {
   if (!currentFile) { toast(t('web.preview.openDocFirst'), 'error'); return; }
   var btn = document.getElementById('copyContentBtn');
   if (!btn) return;
   var origHTML = btn.innerHTML;
-  // Copy the rendered HTML from the DOM (never the raw /api/content JSON
-  // response body), so pasting into rich-text targets keeps formatting.
-  var docEl = document.getElementById('docContent');
-  if (!docEl || !docEl.innerHTML) { toast(t('web.preview.copyFailed'), 'error'); return; }
-  var wrap = document.createElement('div');
-  wrap.className = 'doc-content';
-  wrap.appendChild(docEl.cloneNode(true)); // clone — do not disturb the page
-  var html = '<style>' + DOC_COPY_STYLES + '</style>' + wrap.outerHTML;
-  var text = wrap.innerText || wrap.textContent || '';
   var onOk = function() {
     btn.innerHTML = '✓';
     toast(t('web.preview.copySuccess'), 'success');
     setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
   };
   var onFail = function() { toast(t('web.preview.copyFailed'), 'error'); };
-  if (navigator.clipboard && window.ClipboardItem) {
-    navigator.clipboard.write([
-      new ClipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([text], { type: 'text/plain' }),
-      }),
-    ]).then(onOk).catch(function() {
-      if (fallbackCopyRich(html, text)) onOk(); else onFail();
-    });
-  } else if (fallbackCopyRich(html, text)) {
-    onOk();
-  } else {
-    onFail();
-  }
+  // &t= 绕过浏览器 HTTP 缓存（/api/raw 响应带 Cache-Control: public, max-age=3600）
+  fetch('/api/raw/' + proj.id + '?path=' + encodeURIComponent(currentFile) + '&t=' + Date.now())
+    .then(function(r) {
+      if (!r.ok) throw new Error('raw fetch failed: ' + r.status);
+      return r.text();
+    })
+    .then(function(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      return fallbackCopyText(text); // 非安全上下文（http://LAN）降级
+    })
+    .then(function(ok) {
+      if (ok === false) throw new Error('copy failed');
+      onOk();
+    })
+    .catch(function() { onFail(); });
 }
 
-// Rich-text copy fallback for non-secure contexts (e.g. http://LAN) where
-// navigator.clipboard is unavailable. Returns true on success.
-function fallbackCopyRich(html, text) {
-  var d = document.createElement('div');
-  d.setAttribute('contenteditable', 'true');
-  d.style.cssText = 'position:fixed;left:-9999px;top:0;';
-  d.innerHTML = html;
-  document.body.appendChild(d);
-  var sel = window.getSelection();
-  sel.removeAllRanges();
-  var range = document.createRange();
-  range.selectNodeContents(d);
-  sel.addRange(range);
+// 非安全上下文复制降级（navigator.clipboard 仅在 localhost/HTTPS 可用）。
+// 返回 true 表示成功。
+function fallbackCopyText(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+  document.body.appendChild(ta);
+  ta.select();
   var ok = false;
   try { ok = document.execCommand('copy'); } catch (e) { /* ignore */ }
-  sel.removeAllRanges();
-  document.body.removeChild(d);
+  document.body.removeChild(ta);
   return ok;
 }
 
@@ -1642,21 +1789,30 @@ function hideCtxMenu() { document.getElementById('ctxMenu').classList.add('hidde
 
 // ── Context Menu Actions ──
 
+// 创建成功后定位新节点：文件 → 打开 tab；目录 → 展开并高亮
+function selectNewNode(path, isDir) {
+  if (!path) return;
+  if (isDir) revealDirInTree(path);
+  else navigateToFile(path);
+}
+
 function ctxCreateFile(dirPath) {
   promptDialog({
     title: t('web.preview.ctxMenu.newFile'),
     placeholder: t('web.preview.prompt.newFileName'),
     defaultValue: ''
   }).then(function(fname) {
-    if (!fname) return;
+    if (!fname) return; // 取消：静默退出（此前会误弹成功 toast）
     return fetch('/api/tree/' + pid + '/file?path=' + encodeURIComponent(dirPath), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: fname.trim() })
-    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
-  }).then(function() {
-    toast(t('web.preview.toast.fileCreated'), 'success');
-    refreshSubtree(dirPath);
+    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); })
+      .then(function(d) {
+        toast(t('web.preview.toast.fileCreated'), 'success');
+        refreshSubtree(dirPath);
+        selectNewNode(d.path || dirPath + '/' + fname.trim(), false);
+      });
   }).catch(function(e) { toast(e.message || t('web.preview.toast.actionFailed'), 'error'); });
 }
 
@@ -1666,15 +1822,17 @@ function ctxCreateFolder(dirPath) {
     placeholder: t('web.preview.prompt.newFolderName'),
     defaultValue: ''
   }).then(function(fname) {
-    if (!fname) return;
+    if (!fname) return; // 取消：静默退出
     return fetch('/api/tree/' + pid + '/folder?path=' + encodeURIComponent(dirPath), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: fname.trim() })
-    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); });
-  }).then(function() {
-    toast(t('web.preview.toast.folderCreated'), 'success');
-    refreshSubtree(dirPath);
+    }).then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Failed'); return d; }); })
+      .then(function(d) {
+        toast(t('web.preview.toast.folderCreated'), 'success');
+        refreshSubtree(dirPath);
+        selectNewNode(d.path || dirPath + '/' + fname.trim(), true);
+      });
   }).catch(function(e) { toast(e.message || t('web.preview.toast.actionFailed'), 'error'); });
 }
 
@@ -1694,7 +1852,19 @@ function ctxRenameFile(oldPath) {
   }).then(function(d) {
     if (!d) return;
     toast(t('web.preview.toast.renamed'), 'success');
-    if (d.oldPath && d.newPath && d.oldPath !== d.newPath) updateBookmarkPath(d.oldPath, d.newPath);
+    if (d.oldPath && d.newPath && d.oldPath !== d.newPath) {
+      updateBookmarkPath(d.oldPath, d.newPath);
+      // 迁移打开的 tab：精确匹配或位于被重命名目录下（内容缓存已失效，重新加载）
+      var affected = tabStore.list().filter(function(tab) {
+        if (TempPreview.isTempPath(tab.path)) return false;
+        return tab.path === d.oldPath || tab.path.indexOf(d.oldPath + '/') === 0;
+      });
+      affected.forEach(function(tab) {
+        var newTabPath = d.newPath + tab.path.slice(d.oldPath.length);
+        closeTab(tab.path);
+        openTab(newTabPath);
+      });
+    }
     // Refresh parent directories of both old and new paths
     var oldDir = oldPath.split('/').slice(0, -1).join('/');
     var newDir = d.newPath.split('/').slice(0, -1).join('/');
@@ -1715,6 +1885,12 @@ function ctxDeleteFile(targetPath, targetType) {
     if (!d) return;
     toast(t('web.preview.toast.deleted'), 'success');
     removeBookmarkByPath(targetPath);
+    // 关闭受影响的 tab（精确匹配或位于被删目录下），与外部删除行为一致
+    var affected = tabStore.list().filter(function(tab) {
+      if (TempPreview.isTempPath(tab.path)) return false;
+      return tab.path === targetPath || tab.path.indexOf(targetPath + '/') === 0;
+    });
+    affected.forEach(function(tab) { closeTab(tab.path); });
     var parentDir = targetPath.split('/').slice(0, -1).join('/');
     refreshSubtree(parentDir);
   }).catch(function(e) { toast(e.message || t('web.preview.toast.deleteFailed'), 'error'); });
