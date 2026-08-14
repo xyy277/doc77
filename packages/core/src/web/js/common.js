@@ -297,6 +297,8 @@ window.showProgressOverlay = function(title, steps) {
     var msg = opts.message || '';
     var type = opts.type || 'text';
     var placeholder = opts.placeholder || '';
+    // defaultValue: 重命名等场景预填当前值（此前被忽略导致弹框永远为空）
+    var defaultValue = opts.defaultValue || '';
     var okText = opts.okText || t('common.confirm.ok');
     var cancelText = opts.cancelText || t('common.confirm.cancel');
     return new Promise(function(resolve) {
@@ -304,7 +306,9 @@ window.showProgressOverlay = function(title, steps) {
       o.innerHTML = '<div class="confirm-box">' +
         (title ? '<div style="font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text-primary)">' + esc(title) + '</div>' : '') +
         (msg ? '<p style="font-size:13px;margin-bottom:12px;color:var(--text-secondary)">' + esc(msg) + '</p>' : '') +
-        '<input class="input prompt-input" type="' + type + '" placeholder="' + escAttr(placeholder) + '" style="width:100%;padding:8px 12px;margin-bottom:16px">' +
+        '<input class="input prompt-input" type="' + type + '"' +
+        (defaultValue ? ' value="' + escAttr(defaultValue) + '"' : '') +
+        ' placeholder="' + escAttr(placeholder) + '" style="width:100%;padding:8px 12px;margin-bottom:16px">' +
         '<div style="display:flex;gap:8px;justify-content:flex-end">' +
         '<button class="btn cancel-btn" style="font-size:12px">' + esc(cancelText) + '</button>' +
         '<button class="btn btn-primary ok-btn" style="font-size:12px">' + esc(okText) + '</button></div></div>';
@@ -318,7 +322,7 @@ window.showProgressOverlay = function(title, steps) {
         if (e.key === 'Enter') { e.preventDefault(); done(input.value); }
         else if (e.key === 'Escape') { e.preventDefault(); done(null); }
       });
-      setTimeout(function(){ input.focus(); }, 50);
+      setTimeout(function(){ input.focus(); if (defaultValue) input.select(); }, 50);
     });
   };
 })();
