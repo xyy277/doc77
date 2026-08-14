@@ -4,6 +4,17 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-14] — `1.1.2`
+
+### 全包 (`1.1.2`)
+
+**Fixed**
+- Electron: 修复发布门禁测试 — fileAssociations 断言从 `package.json` 迁移至 `electron-builder.yml`（构建配置已随 95721cb 迁移）
+- Web: AI workspace 新增 settings 抽屉，修复 dark theme 与 preview settings 面板侧移（`translate-x-full`）问题
+- Web: 预览复制改为复制渲染后的 HTML（而非原始 JSON）
+- Web: 修复 `wireActions` 中 aiMessages 节点被错误替换的问题
+- Gallery: 恢复 auth token、thumbnail API 与目录导航
+
 ## [2026-08-12] — `1.1.1`
 
 ### 全包 (`1.1.1`)
