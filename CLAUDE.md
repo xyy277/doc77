@@ -107,8 +107,18 @@
 | 3 | `pnpm build` 全部成功 | ☐ |
 | 4 | `git status` 无未提交的关键改动 | ☐ |
 | 5 | 版本号已确认（用户同意 bump 类型） | ☐ |
+| 6 | **根版本已同步**：根 `package.json` bump 后执行 `node scripts/sync-version.cjs`，确认 `packages/electron`、`packages/gallery` 的 `package.json` 与全部 `version.gen.ts` 版本一致（漏掉此步会导致 CI 的 sync-version 把 Electron 打包版本写回旧版） | ☐ |
 
 **任何一项未满足，停止发布流程。**
+
+### 发布后收尾（tag + Electron 构建）
+
+npm 发布完成 ≠ 发布结束。**发布 = npm + tag**：
+
+1. **打 tag**：`git tag v<版本>`（轻量 tag，对齐历史格式）并 `git push origin v<版本>`，触发 `release-electron.yml` 三平台构建（`tags: ['v*']`）
+2. **验证构建产物版本**：等待 Release Electron 工作流完成后，检查 GitHub Release 资产文件名版本号正确（如 `Doc77-1.1.3.AppImage`），有旧版本资产需删除
+3. 提交版本变更（含根 `package.json`、`packages/electron/package.json`、`packages/gallery/package.json` 与 CHANGELOG），格式 `chore(release): bump version to <版本> and update changelog`
+4. 若发现产物版本错误：修复根版本 → 提交 → **删除并重打 tag**（`git push origin :v<版本>` + 重打 + 推送）→ 清理旧 Release 资产
 
 ### 安全和质量
 
