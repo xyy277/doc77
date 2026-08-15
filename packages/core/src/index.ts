@@ -47,6 +47,7 @@ export {
   initDatabase,
   getConnection,
   closeConnection,
+  flushDatabase,
   DatabaseCompat,
   StatementCompat,
 } from './db/connection.js';

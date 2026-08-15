@@ -110,6 +110,11 @@ export function runMigrations(db?: DatabaseCompat): void {
   // v12: 插件持久化 — T11 插件沙箱 + API 路由
   // 存储 enable/disable 状态、配置 JSON、安装元数据
   conn.exec(PLUGINS_SCHEMA_SQL);
+
+  // v13: filetree_cache 移入进程内 Map（1.1.4 性能修复）
+  // 表结构保留（兼容 schema 断言），清理历史缓存行——旧行会在每次整库
+  // 序列化落盘时被反复写入文件，纯死重。scanner 已不再读写此表。
+  conn.exec('DELETE FROM filetree_cache');
 }
 
 const SCHEMA_SQL = `

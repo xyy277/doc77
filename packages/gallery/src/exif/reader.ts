@@ -1,4 +1,14 @@
-import sharp from 'sharp';
+// v1.1.4 (F2)：sharp 是原生模块（加载即初始化 native binding），按需加载。
+// sharp 类型为 export= （可调用），dynamic import 返回的 namespace 需取 .default
+type SharpModule = typeof import('sharp');
+let _sharp: SharpModule | null = null;
+async function getSharp(): Promise<SharpModule> {
+  if (!_sharp) {
+    const mod = (await import('sharp')) as unknown as { default?: SharpModule };
+    _sharp = mod.default ?? (mod as SharpModule);
+  }
+  return _sharp;
+}
 import { validatePath } from '@doc77/core';
 import fs from 'node:fs';
 
@@ -60,7 +70,7 @@ export async function readExif(
 
   try {
     const stats = fs.statSync(absPath);
-    const image = sharp(absPath);
+    const image = (await getSharp())(absPath);
     const metadata = await image.metadata();
 
     const data: ExifData = {

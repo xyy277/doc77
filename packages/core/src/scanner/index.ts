@@ -12,22 +12,75 @@ export interface ScanResult {
 }
 
 /**
+ * 目录扫描缓存（进程内 Map）。
+ *
+ * 自 v1.1.4 起不再写入 filetree_cache 表：该表每次写都会触发 sql.js
+ * 全内存 DB 的整库序列化（性能灾难放大器），且行数随目录数量无限膨胀。
+ * 缓存本质是 mtime 校验的临时数据，重启后重建透明，无持久化需求。
+ *
+ * 校验策略（v1.1.4 F1）：单次目录 stat（O(1)）替代逐条目 statSync（O(N)，
+ * WSL2 上 statSync 昂贵，原"缓存校验"≈重新扫描）。目录 mtime 覆盖
+ * 增删/重命名；文件内容修改不改变目录 mtime —— 由 watcher 的
+ * clearCache 精确失效兜底（SSE 客户端连接时 watcher 在运行）。
+ *
+ * 每项目 FIFO 容量上限防内存无限增长；多份 core 副本（Electron main 与
+ * MCP 的 electron-modules）各自持一份 Map，分叉无害（mtime 校验兜底）。
+ */
+interface CacheEntry {
+  entries: DirEntry[];
+  /** 扫描时目录自身的 mtime（ISO 毫秒精度） */
+  dirMtime: string;
+  /** 条目数，与目录 mtime 互补：粗粒度文件系统（FAT 等）目录 mtime 可能不更新 */
+  entryCount: number;
+}
+
+const _cache = new Map<string, CacheEntry>();
+const MAX_ENTRIES_PER_PROJECT = 2000;
+const _projectCounts = new Map<number, number>();
+
+function cacheKey(projectId: number, nodePath: string): string {
+  return projectId + '|' + nodePath;
+}
+
+/** 每项目超出上限时按插入序淘汰最旧条目（Map 迭代序即插入序）。 */
+function evictIfOverflow(projectId: number): void {
+  const count = _projectCounts.get(projectId) ?? 0;
+  if (count < MAX_ENTRIES_PER_PROJECT) return;
+  const prefix = projectId + '|';
+  for (const key of _cache.keys()) {
+    if (key.startsWith(prefix)) {
+      _cache.delete(key);
+      _projectCounts.set(projectId, count - 1);
+      return;
+    }
+  }
+}
+
+function putCache(projectId: number, nodePath: string, entry: CacheEntry): void {
+  const key = cacheKey(projectId, nodePath);
+  if (!_cache.has(key)) {
+    evictIfOverflow(projectId);
+    _projectCounts.set(projectId, (_projectCounts.get(projectId) ?? 0) + 1);
+  }
+  _cache.set(key, entry);
+}
+
+/**
  * Scan a directory within a project.
  * Uses lazy loading — only returns direct children.
- * Results are cached in filetree_cache with mtime-based invalidation.
+ * Results are cached in memory with mtime-based invalidation.
  *
  * @param projectId - The project ID
  * @param dirPath - Relative path within the project ('' for root)
  */
 export function scanDirectory(projectId: number, dirPath: string): ScanResult {
-  const db = getConnection();
-
   // Normalize path
   const normalizedPath = dirPath.replace(/\\/g, '/').replace(/^\/+/, '');
 
   // Get project root path
-  const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
-    { path: string } | undefined;
+  const project = getConnection()
+    .prepare('SELECT path FROM projects WHERE id = ?')
+    .get(projectId) as { path: string } | undefined;
 
   if (!project) {
     throw new Error(`Project not found: ${projectId}`);
@@ -35,43 +88,26 @@ export function scanDirectory(projectId: number, dirPath: string): ScanResult {
 
   const absPath = normalizedPath ? path.join(project.path, normalizedPath) : project.path;
 
-  // Check cache
-  const cached = db
-    .prepare(
-      'SELECT tree_json, mtime_map FROM filetree_cache WHERE project_id = ? AND node_path = ?',
-    )
-    .get(projectId, normalizedPath) as { tree_json: string; mtime_map: string | null } | undefined;
-
-  if (cached) {
-    const mtimeMap: Record<string, string> = cached.mtime_map ? JSON.parse(cached.mtime_map) : {};
-
-    // Validate by stat'ing each cached file and comparing mtime
-    if (isCacheValid(absPath, mtimeMap)) {
-      const entries = JSON.parse(cached.tree_json) as DirEntry[];
-      return { path: normalizedPath, entries, cached: true };
-    }
-
-    // Cache invalid — delete it
-    db.prepare('DELETE FROM filetree_cache WHERE project_id = ? AND node_path = ?').run(
-      projectId,
-      normalizedPath,
-    );
+  // Check in-memory cache
+  const cached = _cache.get(cacheKey(projectId, normalizedPath));
+  if (cached && isCacheValid(absPath, cached)) {
+    return { path: normalizedPath, entries: cached.entries, cached: true };
   }
 
   // Scan fresh
   const entries = listDir(absPath);
-
-  // Build mtime map for future cache validation
-  const mtimeMap: Record<string, string> = {};
-  for (const entry of entries) {
-    mtimeMap[entry.name] = entry.modified;
+  let dirMtime = '';
+  try {
+    dirMtime = fs.statSync(absPath).mtime.toISOString();
+  } catch {
+    /* 目录不可访问 — 空 mtime 使缓存恒失效，下次请求重扫 */
   }
 
-  // Store in cache
-  db.prepare(
-    `INSERT OR REPLACE INTO filetree_cache (project_id, node_path, tree_json, mtime_map)
-     VALUES (?, ?, ?, ?)`,
-  ).run(projectId, normalizedPath, JSON.stringify(entries), JSON.stringify(mtimeMap));
+  putCache(projectId, normalizedPath, {
+    entries,
+    dirMtime,
+    entryCount: entries.length,
+  });
 
   return { path: normalizedPath, entries, cached: false };
 }
@@ -80,47 +116,39 @@ export function scanDirectory(projectId: number, dirPath: string): ScanResult {
  * Clear cache for a specific project path, or entire project if no path given.
  */
 export function clearCache(projectId: number, dirPath?: string): void {
-  const db = getConnection();
-
   if (dirPath !== undefined) {
     const normalized = dirPath.replace(/\\/g, '/').replace(/^\/+/, '');
-    db.prepare('DELETE FROM filetree_cache WHERE project_id = ? AND node_path = ?').run(
-      projectId,
-      normalized,
-    );
+    const key = cacheKey(projectId, normalized);
+    if (_cache.delete(key)) {
+      const count = _projectCounts.get(projectId);
+      if (count !== undefined) _projectCounts.set(projectId, count - 1);
+    }
   } else {
-    db.prepare('DELETE FROM filetree_cache WHERE project_id = ?').run(projectId);
+    const prefix = projectId + '|';
+    for (const key of _cache.keys()) {
+      if (key.startsWith(prefix)) _cache.delete(key);
+    }
+    _projectCounts.delete(projectId);
   }
 }
 
 /**
  * Check if the cached directory listing is still valid.
- * Stats each file in the cached mtime_map and compares against actual mtime.
+ * v1.1.4 (F1)：单次目录 stat + 条目数比对（O(1)），替代逐条目 statSync（O(N)）。
  */
-function isCacheValid(absDirPath: string, cachedMtimeMap: Record<string, string>): boolean {
-  // Check cached entries still exist with same mtime
-  for (const [name, cachedMtime] of Object.entries(cachedMtimeMap)) {
-    try {
-      const stats = fs.statSync(path.join(absDirPath, name));
-      if (stats.mtime.toISOString() !== cachedMtime) {
-        return false;
-      }
-    } catch {
-      // File was removed or is inaccessible — cache invalid
-      return false;
-    }
-  }
-  // Check for new entries not in cache (added files/dirs that are not ignored)
+function isCacheValid(absDirPath: string, cached: CacheEntry): boolean {
   try {
-    var actualEntries = fs.readdirSync(absDirPath);
-    var nonIgnored = actualEntries.filter(function (name) {
-      return !isSensitiveFile(name);
-    });
-    if (nonIgnored.length !== Object.keys(cachedMtimeMap).length) {
-      return false;
-    }
+    const stats = fs.statSync(absDirPath);
+    if (stats.mtime.toISOString() !== cached.dirMtime) return false;
+  } catch {
+    // Directory was removed or is inaccessible — cache invalid
+    return false;
+  }
+  // Entry count check: catches add/remove even on coarse-mtime filesystems
+  try {
+    const nonIgnored = fs.readdirSync(absDirPath).filter((name) => !isSensitiveFile(name));
+    return nonIgnored.length === cached.entryCount;
   } catch {
     return false;
   }
-  return true;
 }

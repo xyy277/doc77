@@ -171,8 +171,9 @@
       html += '</span>';
     }
     // Copy (assistant only) — icon button with tooltip
+    // v1.1.4 (F4)：移除远程 phosphor 图标脚本（渲染阻塞 + 离线挂起），改文字字形
     if (msg.role === 'assistant' && msg.content) {
-      html += '<button class="ai-msg-action-btn" data-act="copy" title="' + esc(t('web.ai.msg.copy')) + '"><i class="ph ph-copy"></i></button>';
+      html += '<button class="ai-msg-action-btn" data-act="copy" title="' + esc(t('web.ai.msg.copy')) + '"><i class="ai-msg-icon-copy">⧉</i></button>';
     }
     // Regenerate (assistant only — re-run from parent)
     if (msg.role === 'assistant' && !msg.streaming && tab.sessionId) {
@@ -224,9 +225,12 @@
     if (act === 'copy') {
       navigator.clipboard.writeText(msg.content || '').then(function () {
         var icon = btn.querySelector('i');
-        if (icon) { icon.className = 'ph ph-check'; }
+        if (icon) { icon.className = 'ai-msg-icon-check'; icon.textContent = '✓'; }
         btn.style.color = '#22c55e';
-        setTimeout(function () { if (icon) icon.className = 'ph ph-copy'; btn.style.color = ''; }, 1500);
+        setTimeout(function () {
+          if (icon) { icon.className = 'ai-msg-icon-copy'; icon.textContent = '⧉'; }
+          btn.style.color = '';
+        }, 1500);
       });
     } else if (act === 'regenerate') {
       window.aiWorkspace.regenerate(tab, msg);

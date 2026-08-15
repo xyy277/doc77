@@ -15,7 +15,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Doc77">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
-<script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
 
@@ -270,12 +269,13 @@
   </div>
 </div>
 
-<script src="js/common.js"></script>
-<script src="js/search.js"></script>
-<script src="js/stats.js"></script>
-<script src="js/favorites.js"></script>
-<script src="js/discover.js"></script>
-<script src="js/register.js"></script>
-<script src="js/dashboard.js"></script>
+<!-- v1.1.4 (F4)：defer 避免阻塞渲染首帧 -->
+<script defer src="js/common.js"></script>
+<script defer src="js/search.js"></script>
+<script defer src="js/stats.js"></script>
+<script defer src="js/favorites.js"></script>
+<script defer src="js/discover.js"></script>
+<script defer src="js/register.js"></script>
+<script defer src="js/dashboard.js"></script>
 </body>
 </html>

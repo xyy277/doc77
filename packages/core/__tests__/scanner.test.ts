@@ -1,11 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { initDatabase, closeConnection } from '../src/db/connection.js';
+import { initDatabase, closeConnection, getConnection } from '../src/db/connection.js';
 import { runMigrations } from '../src/db/migrations.js';
 import { registerProject } from '../src/db/projects.js';
 import { scanDirectory, clearCache } from '../src/scanner/index.js';
+
+// 包装 statSync 用于断言"缓存命中仅单次目录 stat"（node:fs 属性不可 redefine）
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    statSync: vi.fn(actual.statSync),
+  };
+});
 
 describe('Directory Scanner', () => {
   let testDir: string;
@@ -100,12 +109,41 @@ describe('Directory Scanner', () => {
       expect(second.entries).toEqual(first.entries);
     });
 
-    it('should invalidate cache when a file changes', () => {
+    it('内容修改不使缓存失效（目录 mtime 不变；watcher clearCache 负责精确失效）', () => {
       scanDirectory(projectId, ''); // populate cache
-      // Modify a file
+      // Modify a file — dir mtime 不变，条目数不变
       fs.writeFileSync(path.join(projectDir, 'notes.txt'), 'updated content');
       const result = scanDirectory(projectId, '');
+      expect(result.cached).toBe(true);
+    });
+
+    it('新增条目使缓存失效（目录 mtime / 条目数变化）', () => {
+      scanDirectory(projectId, ''); // populate cache
+      fs.writeFileSync(path.join(projectDir, 'added-after.md'), 'x');
+      const result = scanDirectory(projectId, '');
       expect(result.cached).toBe(false);
+    });
+
+    it('缓存命中仅做单次目录 stat（O(1) 校验，v1.1.4 F1）', () => {
+      scanDirectory(projectId, ''); // populate cache
+      vi.mocked(fs.statSync).mockClear();
+      const result = scanDirectory(projectId, '');
+      expect(result.cached).toBe(true);
+      // 命中路径：isCacheValid 只 stat 目录本身，不再逐条目 statSync
+      expect(vi.mocked(fs.statSync)).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not write filetree_cache rows into DB (v1.1.4 in-memory cache)', () => {
+      scanDirectory(projectId, '');
+      scanDirectory(projectId, 'docs');
+      clearCache(projectId, '');
+      scanDirectory(projectId, '');
+      const row = getConnection().prepare('SELECT COUNT(*) AS c FROM filetree_cache').get() as {
+        c: number;
+      };
+      // 缓存已移入进程内 Map —— 表内必须零行，避免每次扫描触发
+      // sql.js 整库序列化（1.1.4 性能修复的核心断言）
+      expect(row.c).toBe(0);
     });
   });
 

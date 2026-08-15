@@ -411,15 +411,8 @@ async function main() {
         });
       } catch {}
 
-      // 启动文件监听：外部改动（git / webdav / 编辑器）→ file-tree:changed SSE
-      // 尽力而为：watcher 启动失败不阻断服务器启动
-      try {
-        const { startFileWatcher } = await import('@doc77/core');
-        startFileWatcher({ debounceMs: 300 });
-      } catch {
-        /* file watcher unavailable — 降级为手动刷新 */
-      }
-
+      // v1.1.4：文件监听改为惰性启动 —— 首个 SSE 客户端连接时才由 core 的
+      // /api/events 包装启动（headless CLI 无 UI 客户端时零开销）
       const server = http.createServer(app);
 
       // Handle server errors gracefully

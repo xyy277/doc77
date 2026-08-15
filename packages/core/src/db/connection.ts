@@ -17,25 +17,38 @@ let dbPath: string | null = null;
 let wrappedDb: DatabaseCompat | null = null;
 
 // ── Debounced auto-persist ─────────────────────────────
+//
+// 注意（v1.1.4 性能修复）：sql.js 是全内存 DB，export() 序列化整个库。
+// 频率 cap（最小落盘间隔）保证"写入频率 × 序列化代价"不再相乘——
+// 连续写入时最多每 MIN_PERSIST_INTERVAL_MS 落盘一次，合并期间全部变更。
+// 这是临时缓解；彻底方案是迁移 better-sqlite3（见 docs/planning/
+// performance-architecture-review.md 专项 P-A）。
 
 let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+let _lastPersistAt = 0;
+
+const SAVE_DEBOUNCE_MS = 500;
+const MIN_PERSIST_INTERVAL_MS = 2000;
 
 function _persistDb(): void {
   if (rawDb && dbPath) {
     const data = rawDb.export();
-    const buf = Buffer.from(data);
     const tmp = dbPath + '.tmp';
-    fs.writeFileSync(tmp, buf);
+    // Uint8Array 直接写入（Node 原生支持），省去 Buffer.from 的整库拷贝
+    fs.writeFileSync(tmp, data);
     fs.renameSync(tmp, dbPath);
+    _lastPersistAt = Date.now();
   }
 }
 
 function _scheduleSave(): void {
   if (_saveTimer) clearTimeout(_saveTimer);
+  const elapsed = Date.now() - _lastPersistAt;
+  const delay = Math.max(SAVE_DEBOUNCE_MS, MIN_PERSIST_INTERVAL_MS - elapsed);
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
     _persistDb();
-  }, 500);
+  }, delay);
   _saveTimer?.unref();
 }
 
@@ -162,9 +175,8 @@ export class DatabaseCompat {
   /** Internal: persist to disk without closing */
   _persist(filePath: string) {
     const data = this._db.export();
-    const buf = Buffer.from(data);
     const tmp = filePath + '.tmp';
-    fs.writeFileSync(tmp, buf);
+    fs.writeFileSync(tmp, data);
     fs.renameSync(tmp, filePath);
   }
 

@@ -12,7 +12,8 @@
 html{background:#f8fafc}html.dark{background:#0f172a}
 </style>
 <link rel="stylesheet" href="css/tailwind.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsTheme">
+<!-- v1.1.4 (F4)：highlight 主题 CSS 改为懒加载（preview.js ensureHighlightCss），
+     移除渲染阻塞的远程请求；katex CSS 本就是懒加载 -->
 <link rel="stylesheet" id="katexCss" data-src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="css/app.css">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
@@ -253,14 +254,15 @@ html{background:#f8fafc}html.dark{background:#0f172a}
 <!-- Drop zone overlay -->
 <div id="dropOverlay" class="hidden"><div id="dropOverlayContent"><span class="text-6xl mb-4 block">📎</span><span class="text-lg font-medium" data-i18n="web.preview.drop.title">Drop files for temporary preview</span><span class="text-sm opacity-70" data-i18n="web.preview.drop.desc">Supports Markdown, code, images, PDF, and more</span></div></div>
 
-<script src="/gallery/js/gallery-core.js"></script>
-<script src="/gallery/js/gallery-lightbox.js"></script>
-<script src="js/editor-core.js"></script>
-<script src="js/common.js"></script>
-<script src="js/search.js"></script>
-<script src="js/tabs.js"></script>
-<script src="js/temp-preview.js"></script>
-<script src="js/tree-diff.js"></script>
-<script src="js/preview.js"></script>
+<!-- v1.1.4 (F4)：defer 避免阻塞渲染首帧 -->
+<script defer src="/gallery/js/gallery-core.js"></script>
+<script defer src="/gallery/js/gallery-lightbox.js"></script>
+<script defer src="js/editor-core.js"></script>
+<script defer src="js/common.js"></script>
+<script defer src="js/search.js"></script>
+<script defer src="js/tabs.js"></script>
+<script defer src="js/temp-preview.js"></script>
+<script defer src="js/tree-diff.js"></script>
+<script defer src="js/preview.js"></script>
 </body>
 </html>

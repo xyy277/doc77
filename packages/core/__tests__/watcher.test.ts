@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { initDatabase, closeConnection } from '../src/db/connection.js';
+import { initDatabase, closeConnection, flushDatabase } from '../src/db/connection.js';
 import { runMigrations } from '../src/db/migrations.js';
 import { registerProject } from '../src/db/projects.js';
 import { scanDirectory } from '../src/scanner/index.js';
@@ -13,8 +13,20 @@ import {
   stopWatching,
   isWatcherRunning,
   watcherReady,
+  acquireWatcherRef,
+  releaseWatcherRef,
 } from '../src/server/watcher.js';
 import { getEventBus, resetEventBus } from '../src/server/event-bus.js';
+
+// node:fs 内置模块属性不可 redefine（spyOn 报错），模块级 mock 包装
+// writeFileSync 用于断言"watcher flush 不再触发 DB 落盘"（其余透传）
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    writeFileSync: vi.fn(actual.writeFileSync),
+  };
+});
 
 interface TreeChangedPayload {
   projectId: number;
@@ -200,5 +212,58 @@ describe('file watcher', () => {
     const payload = await eventPromise;
     expect(payload.path).toBe('docs');
     expect(payload.paths).toContain('docs/api.md');
+  });
+
+  it('flush 不触发 DB 落盘（v1.1.4 缓存内存化 + 死写删除）', async () => {
+    const p = registerProject('WatcherNoDbWrite', projectDir);
+    // 结算注册项目产生的 DB 变更，之后开始计数
+    flushDatabase();
+    vi.mocked(fs.writeFileSync).mockClear();
+
+    startFileWatcher({ debounceMs: 50 });
+    await watcherReady();
+
+    const eventPromise = waitForEvent((x) => x.projectId === p.id);
+    fs.writeFileSync(path.join(projectDir, 'no-db-write.md'), 'x');
+    await eventPromise;
+    // 等去抖 flush 完成
+    await new Promise((r) => setTimeout(r, 120));
+
+    // 本次文件变更链路（watcher → clearCache → SSE）不得产生任何 DB 落盘
+    const dbWrites = vi
+      .mocked(fs.writeFileSync)
+      .mock.calls.filter(([file]) => String(file).startsWith(dbPath));
+    expect(dbWrites).toHaveLength(0);
+  });
+
+  it('惰性启停：首个 acquire 才启动，引用归零后延迟停止', async () => {
+    registerProject('WatcherLazy', projectDir);
+    expect(isWatcherRunning()).toBe(false);
+
+    acquireWatcherRef();
+    expect(isWatcherRunning()).toBe(true);
+    await watcherReady();
+
+    releaseWatcherRef({ idleStopMs: 30 });
+    // 延迟停止窗口内仍在运行（防页面 reload 翻覆）
+    expect(isWatcherRunning()).toBe(true);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(isWatcherRunning()).toBe(false);
+  });
+
+  it('引用翻覆防抖：停止窗口内重新 acquire 不重启 watcher', async () => {
+    registerProject('WatcherFlap', projectDir);
+    acquireWatcherRef();
+    await watcherReady();
+
+    releaseWatcherRef({ idleStopMs: 80 });
+    await new Promise((r) => setTimeout(r, 30)); // 窗口内重新连接
+    acquireWatcherRef();
+    await new Promise((r) => setTimeout(r, 200)); // 超过原 idle 窗口
+    expect(isWatcherRunning()).toBe(true); // 从未经历停止
+
+    releaseWatcherRef({ idleStopMs: 20 });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(isWatcherRunning()).toBe(false);
   });
 });

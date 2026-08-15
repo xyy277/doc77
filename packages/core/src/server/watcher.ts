@@ -18,8 +18,11 @@ export interface WatcherOptions {
   debounceMs?: number;
 }
 
-const DEFAULT_DEBOUNCE_MS = 300;
+const DEFAULT_DEBOUNCE_MS = 500;
 const MAX_PATHS_PER_EVENT = 50;
+// 引用计数归零后延迟停止，防页面 reload 循环反复触发 chokidar 全树重扫；
+// 浏览器 EventSource 断线默认 ~3s 重试，10s 窗口覆盖翻覆场景
+const DEFAULT_IDLE_STOP_MS = 10_000;
 
 // 忽略 .git / 回收站 / node_modules / 隐藏文件
 // （chokidar v4：watch() 的路径不支持 glob，ignored 支持 glob 与正则）
@@ -54,6 +57,10 @@ let _pending = new Map<number, Map<string, PendingEntry>>();
 let _timers = new Map<string, ReturnType<typeof setTimeout>>();
 let _ready = false;
 let _readyResolvers: Array<() => void> = [];
+// 惰性启停（v1.1.4）：首个 SSE 客户端连接才启动 watcher，最后一个断开后
+// 延迟停止 —— 无客户端时零开销（chokidar 初始全树枚举 + inotify 占用）
+let _refCount = 0;
+let _idleStopTimer: ReturnType<typeof setTimeout> | null = null;
 
 function timerKey(projectId: number, relDir: string): string {
   return projectId + '|' + relDir;
@@ -135,7 +142,8 @@ export function startFileWatcher(opts?: WatcherOptions): void {
   const w = watch([], {
     ignoreInitial: true,
     persistent: true,
-    awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
+    // v1.1.4 移除 awaitWriteFinish：它对每个被写文件 50ms stat 轮询，
+    // 是 CPU 持续占用与事件放大的来源之一；事件提前由 500ms 去抖合并
     ignored: IGNORED,
   });
   w.on('all', (eventName: string, changedPath: string) => {
@@ -166,6 +174,11 @@ export function startFileWatcher(opts?: WatcherOptions): void {
 
 /** 停止监听并清理全部状态（测试与进程退出用）。 */
 export function stopFileWatcher(): void {
+  if (_idleStopTimer) {
+    clearTimeout(_idleStopTimer);
+    _idleStopTimer = null;
+  }
+  _refCount = 0;
   for (const [, timer] of _timers) clearTimeout(timer);
   _timers.clear();
   _pending.clear();
@@ -228,4 +241,33 @@ export function stopWatching(projectId: number): void {
 /** watcher 是否在运行（测试断言用）。 */
 export function isWatcherRunning(): boolean {
   return _watcher !== null;
+}
+
+/** 首个 SSE 客户端连接时调用：引用计数 + 启动 watcher（幂等）。 */
+export function acquireWatcherRef(): void {
+  _refCount++;
+  if (_idleStopTimer) {
+    clearTimeout(_idleStopTimer);
+    _idleStopTimer = null;
+  }
+  if (!_watcher) {
+    try {
+      startFileWatcher();
+    } catch {
+      /* best-effort — 降级为手动刷新 */
+    }
+  }
+}
+
+/** SSE 客户端断开时调用：引用归零后延迟 idleStopMs 停止 watcher。 */
+export function releaseWatcherRef(opts?: { idleStopMs?: number }): void {
+  _refCount = Math.max(0, _refCount - 1);
+  if (_refCount === 0 && _watcher && !_idleStopTimer) {
+    const ms = opts?.idleStopMs ?? DEFAULT_IDLE_STOP_MS;
+    _idleStopTimer = setTimeout(() => {
+      _idleStopTimer = null;
+      stopFileWatcher();
+    }, ms);
+    _idleStopTimer.unref?.();
+  }
 }

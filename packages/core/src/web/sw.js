@@ -12,11 +12,16 @@
 // 加载拦截策略纯函数（同文件同时被 vitest 单元测试复用）
 importScripts('/js/sw-policy.js');
 
-var CACHE_VERSION = 'doc77-v2';
+var CACHE_VERSION = 'doc77-v3';
 var CACHE_SHELL = CACHE_VERSION + '-shell';
 var CACHE_VENDOR = CACHE_VERSION + '-vendor';
 var CACHE_API = CACHE_VERSION + '-api';
 var CACHE_THUMBS = CACHE_VERSION + '-thumbs';
+
+// v1.1.4 (F4)：API 内容缓存（Cache API + IndexedDB 各一份）上限与过期裁剪，
+// 防止长期使用后渲染进程存储无限膨胀（拖慢 Electron 启动）
+var MAX_API_ENTRIES = 200;
+var API_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天
 
 // App Shell 资源列表
 var SHELL_ASSETS = [
@@ -197,8 +202,10 @@ function staleWhileRevalidateAPI(request) {
         if (response.ok) {
           var clone = response.clone();
           cache.put(request, clone);
+          pruneAPIStore(cache);
           // 同时存入 IndexedDB 用于深度离线
           saveToIDB(request.url, response.clone());
+          pruneIDB();
         }
         return response;
       }).catch(function () {
@@ -234,6 +241,44 @@ function staleWhileRevalidateAPI(request) {
       return fetchPromise;
     });
   });
+}
+
+/** CACHE_API 上限裁剪：超出 MAX_API_ENTRIES 时删除最旧条目（Cache API 插入序即时间序） */
+function pruneAPIStore(cache) {
+  cache.keys().then(function (keys) {
+    if (keys.length <= MAX_API_ENTRIES) return;
+    keys.slice(0, keys.length - MAX_API_ENTRIES).forEach(function (key) {
+      cache.delete(key);
+    });
+  });
+}
+
+/** IndexedDB content store 裁剪：超期（>30 天）或超出上限的最旧条目 */
+function pruneIDB() {
+  openIDB().then(function (db) {
+    var tx = db.transaction('content', 'readwrite');
+    var store = tx.objectStore('content');
+    var req = store.getAll();
+    req.onsuccess = function () {
+      var rows = req.result || [];
+      if (rows.length <= MAX_API_ENTRIES) {
+        // 未超上限也清超期条目
+        rows.filter(function (r) {
+          return new Date(r.cachedAt || 0).getTime() < Date.now() - API_CACHE_TTL_MS;
+        }).forEach(function (r) { store.delete(r.url); });
+        return;
+      }
+      var sorted = rows.slice().sort(function (a, b) {
+        return String(a.cachedAt || '').localeCompare(String(b.cachedAt || ''));
+      });
+      var cutoff = Date.now() - API_CACHE_TTL_MS;
+      var surplus = sorted.slice(0, rows.length - MAX_API_ENTRIES);
+      var expired = rows.filter(function (r) {
+        return new Date(r.cachedAt || 0).getTime() < cutoff;
+      });
+      surplus.concat(expired).forEach(function (r) { store.delete(r.url); });
+    };
+  }).catch(function () { /* IDB 不可用时静默失败 */ });
 }
 
 /** Cache First + LRU 淘汰 */

@@ -45,7 +45,7 @@ import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.j
 import { createToolRouterExecutor } from './tool-router-factory.js';
 import { getEventBus } from './event-bus.js';
 import { createEventsHandler } from './events.js';
-import { watchProject, stopWatching } from './watcher.js';
+import { watchProject, stopWatching, acquireWatcherRef, releaseWatcherRef } from './watcher.js';
 import { createRateLimiter } from './rate-limit.js';
 import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import {
@@ -2571,12 +2571,10 @@ export function createApp(
         });
 
         // 11. Update cache
+        // filetree_cache 自 v1.1.4 起为进程内 Map，由 scanner 按需失效；
+        // 此前的 scanned_at 死写（无任何读取者）已删除——每次编辑触发
+        // 一次 sql.js 整库序列化正是性能灾难放大器的一部分。
         const newStats = fs.statSync(absPath);
-        try {
-          db.prepare(
-            `UPDATE filetree_cache SET scanned_at = datetime('now') WHERE project_id = ? AND node_path = ?`,
-          ).run(projectId, path.dirname(filePath));
-        } catch {}
 
         // 12. Incremental FTS index update
         try {
@@ -3713,7 +3711,12 @@ export function createApp(
 
   // SSE 推送通道：无条件注册（自 v1.1.2 起不再依赖 MCP 是否安装），
   // 转发 task:executed / task:failed / file-tree:changed 事件
-  app.get('/api/events', createEventsHandler());
+  // v1.1.4：首个客户端连接才启动文件监听（惰性），断开后引用归零延迟停止
+  app.get('/api/events', (req, res) => {
+    acquireWatcherRef();
+    req.on('close', () => releaseWatcherRef());
+    createEventsHandler()(req, res);
+  });
 
   return app;
 }

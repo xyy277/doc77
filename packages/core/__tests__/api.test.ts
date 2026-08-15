@@ -8,6 +8,7 @@ import { runMigrations } from '../src/db/migrations.js';
 import { createApp } from '../src/server/app.js';
 import { registerProject } from '../src/db/projects.js';
 import { getEventBus, resetEventBus } from '../src/server/event-bus.js';
+import { stopFileWatcher } from '../src/server/watcher.js';
 
 async function withServer(
   app: ReturnType<typeof createApp>,
@@ -70,6 +71,8 @@ describe('API Endpoints', () => {
   }
 
   afterEach(async () => {
+    // SSE 用例会通过 /api/events 惰性启动真实 chokidar，必须清理防跨用例残留
+    stopFileWatcher();
     try {
       closeConnection();
     } catch {

@@ -73,6 +73,7 @@ interface CoreModule {
   isEngineAvailable: () => Promise<boolean>;
   getConfig: (key: string) => string | undefined;
   getConnection: () => DatabaseCompat;
+  pruneAiSessions: (ttlHours?: number) => number;
   registerAiRagRoutes: (app: ExpressLike, deps: { engine: unknown; db: DatabaseCompat }) => void;
   registerPluginRoutes: (app: ExpressLike, deps: { db: DatabaseCompat; pluginDir: string }) => void;
 }
@@ -369,6 +370,22 @@ export async function startServer(port: number, uiLocale?: string): Promise<Serv
   runMigrations();
   loadDefaults();
 
+  // v1.1.4 (F3)：启动 GC —— 遏制"用久了越来越卡"（表无限累积 → sql.js
+  // 全库序列化越来越贵）。与 CLI 的 pruneAiSessions(24) 对齐；日志保留 90 天。
+  try {
+    core.pruneAiSessions(24);
+  } catch {
+    /* best-effort */
+  }
+  try {
+    core.getConnection().exec(
+      `DELETE FROM audit_log WHERE created_at < datetime('now', '-90 days');
+       DELETE FROM sync_log WHERE created_at < datetime('now', '-90 days');`,
+    );
+  } catch {
+    /* best-effort */
+  }
+
   // Port policy: loadDefaults() seeds server.port with the CLI default
   // (27777), so its mere presence does NOT mean the user chose it — honouring
   // it blindly made the desktop app fight a running CLI instance for 27777
@@ -388,12 +405,8 @@ export async function startServer(port: number, uiLocale?: string): Promise<Serv
 
   const app = createApp(undefined, effectiveBind, effectivePort);
   await registerInstalledModules(core, app as unknown as ExpressLike);
-  // 启动文件监听（外部改动 → file-tree:changed SSE）；尽力而为，失败不阻断
-  try {
-    core.startFileWatcher({ debounceMs: 300 });
-  } catch {
-    /* file watcher unavailable — 降级为手动刷新 */
-  }
+  // v1.1.4：文件监听改为惰性启动 —— 首个 SSE 客户端连接时才由 core 的
+  // /api/events 包装启动（无 UI 客户端时零开销），不再在此无条件启动
   const server = http.createServer(app);
 
   return new Promise((resolve, reject) => {

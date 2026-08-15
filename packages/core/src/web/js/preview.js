@@ -9,6 +9,7 @@
 var VENDOR_MAP = {
   'highlight.min.js': 'highlight.min.js',
   'highlight.js/11.9.0/highlight.min.js': 'highlight.min.js',
+  'github-dark.min.css': 'github-dark.min.css',
   'mermaid.min.js': 'mermaid.min.js',
   'mermaid@11/dist/mermaid.min.js': 'mermaid.min.js',
   'xlsx.mini.min.js': 'xlsx.mini.min.js',
@@ -75,6 +76,36 @@ function tabsStorageKey() { return 'doc77-tabs-' + pid; }
 
 var CAPABILITIES = { ai: false, mcp: false };
 var currentDir = '';
+
+//══════════ 目录树刷新节流（v1.1.4 性能修复）══════════
+// SSE file-tree:changed 高频事件 → 目录树局部刷新合并为 1s 去抖；
+// document.hidden 时不刷新（不可见无需），恢复可见时统一补一次
+var REFRESH_THROTTLE_MS = 1000;
+var treeRefreshQueue = {}; // dirPath -> timer
+
+function queueTreeRefresh(dirPath) {
+  if (treeRefreshQueue[dirPath]) clearTimeout(treeRefreshQueue[dirPath]);
+  treeRefreshQueue[dirPath] = setTimeout(function () {
+    delete treeRefreshQueue[dirPath];
+    if (document.hidden) return;
+    refreshSubtree(dirPath);
+  }, REFRESH_THROTTLE_MS);
+}
+
+function flushAllTreeRefreshes() {
+  var dirs = Object.keys(treeRefreshQueue);
+  for (var i = 0; i < dirs.length; i++) {
+    var dir = dirs[i];
+    clearTimeout(treeRefreshQueue[dir]);
+    delete treeRefreshQueue[dir];
+    refreshSubtree(dir);
+  }
+}
+
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) flushAllTreeRefreshes();
+});
+
 // Server-pushed write-task lifecycle events (executed/failed) via SSE.
 var taskEventSrc = null;
 function initTaskEvents() {
@@ -96,7 +127,7 @@ function initTaskEvents() {
       if (d.projectId != pid) return;
       var opType = d.opType || 'mixed';
       var paths = d.paths || [];
-      // 匹配打开中的 tab：精确命中 paths；delete 时按目录前缀匹配
+      // 匹配打开中的 tab（≤8 个，代价低，立即处理——关闭/横幅要即时反馈）
       var affected = tabStore.list()
         .filter(function(tab) {
           if (TempPreview.isTempPath(tab.path)) return false;
@@ -113,7 +144,9 @@ function initTaskEvents() {
       } else if (opType === 'modify' || opType === 'mixed') {
         affected.forEach(function(tabPath) { markExternalModified(tabPath); });
       }
-      refreshSubtree(d.path || '');
+      // v1.1.4：目录树刷新合并节流 —— 同一目录 1s 内只刷一次；
+      // document.hidden 时跳过，恢复可见时统一补刷
+      queueTreeRefresh(d.path || '');
     });
     taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
   } catch(_){}
@@ -1127,7 +1160,20 @@ function highlightCode() {
     if (!block.dataset.highlighted) { hljs.highlightElement(block); block.dataset.highlighted = '1'; }
   });
 }
+// v1.1.4 (F4)：highlight 主题 CSS 懒加载（原在 preview.html head 远程渲染阻塞；
+// vendor 目录存在本地副本时走离线缓存，否则回退 CDN）
+function ensureHighlightCss() {
+  var css = document.getElementById('hljsTheme');
+  if (!css) {
+    css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.id = 'hljsTheme';
+    document.head.appendChild(css);
+  }
+  css.href = vsrc('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css', 'github-dark.min.css');
+}
 function loadHighlightJS() {
+  ensureHighlightCss();
   var s = document.createElement('script');
   s.src = vsrc('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js');
   s.onload = highlightCode;

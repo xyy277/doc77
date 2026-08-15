@@ -4,6 +4,30 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-15] — `1.1.4`
+
+### 全包 (`1.1.4`)
+
+**Fixed**
+- **致命性能回归（1.1.3 引入）**：文件监听链路每个 fs 事件 → 目录缓存 DB 写 → sql.js 整库序列化落盘，导致内存暴涨至 ~1500MB、CPU 持续 ~10%、打开即卡死
+  - Core: 目录树缓存移入进程内内存 Map（不再读写 `filetree_cache` 表，热路径 0 DB 写；表结构保留，历史行启动时清理；删除 `scanned_at` 死写）
+  - Core: sql.js 全库序列化落盘加最小间隔节流（连续写入时最多每 2s 一次，与写入频率/库大小解耦；`flushDatabase()` 仍强制立即落盘，新增导出）
+  - Core: 文件监听改为**惰性启动**（首个 SSE 客户端连接才启动，断开后延迟停止）— 无 UI 客户端时零开销；移除 `awaitWriteFinish` 的 50ms stat 轮询；去抖 300ms → 500ms
+  - Web: 目录树刷新合并为 1s 去抖，页面隐藏时不刷新（恢复可见补刷）
+- Core: 目录扫描缓存校验从逐条目 statSync 降为单次目录 stat（O(N) → O(1)，"进入项目/展开目录"明显提速；内容修改由 watcher 精确失效兜底）
+- Core: 启动不再无条件加载 4.5MB AWS SDK / webdav / simple-git / sharp（改为按需动态加载）— 冷启动提速
+- Electron: 启动补 `pruneAiSessions(24)` 与 `audit_log`/`sync_log` 90 天保留窗（此前仅 CLI 清理会话，Electron 永不清 → 表无限膨胀拖慢全库序列化）
+- Web: Service Worker API 缓存（Cache API + IndexedDB 各一份）加 200 条上限 + 30 天过期裁剪（此前无上限，长期使用存储无限膨胀）
+- Web: 首屏去阻塞 — 移除远程 phosphor 图标脚本（3 处图标改文字字形）、脚本加 `defer`、highlight 主题 CSS 改懒加载（原远程渲染阻塞）
+
+**Docs**
+- `docs/planning/performance-architecture-review.md`：性能根因证据链（sql.js 全库序列化放大器 + watcher 引爆链路）、修复记录、后续架构专项路线图（better-sqlite3 迁移 P-A / 搜索改造 P-B / boot 并行化 P-C）
+
+**已知风险**
+- `sync` 调度器 `interval_seconds` 无下限（用户可配置 1s 全量同步）— 级联已拆断后仅剩扫描成本，后续专项处理
+
+---
+
 ## [2026-08-14] — `1.1.3`
 
 ### 全包 (`1.1.3`)

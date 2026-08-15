@@ -3,15 +3,9 @@
  *
  * T9 E2EE: 若 keyring 已 unlock，push 时加密文件内容，pull 时自动解密。
  */
-import {
-  S3Client,
-  ListObjectsV2Command,
-  GetObjectCommand,
-  PutObjectCommand,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { S3Client } from '@aws-sdk/client-s3';
 import type {
   SyncAdapter,
   AdapterConfig,
@@ -23,6 +17,15 @@ import type {
 } from '../types.js';
 import { getKeyring } from '../crypto/keyring.js';
 import { maybeEncryptContent, maybeDecryptContent } from '../crypto/e2ee-helper.js';
+
+// v1.1.4 (F2)：@aws-sdk/client-s3 约 4.5MB —— 用户未配置 S3 时不加载。
+// 模块顶层只保留 type-only import（编译期擦除），运行时首次使用才动态加载。
+type S3Sdk = typeof import('@aws-sdk/client-s3');
+let _s3: S3Sdk | null = null;
+async function getS3(): Promise<S3Sdk> {
+  if (!_s3) _s3 = await import('@aws-sdk/client-s3');
+  return _s3;
+}
 
 export interface S3AdapterConfig extends AdapterConfig {
   type: 's3';
@@ -39,24 +42,28 @@ export class S3Adapter implements SyncAdapter {
   readonly name = 's3';
   readonly displayName = 'S3 / Object Storage';
 
-  private getClient(config: S3AdapterConfig): S3Client {
-    return new S3Client({
-      region: config.region || 'us-east-1',
-      endpoint: config.endpoint || undefined,
-      forcePathStyle: !!config.endpoint, // Required for MinIO
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-    });
+  private async getClient(config: S3AdapterConfig): Promise<{ client: S3Client; s3: S3Sdk }> {
+    const s3 = await getS3();
+    return {
+      client: new s3.S3Client({
+        region: config.region || 'us-east-1',
+        endpoint: config.endpoint || undefined,
+        forcePathStyle: !!config.endpoint, // Required for MinIO
+        credentials: {
+          accessKeyId: config.accessKeyId,
+          secretAccessKey: config.secretAccessKey,
+        },
+      }),
+      s3,
+    };
   }
 
   async testConnection(config: AdapterConfig): Promise<ConnectionResult> {
     const cfg = config as S3AdapterConfig;
     try {
-      const client = this.getClient(cfg);
+      const { client, s3 } = await this.getClient(cfg);
       const result = await client.send(
-        new ListObjectsV2Command({ Bucket: cfg.bucket, Prefix: cfg.prefix || '', MaxKeys: 1 }),
+        new s3.ListObjectsV2Command({ Bucket: cfg.bucket, Prefix: cfg.prefix || '', MaxKeys: 1 }),
       );
       return {
         ok: true,
@@ -74,7 +81,7 @@ export class S3Adapter implements SyncAdapter {
 
   async listRemote(config: AdapterConfig): Promise<RemoteFileEntry[]> {
     const cfg = config as S3AdapterConfig;
-    const client = this.getClient(cfg);
+    const { client, s3 } = await this.getClient(cfg);
     const prefix = cfg.prefix || '';
     const entries: RemoteFileEntry[] = [];
 
@@ -82,7 +89,7 @@ export class S3Adapter implements SyncAdapter {
       let continuationToken: string | undefined;
       do {
         const result = await client.send(
-          new ListObjectsV2Command({
+          new s3.ListObjectsV2Command({
             Bucket: cfg.bucket,
             Prefix: prefix,
             ContinuationToken: continuationToken,
@@ -111,7 +118,7 @@ export class S3Adapter implements SyncAdapter {
 
   async pull(ctx: SyncContext): Promise<PullResult> {
     const cfg = (ctx.options as any).adapterConfig as S3AdapterConfig;
-    const client = this.getClient(cfg);
+    const { client, s3 } = await this.getClient(cfg);
     const prefix = cfg.prefix || '';
     const result: PullResult = { filesUpdated: 0, filesDeleted: 0, errors: [] };
 
@@ -132,7 +139,7 @@ export class S3Adapter implements SyncAdapter {
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
           const response = await client.send(
-            new GetObjectCommand({ Bucket: cfg.bucket, Key: prefix + remote.path }),
+            new s3.GetObjectCommand({ Bucket: cfg.bucket, Key: prefix + remote.path }),
           );
           const body = response.Body;
           if (body) {
@@ -158,7 +165,7 @@ export class S3Adapter implements SyncAdapter {
 
   async push(ctx: SyncContext): Promise<PushResult> {
     const cfg = (ctx.options as any).adapterConfig as S3AdapterConfig;
-    const client = this.getClient(cfg);
+    const { client, s3 } = await this.getClient(cfg);
     const prefix = cfg.prefix || '';
     const result: PushResult = { filesPushed: 0, errors: [] };
 
@@ -167,7 +174,7 @@ export class S3Adapter implements SyncAdapter {
         const key = prefix + change.path;
         try {
           if (change.type === 'deleted') {
-            await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
+            await client.send(new s3.DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
           } else {
             const localPath = path.join(ctx.projectPath, change.path);
             const body = fs.readFileSync(localPath);
@@ -175,7 +182,7 @@ export class S3Adapter implements SyncAdapter {
             const keyring = getKeyring();
             const output = maybeEncryptContent(body, keyring);
             await client.send(
-              new PutObjectCommand({
+              new s3.PutObjectCommand({
                 Bucket: cfg.bucket,
                 Key: key,
                 Body: output,

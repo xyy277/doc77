@@ -3,7 +3,15 @@
  *
  * T9 E2EE: 若 keyring 已 unlock，push 时加密文件内容，pull 时自动解密。
  */
-import { createClient, type WebDAVClient } from 'webdav';
+import type { WebDAVClient } from 'webdav';
+
+// v1.1.4 (F2)：webdav 约 748K，用户未配置 WebDAV 时不加载（仅 type-only import）
+type WebDAVSdk = typeof import('webdav');
+let _webdav: WebDAVSdk | null = null;
+async function getWebDAV(): Promise<WebDAVSdk> {
+  if (!_webdav) _webdav = await import('webdav');
+  return _webdav;
+}
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
@@ -31,7 +39,8 @@ export class WebDAVAdapter implements SyncAdapter {
   readonly name = 'webdav';
   readonly displayName = 'WebDAV (NAS)';
 
-  private getClient(config: WebDAVAdapterConfig): WebDAVClient {
+  private async getClient(config: WebDAVAdapterConfig): Promise<WebDAVClient> {
+    const { createClient } = await getWebDAV();
     return createClient(config.endpoint, {
       username: config.username,
       password: config.password,
@@ -41,7 +50,7 @@ export class WebDAVAdapter implements SyncAdapter {
   async testConnection(config: AdapterConfig): Promise<ConnectionResult> {
     const cfg = config as WebDAVAdapterConfig;
     try {
-      const client = this.getClient(cfg);
+      const client = await this.getClient(cfg);
       const items = await client.getDirectoryContents(cfg.remotePath || '/', { deep: false });
       return {
         ok: true,
@@ -58,7 +67,7 @@ export class WebDAVAdapter implements SyncAdapter {
 
   async listRemote(config: AdapterConfig): Promise<RemoteFileEntry[]> {
     const cfg = config as WebDAVAdapterConfig;
-    const client = this.getClient(cfg);
+    const client = await this.getClient(cfg);
     const remotePath = cfg.remotePath || '/';
     const entries: RemoteFileEntry[] = [];
 
@@ -86,7 +95,7 @@ export class WebDAVAdapter implements SyncAdapter {
 
   async pull(ctx: SyncContext): Promise<PullResult> {
     const cfg = (ctx.options as any).adapterConfig as WebDAVAdapterConfig;
-    const client = this.getClient(cfg);
+    const client = await this.getClient(cfg);
     const remotePath = cfg.remotePath || '/';
     const result: PullResult = { filesUpdated: 0, filesDeleted: 0, errors: [] };
 
@@ -129,7 +138,7 @@ export class WebDAVAdapter implements SyncAdapter {
 
   async push(ctx: SyncContext): Promise<PushResult> {
     const cfg = (ctx.options as any).adapterConfig as WebDAVAdapterConfig;
-    const client = this.getClient(cfg);
+    const client = await this.getClient(cfg);
     const remotePath = cfg.remotePath || '/';
     const result: PushResult = { filesPushed: 0, errors: [] };
 

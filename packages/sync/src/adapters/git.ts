@@ -1,7 +1,15 @@
 /**
  * Git sync adapter — uses simple-git for Git operations.
  */
-import simpleGit, { type SimpleGit } from 'simple-git';
+import type { SimpleGit } from 'simple-git';
+
+// v1.1.4 (F2)：simple-git 约 1.4MB，未配置 Git 同步时不加载（仅 type-only import）
+type GitSdk = typeof import('simple-git');
+let _gitSdk: GitSdk | null = null;
+async function getGitSdk(): Promise<GitSdk> {
+  if (!_gitSdk) _gitSdk = await import('simple-git');
+  return _gitSdk;
+}
 import type {
   SyncAdapter,
   AdapterConfig,
@@ -17,16 +25,16 @@ export class GitAdapter implements SyncAdapter {
   readonly name = 'git';
   readonly displayName = 'Git Repository';
 
-  private getGit(projectPath: string, _config: GitAdapterConfig): SimpleGit {
-    const git = simpleGit(projectPath);
-    return git;
+  private async getGit(projectPath: string, _config: GitAdapterConfig): Promise<SimpleGit> {
+    const sdk = await getGitSdk();
+    return sdk.default(projectPath);
   }
 
   async testConnection(config: AdapterConfig): Promise<ConnectionResult> {
     const cfg = config as GitAdapterConfig;
     try {
       // Try ls-remote to test connectivity
-      const git = simpleGit();
+      const git = (await getGitSdk()).default();
       const result = await git.listRemote(['--heads', cfg.remoteUrl]);
       if (result) {
         return { ok: true, message: 'Connected successfully', server: cfg.remoteUrl };
@@ -45,7 +53,7 @@ export class GitAdapter implements SyncAdapter {
       gitConfig?: GitAdapterConfig;
     };
     const gitConfig = (cfg.adapterConfig || cfg.gitConfig || {}) as GitAdapterConfig;
-    const git = this.getGit(ctx.projectPath, gitConfig);
+    const git = await this.getGit(ctx.projectPath, gitConfig);
     const result: PullResult = { filesUpdated: 0, filesDeleted: 0, errors: [] };
 
     try {
@@ -102,7 +110,7 @@ export class GitAdapter implements SyncAdapter {
       gitConfig?: GitAdapterConfig;
     };
     const gitConfig = (cfg.adapterConfig || cfg.gitConfig || {}) as GitAdapterConfig;
-    const git = this.getGit(ctx.projectPath, gitConfig);
+    const git = await this.getGit(ctx.projectPath, gitConfig);
     const result: PushResult = { filesPushed: 0, errors: [] };
 
     try {
@@ -146,7 +154,7 @@ export class GitAdapter implements SyncAdapter {
       // If push rejected (non-fast-forward), try pull --rebase then push again
       if (msg.includes('rejected') || msg.includes('non-fast-forward')) {
         try {
-          const git2 = this.getGit(ctx.projectPath, gitConfig);
+          const git2 = await this.getGit(ctx.projectPath, gitConfig);
           await git2.pull('origin', gitConfig.branch || 'main', { '--rebase': null });
           await git2.push(gitConfig.remoteName || 'origin', gitConfig.branch || 'main');
         } catch (e2: unknown) {
@@ -167,7 +175,7 @@ export class GitAdapter implements SyncAdapter {
     // For Git, we use git ls-tree to list remote files
     // This requires the remote to be fetched first
     try {
-      const git = simpleGit();
+      const git = (await getGitSdk()).default();
 
       // ls-remote to check availability
       await git.listRemote(['--heads', cfg.remoteUrl]);
