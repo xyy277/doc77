@@ -121,3 +121,15 @@ pnpm store cache → .npmrc (hoisted) → pnpm install → sync-version → buil
 **防回归**：`packages/electron/scripts/verify-no-static-core.cjs` 已接入 electron build 脚本（本地与 release CI 都会跑）——dist 里出现 `require("@doc77/core")` 即失败。
 
 **复现/验证方法**（无需装机）：`electron-builder --dir` → 解包 app.asar → `node --no-experimental-require-module -e "require('./dist/main.js')"`（stub electron 模块）模拟 Electron 内置 Node 语义。
+
+## 2026-08-15 — 1.1.5 Release Electron linux 打包失败：asarUnpack 与 hoisted symlink 冲突
+
+**症状**：`npx electron-builder --publish never` 在 linux job 报 `packages/core/dist/index.cjs must be under packages/electron/`（AsarPackager.unpackPattern → filter.ts:32 getRelativePath 抛错）。1.1.4 打包正常，1.1.5 引入。
+
+**根因**：better-sqlite3 迁移时给 electron-builder.yml 加了 `asarUnpack: ["**/node_modules/better-sqlite3/**"]`。CI 使用 `node-linker=hoisted`（见本文件上文 #6289），workspace 包以 symlink 提升到根 node_modules —— `files: node_modules/**/*` 会穿透 symlink 把 `packages/core/dist/index.cjs` 等真实路径越出 appDir 的文件纳入打包列表；electron-builder 只要配置了 asarUnpack，就会对列表内每个文件跑 unpackPattern 做相对路径校验，越界文件直接抛错。
+
+**修复**：删除 electron-builder.yml 的 asarUnpack 配置 —— electron-builder 25 对原生模块（含 .node 文件的模块目录）**默认自动解包**到 `app.asar.unpacked`，无需显式配置（本地打包验证：`better_sqlite3.node` 自动落位 `app.asar.unpacked/node_modules/better-sqlite3/build/Release/`）。
+
+**防回归**：electron-builder.yml 中**不要配置 asarUnpack glob**（在 hoisted 布局下任何 asarUnpack 配置都会触发同样的越界校验错误）；原生模块依赖 electron-builder 的自动解包即可。
+
+**复现/验证方法**：`ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npx electron-builder --dir`（本地 GitHub 直连不稳定，用镜像）→ 检查 `release/linux-unpacked/resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node` 存在。
