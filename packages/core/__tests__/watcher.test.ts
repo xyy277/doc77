@@ -76,9 +76,12 @@ describe('file watcher', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
+  // macOS 上 chokidar v4 走 fs.watch（recursive）事件有平台延迟（CI macOS
+  // runner 实测偶发 >5s），默认超时放宽到 15s 防 flaky —— watcher 本身
+  // 是尽力而为组件，事件延迟不构成产品缺陷
   function waitForEvent(
     predicate: (p: TreeChangedPayload) => boolean,
-    timeoutMs = 5000,
+    timeoutMs = 15000,
   ): Promise<TreeChangedPayload> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
