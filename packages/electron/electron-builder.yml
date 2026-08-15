@@ -6,16 +6,22 @@ directories:
 publish: null
 
 extraResources:
-  - from: "vendor"
-    to: "vendor"
+  - from: 'vendor'
+    to: 'vendor'
 
 files:
-  - "dist/**/*"
-  - "assets/**/*"
-  - "node_modules/**/*"
-  - "!node_modules/.cache"
-  - "!node_modules/@doc77/mcp"
-  - "!node_modules/@doc77/ai"
+  - 'dist/**/*'
+  - 'assets/**/*'
+  - 'node_modules/**/*'
+  - '!node_modules/.cache'
+  - '!node_modules/@doc77/mcp'
+  - '!node_modules/@doc77/ai'
+
+# better-sqlite3 是原生模块：.node 二进制不能从 asar 内 dlopen，
+# 必须 unpack 到 app.asar.unpacked（electron-builder 25 默认 npmRebuild
+# 会在打包时按 Electron ABI 重建；此 glob 保证确定性解包）
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
 
 win:
   target: nsis

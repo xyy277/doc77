@@ -41,17 +41,18 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
     "chokidar": "^4.0.3",
     "express": "^5.1.0",
     "marked": "^17.0.0",
     "multicast-dns": "^7.2.5",
     "pino": "^9.0.0",
-    "qrcode": "^1.5.4",
-    "sql.js": "^1.11.0"
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@huggingface/transformers": "^4.2.0",
     "@tailwindcss/cli": "^4.3.3",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.0",
     "@types/qrcode": "^1.5.6",
     "tailwindcss": "^4.3.3"

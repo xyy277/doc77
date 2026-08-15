@@ -4,6 +4,25 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [Unreleased] — `1.1.5`
+
+### 全包 (`1.1.5`)
+
+**Changed**
+- **DB 层迁移：sql.js（WASM 全内存）→ better-sqlite3（原生）** — 三个性能根因一次性根除：
+  - Core: 删除 sql.js 全库 export 序列化 + 去抖落盘机制（1.1.3 性能灾难放大器，1.1.4 节流为临时缓解）— WAL 模式下每写即落盘，崩溃不丢数据，`flushDatabase()` 保留为 no-op 兼容导出
+  - Core: DB 不再常驻 WASM 堆，内存基线不再随库大小线性增长
+  - Core: **FTS5 搜索真实可用**（sql.js 官方 dist 无 FTS5，此前一直是 LIKE 全表扫描）；历史库自动迁移（v14：FTS 表 DROP 重建 + 一次性全量重索引）
+- Core: `flushDatabase` 语义变更（no-op），`persist-throttle` 测试改写为 WAL/持久化/FTS5 回归
+
+**Fixed**
+- Web: 删除/新建/重命名文件后，目录树在刷新或重进项目时可能仍显示旧状态（再操作报"文件不存在"）— Service Worker 的 SWR 缓存对 `/api/tree` 命中即返回旧数据且变更后从未失效；现在变更类请求通过时清除该项目范围的缓存条目，SSE 刷新响应同步写回缓存
+
+**Docs**
+- `docs/planning/performance-architecture-review.md`：P-A 专项标记完成 ✅，记录实际改动与遗留问题
+
+---
+
 ## [2026-08-15] — `1.1.4`
 
 ### 全包 (`1.1.4`)

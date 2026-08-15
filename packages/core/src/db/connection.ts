@@ -1,153 +1,84 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import initSqlJs from 'sql.js';
-import type { Database as SqlJsDatabase, SqlJsStatic, Statement as SqlJsStatement } from 'sql.js';
+import Database from 'better-sqlite3';
 
 /***********************************************
- * sql.js → better-sqlite3 compatibility layer
+ * better-sqlite3（原生模块）— 直接驱动，无兼容 shim。
  *
- * initDatabase() is async (loads WASM once).
- * After init, getConnection() returns a
- * DatabaseCompat with .prepare().get()/.all()/.run()
- * and .transaction() — same API as better-sqlite3.
+ * initDatabase() 保持 async 签名（cli/electron/33 个测试文件的 await 零改动），
+ * 内部同步实现，返回已 resolved 的 promise。
+ *
+ * 本地结构化接口（NativeDatabase/NativeStatement）保证 better-sqlite3 的
+ * 类型不泄漏进 dist/index.d.ts —— @types/better-sqlite3 保持 devDependency，
+ * npm 消费者零额外依赖。
+ *
+ * WAL 模式下每次写语句即落盘（无需 sql.js 时代的 export 序列化 + 去抖写盘），
+ * flushDatabase() 因此成为无意义 no-op，仅保留导出兼容。
  ***********************************************/
 
-let rawDb: SqlJsDatabase | null = null;
+interface NativeStatement {
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+  run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
+}
+
+interface NativeDatabase {
+  open: boolean;
+  exec(sql: string): unknown;
+  prepare(sql: string): NativeStatement;
+  pragma(sql: string): unknown;
+  close(): void;
+  transaction<TArgs extends unknown[], TResult>(
+    fn: (...args: TArgs) => TResult,
+  ): (...args: TArgs) => TResult;
+}
+
+let rawDb: Database.Database | null = null;
 let dbPath: string | null = null;
 let wrappedDb: DatabaseCompat | null = null;
-
-// ── Debounced auto-persist ─────────────────────────────
-//
-// 注意（v1.1.4 性能修复）：sql.js 是全内存 DB，export() 序列化整个库。
-// 频率 cap（最小落盘间隔）保证"写入频率 × 序列化代价"不再相乘——
-// 连续写入时最多每 MIN_PERSIST_INTERVAL_MS 落盘一次，合并期间全部变更。
-// 这是临时缓解；彻底方案是迁移 better-sqlite3（见 docs/planning/
-// performance-architecture-review.md 专项 P-A）。
-
-let _saveTimer: ReturnType<typeof setTimeout> | null = null;
-let _lastPersistAt = 0;
-
-const SAVE_DEBOUNCE_MS = 500;
-const MIN_PERSIST_INTERVAL_MS = 2000;
-
-function _persistDb(): void {
-  if (rawDb && dbPath) {
-    const data = rawDb.export();
-    const tmp = dbPath + '.tmp';
-    // Uint8Array 直接写入（Node 原生支持），省去 Buffer.from 的整库拷贝
-    fs.writeFileSync(tmp, data);
-    fs.renameSync(tmp, dbPath);
-    _lastPersistAt = Date.now();
-  }
-}
-
-function _scheduleSave(): void {
-  if (_saveTimer) clearTimeout(_saveTimer);
-  const elapsed = Date.now() - _lastPersistAt;
-  const delay = Math.max(SAVE_DEBOUNCE_MS, MIN_PERSIST_INTERVAL_MS - elapsed);
-  _saveTimer = setTimeout(() => {
-    _saveTimer = null;
-    _persistDb();
-  }, delay);
-  _saveTimer?.unref();
-}
-
-/**
- * Force-sync all pending writes to disk immediately.
- * Used by restart/shutdown paths that need durability before exit.
- */
-export function flushDatabase(): void {
-  if (_saveTimer) {
-    clearTimeout(_saveTimer);
-    _saveTimer = null;
-  }
-  _persistDb();
-}
 
 // ── Statement wrapper ──────────────────────────────────
 
 export class StatementCompat {
-  private _db: SqlJsDatabase;
+  private _db: NativeDatabase;
   private _sql: string;
 
-  constructor(db: SqlJsDatabase, sql: string) {
+  constructor(db: NativeDatabase, sql: string) {
     this._db = db;
     this._sql = sql;
   }
 
   run(...params: unknown[]) {
-    const stmt = this._db.prepare(this._sql);
-    if (params.length > 0) stmt.bind(params);
-    stmt.step(); // Don't catch — let constraint violations throw
-    let lastInsertRowid = 0;
-    let changes = 0;
-    if (/^\s*INSERT\b/i.test(this._sql.trim())) {
-      const idStmt = this._db.prepare('SELECT last_insert_rowid() as id');
-      if (idStmt.step()) lastInsertRowid = idStmt.getAsObject().id as number;
-      idStmt.free();
-      changes = this._db.getRowsModified();
-    } else if (/^\s*(UPDATE|DELETE)\b/i.test(this._sql.trim())) {
-      changes = this._db.getRowsModified();
-    }
-    stmt.free();
-
-    // Auto-persist to disk after any write mutation
-    if (/^\s*(INSERT|UPDATE|DELETE)\b/i.test(this._sql.trim())) {
-      _scheduleSave();
-    }
-
-    return { changes, lastInsertRowid };
+    // 每次 prepare 即用即弃（对齐旧 shim 生命周期；better-sqlite3 prepare 很便宜，GC 自动 finalize）
+    // lastInsertRowid 归一化为 number（bigint → Number），满足调用点的 === 0 / Number() / as number
+    const result = this._db.prepare(this._sql).run(...(params as never[]));
+    return { changes: result.changes, lastInsertRowid: Number(result.lastInsertRowid) };
   }
 
   get<T = Record<string, unknown>>(...params: unknown[]): T | undefined {
-    const stmt = this._db.prepare(this._sql);
-    if (params.length > 0) stmt.bind(params);
-    try {
-      if (stmt.step()) {
-        const r = stmt.getAsObject() as T;
-        stmt.free();
-        return r;
-      }
-    } catch {
-      stmt.free();
-      return undefined;
-    }
-    stmt.free();
-    return undefined;
+    return this._db.prepare(this._sql).get(...(params as never[])) as T | undefined;
   }
 
   all<T = Record<string, unknown>>(...params: unknown[]): T[] {
-    const stmt = this._db.prepare(this._sql);
-    if (params.length > 0) stmt.bind(params);
-    const results: T[] = [];
-    try {
-      while (stmt.step()) results.push(stmt.getAsObject() as T);
-    } catch {}
-    stmt.free();
-    return results;
+    return this._db.prepare(this._sql).all(...(params as never[])) as T[];
   }
 }
 
 // ── Database wrapper ───────────────────────────────────
 
 export class DatabaseCompat {
-  private _db: SqlJsDatabase;
+  private _db: NativeDatabase;
 
-  constructor(db: SqlJsDatabase) {
+  constructor(db: NativeDatabase) {
     this._db = db;
   }
 
   get open(): boolean {
-    try {
-      this._db.exec('SELECT 1');
-      return true;
-    } catch {
-      return false;
-    }
+    return this._db.open;
   }
 
   exec(sql: string) {
-    this._db.run(sql);
+    this._db.exec(sql);
   }
 
   prepare(sql: string): StatementCompat {
@@ -157,65 +88,32 @@ export class DatabaseCompat {
   transaction<TArgs extends unknown[], TResult>(
     fn: (...args: TArgs) => TResult,
   ): (...args: TArgs) => TResult {
-    return (...args: TArgs): TResult => {
-      try {
-        this._db.run('BEGIN');
-        const r = fn(...args);
-        this._db.run('COMMIT');
-        return r;
-      } catch (err) {
-        try {
-          this._db.run('ROLLBACK');
-        } catch {}
-        throw err;
-      }
-    };
-  }
-
-  /** Internal: persist to disk without closing */
-  _persist(filePath: string) {
-    const data = this._db.export();
-    const tmp = filePath + '.tmp';
-    fs.writeFileSync(tmp, data);
-    fs.renameSync(tmp, filePath);
-  }
-
-  /** Internal: persist to disk and close */
-  _saveAndClose(filePath: string) {
-    this._persist(filePath);
-    this._db.close();
+    // 原生事务（BEGIN/COMMIT/ROLLBACK + SAVEPOINT 嵌套）
+    return this._db.transaction(fn);
   }
 }
 
 // ── Exported API ───────────────────────────────────────
 
-let sqlModule: SqlJsStatic | null = null;
 let initPromise: Promise<DatabaseCompat> | null = null;
 
 /**
  * Initialize the database.
- * On first call, loads sql.js WASM (async).
- * Subsequent calls with same path reuse existing connection.
- * Uses a promise guard to prevent race conditions.
+ * WAL journal + foreign keys。内部同步实现（better-sqlite3 无需 WASM 加载），
+ * 保持 async 签名仅为调用方兼容。
  */
 export async function initDatabase(filePath: string): Promise<DatabaseCompat> {
   if (rawDb && wrappedDb) return wrappedDb;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    if (!sqlModule) {
-      sqlModule = await initSqlJs();
-    }
-
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-    let buffer: Buffer | undefined;
-    if (fs.existsSync(filePath)) buffer = fs.readFileSync(filePath);
-
-    rawDb = new sqlModule.Database(buffer);
+    rawDb = new Database(filePath);
+    rawDb.pragma('journal_mode = WAL');
+    rawDb.pragma('foreign_keys = ON');
     dbPath = filePath;
-    rawDb.run('PRAGMA foreign_keys = ON');
     wrappedDb = new DatabaseCompat(rawDb);
     return wrappedDb;
   })();
@@ -231,18 +129,16 @@ export function getConnection(): DatabaseCompat {
   return wrappedDb;
 }
 
-/** Close and save the database. */
+/**
+ * Close the database connection. WAL 模式下数据已逐语句落盘，close 时
+ * SQLite 自动 checkpoint，无需额外持久化。
+ */
 export function closeConnection(): void {
-  if (rawDb && dbPath) {
-    // Cancel pending debounced save — we'll sync-persist right now
-    if (_saveTimer) {
-      clearTimeout(_saveTimer);
-      _saveTimer = null;
-    }
+  if (rawDb) {
     try {
-      wrappedDb?._saveAndClose(dbPath);
-    } catch {
       rawDb.close();
+    } catch {
+      /* ignore */
     }
     rawDb = null;
     wrappedDb = null;
@@ -250,3 +146,9 @@ export function closeConnection(): void {
     initPromise = null;
   }
 }
+
+/**
+ * No-op（API 兼容保留）：better-sqlite3 WAL 模式下每次写语句即落盘，
+ * sql.js 时代的"强制立即 export 落盘"语义已不存在。
+ */
+export function flushDatabase(): void {}

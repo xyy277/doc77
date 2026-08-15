@@ -454,7 +454,13 @@ export function searchMessages(
   const limit = opts.limit ?? 20;
 
   if (fts5Available) {
-    return searchMessagesFts5(db, query, opts, limit);
+    try {
+      return searchMessagesFts5(db, query, opts, limit);
+    } catch {
+      // better-sqlite3 对 FTS5 语法错误抛异常（如纯标点查询 sanitize 后仍非法）；
+      // 旧 sql.js shim 吞错返回 []，这里对齐该行为
+      return [];
+    }
   }
   return searchMessagesLike(db, query, opts, limit);
 }
