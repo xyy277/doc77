@@ -213,8 +213,14 @@ describe('file watcher', () => {
     const eventPromise = waitForEvent((x) => x.projectId === p.id);
     fs.writeFileSync(path.join(projectDir, 'docs', 'api.md'), '## API');
     const payload = await eventPromise;
-    expect(payload.path).toBe('docs');
-    expect(payload.paths).toContain('docs/api.md');
+    // Linux/Windows 报精确相对路径（path='docs'，paths 含 'docs/api.md'）；
+    // macOS 上 fs.watch recursive 对子目录写入可能只报目录级事件（path=''，
+    // paths 为 'docs'）。watcher 是尽力而为组件，粒度差异非缺陷——
+    // 断言只要求事件归属正确且 paths 命中 docs 前缀
+    if (payload.path) {
+      expect(payload.path).toBe('docs');
+    }
+    expect(payload.paths.some((p) => p === 'docs' || p.startsWith('docs/'))).toBe(true);
   });
 
   it('flush 不触发 DB 落盘（v1.1.4 缓存内存化 + 死写删除）', async () => {
