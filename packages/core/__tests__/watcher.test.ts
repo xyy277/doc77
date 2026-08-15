@@ -49,7 +49,7 @@ interface TreeChangedPayload {
 // （每次仅个别用例超时、随机分布，Linux/Windows 稳定）——watcher 是
 // 尽力而为组件，产品端事件丢失降级为手动刷新。用重试防平台 flaky：
 // 失败用例独立重跑，系统性回归时重试后仍失败、如实报红，不会掩盖问题。
-describe.retry(2)('file watcher', () => {
+describe('file watcher', { retry: 2 }, () => {
   let testDir: string;
   let dbPath: string;
   let projectDir: string;
