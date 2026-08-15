@@ -45,7 +45,11 @@ interface TreeChangedPayload {
  *   3. 同目录变更去抖合并（git pull 批量文件不产生事件风暴）
  *   4. watchProject / stopWatching 动态增删监听
  */
-describe('file watcher', () => {
+// macOS arm64 CI runner 上 fs.watch recursive 对新文件事件存在偶发丢失
+// （每次仅个别用例超时、随机分布，Linux/Windows 稳定）——watcher 是
+// 尽力而为组件，产品端事件丢失降级为手动刷新。用重试防平台 flaky：
+// 失败用例独立重跑，系统性回归时重试后仍失败、如实报红，不会掩盖问题。
+describe.retry(2)('file watcher', () => {
   let testDir: string;
   let dbPath: string;
   let projectDir: string;
