@@ -4,7 +4,7 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
-## [Unreleased] — `1.1.5`
+## [2026-08-15] — `1.1.5`
 
 ### 全包 (`1.1.5`)
 
