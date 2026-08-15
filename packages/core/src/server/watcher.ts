@@ -23,6 +23,8 @@ const MAX_PATHS_PER_EVENT = 50;
 // 引用计数归零后延迟停止，防页面 reload 循环反复触发 chokidar 全树重扫；
 // 浏览器 EventSource 断线默认 ~3s 重试，10s 窗口覆盖翻覆场景
 const DEFAULT_IDLE_STOP_MS = 10_000;
+// 初始枚举窗口期兜底补发延迟（见 scheduleInitialSyncEmit）
+const INITIAL_SYNC_EMIT_DELAY_MS = 5000;
 
 // 忽略 .git / 回收站 / node_modules / 隐藏文件
 // （chokidar v4：watch() 的路径不支持 glob，ignored 支持 glob 与正则）
@@ -163,6 +165,22 @@ export function startFileWatcher(opts?: WatcherOptions): void {
     _ready = true;
     _readyResolvers.forEach((r) => r());
     _readyResolvers = [];
+    // v1.1.5 修复：初始枚举窗口期（chokidar 递归建 watch，大项目根可达
+    // 数十秒）内发生的文件变化不产生事件（ignoreInitial 抑制枚举事件），
+    // 窗口期变化将永久丢失。ready 后为每个项目补发一次全量刷新事件
+    // （path=''、paths 为空），前端收到后整树重新拉取纠正。
+    for (const [, projectId] of _rootToProject) {
+      try {
+        getEventBus().emit('file-tree:changed', {
+          projectId,
+          path: '',
+          opType: 'mixed',
+          paths: [],
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
   });
   _watcher = w;
   try {
@@ -253,10 +271,35 @@ export function acquireWatcherRef(): void {
   if (!_watcher) {
     try {
       startFileWatcher();
+      scheduleInitialSyncEmit();
     } catch {
       /* best-effort — 降级为手动刷新 */
     }
   }
+}
+
+/**
+ * 初始枚举窗口期兜底（v1.1.5）：chokidar 对大型项目根的递归枚举可能
+ * 数十秒甚至不触发 'ready'（inotify 限制等环境问题），期间的文件变化
+ * 不产生事件。SSE 连接 5s 后补发一次全量刷新事件；若 'ready' 已触发
+ * （ready 补发已覆盖），跳过去重。
+ */
+function scheduleInitialSyncEmit(): void {
+  setTimeout(() => {
+    if (_ready) return;
+    for (const [, projectId] of _rootToProject) {
+      try {
+        getEventBus().emit('file-tree:changed', {
+          projectId,
+          path: '',
+          opType: 'mixed',
+          paths: [],
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
+  }, INITIAL_SYNC_EMIT_DELAY_MS).unref?.();
 }
 
 /** SSE 客户端断开时调用：引用归零后延迟 idleStopMs 停止 watcher。 */

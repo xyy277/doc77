@@ -508,6 +508,16 @@ function refreshTree() {
       applyDiff(tree, entriesFromDom(tree), d.entries || [], '');
     })
     .catch(function() { toast(t('web.preview.loadFailed'), 'error'); });
+
+  // v1.1.5 修复：刷新所有已展开的目录 —— 此前 🔄 只刷新根目录，
+  // 已展开子目录的 DOM 与 SW 缓存条目永不更新，外部新增文件看不到。
+  // 展开状态 = 行后紧跟 .ml-4 wrapper 且未隐藏；refreshSubtree 保留展开状态。
+  document.querySelectorAll('#tree [data-path]').forEach(function(row) {
+    var wrapper = row.nextElementSibling;
+    if (wrapper && wrapper.classList.contains('ml-4') && !wrapper.classList.contains('hidden')) {
+      refreshSubtree(row.dataset.path);
+    }
+  });
 }
 
 // 增量刷新受影响目录：目标行未渲染时向上找最近已渲染的祖先容器，

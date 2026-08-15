@@ -12,7 +12,9 @@
 // 加载拦截策略纯函数（同文件同时被 vitest 单元测试复用）
 importScripts('/js/sw-policy.js');
 
-var CACHE_VERSION = 'doc77-v3';
+// v1.1.5：bump 到 v4 —— 旧版本缓存的 /api/tree 条目（SWR 命中即返回旧数据，
+// 且旧 SW 的 fresh 请求不写回缓存）会让升级用户看到过期目录树，必须整体清除
+var CACHE_VERSION = 'doc77-v4';
 var CACHE_SHELL = CACHE_VERSION + '-shell';
 var CACHE_VENDOR = CACHE_VERSION + '-vendor';
 var CACHE_API = CACHE_VERSION + '-api';

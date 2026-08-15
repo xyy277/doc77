@@ -4,6 +4,18 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-16] — `1.1.6`
+
+### 全包 (`1.1.6`)
+
+**Fixed**
+- **目录树刷新失效（1.1.5 回归）**：外部新增文件后，已展开的目录内容不更新（点 🔄 刷新、重进项目均无效）
+  - Web: 🔄 刷新按钮改为刷新根目录 + **所有已展开的目录**（此前只刷新根目录，展开子目录的 DOM 与 SW 缓存条目永不更新）
+  - Web: Service Worker `CACHE_VERSION` bump 至 `doc77-v4` —— 清除 1.1.4 时代缓存的旧 `/api/tree` 条目（SWR 命中即返回旧数据）
+  - Core: watcher 初始枚举窗口期（chokidar 递归建 watch，大项目根可达数十秒）内发生的文件变化不产生事件 → `ready` 后为每个项目补发一次全量刷新事件；另加 SSE 连接 5s 定时兜底（`ready` 不触发的大目录环境）
+
+---
+
 ## [2026-08-15] — `1.1.5`
 
 ### 全包 (`1.1.5`)

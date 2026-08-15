@@ -83,7 +83,37 @@ describe('file watcher', { retry: 2 }, () => {
   // macOS 上 chokidar v4 走 fs.watch（recursive）事件有平台延迟（CI macOS
   // runner 实测偶发 >5s），默认超时放宽到 15s 防 flaky —— watcher 本身
   // 是尽力而为组件，事件延迟不构成产品缺陷
+  // watcher ready 补发事件（v1.1.5）：path='' 且 paths 为空 —— 初始枚举
+  // 窗口期变化的全量纠正信号，非具体文件事件。测试具体事件时统一过滤。
+  function isSyncNoopEvent(p: TreeChangedPayload): boolean {
+    return p.path === '' && (!p.paths || p.paths.length === 0);
+  }
+
   function waitForEvent(
+    predicate: (p: TreeChangedPayload) => boolean,
+    timeoutMs = 15000,
+  ): Promise<TreeChangedPayload> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        bus.off('file-tree:changed', listener);
+        reject(new Error('timed out waiting for file-tree:changed event'));
+      }, timeoutMs);
+      const bus = getEventBus();
+      const listener = (p: unknown) => {
+        const payload = p as TreeChangedPayload;
+        if (isSyncNoopEvent(payload)) return;
+        if (predicate(payload)) {
+          clearTimeout(timer);
+          bus.off('file-tree:changed', listener);
+          resolve(payload);
+        }
+      };
+      bus.on('file-tree:changed', listener);
+    });
+  }
+
+  /** 不过滤 ready 补发事件的原生等待（供补发事件断言用） */
+  function waitForEventRaw(
     predicate: (p: TreeChangedPayload) => boolean,
     timeoutMs = 15000,
   ): Promise<TreeChangedPayload> {
@@ -113,6 +143,7 @@ describe('file watcher', { retry: 2 }, () => {
     const bus = getEventBus();
     const listener = (p: unknown) => {
       const payload = p as TreeChangedPayload;
+      if (isSyncNoopEvent(payload)) return;
       if (predicate(payload)) events.push(payload);
     };
     bus.on('file-tree:changed', listener);
@@ -262,6 +293,18 @@ describe('file watcher', { retry: 2 }, () => {
     expect(isWatcherRunning()).toBe(true);
     await new Promise((r) => setTimeout(r, 150));
     expect(isWatcherRunning()).toBe(false);
+  });
+
+  it('ready 后补发全量刷新事件（枚举窗口期变化不丢失，v1.1.5 修复）', async () => {
+    const p = registerProject('WatcherReadyEmit', projectDir);
+    // 补发事件：path='' 且 paths 为空（isSyncNoopEvent 会过滤它，这里直接断言）
+    const eventPromise = waitForEventRaw((x) => x.projectId === p.id);
+    startFileWatcher({ debounceMs: 50 });
+    await watcherReady();
+    const payload = await eventPromise;
+    expect(payload.path).toBe('');
+    expect(payload.opType).toBe('mixed');
+    expect(payload.paths).toEqual([]);
   });
 
   it('引用翻覆防抖：停止窗口内重新 acquire 不重启 watcher', async () => {
