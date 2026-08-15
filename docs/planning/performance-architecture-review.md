@@ -72,17 +72,25 @@ Electron 主进程无 setInterval；preload 无轮询；无 dev-server 混入打
 
 ## 4. 专项路线图（后续 AGENT 直接接着干）
 
-### P-A. better-sqlite3 迁移（优先级最高，约 1-2 天）
+### P-A. better-sqlite3 迁移 ✅（2026-08-15 完成，分支 feature/better-sqlite3-migration）
 
 **为什么**：sql.js 的整库序列化、全内存模型、FTS5 缺失三个根因靠节流只能缓解。迁移收益：export 机制消失（性能放大器根除）、内存基线大降（不再整库常驻 WASM 堆）、FTS5 搜索真实可用、崩溃不丢数据（当前 `flushDatabase` 无调用方，未 export 的写入全部丢失）。
 
-**实施清单**：
-1. `connection.ts` 重写：删 `_persistDb`/`_scheduleSave`/`_persist`/`_saveAndClose` 全家桶；**保留 `async initDatabase` 签名**（内部同步实现返回 resolved promise，cli/electron/33 个测试文件的 `await` 零改动）；保留 `DatabaseCompat`/`StatementCompat` 导出名与 `prepare().get()/all()/run()` 形状（`{changes, lastInsertRowid}`）；恢复 `journal_mode = WAL`；`PRAGMA foreign_keys = ON` 保留。
-2. 依赖：`packages/core/package.json` sql.js → better-sqlite3@^12（`pnpm-workspace.yaml:13` 的 `allowBuilds: better-sqlite3: true` 已存在，无需改）。
-3. **v13 迁移陷阱（必做）**：迁回后 `fts5Available` 变 true，v7 的 `CREATE VIRTUAL TABLE IF NOT EXISTS file_content_fts USING fts5(...)` 会因同名**普通表**已存在而静默 no-op → query.ts 走 FTS5 分支 `MATCH` 抛错被 catch 吞掉 → **搜索返回空结果（比 LIKE 更糟）**。必须加 v13：`fts5Available && 现表非虚拟表` → DROP 重建 + 重跑 `fullIndex`。残留 `temp_fts5_test` 是 temp 表，无害。
-4. 行为差异测试面：better-sqlite3 参数类型严格（undefined/NaN 抛错）、get() 列名大小写 —— 142+ 现有测试正好是验证面。
-5. **三平台打包验证（上次就是 Windows 打包翻车）**：electron-builder 会自动识别 .node 原生模块 asarUnpack + `@electron/rebuild`（lockfile 3.6.1 已有），但必须 Win/macOS/Linux 实测；npm 发布路径（cli → core）postinstall prebuild 下载需验证网络可达。
-6. 验收：export 相关代码全删后 142+ 测试全绿；Windows 打包打开搜索 FTS5 生效；`~/.doc77/data.db` 恢复 WAL 文件；内存基线不再随 DB 线性涨。
+**实际改动**（commit `fix(core): migrate db layer from sql.js to better-sqlite3 (P-A)`）：
+1. 依赖：`packages/core/package.json` sql.js@^1.11.0 → `better-sqlite3@^12.11.1` + `@types/better-sqlite3@^7.6.13`（devDependency；better-sqlite3 v12 自带无 .d.ts，@types 必需非废弃）。`pnpm-workspace.yaml:13` allowBuilds 已存在未改。tsup 无需改（dependencies 自动 external，实证 dist 中 `require("better-sqlite3")`）。
+2. `connection.ts` 重写：删 `_persistDb`/`_scheduleSave`/`_persist`/`_saveAndClose`/WASM 加载全家桶；保留 `DatabaseCompat`/`StatementCompat` 类名与 API 形状、`async initDatabase` 签名（内部同步，返回 resolved promise）、`getConnection`/`closeConnection` 守卫语义；`flushDatabase()` 改 **no-op**（WAL 下每写即落盘，仅 API 兼容保留，零生产调用方）；恢复 `journal_mode = WAL` + `foreign_keys = ON`；内部用本地结构化接口（`NativeDatabase`/`NativeStatement`）持 better-sqlite3 实例，类型不泄漏进 dist/index.d.ts。
+3. **v14 迁移（注意编号：v13 已被 1.1.4 的 filetree_cache 清理占用）**：`fts5Available && file_content_fts 非虚拟表` → DROP 普通表 + `search_index_meta`（必须：否则 hash 短路让重索引全跳过，FTS 恒空）+ `ai_messages_fts` + 3 个悬空触发器（挂在 ai_messages 上不随表删，不 DROP 则后续 INSERT 全抛）→ 重跑 `SEARCH_SCHEMA_SQL` + `AI_V9_SCHEMA_SQL` → `INSERT INTO ai_messages_fts(ai_messages_fts) VALUES('rebuild')`（外部内容表重建索引）→ 同步 `fullIndexSync` 重索引所有项目（一次性 boot 延迟）。新增 `fullIndexSync`（indexer.ts，fullIndex 的同步版，无 yield/progress）。
+4. 行为差异修复：`session-store.ts` `searchMessages` FTS5 分支包 try/catch（better-sqlite3 对纯标点等非法 MATCH 语法抛错，旧 shim 吞错返回 []）；严格绑定审计（undefined/NaN）全量 grep 无违规调用点。
+5. 测试：persist-throttle.test.ts 改写为 WAL / 写后立即持久化（关→重开读回）/ flushDatabase no-op / **FTS5 端到端（indexFile → searchProject MATCH 命中，此前从未被测过）**；其余 142+ 用例零改动全绿（748 通过）。
+6. 打包：`packages/electron/electron-builder.yml` 加 `asarUnpack: ["**/node_modules/better-sqlite3/**"]`；electron-builder 25 `npmRebuild` 默认 true 打包时按 Electron ABI 重建（**仓库无 @electron/rebuild，也不需要**——修正此前"lockfile 已有"的错误假设）；CI release-electron.yml 无需改（hoisted linker 下 better-sqlite3 + bindings 落根 node_modules，现有 glob 覆盖）。
+
+**遗留问题**：
+- query.ts / session-store.ts 的 LIKE fallback 分支成死代码（better-sqlite3 恒有 FTS5）→ 归 P-B 清理
+- 发布后的 @doc77/core 带原生依赖：安装期 prebuild-install 需网络（三平台预编译已发布，备选本地编译）
+- 旧库升级首次启动有一次同步重索引延迟（一次性）
+- 2026-07 那次 Windows "Cannot GET /" 实为静态资源打包 bug（dist/web 未进 tarball），非原生模块失败——本次原生风险面已由 asarUnpack + npmRebuild 覆盖，仍需用户 Windows 实测
+
+**验收**：export 相关代码全删后 748 测试全绿（基线 745 + 新增 3）；旧 sql.js 库升级冒烟通过（普通表 → 虚拟表 + 重索引 MATCH 命中）；Windows 打包打开搜索 FTS5 生效 + `~/.doc77/data.db-wal`/`-shm` 出现由用户实测。
 
 ### P-B. 搜索改造（依赖 P-A，P-A 完成后 FTS5 原生）
 

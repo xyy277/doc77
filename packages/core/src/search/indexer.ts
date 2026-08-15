@@ -260,6 +260,58 @@ export async function fullIndex(
 }
 
 /**
+ * Synchronous full index — used by the v14 FTS5 rebuild migration
+ * （runMigrations 是同步的，fullIndex 的 event-loop yield 无法在其中 await）。
+ * 与 fullIndex 相同的遍历 + 分批 + 清理，无进度回调与异步让步。
+ */
+export function fullIndexSync(
+  projectId: number,
+  projectRoot: string,
+  db?: DatabaseCompat,
+): IndexProgress {
+  const conn = db ?? getConnection();
+  const progress: IndexProgress = { indexed: 0, total: 0, skipped: 0, errors: 0 };
+
+  const files = walkDir(projectRoot, projectRoot);
+  const textFiles = files.filter((f) => isTextFile(f));
+  progress.total = textFiles.length;
+
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < textFiles.length; i += BATCH_SIZE) {
+    const batch = textFiles.slice(i, i + BATCH_SIZE);
+    conn.exec('BEGIN');
+    try {
+      for (const relPath of batch) {
+        const changed = indexFile(projectId, projectRoot, relPath, conn);
+        if (changed) progress.indexed++;
+        else progress.skipped++;
+      }
+      conn.exec('COMMIT');
+    } catch {
+      try {
+        conn.exec('ROLLBACK');
+      } catch {
+        /* ignore */
+      }
+      progress.errors += batch.length;
+    }
+  }
+
+  // Cleanup: remove entries for files that no longer exist
+  const existing = conn
+    .prepare('SELECT file_path FROM search_index_meta WHERE project_id = ?')
+    .all(projectId) as { file_path: string }[];
+  const fileSet = new Set(textFiles);
+  for (const row of existing) {
+    if (!fileSet.has(row.file_path)) {
+      removeFileFromIndex(projectId, row.file_path, conn);
+    }
+  }
+
+  return progress;
+}
+
+/**
  * Get index stats for a project.
  */
 export function getIndexStats(projectId: number, db?: DatabaseCompat) {

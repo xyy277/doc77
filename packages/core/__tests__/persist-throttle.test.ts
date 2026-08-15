@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -8,26 +8,23 @@ import {
   getConnection,
   flushDatabase,
 } from '../src/db/connection.js';
-import { runMigrations } from '../src/db/migrations.js';
+import { runMigrations, fts5Available } from '../src/db/migrations.js';
 import { registerProject } from '../src/db/projects.js';
-
-// node:fs 内置模块属性不可 redefine（spyOn 报 Cannot redefine property），
-// 用模块级 mock 包装 writeFileSync 计数（其余函数透传真实实现）。
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    writeFileSync: vi.fn(actual.writeFileSync),
-  };
-});
+import { indexFile } from '../src/search/indexer.js';
+import { searchProject } from '../src/search/query.js';
 
 /**
- * sql.js export 节流测试（v1.1.4 性能修复 Part 1-B）。
+ * DB 持久化回归测试（P-A：sql.js → better-sqlite3 迁移）。
  *
- * 核心断言：连续写入时，整库序列化落盘频率必须被 MIN_PERSIST_INTERVAL_MS
- * cap 住（与写入频率、DB 大小解耦）；flushDatabase() 始终强制立即落盘。
+ * sql.js 时代的 export 节流测试（v1.1.4 Part 1-B）语义已随迁移消失：
+ * better-sqlite3 WAL 模式下每次写语句即落盘，无需去抖 + 整库序列化。
+ * 本文件改写为验证迁移承诺的行为：
+ *   1. WAL journal 模式生效
+ *   2. 写 → 关 → 重开，数据在（崩溃不丢数据的基线）
+ *   3. flushDatabase 保持可调用（API 兼容 no-op）
+ *   4. FTS5 搜索端到端（此前 sql.js 无 FTS5，该路径从未被测过）
  */
-describe('Persist throttle (sql.js export cap)', () => {
+describe('DB persistence (better-sqlite3, WAL)', () => {
   let testDir: string;
   let dbPath: string;
   let projectDir: string;
@@ -41,18 +38,10 @@ describe('Persist throttle (sql.js export cap)', () => {
 
     await initDatabase(dbPath);
     runMigrations();
-    registerProject('Persist Test', projectDir);
-    // 落盘设置期产生的一切变更，并把 _lastPersistAt 推到"现在"
-    flushDatabase();
-
-    vi.mocked(fs.writeFileSync).mockClear();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.mocked(fs.writeFileSync).mockClear();
     try {
-      flushDatabase();
       closeConnection();
     } catch {
       /* ignore */
@@ -60,56 +49,18 @@ describe('Persist throttle (sql.js export cap)', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  function insert(key: string): void {
+  it('runs in WAL journal mode', () => {
+    const row = getConnection().prepare('PRAGMA journal_mode').get() as {
+      journal_mode: string;
+    };
+    expect(row.journal_mode).toBe('wal');
+  });
+
+  it('writes persist immediately and survive close + reopen', async () => {
     getConnection()
       .prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
-      .run(key, 'v');
-  }
-
-  it('caps export frequency: continuous writes persist at most once per 2s', () => {
-    vi.useFakeTimers();
-
-    // 10 次连续写入（模拟 watcher 事件风暴 / 编辑风暴）
-    for (let i = 0; i < 10; i++) insert(`k${i}`);
-
-    // 600ms：去抖窗口内，尚未到最小间隔 → 0 次落盘
-    vi.advanceTimersByTime(600);
-    expect(fs.writeFileSync).not.toHaveBeenCalled();
-
-    // 累计 2.1s：距上次落盘超过 2s → 恰好 1 次（合并了全部 10 次写入）
-    vi.advanceTimersByTime(1500);
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
-
-    // 持续写入 + 每 2.5s 检查一次：3 个间隔最多 3 次新落盘（含最后一次）
-    for (let i = 0; i < 5; i++) insert(`more${i}`);
-    vi.advanceTimersByTime(2500);
-    for (let i = 5; i < 10; i++) insert(`more${i}`);
-    vi.advanceTimersByTime(2500);
-    for (let i = 10; i < 15; i++) insert(`more${i}`);
-    vi.advanceTimersByTime(2500);
-
-    // 总落盘次数 = 1（首次）+ ≤3 = ≤4，远小于 25 次写入
-    expect(vi.mocked(fs.writeFileSync).mock.calls.length).toBeLessThanOrEqual(4);
-  });
-
-  it('flushDatabase forces immediate persist even with pending debounce', () => {
-    vi.useFakeTimers();
-
-    insert('forced');
-    vi.advanceTimersByTime(300); // 去抖 500ms 未到
-    flushDatabase();
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
-
-    // flush 后挂起的定时器已被清除，不再有重复落盘
-    vi.advanceTimersByTime(3000);
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
-  });
-
-  it('persistence regression: flushed writes survive close and reopen', async () => {
-    // 真实定时器（重开 initDatabase 是异步 WASM 加载）
-    vi.useRealTimers();
-    insert('survive-me');
-    flushDatabase();
+      .run('survive-me', 'v');
+    // 无需 flushDatabase：WAL 下每条写语句已落盘
     closeConnection();
 
     await initDatabase(dbPath);
@@ -117,5 +68,22 @@ describe('Persist throttle (sql.js export cap)', () => {
       .prepare("SELECT value FROM config WHERE key = 'survive-me'")
       .get() as { value: string } | undefined;
     expect(row?.value).toBe('v');
+  });
+
+  it('flushDatabase is a callable no-op (API compat)', () => {
+    expect(() => flushDatabase()).not.toThrow();
+  });
+
+  it('FTS5 search end-to-end: indexFile → searchProject MATCH hit', () => {
+    expect(fts5Available).toBe(true);
+    const p = registerProject('FTS5 Test', projectDir);
+    fs.writeFileSync(path.join(projectDir, 'hello.md'), '# Hello World\n\nfoo bar baz qux');
+
+    expect(indexFile(p.id, projectDir, 'hello.md')).toBe(true);
+
+    const res = searchProject(p.id, 'qux');
+    expect(res.total).toBe(1);
+    expect(res.results[0].file_path).toBe('hello.md');
+    expect(res.results[0].snippets.length).toBeGreaterThan(0);
   });
 });

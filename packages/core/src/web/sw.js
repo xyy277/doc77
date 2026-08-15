@@ -37,37 +37,45 @@ var SHELL_ASSETS = [
   '/assets/logo-dark.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/manifest.json'
+  '/manifest.json',
 ];
 
 // ═══════ Install ═══════
 self.addEventListener('install', function (event) {
   event.waitUntil(
-    caches.open(CACHE_SHELL).then(function (cache) {
-      return cache.addAll(SHELL_ASSETS).catch(function () {
-        // 部分资源可能不存在，忽略
-        return Promise.resolve();
-      });
-    }).then(function () {
-      return self.skipWaiting();
-    })
+    caches
+      .open(CACHE_SHELL)
+      .then(function (cache) {
+        return cache.addAll(SHELL_ASSETS).catch(function () {
+          // 部分资源可能不存在，忽略
+          return Promise.resolve();
+        });
+      })
+      .then(function () {
+        return self.skipWaiting();
+      }),
   );
 });
 
 // ═══════ Activate ═══════
 self.addEventListener('activate', function (event) {
   event.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(
-        keys.filter(function (key) {
-          return key.indexOf(CACHE_VERSION) !== 0;
-        }).map(function (key) {
-          return caches.delete(key);
-        })
-      );
-    }).then(function () {
-      return self.clients.claim();
-    })
+    caches
+      .keys()
+      .then(function (keys) {
+        return Promise.all(
+          keys
+            .filter(function (key) {
+              return key.indexOf(CACHE_VERSION) !== 0;
+            })
+            .map(function (key) {
+              return caches.delete(key);
+            }),
+        );
+      })
+      .then(function () {
+        return self.clients.claim();
+      }),
   );
 });
 
@@ -92,10 +100,28 @@ self.addEventListener('fetch', function (event) {
   //     合成 503 {"error":"offline"}——曾导致新建/重命名/删除误报失败
   if (swPolicy.shouldIntercept(url.pathname)) {
     if (swPolicy.isFreshRequest(event.request.headers)) {
-      event.respondWith(fetch(event.request));
+      // 刷新类请求：网络优先，同时把响应写回 SWR 缓存 —— freshFetch 本身绕过
+      // SW，若不同步缓存，下次普通 GET 仍会命中变更前的旧数据
+      event.respondWith(
+        fetch(event.request).then(function (response) {
+          if (response.ok) {
+            caches.open(CACHE_API).then(function (cache) {
+              cache.put(event.request, response.clone());
+              pruneAPIStore(cache);
+              saveToIDB(event.request.url, response.clone());
+              pruneIDB();
+            });
+          }
+          return response;
+        }),
+      );
       return;
     }
     if (!swPolicy.isGetMethod(event.request.method)) {
+      // 变更类请求（新建/重命名/删除/保存）：直通网络；同时清除该项目范围的
+      // SWR 缓存 —— 否则下次普通 GET 命中变更前旧数据（已删文件仍显示在树上）
+      var purgePrefix = swPolicy.getMutationPurgePrefix(url.pathname);
+      if (purgePrefix) purgeAPIEntries(purgePrefix);
       event.respondWith(fetch(event.request));
       return;
     }
@@ -104,8 +130,10 @@ self.addEventListener('fetch', function (event) {
   }
 
   // 缩略图: Cache First + LRU
-  if (url.pathname.indexOf('/api/thumbnails/') === 0 ||
-      url.pathname.indexOf('/api/gallery/') === 0) {
+  if (
+    url.pathname.indexOf('/api/thumbnails/') === 0 ||
+    url.pathname.indexOf('/api/gallery/') === 0
+  ) {
     event.respondWith(cacheFirstLRU(event.request, CACHE_THUMBS, 200));
     return;
   }
@@ -153,15 +181,19 @@ function cacheFirst(request, cacheName) {
 /** Cache First + 后台更新 — 先返回缓存，后台静默更新 */
 function cacheFirstUpdate(request, cacheName) {
   return caches.match(request).then(function (cached) {
-    var fetchPromise = fetch(request).then(function (response) {
-      if (response.ok) {
-        var clone = response.clone();
-        caches.open(cacheName).then(function (cache) {
-          cache.put(request, clone);
-        });
-      }
-      return response;
-    }).catch(function () { return null; });
+    var fetchPromise = fetch(request)
+      .then(function (response) {
+        if (response.ok) {
+          var clone = response.clone();
+          caches.open(cacheName).then(function (cache) {
+            cache.put(request, clone);
+          });
+        }
+        return response;
+      })
+      .catch(function () {
+        return null;
+      });
 
     if (cached) {
       // 有缓存: 返回缓存，后台更新
@@ -177,19 +209,21 @@ function cacheFirstUpdate(request, cacheName) {
 
 /** Network First — 网络优先，失败用缓存 */
 function networkFirst(request, cacheName) {
-  return fetch(request).then(function (response) {
-    if (response.ok) {
-      var clone = response.clone();
-      caches.open(cacheName).then(function (cache) {
-        cache.put(request, clone);
+  return fetch(request)
+    .then(function (response) {
+      if (response.ok) {
+        var clone = response.clone();
+        caches.open(cacheName).then(function (cache) {
+          cache.put(request, clone);
+        });
+      }
+      return response;
+    })
+    .catch(function () {
+      return caches.match(request).then(function (cached) {
+        return cached || new Response('Offline', { status: 503 });
       });
-    }
-    return response;
-  }).catch(function () {
-    return caches.match(request).then(function (cached) {
-      return cached || new Response('Offline', { status: 503 });
     });
-  });
 }
 
 /** Stale While Revalidate + IndexedDB 离线缓存 */
@@ -198,38 +232,40 @@ function staleWhileRevalidateAPI(request) {
 
   return caches.open(CACHE_API).then(function (cache) {
     return cache.match(request).then(function (cached) {
-      var fetchPromise = fetch(request).then(function (response) {
-        if (response.ok) {
-          var clone = response.clone();
-          cache.put(request, clone);
-          pruneAPIStore(cache);
-          // 同时存入 IndexedDB 用于深度离线
-          saveToIDB(request.url, response.clone());
-          pruneIDB();
-        }
-        return response;
-      }).catch(function () {
-        // 网络失败，尝试 IndexedDB
-        if (!cached) {
-          return getFromIDB(request.url).then(function (data) {
-            if (data) {
-              return new Response(data.body, {
-                status: 200,
-                headers: {
-                  'Content-Type': data.contentType || 'application/json',
-                  'X-Doc77-Offline': 'true',
-                  'X-Doc77-Cached-At': data.cachedAt || ''
-                }
+      var fetchPromise = fetch(request)
+        .then(function (response) {
+          if (response.ok) {
+            var clone = response.clone();
+            cache.put(request, clone);
+            pruneAPIStore(cache);
+            // 同时存入 IndexedDB 用于深度离线
+            saveToIDB(request.url, response.clone());
+            pruneIDB();
+          }
+          return response;
+        })
+        .catch(function () {
+          // 网络失败，尝试 IndexedDB
+          if (!cached) {
+            return getFromIDB(request.url).then(function (data) {
+              if (data) {
+                return new Response(data.body, {
+                  status: 200,
+                  headers: {
+                    'Content-Type': data.contentType || 'application/json',
+                    'X-Doc77-Offline': 'true',
+                    'X-Doc77-Cached-At': data.cachedAt || '',
+                  },
+                });
+              }
+              return new Response(JSON.stringify({ error: 'offline' }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' },
               });
-            }
-            return new Response(JSON.stringify({ error: 'offline' }), {
-              status: 503,
-              headers: { 'Content-Type': 'application/json' }
             });
-          });
-        }
-        return null;
-      });
+          }
+          return null;
+        });
 
       if (cached) {
         // 返回缓存，添加离线标记 header
@@ -253,32 +289,76 @@ function pruneAPIStore(cache) {
   });
 }
 
+/** 清除 CACHE_API + IndexedDB 中 pathname 以 prefix 开头的条目（变更类请求后调用，fire-and-forget） */
+function purgeAPIEntries(prefix) {
+  caches
+    .open(CACHE_API)
+    .then(function (cache) {
+      cache.keys().then(function (keys) {
+        keys.forEach(function (key) {
+          if (new URL(key.url).pathname.indexOf(prefix) === 0) cache.delete(key);
+        });
+      });
+    })
+    .catch(function () {
+      /* 清除失败无害：下次 GET 会以 SWR 后台更新自愈 */
+    });
+  openIDB()
+    .then(function (db) {
+      var tx = db.transaction('content', 'readwrite');
+      var store = tx.objectStore('content');
+      var req = store.getAll();
+      req.onsuccess = function () {
+        (req.result || []).forEach(function (r) {
+          try {
+            if (new URL(r.url).pathname.indexOf(prefix) === 0) store.delete(r.url);
+          } catch (e) {
+            /* 畸形 URL 跳过 */
+          }
+        });
+      };
+    })
+    .catch(function () {
+      /* IDB 不可用时静默失败 */
+    });
+}
+
 /** IndexedDB content store 裁剪：超期（>30 天）或超出上限的最旧条目 */
 function pruneIDB() {
-  openIDB().then(function (db) {
-    var tx = db.transaction('content', 'readwrite');
-    var store = tx.objectStore('content');
-    var req = store.getAll();
-    req.onsuccess = function () {
-      var rows = req.result || [];
-      if (rows.length <= MAX_API_ENTRIES) {
-        // 未超上限也清超期条目
-        rows.filter(function (r) {
-          return new Date(r.cachedAt || 0).getTime() < Date.now() - API_CACHE_TTL_MS;
-        }).forEach(function (r) { store.delete(r.url); });
-        return;
-      }
-      var sorted = rows.slice().sort(function (a, b) {
-        return String(a.cachedAt || '').localeCompare(String(b.cachedAt || ''));
-      });
-      var cutoff = Date.now() - API_CACHE_TTL_MS;
-      var surplus = sorted.slice(0, rows.length - MAX_API_ENTRIES);
-      var expired = rows.filter(function (r) {
-        return new Date(r.cachedAt || 0).getTime() < cutoff;
-      });
-      surplus.concat(expired).forEach(function (r) { store.delete(r.url); });
-    };
-  }).catch(function () { /* IDB 不可用时静默失败 */ });
+  openIDB()
+    .then(function (db) {
+      var tx = db.transaction('content', 'readwrite');
+      var store = tx.objectStore('content');
+      var req = store.getAll();
+      req.onsuccess = function () {
+        var rows = req.result || [];
+        if (rows.length <= MAX_API_ENTRIES) {
+          // 未超上限也清超期条目
+          rows
+            .filter(function (r) {
+              return new Date(r.cachedAt || 0).getTime() < Date.now() - API_CACHE_TTL_MS;
+            })
+            .forEach(function (r) {
+              store.delete(r.url);
+            });
+          return;
+        }
+        var sorted = rows.slice().sort(function (a, b) {
+          return String(a.cachedAt || '').localeCompare(String(b.cachedAt || ''));
+        });
+        var cutoff = Date.now() - API_CACHE_TTL_MS;
+        var surplus = sorted.slice(0, rows.length - MAX_API_ENTRIES);
+        var expired = rows.filter(function (r) {
+          return new Date(r.cachedAt || 0).getTime() < cutoff;
+        });
+        surplus.concat(expired).forEach(function (r) {
+          store.delete(r.url);
+        });
+      };
+    })
+    .catch(function () {
+      /* IDB 不可用时静默失败 */
+    });
 }
 
 /** Cache First + LRU 淘汰 */
@@ -294,7 +374,9 @@ function cacheFirstLRU(request, cacheName, maxEntries) {
           cache.keys().then(function (keys) {
             if (keys.length > maxEntries) {
               var toDelete = keys.slice(0, keys.length - maxEntries);
-              toDelete.forEach(function (key) { cache.delete(key); });
+              toDelete.forEach(function (key) {
+                cache.delete(key);
+              });
             }
           });
         });
@@ -306,28 +388,33 @@ function cacheFirstLRU(request, cacheName, maxEntries) {
 
 /** 导航请求处理 — 离线时返回缓存的 shell */
 function navigationHandler(request) {
-  return fetch(request).then(function (response) {
-    // 在线时缓存 HTML 页面
-    if (response.ok) {
-      var clone = response.clone();
-      caches.open(CACHE_SHELL).then(function (cache) {
-        cache.put(request, clone);
-      });
-    }
-    return response;
-  }).catch(function () {
-    // 离线: 尝试缓存
-    return caches.match(request).then(function (cached) {
-      if (cached) return cached;
-      // 最终 fallback: 返回 Dashboard 缓存
-      return caches.match('/').then(function (shell) {
-        return shell || new Response(
-          '<html><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;color:#e2e8f0"><div style="text-align:center"><h1>📴 Offline</h1><p>Doc77 is not reachable. Please check your connection.</p></div></body></html>',
-          { status: 503, headers: { 'Content-Type': 'text/html' } }
-        );
+  return fetch(request)
+    .then(function (response) {
+      // 在线时缓存 HTML 页面
+      if (response.ok) {
+        var clone = response.clone();
+        caches.open(CACHE_SHELL).then(function (cache) {
+          cache.put(request, clone);
+        });
+      }
+      return response;
+    })
+    .catch(function () {
+      // 离线: 尝试缓存
+      return caches.match(request).then(function (cached) {
+        if (cached) return cached;
+        // 最终 fallback: 返回 Dashboard 缓存
+        return caches.match('/').then(function (shell) {
+          return (
+            shell ||
+            new Response(
+              '<html><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;color:#e2e8f0"><div style="text-align:center"><h1>📴 Offline</h1><p>Doc77 is not reachable. Please check your connection.</p></div></body></html>',
+              { status: 503, headers: { 'Content-Type': 'text/html' } },
+            )
+          );
+        });
       });
     });
-  });
 }
 
 // ═══════ IndexedDB 辅助 ═══════
@@ -341,34 +428,53 @@ function openIDB() {
         db.createObjectStore('content', { keyPath: 'url' });
       }
     };
-    req.onsuccess = function () { resolve(req.result); };
-    req.onerror = function () { reject(req.error); };
+    req.onsuccess = function () {
+      resolve(req.result);
+    };
+    req.onerror = function () {
+      reject(req.error);
+    };
   });
 }
 
 function saveToIDB(url, response) {
-  response.text().then(function (body) {
-    openIDB().then(function (db) {
-      var tx = db.transaction('content', 'readwrite');
-      tx.objectStore('content').put({
-        url: url,
-        body: body,
-        contentType: response.headers.get('Content-Type') || 'application/json',
-        cachedAt: new Date().toISOString()
-      });
-    }).catch(function () { /* IDB 不可用时静默失败 */ });
-  }).catch(function () {});
+  response
+    .text()
+    .then(function (body) {
+      openIDB()
+        .then(function (db) {
+          var tx = db.transaction('content', 'readwrite');
+          tx.objectStore('content').put({
+            url: url,
+            body: body,
+            contentType: response.headers.get('Content-Type') || 'application/json',
+            cachedAt: new Date().toISOString(),
+          });
+        })
+        .catch(function () {
+          /* IDB 不可用时静默失败 */
+        });
+    })
+    .catch(function () {});
 }
 
 function getFromIDB(url) {
-  return openIDB().then(function (db) {
-    return new Promise(function (resolve) {
-      var tx = db.transaction('content', 'readonly');
-      var req = tx.objectStore('content').get(url);
-      req.onsuccess = function () { resolve(req.result || null); };
-      req.onerror = function () { resolve(null); };
+  return openIDB()
+    .then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction('content', 'readonly');
+        var req = tx.objectStore('content').get(url);
+        req.onsuccess = function () {
+          resolve(req.result || null);
+        };
+        req.onerror = function () {
+          resolve(null);
+        };
+      });
+    })
+    .catch(function () {
+      return null;
     });
-  }).catch(function () { return null; });
 }
 
 // ═══════ 工具函数 ═══════
@@ -381,13 +487,18 @@ function isStaticAsset(pathname) {
 self.addEventListener('message', function (event) {
   if (event.data && event.data.type === 'CLEAR_CACHE') {
     // 用户请求清除离线缓存
-    caches.keys().then(function (keys) {
-      return Promise.all(keys.map(function (key) {
-        if (key.indexOf(CACHE_VERSION) === 0) return caches.delete(key);
-      }));
-    }).then(function () {
-      event.source.postMessage({ type: 'CACHE_CLEARED' });
-    });
+    caches
+      .keys()
+      .then(function (keys) {
+        return Promise.all(
+          keys.map(function (key) {
+            if (key.indexOf(CACHE_VERSION) === 0) return caches.delete(key);
+          }),
+        );
+      })
+      .then(function () {
+        event.source.postMessage({ type: 'CACHE_CLEARED' });
+      });
   }
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();

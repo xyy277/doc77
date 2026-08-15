@@ -1,4 +1,5 @@
 import { getConnection, type DatabaseCompat } from './connection.js';
+import { fullIndexSync } from '../search/indexer.js';
 
 /**
  * Whether the SQLite engine supports FTS5 full-text search.
@@ -115,6 +116,50 @@ export function runMigrations(db?: DatabaseCompat): void {
   // 表结构保留（兼容 schema 断言），清理历史缓存行——旧行会在每次整库
   // 序列化落盘时被反复写入文件，纯死重。scanner 已不再读写此表。
   conn.exec('DELETE FROM filetree_cache');
+
+  // v14: better-sqlite3 迁移（P-A）——历史 sql.js 库的 FTS5 表重建。
+  // sql.js 官方 dist 无 FTS5，历史库中 file_content_fts / ai_messages_fts
+  // 是 fallback 普通表：CREATE VIRTUAL TABLE IF NOT EXISTS 对同名普通表
+  // 静默 no-op → query.ts 的 MATCH 分支抛错被吞 → 搜索空结果（比 LIKE 更糟）。
+  // 检测 sqlite_master.sql 前缀，非虚拟表则整体拆除 + 重建 + 重索引。
+  // 注意：必须连 search_index_meta 一起 DROP —— 否则 indexFile 的 hash 短路
+  // （indexer.ts:143）会让 fullIndexSync 全跳过，FTS 索引恒空。
+  if (fts5Available) {
+    const ftsRow = conn
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='file_content_fts'")
+      .get() as { sql: string } | undefined;
+    const isPlainTable =
+      ftsRow !== undefined && !/^CREATE\s+VIRTUAL\s+TABLE/i.test(ftsRow.sql.trim());
+    if (isPlainTable) {
+      // 1) 拆除普通表 + 悬空触发器（ai_messages_fts 的触发器挂在 ai_messages 上，
+      //    不随表删除，不显式 DROP 则后续 INSERT INTO ai_messages 全抛 no such table）
+      conn.exec('DROP TABLE IF EXISTS file_content_fts');
+      conn.exec('DROP TABLE IF EXISTS search_index_meta');
+      conn.exec('DROP TABLE IF EXISTS ai_messages_fts');
+      conn.exec('DROP TRIGGER IF EXISTS ai_messages_fts_insert');
+      conn.exec('DROP TRIGGER IF EXISTS ai_messages_fts_delete');
+      conn.exec('DROP TRIGGER IF EXISTS ai_messages_fts_update');
+      // 2) 重建 FTS5 架构（复用上方 schema 常量，单一事实来源）
+      conn.exec(SEARCH_SCHEMA_SQL);
+      conn.exec(AI_V9_SCHEMA_SQL);
+      // 3) ai_messages_fts 是外部内容表（content=ai_messages），重建后索引为空，
+      //    用 'rebuild' 命令覆盖存量消息；之后的写入由重建的触发器接管
+      conn.exec("INSERT INTO ai_messages_fts(ai_messages_fts) VALUES('rebuild')");
+      // 4) 全量重索引所有项目（同步：迁移返回前必须完成，否则搜索立即空结果；
+      //    一次性 boot 延迟，此后 ftsRow.sql 已是 CREATE VIRTUAL TABLE，本步跳过）
+      const projects = conn.prepare('SELECT id, path FROM projects').all() as Array<{
+        id: number;
+        path: string;
+      }>;
+      for (const p of projects) {
+        try {
+          fullIndexSync(p.id, p.path, conn);
+        } catch (e) {
+          console.warn(`[migrations] v14 reindex failed for project ${p.id}:`, e);
+        }
+      }
+    }
+  }
 }
 
 const SCHEMA_SQL = `
