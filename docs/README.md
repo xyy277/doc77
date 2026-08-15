@@ -13,7 +13,8 @@ docs/
 │   └── system-architecture-analysis.md     # 架构评审与技术栈验证报告
 └── planning/                               # 规划与跟踪
     ├── implementation-plan.md              # 实施方案（40 个 Task，9 个 Phase）
-    └── implementation-status.md            # 实施进度跟踪（实时更新）
+    ├── implementation-status.md            # 实施进度跟踪（实时更新）
+    └── performance-architecture-review.md  # 性能架构评审与修复记录（2026-08-15）
 ```
 
 ## 文档说明
@@ -36,6 +37,7 @@ docs/
 |---|---|---|
 | `implementation-plan.md` | 详细实施方案：每个 Phase/Task 的依赖、交付物、验收标准、关键文件速查表 | ✅ 已就绪 |
 | `implementation-status.md` | 实时进度跟踪：40 个 Task 的状态 checklist、阻塞记录、变更日志 | 🔄 实施中更新 |
+| `performance-architecture-review.md` | 性能架构评审：1.1.3 回归根因证据链、1.1.4 修复记录、后续架构专项路线图（better-sqlite3 迁移等） | 📋 2026-08-15 创建 |
 
 ## 文档编写规范
 
@@ -49,3 +51,4 @@ docs/
 - 想了解设计有什么问题？→ `analysis/system-architecture-analysis.md`
 - 想知道怎么开发？→ `planning/implementation-plan.md`
 - 想了解当前进度？→ `planning/implementation-status.md`
+- 想了解性能问题与架构专项？→ `planning/performance-architecture-review.md`
