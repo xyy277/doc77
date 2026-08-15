@@ -164,6 +164,61 @@ Common config keys:
 | `doc77 lock status` | View active project locks |
 | `doc77 lock release <project_id>` | Manually release a project lock |
 
+### Sync (Git / WebDAV / S3 / Local)
+
+Doc77 can sync a project folder with a remote source: Git remote, WebDAV (NAS),
+S3-compatible object storage (MinIO / R2 / B2), or another local directory.
+Sync is bidirectional, supports automatic scheduling, conflict detection with
+three-way merge + AI assistance, and optional end-to-end encryption.
+
+#### CLI
+
+```bash
+# Add a sync configuration (config JSON depends on adapter type)
+doc77 sync add <project> <adapter-type> <config-json>
+
+# List / run / remove / inspect configurations
+doc77 sync list
+doc77 sync run <project>
+doc77 sync remove <project>
+doc77 sync status <project>
+```
+
+Adapter config examples:
+
+```jsonc
+// Git — remoteUrl + auth method
+{ "type": "git", "remoteUrl": "git@github.com:user/docs.git",
+  "branch": "main", "remoteName": "origin", "authMethod": "ssh",
+  "commitPrefix": "[doc77-sync]", "autoCommit": true, "pullStrategy": "merge" }
+
+// WebDAV (NAS)
+{ "type": "webdav", "endpoint": "https://nas.example.com/dav",
+  "username": "user", "password": "secret", "remotePath": "/doc77",
+  "ignorePatterns": ["*.tmp"] }
+
+// S3-compatible (MinIO / R2 / B2)
+{ "type": "s3", "endpoint": "https://s3.example.com", "region": "auto",
+  "bucket": "my-docs", "prefix": "notes", "accessKeyId": "AKIA...",
+  "secretAccessKey": "...", "ignorePatterns": [] }
+
+// Local mirror directory
+{ "type": "local", "targetPath": "/mnt/backup/docs" }
+```
+
+For HTTPS / token auth use `"authMethod": "https"` (or `"token"`) and pass the
+token in `"token"`. SSH auth relies on your local `~/.ssh` keys.
+
+#### Web UI
+
+Open **Settings → Sync** for a project: pick the adapter type, paste the
+config JSON, choose direction and sync interval, then **Test Connection**
+before saving. The panel shows sync state, history and conflicts; conflicts
+open a three-way merge view with optional AI-suggested resolution.
+
+> Note: changes synced in from Git / WebDAV are detected by the built-in file
+> watcher, so the file tree refreshes automatically without a manual reload.
+
 ### Offline Support
 
 ```bash
@@ -295,6 +350,65 @@ doc77/
 └── README.md          # This file
 ```
 
+## Contributing
+
+Contributions are welcome! Here is the full local setup and submission flow.
+
+### Prerequisites
+
+| Tool | Version |
+|---|---|
+| Node.js | >= 22.x |
+| pnpm | >= 9.x (install with `npm i -g pnpm`) |
+| Git | any recent version |
+
+### Local Setup
+
+```bash
+git clone https://github.com/xyy277/doc77.git
+cd doc77
+pnpm install            # install dependencies (builds each package's dist on first run)
+pnpm build              # build all packages
+```
+
+### Common Scripts
+
+| Command | Description |
+|---|---|
+| `pnpm dev` | Start the `@doc77/core` dev server (hot reload, port 27777) |
+| `pnpm dev:start` | Build the CLI and its deps, then start the full app (`--bind 0.0.0.0`, port 27777) |
+| `pnpm dev:restart` | Same as `dev:start`, used to restart the app |
+| `pnpm dev-electron` | Start Electron desktop dev mode |
+| `pnpm build` | Build all packages and sync version numbers |
+| `pnpm test` | Run the Vitest test suite |
+| `pnpm lint` | ESLint check |
+| `pnpm format:check` | Prettier format check |
+| `pnpm check:i18n` | Verify zh-CN / en-US i18n key consistency |
+
+### Branching & Submission Flow
+
+The `main` branch is protected by **GitHub Rulesets**:
+
+- ❌ Direct push to `main` is forbidden
+- ❌ Force push / deletion of `main` is forbidden
+- ✅ Changes must be merged via Pull Request
+- ✅ Before merge, the following CI checks must all pass: `Lint & Format Check`, `Build`, `Test (Node 22 on ubuntu/macos/windows-latest)`
+- ✅ Squash merge is recommended to keep history linear
+
+Recommended workflow:
+
+1. Branch off `main`: `git checkout -b feat/your-feature`
+2. Self-test locally: `pnpm lint && pnpm format:check && pnpm test`
+3. Commit (Conventional Commits recommended, e.g. `fix(web): ...`, `feat(core): ...`)
+4. Push the branch: `git push -u origin feat/your-feature`
+5. Open a PR into `main` on GitHub, wait for CI to go green, then merge
+
+### Code Conventions
+
+- See [CLAUDE.md](https://github.com/xyy277/doc77/blob/main/CLAUDE.md) for detailed conventions
+- TypeScript strict mode; ensure `pnpm build` passes before committing
+- i18n strings must be updated in both `zh-CN.json` and `en-US.json`; run `pnpm check:i18n` before committing
+
 ## Privacy & Security
 
 - All data stored locally in `~/.doc77/`
@@ -304,4 +418,4 @@ doc77/
 
 ## License
 
-[MIT License](https://github.com/xyy277/doc77/blob/main/LICENSE)
+Doc77 is released under the [MIT License](https://github.com/xyy277/doc77/blob/main/LICENSE) — free to use, modify, and distribute. See the [LICENSE](https://github.com/xyy277/doc77/blob/main/LICENSE) file for the full text.
