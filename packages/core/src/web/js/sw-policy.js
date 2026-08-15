@@ -16,7 +16,9 @@
 
   /** 该 pathname 是否属于 SW 缓存的文档类 API */
   function shouldIntercept(pathname) {
-    return API_PREFIXES.some(function (p) { return pathname.indexOf(p) === 0; });
+    return API_PREFIXES.some(function (p) {
+      return pathname.indexOf(p) === 0;
+    });
   }
 
   /** 仅 GET/HEAD 可写入 Cache API（cache.put 对非 GET 响应抛异常） */
@@ -32,9 +34,23 @@
     return typeof headers.get === 'function' && headers.get('x-doc77-fresh') === '1';
   }
 
+  /**
+   * 变更类请求（非 GET）的缓存清除前缀。
+   *
+   * 返回该项目范围的 /api/tree/<id> 或 /api/content/<id>：该前缀下的
+   * SWR 缓存条目（Cache API + IndexedDB）必须在变更生效时清除，否则
+   * 下次普通 GET 会命中变更前的旧目录/旧内容（如已删除文件仍显示在树上）。
+   * 无项目范围的路径返回 null（不拦截）。
+   */
+  function getMutationPurgePrefix(pathname) {
+    var m = /^\/api\/(tree|content)\/(\d+)/.exec(pathname);
+    return m ? '/api/' + m[1] + '/' + m[2] : null;
+  }
+
   return {
     shouldIntercept: shouldIntercept,
     isGetMethod: isGetMethod,
-    isFreshRequest: isFreshRequest
+    isFreshRequest: isFreshRequest,
+    getMutationPurgePrefix: getMutationPurgePrefix,
   };
 });

@@ -6,6 +6,7 @@ interface SwPolicy {
   shouldIntercept: (pathname: string) => boolean;
   isGetMethod: (method: string) => boolean;
   isFreshRequest: (headers: { get: (k: string) => string | null }) => boolean;
+  getMutationPurgePrefix: (pathname: string) => string | null;
 }
 
 function getPolicy(): SwPolicy {
@@ -63,5 +64,23 @@ describe('sw-policy（Service Worker 拦截策略）', () => {
     expect(policy.isFreshRequest(fresh)).toBe(true);
     expect(policy.isFreshRequest(absent)).toBe(false);
     expect(policy.isFreshRequest(other)).toBe(false);
+  });
+
+  it('变更类请求返回项目范围清除前缀（/api/tree/<id> 或 /api/content/<id>）', () => {
+    // 删除 / 新建 / 重命名 / 保存（含子路径如 bookmark）
+    expect(policy.getMutationPurgePrefix('/api/tree/12')).toBe('/api/tree/12');
+    expect(policy.getMutationPurgePrefix('/api/tree/12?path=docs')).toBe('/api/tree/12');
+    expect(policy.getMutationPurgePrefix('/api/tree/12/file?path=a.md')).toBe('/api/tree/12');
+    expect(policy.getMutationPurgePrefix('/api/tree/12/bookmark?path=a.md')).toBe('/api/tree/12');
+    expect(policy.getMutationPurgePrefix('/api/content/7?path=a.md')).toBe('/api/content/7');
+  });
+
+  it('无项目范围的路径不产生清除前缀', () => {
+    expect(policy.getMutationPurgePrefix('/api/tree/')).toBe(null);
+    expect(policy.getMutationPurgePrefix('/api/tree/abc')).toBe(null);
+    expect(policy.getMutationPurgePrefix('/api/raw/1?path=a.md')).toBe(null);
+    expect(policy.getMutationPurgePrefix('/api/projects')).toBe(null);
+    expect(policy.getMutationPurgePrefix('/api/events')).toBe(null);
+    expect(policy.getMutationPurgePrefix('/')).toBe(null);
   });
 });
