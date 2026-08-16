@@ -227,6 +227,13 @@ async function main() {
       } catch {
         /* non-fatal */
       }
+      // v1.2.0：知识图谱启动自愈 —— 后台逐项目全量重建（不阻塞启动，失败静默）
+      try {
+        const { bootstrapGraphIndexing } = await import('@doc77/core');
+        bootstrapGraphIndexing();
+      } catch {
+        /* non-fatal */
+      }
       try {
         const mcpMaint = await import('@doc77/mcp');
         const { runShadowGC, rejectExpiredTasks, cleanupExpiredSessions } = mcpMaint;

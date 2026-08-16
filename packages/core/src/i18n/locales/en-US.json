@@ -1094,5 +1094,10 @@
   "enc.recoveryCode": "Recovery code",
   "enc.recoveryCodePlaceholder": "Enter recovery code",
   "enc.recoveryBtn": "Unlock with recovery code",
-  "enc.recoveryWarning": "Please save the following recovery codes securely. If lost, they cannot be recovered:"
+  "enc.recoveryWarning": "Please save the following recovery codes securely. If lost, they cannot be recovered:",
+  "web.preview.graph.backlinks": "Backlinks",
+  "web.preview.graph.noBacklinks": "No backlinks yet — add [[wikilinks]] to connect documents",
+  "web.preview.graph.related": "Related documents",
+  "web.preview.graph.loadingRelated": "Loading…",
+  "web.preview.graph.noRelated": "No related documents"
 }

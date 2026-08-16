@@ -37,8 +37,9 @@ function getProjectFiles(projectId: number, projectRoot: string): string[] {
 
 /**
  * Parse alias map from .doc77links file.
+ * （v1.2.0 导出：图谱提取层与渲染期共用同一别名语义）
  */
-function loadAliasMap(projectRoot: string): Map<string, string> {
+export function loadAliasMap(projectRoot: string): Map<string, string> {
   const aliasFile = path.join(projectRoot, '.doc77links');
   const map = new Map<string, string>();
   try {
@@ -58,23 +59,25 @@ function loadAliasMap(projectRoot: string): Map<string, string> {
 }
 
 /**
- * Resolve a wikilink `[[title]]` to a file path relative to the project root.
+ * 解析 `[[title]]` 的纯函数核心（渲染期与图谱提取层共用，v1.2.0 抽取）。
  *
  * Algorithm:
  * 1. Check alias map (.doc77links)
  * 2. Exact match: title.md
  * 3. Case-insensitive match
  * 4. If not found, return null (dead link)
+ *
+ * @param allFiles 项目内全部 markdown 文件的绝对路径列表
+ * @param aliasMap .doc77links 别名表（title → 相对路径）
+ * @param title 链接标题（不含 #锚点 / |display）
  */
-export function resolveWikilink(
-  title: string,
-  projectId: number,
+export function resolveWikilinkIn(
+  allFiles: string[],
+  aliasMap: Map<string, string>,
   projectRoot: string,
+  title: string,
 ): string | null {
-  const allFiles = getProjectFiles(projectId, projectRoot);
-
   // 1. Check alias map
-  const aliasMap = loadAliasMap(projectRoot);
   const aliased = aliasMap.get(title);
   if (aliased) {
     const aliasPath = path.resolve(projectRoot, aliased);
@@ -95,6 +98,25 @@ export function resolveWikilink(
 
   // 4. Not found
   return null;
+}
+
+/**
+ * Resolve a wikilink `[[title]]` to a file path relative to the project root.
+ *
+ * Algorithm:
+ * 1. Check alias map (.doc77links)
+ * 2. Exact match: title.md
+ * 3. Case-insensitive match
+ * 4. If not found, return null (dead link)
+ */
+export function resolveWikilink(
+  title: string,
+  projectId: number,
+  projectRoot: string,
+): string | null {
+  const allFiles = getProjectFiles(projectId, projectRoot);
+  const aliasMap = loadAliasMap(projectRoot);
+  return resolveWikilinkIn(allFiles, aliasMap, projectRoot, title);
 }
 
 /**

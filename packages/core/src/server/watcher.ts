@@ -3,6 +3,8 @@ import { watch, type FSWatcher } from 'chokidar';
 import { listProjects } from '../db/projects.js';
 import { clearCache } from '../scanner/index.js';
 import { getEventBus } from './event-bus.js';
+import { onWatcherFlush } from '../graph/maintenance.js';
+import { markProjectGraphDirty } from '../graph/indexer.js';
 
 /**
  * 文件系统监听器 — 将磁盘变化（外部编辑器 / git pull / webdav 同步 /
@@ -93,6 +95,29 @@ function flush(projectId: number, relDir: string): void {
   } catch {
     /* best-effort */
   }
+  // v1.2.0：图谱增量（外部变更/MCP 写路径的兜底入口；覆盖 REST 之外的
+  // 一切磁盘变化）。截断（>50 路径）或目录级事件 → 标记脏，后台全量重建。
+  try {
+    if (
+      entry.truncated ||
+      entry.paths.some((p) => !/\.(md|mdx|markdown)$/i.test(p) && !path.posix.extname(p))
+    ) {
+      markProjectGraphDirty(projectId);
+    } else {
+      const root = rootOf(projectId);
+      if (root) onWatcherFlush(projectId, root, opType, entry.paths);
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** projectId → 项目根（_rootToProject 反查） */
+function rootOf(projectId: number): string | undefined {
+  for (const [root, id] of _rootToProject) {
+    if (id === projectId) return root;
+  }
+  return undefined;
 }
 
 function schedule(projectId: number, relDir: string, opType: string, relPath: string): void {

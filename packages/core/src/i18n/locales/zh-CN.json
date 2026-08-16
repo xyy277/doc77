@@ -1093,5 +1093,10 @@
   "enc.recoveryCode": "恢复码",
   "enc.recoveryCodePlaceholder": "输入恢复码",
   "enc.recoveryBtn": "用恢复码解锁",
-  "enc.recoveryWarning": "请妥善保存以下恢复码，丢失后无法找回："
+  "enc.recoveryWarning": "请妥善保存以下恢复码，丢失后无法找回：",
+  "web.preview.graph.backlinks": "反向链接",
+  "web.preview.graph.noBacklinks": "暂无反向链接 —— 用 [[wikilink]] 关联文档",
+  "web.preview.graph.related": "相关文档",
+  "web.preview.graph.loadingRelated": "加载中…",
+  "web.preview.graph.noRelated": "暂无相关文档"
 }
