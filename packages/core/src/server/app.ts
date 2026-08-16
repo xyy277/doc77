@@ -429,13 +429,20 @@ export function createApp(
   // the unauthenticated static /thumbnails path).
   const PUBLIC_API_PREFIXES = ['/api/share/', '/api/thumbnails/'];
 
-  function extractBearerToken(req: Request): string | null {
+  function extractBearerToken(req: Request, opts?: { allowQuery?: boolean }): string | null {
     const h = req.headers['authorization'];
     if (typeof h === 'string' && h.startsWith('Bearer ')) {
       return h.slice(7).trim() || null;
     }
     const x = req.headers['x-doc77-token'];
     if (typeof x === 'string') return x.trim() || null;
+    // EventSource 无法设置 Authorization header，SSE 端点（仅 /api/events）
+    // 允许经 ?token= 接收 session token。窄范围 opt-in：服务端无 URL 日志，
+    // 同源无 referrer 外泄；header 始终优先于 query。
+    if (opts?.allowQuery) {
+      const q = req.query.token;
+      if (typeof q === 'string' && q.trim()) return q.trim();
+    }
     return null;
   }
 
@@ -444,6 +451,10 @@ export function createApp(
     if (!req.path.startsWith('/api/')) return next();
     if (PUBLIC_API_ROUTES.has(req.path)) return next();
     if (PUBLIC_API_PREFIXES.some((p) => req.path.startsWith(p))) return next();
+
+    // 仅 /api/events（SSE）允许 query token —— EventSource 无法带 header。
+    // 隧道与密码两分支都需传入（隧道 running + LAN 浏览时 SSE 走隧道分支）。
+    const allowQueryToken = req.path === '/api/events';
 
     // 隧道安全门控（T3）：隧道 running 且请求非 localhost 时，即使开放模式也强制认证。
     // 通过 X-Forwarded-For 或 req.ip 判断来源 IP——隧道转发时 XFF 携带真实客户端 IP。
@@ -466,7 +477,7 @@ export function createApp(
           return;
         }
         // 接受常规 session 或隧道 session（30min TTL）
-        const token = extractBearerToken(req);
+        const token = extractBearerToken(req, { allowQuery: allowQueryToken });
         if (token && (auth.validateSessionToken(token) || auth.validateTunnelSessionToken(token))) {
           return next();
         }
@@ -482,7 +493,7 @@ export function createApp(
     // Open mode: no password configured → no session required.
     if (!auth.isPasswordSet()) return next();
     // Password configured → require a valid, non-expired session token.
-    const token = extractBearerToken(req);
+    const token = extractBearerToken(req, { allowQuery: allowQueryToken });
     if (token && auth.validateSessionToken(token)) return next();
     res
       .status(401)

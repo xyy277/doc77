@@ -1002,7 +1002,12 @@
   // ── SSE：索引进度 / 文件变更 → 1s 去抖重载 ──
   function initSSE() {
     if (!window.EventSource) return;
-    var es = new EventSource('/api/events');
+    // EventSource 无法设置 Authorization header；session token 经 ?token=
+    // 传递（服务端仅对 /api/events 开放 query token；'1' 为无 token 哨兵）
+    var tok = sessionStorage.getItem('doc77-auth');
+    var es = new EventSource(
+      '/api/events' + (tok && tok !== '1' ? '?token=' + encodeURIComponent(tok) : ''),
+    );
     var scheduleReload = function () {
       clearTimeout(state.reloadTimer);
       state.reloadTimer = setTimeout(function () {

@@ -119,7 +119,11 @@ function initGraphBtn() {
 function initTaskEvents() {
   if (taskEventSrc || typeof EventSource === 'undefined') return;
   try {
-    taskEventSrc = new EventSource('/api/events');
+    // EventSource 无法设置 Authorization header；session token 经 ?token=
+    // 传递（服务端仅对 /api/events 开放 query token；'1' 为无 token 哨兵）。
+    var tok = sessionStorage.getItem('doc77-auth');
+    var sseUrl = '/api/events' + (tok && tok !== '1' ? '?token=' + encodeURIComponent(tok) : '');
+    taskEventSrc = new EventSource(sseUrl);
     taskEventSrc.addEventListener('task:executed', function(e){
       var d = {}; try { d = JSON.parse(e.data); } catch(_){}
       toast(t('web.preview.task.toastExecuted', {id: d.task_id||'?'}), 'success');
