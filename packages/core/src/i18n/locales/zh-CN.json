@@ -1115,5 +1115,6 @@
   "web.graph.truncated": "图谱数据过大，仅显示部分",
   "web.graph.empty": "暂无图谱数据 — 点击重建索引",
   "web.graph.reindex": "重建索引",
-  "web.graph.openSource": "打开来源文档"
+  "web.graph.openSource": "打开来源文档",
+  "ai.context.noProjectHint": "注意：当前对话未关联任何项目（project_id 为空）。**不要调用** list_files、read_file、get_file_info、search_files 等文件工具——它们需要项目上下文，调用会返回错误。若用户询问项目或文件相关的问题，请使用 list_projects 列出可用项目，并告知用户：需要先在界面中选择一个项目，再重新提问。"
 }

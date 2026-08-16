@@ -4349,6 +4349,13 @@ export function createAIChatHandler(deps: {
  */
 export function createAgentLoopHandler(deps: {
   AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => unknown;
+  /** T4: OllamaProvider — 仅当 ai.provider === 'ollama' 时使用。 */
+  OllamaProvider?: new (config: {
+    apiKey: string;
+    baseUrl?: string;
+    model?: string;
+    ollamaUrl?: string;
+  }) => unknown;
   AgentLoop: new (config: Record<string, unknown>) => {
     run(
       sessionId: string,
@@ -4382,7 +4389,15 @@ export function createAgentLoopHandler(deps: {
   const aiRateLimiter = createRateLimiter();
 
   return async (req: Request, res: Response) => {
-    const { message, project_id, session_id, context_file, regenerate_from, edit_from } = req.body;
+    const {
+      message,
+      project_id,
+      session_id,
+      context_file,
+      context_graph_neighbors,
+      regenerate_from,
+      edit_from,
+    } = req.body;
     console.error(
       `[ai-loop] chat request: session=${session_id || 'new'}, project=${project_id}, ` +
         `context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"` +
@@ -4447,6 +4462,14 @@ export function createAgentLoopHandler(deps: {
     }
     const baseUrl = baseRow?.value || 'https://api.deepseek.com';
     const model = modelRow?.value || 'deepseek-v4-pro';
+    // T4: 读取 ai.provider，支持多 provider 切换（ollama / custom）
+    const providerRow = db.prepare("SELECT value FROM config WHERE key = 'ai.provider'").get() as
+      { value: string } | undefined;
+    const ollamaUrlRow = db
+      .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
+      .get() as { value: string } | undefined;
+    const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
+    const ollamaUrl = ollamaUrlRow?.value;
 
     // ── SSE setup ──
     res.writeHead(200, {
@@ -4485,6 +4508,23 @@ export function createAgentLoopHandler(deps: {
       }
       send('session', { session_id: sid });
 
+      // ── Per-session rate limit (message ceiling over a 5-minute window) ──
+      const rlLimit = (() => {
+        try {
+          const row = db
+            .prepare("SELECT value FROM config WHERE key = 'ai.read_limit_per_session'")
+            .get() as { value: string } | undefined;
+          return parseInt(row?.value || '200', 10) || 200;
+        } catch {
+          return 200;
+        }
+      })();
+      if (!aiRateLimiter.check(sid, rlLimit, 5 * 60 * 1000, Date.now()).allowed) {
+        send('error', { message: t('ai.context.rateLimited') });
+        res.end();
+        return;
+      }
+
       // ── Build the persistence adapter (bridges AgentLoop ↔ SessionStore) ──
       const persistence = createPersistenceAdapter({
         appendMessage: (sId: string, msg: Record<string, unknown>) =>
@@ -4511,10 +4551,11 @@ export function createAgentLoopHandler(deps: {
         logToolCall: (entry: Record<string, unknown>) => logToolCall(entry as never),
       });
 
-      // ── Build the provider ──
-      const provider = new AiProvider({ apiKey: token, baseUrl, model }) as InstanceType<
-        typeof AiProvider
-      >;
+      // ── Build the provider (T4: ollama / custom 按 ai.provider 选择) ──
+      const sessionProvider =
+        provider === 'ollama' && deps.OllamaProvider
+          ? new deps.OllamaProvider({ apiKey: 'ollama', model, ollamaUrl })
+          : new AiProvider({ apiKey: token, baseUrl, model });
 
       // ── Build the tool executor (same logic as createAIChatHandler) ──
       let toolSessionId = sid;
@@ -4564,6 +4605,14 @@ export function createAgentLoopHandler(deps: {
       const readTools = getReadTools();
       const writeTools = deps.writeFns ? deps.getWriteTools?.() || [] : [];
       const allTools = [...readTools, ...writeTools];
+      // 无项目上下文时：文件/写工具全部不可用（会因缺少 pid 失败），只保留
+      // list_projects 供 AI 列出项目、引导用户在界面中选择后再提问。
+      const activeTools = project_id
+        ? allTools
+        : allTools.filter(
+            (tool) =>
+              (tool as { function?: { name?: string } })?.function?.name === 'list_projects',
+          );
 
       // ── Context file fast-path (same as createAIChatHandler) ──
       let outgoing = message;
@@ -4572,6 +4621,16 @@ export function createAgentLoopHandler(deps: {
         const content = readProjectFileContent(project_id, context_file as string);
         if (!content.startsWith('Error:')) {
           outgoing = `${message}\n\n---\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
+          // v1.2.0：图谱邻居注入（context_graph_neighbors !== false 时附加；
+          // N/K/T 预算内，复用 readProjectFileContent 的敏感拦截与截断语义）
+          if (context_graph_neighbors !== false) {
+            const neighbors = collectGraphNeighbors(
+              project_id,
+              context_file as string,
+              readProjectFileContent,
+            );
+            if (neighbors) outgoing += neighbors;
+          }
           noTools = true;
         }
       }
@@ -4635,6 +4694,10 @@ export function createAgentLoopHandler(deps: {
 
       // ── Inject project context for new sessions ──
       let systemPrompt = t('ai.systemPrompt');
+      if (!project_id) {
+        // 无项目上下文：引导 AI 不要调用文件工具，改为提示用户选择项目
+        systemPrompt += '\n\n' + t('ai.context.noProjectHint');
+      }
       if (project_id && !context_file) {
         try {
           const root = scanDirectory(project_id, '');
@@ -4659,9 +4722,9 @@ export function createAgentLoopHandler(deps: {
 
       // ── Create the AgentLoop ──
       const loop = new AgentLoop({
-        provider,
+        provider: sessionProvider,
         model,
-        tools: allTools as never[],
+        tools: activeTools as never[],
         executeTool,
         maxSteps: 10,
         systemPrompt,
@@ -4675,14 +4738,20 @@ export function createAgentLoopHandler(deps: {
         inject: (msg: string) => loop.interrupts.inject(msg),
       });
 
+      // ── Run the loop and forward events as SSE ──
+      // 累积 assistant 回复文本，结束后写日志便于排查（回复内容、状态、耗时）
+      let assistantText = '';
+      let replyFinish: string | null = null;
+      let replyError: string | null = null;
+      const replyStart = Date.now();
       try {
-        // ── Run the loop and forward events as SSE ──
         for await (const event of loop.run(sid, outgoing, { noTools, skipAppendUser })) {
           switch (event.type) {
             case 'session':
               // Already sent above; skip
               break;
             case 'token':
+              assistantText += event.content;
               send('token', { text: event.content });
               break;
             case 'tool_call_start':
@@ -4712,13 +4781,24 @@ export function createAgentLoopHandler(deps: {
               });
               break;
             case 'done':
+              replyFinish = event.finishReason || 'done';
               send('done', { finishReason: event.finishReason, usage: event.usage });
               break;
             case 'error':
+              replyError = event.message || null;
+              replyFinish = 'error';
               send('error', { message: event.message });
               break;
           }
         }
+        // 排查日志：记录本次 AI 回复的完整内容（截断）、状态与耗时
+        const elapsedMs = Date.now() - replyStart;
+        console.error(
+          `[ai-loop] reply done: session=${sid}, ${assistantText.length} chars, ` +
+            `finish=${replyFinish || 'interrupted'}, ${elapsedMs}ms` +
+            (replyError ? `, error=${replyError}` : '') +
+            `\n[ai-loop] reply text: ${assistantText.slice(0, 1000)}`,
+        );
       } finally {
         // ── Clean up: unregister the interrupt queue ──
         _activeInterruptQueues.delete(sid);

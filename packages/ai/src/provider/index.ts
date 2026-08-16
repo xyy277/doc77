@@ -248,13 +248,19 @@ export class AiProvider {
 
       // Emit completed tool calls
       if (finishReason === 'tool_calls' || toolCallAcc.size > 0) {
-        for (const tc of toolCallAcc.values()) {
+        for (const [idx, tc] of toolCallAcc) {
           if (tc.name) {
             yield {
               type: 'tool_call',
-              id: tc.id,
+              // Defensive: some OpenAI-compatible providers (DeepSeek /
+              // SiliconFlow) stream tool_call deltas with a null/empty id —
+              // sending an empty id downstream makes the chat API reject the
+              // follow-up with "tool must be a response to a preceding
+              // message with tool_calls". Fall back to a stable per-index id
+              // so assistant(tool_calls) ↔ tool messages stay paired.
+              id: tc.id || `call_${idx}`,
               name: tc.name,
-              arguments: tc.arguments,
+              arguments: tc.arguments || '{}',
             };
           }
         }
