@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Quick pre-commit check: format + lint + i18n parity.
+# Full CI (build + test) stays manual / on CI per CLAUDE.md.
+pnpm format:check && pnpm lint && pnpm check:i18n

@@ -17,7 +17,8 @@
     "format": "prettier --write \"packages/**/*.ts\"",
     "format:check": "prettier --check \"packages/**/*.ts\"",
     "clean": "pnpm -r clean",
-    "check:i18n": "bash scripts/check-i18n.sh"
+    "check:i18n": "bash scripts/check-i18n.sh",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
@@ -29,7 +30,8 @@
     "tsup": "^8.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.1.0"
+    "vitest": "^3.1.0",
+    "husky": "^9.1.7"
   },
   "engines": {
     "node": ">=22.0.0",
