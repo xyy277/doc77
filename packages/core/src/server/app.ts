@@ -369,6 +369,25 @@ export function createApp(
     ? process.env.DOC77_VENDOR_DIR ||
       path.join((process as NodeJS.Process & { resourcesPath?: string }).resourcesPath!, 'vendor')
     : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
+  // Readiness probe guard: report .ready as 404 when the vendor dir holds no
+  // real assets (a stale .ready from a failed vendor-install used to make the
+  // frontend pick the local path and 404 on every asset — blanking the AI
+  // chat and flashing the tab strip in a reload loop).
+  app.use('/vendor', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/.ready') {
+      try {
+        const hasAssets = fs.readdirSync(vendorDir).some((f) => f !== '.ready' && f !== '.');
+        if (!hasAssets) {
+          res.status(404).end();
+          return;
+        }
+      } catch {
+        res.status(404).end();
+        return;
+      }
+    }
+    next();
+  });
   app.use('/vendor', express.static(vendorDir, { fallthrough: true, dotfiles: 'allow' }));
 
   // CORS — allow all origins (localhost-only binding for security)
@@ -487,12 +506,17 @@ export function createApp(
   // --- API Routes ---
 
   // i18n dictionary delivery (with ETag caching)
+  // Note: no-store — the frontend fetch() cannot consume a 304 body (r.json()
+  // on an empty body rejects, leaving the client dict empty and every label
+  // rendering as its raw key). Browsers therefore must never cache this
+  // response; the ETag branch is kept for non-browser clients only.
   app.get('/api/i18n', (req: Request, res: Response) => {
     const r = buildI18nResponse({
       lang: String(req.query.lang || ''),
       hint: String(req.query.hint || ''),
       global: getConfig('locale.language') || '',
     });
+    res.set('Cache-Control', 'no-store');
     if (req.headers['if-none-match'] === r.etag) {
       res.status(304).end();
       return;

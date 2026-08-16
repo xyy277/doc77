@@ -93,7 +93,10 @@ export const VENDOR_ASSETS: VendorAsset[] = [
   },
   {
     name: 'marked.min.js',
-    url: 'https://cdn.jsdelivr.net/npm/marked@17.0.0/marked.min.js',
+    // marked@17 moved the UMD build out of the package root — the old
+    // /marked.min.js path 404s on jsdelivr, which made vendor-install skip
+    // it and left markdown rendering in plain-text fallback forever.
+    url: 'https://cdn.jsdelivr.net/npm/marked@17.0.0/lib/marked.umd.min.js',
     type: 'js',
     size: '~40KB',
   },
@@ -137,9 +140,11 @@ export const VENDOR_ASSETS: VendorAsset[] = [
 export async function fetchVendorAssets(vendorDir: string, assets: VendorAsset[]): Promise<void> {
   fs.mkdirSync(vendorDir, { recursive: true });
 
+  let available = 0;
   for (const asset of assets) {
     const dest = path.join(vendorDir, asset.name);
     if (fs.existsSync(dest)) {
+      available++;
       console.log(t('cli.vendor.assetExists', { name: asset.name }));
       continue;
     }
@@ -152,6 +157,7 @@ export async function fetchVendorAssets(vendorDir: string, assets: VendorAsset[]
       }
       const buffer = Buffer.from(await resp.arrayBuffer());
       fs.writeFileSync(dest, buffer);
+      available++;
       console.log(`  ✓ ${asset.name} (${(buffer.length / 1024).toFixed(0)} KB)`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
@@ -159,8 +165,19 @@ export async function fetchVendorAssets(vendorDir: string, assets: VendorAsset[]
     }
   }
 
-  // Write a marker file to indicate vendor is ready
-  fs.writeFileSync(path.join(vendorDir, '.ready'), Date.now().toString());
+  // Write the ready marker ONLY when at least one asset is actually present.
+  // Previously the marker was written unconditionally, so a fully-failed
+  // download left an empty vendor dir "ready" — the frontend then probed
+  // /vendor/.ready, picked the local path and 404'd on every asset.
+  if (available > 0) {
+    fs.writeFileSync(path.join(vendorDir, '.ready'), Date.now().toString());
+  } else {
+    try {
+      fs.rmSync(path.join(vendorDir, '.ready'), { force: true });
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
 }
 
 /**

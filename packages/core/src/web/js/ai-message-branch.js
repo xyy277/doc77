@@ -22,24 +22,33 @@
   var WRITE_TOOLS = { write_file: 1, move_file: 1, create_folder: 1, delete_file: 1, batch_operations: 1 };
 
   // ═══════════ Markdown Rendering (lazy-loaded marked + DOMPurify) ═══════════
-  var _mdCbs = [], _mdLoading = false;
+  var _mdCbs = [], _mdLoading = false, _mdFailed = false;
   /**
    * Lazy-load marked + DOMPurify from local vendor cache or CDN.
    * @param {function(boolean)} cb — called with true when both are ready
    */
   function loadMarkdown(cb) {
     if (window.marked && window.DOMPurify) { cb(true); return; }
+    // Circuit breaker: after a failed attempt (e.g. empty vendor dir + no CDN
+    // access) stop retrying — otherwise every render fires another load +
+    // 404 and the callbacks re-render in a loop.
+    if (_mdFailed) { cb(false); return; }
     _mdCbs.push(cb);
     if (_mdLoading) return;
     _mdLoading = true;
-    // Check if local vendor cache is available
-    fetch('/vendor/.ready').then(function (r) { return r.ok; }).catch(function () { return false; }).then(function (ready) {
+    // Probe the actual marked.min.js instead of the .ready marker: the marker
+    // is written even when every download failed, which made us pick the
+    // vendor path and 404 on every render.
+    fetch('/vendor/marked.min.js', { method: 'HEAD' }).then(function (r) {
+      return r.ok;
+    }).catch(function () { return false; }).then(function (ready) {
       var base = ready ? '/vendor/' : 'https://cdn.jsdelivr.net/npm/';
-      var markedUrl = ready ? '/vendor/marked.min.js' : base + 'marked@17.0.0/marked.min.js';
+      // marked@17 moved the UMD build to lib/ — the root marked.min.js 404s.
+      var markedUrl = ready ? '/vendor/marked.min.js' : base + 'marked@17.0.0/lib/marked.umd.min.js';
       var purifyUrl = ready ? '/vendor/dompurify.min.js' : base + 'dompurify@3.2.0/dist/purify.min.js';
       var loaded = 0;
       function done() { loaded++; if (loaded === 2) { _mdLoading = false; _mdCbs.splice(0).forEach(function (fn) { fn(true); }); } }
-      function fail() { _mdLoading = false; _mdCbs.splice(0).forEach(function (fn) { fn(false); }); }
+      function fail() { _mdFailed = true; _mdLoading = false; _mdCbs.splice(0).forEach(function (fn) { fn(false); }); }
       var s1 = document.createElement('script');
       s1.src = markedUrl;
       s1.onload = function () {
@@ -55,6 +64,25 @@
   }
 
   /**
+   * Resolve the DOMPurify sanitizer, tolerating both the 2.x object export
+   * ({ sanitize }) and the 3.x class/function export that needs instantiation.
+   */
+  var _purifier = null;
+  function getPurifier() {
+    if (_purifier) return _purifier;
+    var DP = window.DOMPurify;
+    if (DP && typeof DP.sanitize === 'function') {
+      _purifier = DP;
+    } else if (DP && typeof DP === 'function' && DP.prototype && typeof DP.prototype.sanitize === 'function') {
+      _purifier = new DP();
+    } else if (DP && typeof DP === 'function') {
+      // 3.x factory-style export: DOMPurify(window-like)
+      try { _purifier = DP(window); } catch (e) { _purifier = null; }
+    }
+    return _purifier;
+  }
+
+  /**
    * Render assistant message content as sanitized Markdown HTML.
    * Falls back to escaped plain text if marked/DOMPurify aren't loaded yet
    * (and kicks off a background load so the next render has them).
@@ -63,19 +91,33 @@
    */
   function renderAssistantContent(content) {
     if (!content) return '';
-    if (window.marked && window.DOMPurify) {
+    var purify = getPurifier();
+    if (window.marked && purify) {
       try {
         var raw = window.marked.parse(content, { breaks: true, gfm: true, async: false });
-        return window.DOMPurify.sanitize(raw, {
+        return purify.sanitize(raw, {
           ALLOWED_TAGS: ['p','br','strong','em','del','code','pre','ul','ol','li','blockquote','h1','h2','h3','h4','h5','h6','a','table','thead','tbody','tr','th','td','hr','img','span','div'],
           ALLOWED_ATTR: ['href','src','alt','title','class'],
         });
-      } catch (e) { return esc(content); }
+      } catch (e) {
+        console.warn('[md] marked/sanitize 失败，降级纯文本:', e && e.message);
+        return esc(content);
+      }
     }
+    // 诊断：标记库未就绪的原因（排查用）
+    console.warn(
+      '[md] marked/DOMPurify 未就绪: marked=' + (window.marked ? 'ok' : 'missing') +
+      ', DOMPurify=' + (window.DOMPurify ? typeof window.DOMPurify : 'missing') +
+      ', sanitize=' + (window.DOMPurify && typeof window.DOMPurify.sanitize)
+    );
     // marked not yet loaded — trigger background load and return plain text
-    loadMarkdown(function () {
-      // Re-render messages after marked loads
-      if (window.aiChatTabs && window.aiChatTabs.reloadActive) window.aiChatTabs.reloadActive();
+    loadMarkdown(function (ok) {
+      // Re-render messages only when marked actually became available —
+      // a failed load must NOT trigger a reload loop (that was blanking the
+      // chat area and flashing the tab strip on every render).
+      if (ok && window.aiChatTabs && window.aiChatTabs.reloadActive) {
+        window.aiChatTabs.reloadActive();
+      }
     });
     return esc(content);
   }

@@ -173,21 +173,31 @@
     tab.status = 'loading';
     renderStrip();
     fetch('/api/ai/sessions/' + encodeURIComponent(tab.sessionId) + '/messages/path')
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        // Non-2xx (e.g. 404 when the session lives only in the legacy
+        // ai_chat_sessions store) must not wipe the locally rendered chat.
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
       .then(function (data) {
         tab.status = 'idle';
-        tab.messages = (data && data.path) || [];
-        // Refresh tab title from session if it was renamed
-        if (data && data.session && data.session.title) {
-          // The path endpoint doesn't return session — fetch separately if needed
+        var path = (data && data.path) || [];
+        // Defensive: if the server reports an empty path but we already have
+        // messages rendered locally, keep them instead of blanking the chat.
+        if (path.length === 0 && tab.messages.length > 0) {
+          renderStrip();
+          return;
         }
+        tab.messages = path;
         renderMessages(tab);
         renderStrip();
       })
       .catch(function () {
         tab.status = 'idle';
-        tab.messages = [];
-        renderMessages(tab);
+        // Load failed (network / 404 / legacy store): preserve local messages.
+        if (tab.messages.length === 0) {
+          renderMessages(tab);
+        }
         renderStrip();
       });
   }
