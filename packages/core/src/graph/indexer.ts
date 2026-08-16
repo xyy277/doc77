@@ -17,7 +17,10 @@ import { upsertDocMeta, replaceFileLinks, withConn } from './repository.js';
  * 末尾清理不存在文件（死链自愈）。
  */
 
-const BATCH_SIZE = 100;
+// 批大小影响事件循环停顿：100 文件/批在真实项目可达 ~100ms 阻塞
+// （性能测试实测 95ms）—— 40/批把单次停顿压到 ~40ms（1.1.3 事件循环
+// 冻结教训的量化约束：全量重建期间 UI/API 不应可感知卡顿）
+const BATCH_SIZE = 40;
 
 function fileHash(content: string): string {
   return createHash('sha256').update(content).digest('hex').slice(0, 16);

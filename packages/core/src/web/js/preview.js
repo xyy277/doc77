@@ -925,7 +925,8 @@ function renderGraphPanel(path) {
 function renderGraphPanelContent(card, path, backlinks) {
   var panel = document.createElement('div');
   panel.id = 'graphPanel';
-  panel.className = 'max-w-4xl mx-auto mt-4 px-8 pb-4';
+  // sm:px-12 与 docCard 的 sm:p-12 对齐（面板内容与文档内容左对齐）
+  panel.className = 'max-w-4xl mx-auto mt-4 px-8 sm:px-12 pb-4';
   var html = '<div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm">';
 
   // 反向链接区
