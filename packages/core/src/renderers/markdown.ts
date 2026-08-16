@@ -372,9 +372,30 @@ export function renderMarkdown(
   // Wikilink resolution (only in obsidian mode)
   if (obsidianMode && projectId != null && filePath) {
     html = resolveWikilinks(html, projectId, filePath);
+  } else {
+    // v1.2.0 修复（知识图谱顺带项）：非 obsidian 模式下 wikilink extension
+    // 仍会渲染成 `doc77-wikilink:` 死锚点（前端无该协议处理器，点击无效）。
+    // 还原为字面文本 [[title]] / [[title|display]] —— 图谱提取层独立于
+    // 渲染层，不受影响。
+    html = restoreWikilinkLiteral(html);
   }
 
   return html;
+}
+
+/** 把 `doc77-wikilink:` 锚点还原为 [[...]] 字面文本（非 obsidian 模式） */
+function restoreWikilinkLiteral(html: string): string {
+  return html.replace(
+    /<a href="doc77-wikilink:([^"]+)" data-display="([^"]*)">[^<]*<\/a>/g,
+    (_match: string, encoded: string, display: string) => {
+      const title = decodeURIComponent(encoded);
+      const disp = display
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<');
+      return disp === title ? `[[${title}]]` : `[[${title}|${disp}]]`;
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

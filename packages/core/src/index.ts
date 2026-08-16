@@ -42,6 +42,30 @@ export {
 } from './i18n/index.js';
 export type { LocaleInfo } from './i18n/index.js';
 
+// Knowledge Graph (v1.2.0)
+export {
+  indexFileLinks,
+  fullGraphIndex,
+  clearProjectGraph,
+  markProjectGraphDirty,
+  bootstrapGraphIndexing,
+} from './graph/indexer.js';
+export {
+  queryBacklinks,
+  queryOutlinks,
+  getGraphStats,
+  deleteFileGraph,
+  renameFileGraph,
+} from './graph/repository.js';
+export { relatedDocs, coCitationScorer } from './graph/related.js';
+export { extractLinksFromContent, createLinkResolver } from './graph/link-extractor.js';
+export { extractDocMeta } from './graph/frontmatter.js';
+export { onFileSaved, onFileDeleted, onFileRenamed, onWatcherFlush } from './graph/maintenance.js';
+export type { ExtractedLink, LinkResolver } from './graph/link-extractor.js';
+export type { ScoredDoc, RelatedScorer } from './graph/related.js';
+export type { DocMetaRow, LinkRow, BacklinkRow, GraphStats } from './graph/repository.js';
+export type { GraphIndexProgress } from './graph/indexer.js';
+
 // Database
 export {
   initDatabase,

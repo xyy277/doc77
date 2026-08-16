@@ -89,7 +89,8 @@ function fileHash(content: string): string {
   return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
 }
 
-function extractTitle(content: string, filePath: string): string {
+/** 文档标题（图谱 doc_meta 复用同一语义，v1.2.0 导出） */
+export function extractTitle(content: string, filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.md' || ext === '.mdx' || ext === '.markdown') {
     const match = content.match(/^#\s+(.+)$/m);
@@ -327,7 +328,8 @@ export function getIndexStats(projectId: number, db?: DatabaseCompat) {
   };
 }
 
-function walkDir(root: string, dir: string): string[] {
+/** 全库遍历（相对路径，posix 化；图谱全量索引复用，v1.2.0 起导出） */
+export function walkDir(root: string, dir: string): string[] {
   const results: string[] = [];
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });

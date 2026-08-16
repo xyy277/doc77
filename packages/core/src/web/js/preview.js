@@ -147,6 +147,12 @@ function initTaskEvents() {
       // v1.1.4：目录树刷新合并节流 —— 同一目录 1s 内只刷一次；
       // document.hidden 时跳过，恢复可见时统一补刷
       queueTreeRefresh(d.path || '');
+      // v1.2.0：当前打开的文档被外部变更 → 图谱面板刷新
+      if (activeTabPath && paths.indexOf(activeTabPath) !== -1) refreshGraphPanel();
+    });
+    taskEventSrc.addEventListener('graph:index-progress', function () {
+      // v1.2.0：图谱全量重建进度 → 刷新当前面板
+      refreshGraphPanel();
     });
     taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
   } catch(_){}
@@ -778,7 +784,7 @@ function buildDocHTML(path, d) {
       (d.temp ? '' : '<button onclick="revealFile(\'reveal\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">📂 ' + t('web.preview.showInFolder') + '</button>') +
       '</div>';
   } else if (d.type === 'markdown' || d.type === 'mermaid' || d.type === 'code') {
-    html = '<div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
+    html = '<div id="docCard" class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"><div class="doc-content text-slate-700 dark:text-slate-300" id="docContent">' + d.content + '</div></div>';
     if (d.type === 'code') {
       var ext = path.split('.').pop().toLowerCase();
       if (ext === 'html' || ext === 'htm') {
@@ -886,6 +892,114 @@ function afterActivate(path, d) {
   setTimeout(renderMath, 80);
   if (_pendingLine > 0) { setTimeout(function(){ scrollToLine(_pendingLine); _pendingLine = 0; }, 200); }
   renderBreadcrumb(path);
+  // v1.2.0：知识图谱面板（反向链接 + 相关文档）
+  renderGraphPanel(path);
+}
+
+//══════════ 知识图谱面板（v1.2.0）══════════
+// 独立 DOM（不拼进 d.content —— tabDataCache 缓存 /api/content 响应，
+// 混入会导致面板不随数据更新）。异步 fetch，文档卡片底部插入。
+var graphPanelTimer = null;
+
+function renderGraphPanel(path) {
+  if (!path || TempPreview.isTempPath(path)) return;
+  if (graphPanelTimer) clearTimeout(graphPanelTimer);
+  graphPanelTimer = setTimeout(function () {
+    graphPanelTimer = null;
+    var card = document.getElementById('docCard');
+    if (!card) return;
+    var existing = document.getElementById('graphPanel');
+    if (existing) existing.remove();
+
+    fetch('/api/graph/' + pid + '/backlinks?path=' + encodeURIComponent(path))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) return;
+        renderGraphPanelContent(card, path, d.backlinks || []);
+      })
+      .catch(function () { /* 图谱缺失可降级 */ });
+  }, 120);
+}
+
+/** 构建面板 DOM（纯函数化便于测试；数据渲染全部 esc 转义） */
+function renderGraphPanelContent(card, path, backlinks) {
+  var panel = document.createElement('div');
+  panel.id = 'graphPanel';
+  panel.className = 'max-w-4xl mx-auto mt-4 px-8 pb-4';
+  var html = '<div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm">';
+
+  // 反向链接区
+  html += '<div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">' +
+    esc(t('web.preview.graph.backlinks')) + (backlinks.length ? ' (' + backlinks.length + ')' : '') + '</div>';
+  if (backlinks.length === 0) {
+    html += '<div class="text-slate-400 dark:text-slate-500 text-xs mb-3">' + esc(t('web.preview.graph.noBacklinks')) + '</div>';
+  } else {
+    html += '<ul class="space-y-1 mb-3">';
+    backlinks.forEach(function (b) {
+      html += '<li><a href="javascript:void(0)" class="text-blue-500 hover:underline" data-graph-backlink="' +
+        esc(b.from_path) + '">' + esc(b.title || b.from_path) + '</a></li>';
+    });
+    html += '</ul>';
+  }
+
+  // 相关文档区
+  html += '<div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">' +
+    esc(t('web.preview.graph.related')) + '</div>';
+  html += '<div class="text-slate-400 dark:text-slate-500 text-xs" data-graph-related>' + esc(t('web.preview.graph.loadingRelated')) + '</div>';
+
+  panel.innerHTML = html;
+  card.parentNode.insertBefore(panel, card.nextSibling);
+
+  // backlinks 点击跳转（复用现有 tab 导航）
+  panel.querySelectorAll('[data-graph-backlink]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      var target = a.getAttribute('data-graph-backlink');
+      if (target && typeof openFileFromTree === 'function') {
+        openFileFromTree(target);
+      } else if (target && typeof navigateToFile === 'function') {
+        navigateToFile(target);
+      }
+    });
+  });
+
+  // 异步加载 related
+  fetch('/api/graph/' + pid + '/related?path=' + encodeURIComponent(path) + '&limit=5')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var box = panel.querySelector('[data-graph-related]');
+      if (!box) return;
+      var related = (d.related || []);
+      if (!related.length) {
+        box.textContent = t('web.preview.graph.noRelated');
+        return;
+      }
+      box.innerHTML = '';
+      var ul = document.createElement('ul');
+      ul.className = 'space-y-1';
+      related.forEach(function (r) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = 'javascript:void(0)';
+        a.className = 'text-blue-500 hover:underline';
+        a.textContent = r.title || r.path;
+        a.addEventListener('click', function () {
+          if (r.path && typeof openFileFromTree === 'function') openFileFromTree(r.path);
+          else if (r.path && typeof navigateToFile === 'function') navigateToFile(r.path);
+        });
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    })
+    .catch(function () {
+      var box = panel.querySelector('[data-graph-related]');
+      if (box) box.textContent = '';
+    });
+}
+
+/** SSE / 保存回调触发的面板刷新（仅当前激活文档） */
+function refreshGraphPanel() {
+  if (activeTabPath) renderGraphPanel(activeTabPath);
 }
 
 /** 根据当前活动 pane 的内容刷新大纲面板。 */
@@ -2130,6 +2244,8 @@ function doSave(cb, skipPreview) {
     if (!skipPreview) updateEditPreview(content);
     tabDataCache[currentFile] = { content: content, path: currentFile, size: d.size, modified: d.modified };
     delete paneCache[currentFile]; // force re-fetch from server on re-render
+    // v1.2.0：保存后图谱面板刷新（出链可能已变化）
+    refreshGraphPanel();
     if (cb) cb();
   })
   .catch(function(e) { toast(t('web.preview.edit.saveFailed') + ': ' + e.message, 'error'); });

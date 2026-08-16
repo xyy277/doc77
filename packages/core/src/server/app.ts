@@ -46,6 +46,10 @@ import { createToolRouterExecutor } from './tool-router-factory.js';
 import { getEventBus } from './event-bus.js';
 import { createEventsHandler } from './events.js';
 import { watchProject, stopWatching, acquireWatcherRef, releaseWatcherRef } from './watcher.js';
+import { onFileSaved, onFileRenamed, onFileDeleted } from '../graph/maintenance.js';
+import { markProjectGraphDirty } from '../graph/indexer.js';
+import { collectGraphNeighbors } from '../graph/context.js';
+import { registerGraphRoutes } from './routes/graph.js';
 import { createRateLimiter } from './rate-limit.js';
 import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import {
@@ -1524,6 +1528,16 @@ export function createApp(
         oldPath,
         newRelPath,
       ]);
+      // 图谱：边与 meta 路径跟随 + 重提取（v1.2.0）
+      try {
+        const projRoot = (
+          getConnection().prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+            { path: string } | undefined
+        )?.path;
+        if (projRoot) onFileRenamed(projectId, projRoot, oldPath, newRelPath);
+      } catch {
+        /* non-critical */
+      }
       res.json({ oldPath, newPath: newRelPath });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -1599,6 +1613,16 @@ export function createApp(
       const parentDir = path.dirname(targetPath);
       clearCache(projectId, parentDir === '.' ? '' : parentDir);
       emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'delete', [targetPath]);
+      // 图谱：删除文件后清理（v1.2.0；目录删除 → 标记脏，由全量重建自愈）
+      try {
+        if (isDir) {
+          markProjectGraphDirty(projectId);
+        } else {
+          onFileDeleted(projectId, targetPath);
+        }
+      } catch {
+        /* non-critical */
+      }
       res.json({ path: targetPath, movedToTrash });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -2579,6 +2603,13 @@ export function createApp(
         // 12. Incremental FTS index update
         try {
           indexFile(projectId, project.path, filePath);
+        } catch {
+          /* non-critical */
+        }
+
+        // 12b. 图谱增量索引（v1.2.0：链接基础设施）
+        try {
+          onFileSaved(projectId, project.path, filePath);
         } catch {
           /* non-critical */
         }
@@ -3718,6 +3749,13 @@ export function createApp(
     createEventsHandler()(req, res);
   });
 
+  // 知识图谱 API（v1.2.0：backlinks / related / stats / nodes / index）
+  try {
+    registerGraphRoutes(app);
+  } catch {
+    /* best-effort — 图谱缺失可降级 */
+  }
+
   return app;
 }
 
@@ -3908,7 +3946,7 @@ export function createAIChatHandler(deps: {
   const aiRateLimiter = createRateLimiter();
 
   return async (req: Request, res: Response) => {
-    const { message, project_id, session_id, context_file } = req.body;
+    const { message, project_id, session_id, context_file, context_graph_neighbors } = req.body;
     console.error(
       `[ai] chat request: session=${session_id || 'new'}, project=${project_id}, context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"`,
     );
@@ -4213,6 +4251,16 @@ export function createAIChatHandler(deps: {
               `[ai] context_file: first ref to "${context_file}" — inject content + noTools`,
             );
             outgoing = `${message}\n\n---\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
+            // v1.2.0：图谱邻居注入（context_graph_neighbors !== false 时附加；
+            // N/K/T 预算内，复用 readProjectFileContent 的敏感拦截与截断语义）
+            if (context_graph_neighbors !== false) {
+              const neighbors = collectGraphNeighbors(
+                project_id,
+                context_file as string,
+                readProjectFileContent,
+              );
+              if (neighbors) outgoing += neighbors;
+            }
             noTools = true;
           } else {
             // Same file again: inject path hint only + keep tools enabled so the agent can

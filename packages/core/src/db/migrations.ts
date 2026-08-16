@@ -160,6 +160,11 @@ export function runMigrations(db?: DatabaseCompat): void {
       }
     }
   }
+
+  // v15: 知识图谱 — 只建表不重建（全量索引由启动后台任务逐项目执行，
+  // 与 v14 阻塞式 fullIndexSync 刻意区分：图谱缺失可降级显示，
+  // FTS 缺失会立即破坏搜索）
+  conn.exec(GRAPH_SCHEMA_SQL);
 }
 
 const SCHEMA_SQL = `
@@ -697,6 +702,41 @@ CREATE INDEX IF NOT EXISTS idx_rag_chunks_project ON rag_chunks(project_id, file
  * v12: 插件持久化 — T11 插件沙箱 + API 路由。
  * 存储 enable/disable 状态、配置 JSON、安装来源、版本兼容信息。
  */
+// v15: 知识图谱 — 文档元数据 + 链接索引（2026-08-16，链接基础设施 MVP）
+// 反向链接 = doc_links 按 to_path 聚合查询，不设单独表；
+// 死链入库（status='broken'，to_path 存规范化目标 key，status 进 PK 防撞）；
+// 迁移只建表，全量索引由启动后台任务逐项目执行（不阻塞启动，图谱缺失可降级）
+const GRAPH_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS doc_meta (
+  project_id INTEGER NOT NULL,
+  file_path  TEXT NOT NULL,
+  title      TEXT NOT NULL DEFAULT '',
+  aliases    TEXT NOT NULL DEFAULT '[]',
+  tags       TEXT NOT NULL DEFAULT '[]',
+  file_hash  TEXT NOT NULL DEFAULT '',
+  file_mtime TEXT,
+  file_size  INTEGER NOT NULL DEFAULT 0,
+  indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (project_id, file_path)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS doc_links (
+  project_id INTEGER NOT NULL,
+  from_path  TEXT NOT NULL,
+  to_path    TEXT NOT NULL,
+  link_type  TEXT NOT NULL DEFAULT 'wikilink',
+  anchor     TEXT NOT NULL DEFAULT '',
+  status     TEXT NOT NULL DEFAULT 'resolved',
+  display    TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (project_id, from_path, to_path, anchor, link_type)
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_doc_links_to ON doc_links(project_id, to_path, status);
+CREATE INDEX IF NOT EXISTS idx_doc_links_from ON doc_links(project_id, from_path);
+`;
+
 const PLUGINS_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS plugins (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

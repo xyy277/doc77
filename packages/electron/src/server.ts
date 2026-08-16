@@ -74,6 +74,7 @@ interface CoreModule {
   getConfig: (key: string) => string | undefined;
   getConnection: () => DatabaseCompat;
   pruneAiSessions: (ttlHours?: number) => number;
+  bootstrapGraphIndexing: () => void;
   registerAiRagRoutes: (app: ExpressLike, deps: { engine: unknown; db: DatabaseCompat }) => void;
   registerPluginRoutes: (app: ExpressLike, deps: { db: DatabaseCompat; pluginDir: string }) => void;
 }
@@ -374,6 +375,12 @@ export async function startServer(port: number, uiLocale?: string): Promise<Serv
   // 全库序列化越来越贵）。与 CLI 的 pruneAiSessions(24) 对齐；日志保留 90 天。
   try {
     core.pruneAiSessions(24);
+  } catch {
+    /* best-effort */
+  }
+  // v1.2.0：知识图谱启动自愈 —— 后台逐项目全量重建（不阻塞启动，失败静默）
+  try {
+    core.bootstrapGraphIndexing();
   } catch {
     /* best-effort */
   }
