@@ -446,6 +446,27 @@ export function createApp(
     return null;
   }
 
+  /**
+   * 隧道信任边界（T3 安全修复）：XFF 客户端可伪造，仅当连接来源是本机
+   * （隧道代理如 cloudflared 在本地转发）时才信任 XFF，且取**末条**（代理
+   * 追加的真实客户端 IP）——首条/中间条目全为客户端可控。直连请求（socket
+   * 非本机）一律忽略 XFF，用连接来源 req.ip 判定。
+   */
+  function trustedClientIp(req: Request): string {
+    const socketIp = req.socket?.remoteAddress || '';
+    const socketIsLocal =
+      socketIp === '127.0.0.1' ||
+      socketIp === '::1' ||
+      socketIp === '::ffff:127.0.0.1' ||
+      socketIp === '';
+    const xff = (req.headers['x-forwarded-for'] as string) || '';
+    if (socketIsLocal && xff) {
+      const last = xff.split(',').pop()?.trim() || '';
+      if (last) return last;
+    }
+    return req.ip || '';
+  }
+
   app.use((req: Request, res: Response, next: NextFunction) => {
     // Only gate API routes; static/HTML/share pages are handled separately.
     if (!req.path.startsWith('/api/')) return next();
@@ -457,11 +478,10 @@ export function createApp(
     const allowQueryToken = req.path === '/api/events';
 
     // 隧道安全门控（T3）：隧道 running 且请求非 localhost 时，即使开放模式也强制认证。
-    // 通过 X-Forwarded-For 或 req.ip 判断来源 IP——隧道转发时 XFF 携带真实客户端 IP。
+    // 来源 IP 经 trustedClientIp 判定（XFF 信任边界见上）。
     const tunnelActive = getTunnelManager().getStatus().status === 'running';
     if (tunnelActive) {
-      const ip =
-        ((req.headers['x-forwarded-for'] as string) || '').split(',')[0]?.trim() || req.ip || '';
+      const ip = trustedClientIp(req);
       const isLocalhost =
         ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === '';
       if (!isLocalhost) {
@@ -3414,7 +3434,8 @@ export function createApp(
 
   const loginRateLimiter = createRateLimiter();
   function clientIp(req: Request): string {
-    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    // 与门控同一信任边界（trustedClientIp）：XFF 仅在本机代理转发时可信
+    return trustedClientIp(req) || 'unknown';
   }
 
   // Check auth status

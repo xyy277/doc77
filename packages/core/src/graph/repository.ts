@@ -193,7 +193,7 @@ export function queryBacklinks(
   toPath: string,
   opts: { limit?: number; offset?: number } = {},
 ): BacklinkRow[] {
-  const limit = Math.min(opts.limit ?? 50, 200);
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
   const offset = opts.offset ?? 0;
   return db
     .prepare(
@@ -249,15 +249,20 @@ export function getGraphStats(db: DatabaseCompat, projectId: number): GraphStats
 }
 
 /** 多项目节点（全量图谱数据；tags 为原始 JSON 字符串，路由层解析） */
-export function queryGraphNodes(db: DatabaseCompat, projectIds: number[]): GraphNodeRow[] {
+export function queryGraphNodes(
+  db: DatabaseCompat,
+  projectIds: number[],
+  opts?: { limit?: number },
+): GraphNodeRow[] {
   if (projectIds.length === 0) return [];
   const ph = inPlaceholders(projectIds.length);
+  const limitClause = opts?.limit ? ` LIMIT ${Math.max(1, opts.limit)}` : '';
   return db
     .prepare(
       `SELECT m.project_id, m.file_path AS path, m.title, m.tags
        FROM doc_meta m
        WHERE m.project_id IN (${ph})
-       ORDER BY m.project_id, m.file_path`,
+       ORDER BY m.project_id, m.file_path${limitClause}`,
     )
     .all(...projectIds) as unknown as GraphNodeRow[];
 }
@@ -267,9 +272,14 @@ export function queryGraphNodes(db: DatabaseCompat, projectIds: number[]): Graph
  * 源文件必须存在于 doc_meta（与 /api/graph/:id 同语义）；
  * 相关子查询命中 doc_meta 主键索引 (project_id, file_path)。
  */
-export function queryGraphEdges(db: DatabaseCompat, projectIds: number[]): GraphEdgeRow[] {
+export function queryGraphEdges(
+  db: DatabaseCompat,
+  projectIds: number[],
+  opts?: { limit?: number },
+): GraphEdgeRow[] {
   if (projectIds.length === 0) return [];
   const ph = inPlaceholders(projectIds.length);
+  const limitClause = opts?.limit ? ` LIMIT ${Math.max(1, opts.limit)}` : '';
   return db
     .prepare(
       `SELECT l.project_id, l.from_path AS source, l.to_path AS target, l.link_type, l.anchor
@@ -280,7 +290,7 @@ export function queryGraphEdges(db: DatabaseCompat, projectIds: number[]): Graph
            SELECT m2.file_path FROM doc_meta m2
            WHERE m2.project_id = l.project_id AND m2.project_id IN (${ph})
          )
-       ORDER BY l.project_id, l.from_path`,
+       ORDER BY l.project_id, l.from_path${limitClause}`,
     )
     .all(...projectIds, ...projectIds) as unknown as GraphEdgeRow[];
 }
@@ -343,7 +353,7 @@ export function queryOrphans(
 ): PagedRows<OrphanRow> {
   if (projectIds.length === 0) return { rows: [], total: 0 };
   const ph = inPlaceholders(projectIds.length);
-  const limit = Math.min(opts.limit ?? 200, 10000);
+  const limit = Math.max(1, Math.min(opts.limit ?? 200, 10000));
   const offset = opts.offset ?? 0;
   const totalRow = db
     .prepare(
@@ -370,7 +380,7 @@ export function queryBrokenLinks(
 ): PagedRows<BrokenLinkRow> {
   if (projectIds.length === 0) return { rows: [], total: 0 };
   const ph = inPlaceholders(projectIds.length);
-  const limit = Math.min(opts.limit ?? 100, 500);
+  const limit = Math.max(1, Math.min(opts.limit ?? 100, 500));
   const offset = opts.offset ?? 0;
   const totalRow = db
     .prepare(
