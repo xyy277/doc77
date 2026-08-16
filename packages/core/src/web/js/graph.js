@@ -48,6 +48,12 @@
   var NEUTRAL = '#94a3b8'; // 无标签节点颜色
 
   var D3_FORCE_URL = 'https://cdn.jsdelivr.net/npm/d3-force@3.0.0/dist/d3-force.min.js';
+  // d3-force 的 UMD 不打包依赖，需按序先加载（与 vendor.ts 条目同序）
+  var D3_FORCE_DEPS = [
+    'https://cdn.jsdelivr.net/npm/d3-dispatch@3.0.1/dist/d3-dispatch.min.js',
+    'https://cdn.jsdelivr.net/npm/d3-quadtree@3.0.1/dist/d3-quadtree.min.js',
+    'https://cdn.jsdelivr.net/npm/d3-timer@3.0.1/dist/d3-timer.min.js',
+  ];
 
   // ═══════════════════════════════════════════════════════════════
   // 纯函数核心（vitest 可测，不得引用 document/window）
@@ -181,7 +187,12 @@
   // ═══════════════════════════════════════════════════════════════
 
   // VENDOR_MAP：CDN URL 子串 → 本地 vendor 文件名（preview.js 同款精简版）
-  var VENDOR_MAP = { 'd3-force.min.js': 'd3-force.min.js' };
+  var VENDOR_MAP = {
+    'd3-dispatch.min.js': 'd3-dispatch.min.js',
+    'd3-quadtree.min.js': 'd3-quadtree.min.js',
+    'd3-timer.min.js': 'd3-timer.min.js',
+    'd3-force.min.js': 'd3-force.min.js',
+  };
 
   function vsrc(originalUrl, localName) {
     if (!window.__VENDOR_READY) return originalUrl;
@@ -212,20 +223,41 @@
       });
   }
 
-  function loadD3Force(cb) {
-    if (window.d3 && window.d3.forceSimulation) {
-      cb();
-      return;
-    }
+  function loadScript(src, cb) {
     var s = document.createElement('script');
-    s.src = vsrc(D3_FORCE_URL);
+    s.src = vsrc(src);
     s.onload = function () {
-      cb();
+      cb(true);
     };
     s.onerror = function () {
-      cb();
-    }; // 静默降级：无物理引擎时仅渲染静态布局
+      cb(false);
+    };
     document.head.appendChild(s);
+  }
+
+  function loadD3Force(cb) {
+    if (window.d3 && window.d3.forceSimulation) {
+      cb(true);
+      return;
+    }
+    // d3-force UMD 从全局 d3 命名空间读取依赖：先按序加载 dispatch/quadtree/timer
+    var chain = D3_FORCE_DEPS.slice();
+    var next = function () {
+      if (!chain.length) {
+        loadScript(D3_FORCE_URL, function (ok) {
+          cb(ok && !!(window.d3 && window.d3.forceSimulation));
+        });
+        return;
+      }
+      loadScript(chain.shift(), function (ok) {
+        if (!ok) {
+          cb(false);
+          return;
+        }
+        next();
+      });
+    };
+    next();
   }
 
   // ── 页面状态 ──

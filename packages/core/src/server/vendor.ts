@@ -103,6 +103,26 @@ export const VENDOR_ASSETS: VendorAsset[] = [
     type: 'js',
     size: '~20KB',
   },
+  // d3-force 的 UMD 不打包依赖：浏览器分支从全局 d3 命名空间读取
+  // d3-dispatch/d3-quadtree/d3-timer，必须按序先加载（graph.js loadD3Force 同序）。
+  {
+    name: 'd3-dispatch.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-dispatch@3.0.1/dist/d3-dispatch.min.js',
+    type: 'js',
+    size: '~5KB',
+  },
+  {
+    name: 'd3-quadtree.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-quadtree@3.0.1/dist/d3-quadtree.min.js',
+    type: 'js',
+    size: '~10KB',
+  },
+  {
+    name: 'd3-timer.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-timer@3.0.1/dist/d3-timer.min.js',
+    type: 'js',
+    size: '~5KB',
+  },
   {
     name: 'd3-force.min.js',
     url: 'https://cdn.jsdelivr.net/npm/d3-force@3.0.0/dist/d3-force.min.js',

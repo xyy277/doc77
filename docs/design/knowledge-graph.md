@@ -85,7 +85,7 @@ POST /api/graph/:id/index               — 全量重建（立即返回 indexing
 
 **二阶段：`/graph` 页面**（graph.html + graph.js，入口：dashboard 导航 + preview toolbar 🕸️ 按钮）：
 
-- Canvas 渲染 + vendor 懒加载 d3-force（`d3-force.min.js`，VENDOR_MAP/vendor.ts 双注册）——无 DOM 节点，5000 节点 <60fps 交互
+- Canvas 渲染 + vendor 懒加载 d3-force（d3-dispatch/quadtree/timer/force 4 模块按序加载——d3-force UMD 不打包依赖，从全局 d3 命名空间读取；VENDOR_MAP/vendor.ts 双注册）——无 DOM 节点，5000 节点 <60fps 交互
 - 节点大小 = 入链数（客户端由全量边精确计数），颜色 = 首标签（确定性 hash → 12 色调色板），孤立页淡化开关（与 orphans 列表同语义）
 - 交互：滚轮锚点缩放、拖拽平移、拖节点（fx/fy）、点击打开 preview（`/preview.html?id=&path=`）、FTS 搜索定位（缩放居中 + 2s 高亮）
 - 性能：DPR 上限 2、视口裁剪、标签仅 scale≥2 且 ≤400/帧、alpha 收敛后 sim.stop()；物理参数置顶常量
