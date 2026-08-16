@@ -260,6 +260,20 @@ export function createApp(
     res.status(404).type('html').send('<h1>Not Found</h1>');
   });
 
+  // === Knowledge graph workspace (phase 2: visualization + insights) ===
+  app.get('/graph', (_req: Request, res: Response) => {
+    if (!webDir) {
+      res.status(404).type('html').send('<h1>Not Found</h1>');
+      return;
+    }
+    const target = path.join(webDir, 'graph.html');
+    if (fs.existsSync(target)) {
+      res.sendFile(target, { dotfiles: 'allow' });
+      return;
+    }
+    res.status(404).type('html').send('<h1>Not Found</h1>');
+  });
+
   app.get('/preview.html', (_req: Request, res: Response) => {
     if (!webDir) {
       res.status(404).type('html').send('<h1>Not Found</h1>');

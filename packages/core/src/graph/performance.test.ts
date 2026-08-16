@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as http from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -6,12 +7,13 @@ import { initDatabase, closeConnection, getConnection } from '../db/connection.j
 import { runMigrations } from '../db/migrations.js';
 import { registerProject } from '../db/projects.js';
 import { fullGraphIndex, indexFileLinks } from './indexer.js';
-import { queryBacklinks, getGraphStats } from './repository.js';
+import { queryBacklinks, getGraphStats, queryOrphans, queryBrokenLinks } from './repository.js';
 import { relatedDocs } from './related.js';
 import { onWatcherFlush } from './maintenance.js';
+import { createApp } from '../server/app.js';
 
 /**
- * 知识图谱性能回归测试（v1.2.0 收尾）。
+ * 知识图谱性能回归测试（v1.2.0 收尾 + v1.2.1 可视化数据）。
  *
  * 目标值（注释标注）与宽松断言（防 CI 抖动，抓数量级回归）：
  * - 全量重建 3000 文件：目标 < 30s；批处理 setTimeout(0) 让出，事件循环
@@ -19,7 +21,20 @@ import { onWatcherFlush } from './maintenance.js';
  * - 增量索引：目标 < 10ms/文件
  * - 大边表（20 万行）查询：目标 < 50ms
  * - watcher flush 挂点：目标 < 500ms（50 文件批量）
+ * - 5000 节点全量图接口（可视化数据源）：目标 < 1s（验收 < 2s）
+ * - 20 万边表 orphans/broken 列表查询：目标 < 200ms 合计
  */
+
+async function withServer(fn: (baseUrl: string) => Promise<void>): Promise<void> {
+  const server = http.createServer(createApp());
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const addr = server.address() as { port: number };
+  try {
+    await fn(`http://127.0.0.1:${addr.port}`);
+  } finally {
+    server.close();
+  }
+}
 
 const HEARTBEAT_MS = 10;
 
@@ -43,7 +58,6 @@ async function measureEventLoopStall(
 
 describe('graph performance regression', () => {
   let testDir: string;
-  let projectDir: string;
   let projectId: number;
   let cleanupDirs: string[] = [];
 
@@ -159,6 +173,51 @@ describe('graph performance regression', () => {
     const elapsed = Date.now() - t0;
     expect(elapsed).toBeLessThan(1_000);
     console.log(`[graph-perf] watcher flush 50 files: ${elapsed}ms`);
+  });
+
+  it('5000 节点全量图接口 < 2s；20 万边表 orphans/broken 列表 < 200ms', async () => {
+    // 同一 fixture：5000 文件链式互链（10k 条 resolved 边）
+    const dir = synthProject(5000);
+    await fullGraphIndex(projectId, dir);
+
+    // ── 全量图接口（可视化数据源）：5000 节点 + 10000 边 JSON ──
+    await withServer(async (baseUrl) => {
+      const t0 = Date.now();
+      const res = await fetch(`${baseUrl}/api/graph?projects=${projectId}`);
+      const ms = Date.now() - t0;
+      expect(res.status).toBe(200);
+      const d = (await res.json()) as {
+        nodes: Array<{ path: string }>;
+        edges: Array<{ source: string; target: string }>;
+        truncated: boolean;
+      };
+      expect(ms).toBeLessThan(2_000); // 验收 < 2s；目标 < 1s
+      expect(d.nodes).toHaveLength(5000);
+      expect(d.edges.length).toBeGreaterThanOrEqual(10_000); // synthProject 每文档 2 条出链
+      expect(d.truncated).toBe(false);
+      console.log(`[graph-perf] full graph API 5000 nodes: ${ms}ms`);
+    });
+
+    // ── 大边表：孤儿/死链列表查询（含 total）──
+    const conn = getConnection();
+    const tx = conn.transaction(() => {
+      const ins = conn.prepare(
+        `INSERT INTO doc_links (project_id, from_path, to_path, link_type, anchor, status, display)
+         VALUES (?, ?, ?, 'wikilink', '', 'resolved', '')`,
+      );
+      for (let i = 0; i < 5000; i++) {
+        for (let j = 1; j <= 40; j++) {
+          ins.run(projectId, `doc${i}.md`, `doc${(i + j * 7) % 5000}.md`);
+        }
+      }
+    });
+    tx();
+    const t0 = Date.now();
+    queryOrphans(conn, [projectId], { limit: 10000 });
+    queryBrokenLinks(conn, [projectId], { limit: 500 });
+    const elapsed = Date.now() - t0;
+    expect(elapsed).toBeLessThan(200);
+    console.log(`[graph-perf] 200k edges, orphans/broken list queries: ${elapsed}ms`);
   });
 
   it('非 markdown 文件过滤：混合目录不受大文件影响', async () => {
