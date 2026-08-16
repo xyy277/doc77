@@ -47,6 +47,49 @@ export interface GraphStats {
   orphans: number;
 }
 
+/** 多项目图谱节点（tags 为原始 JSON 字符串，路由层解析） */
+export interface GraphNodeRow {
+  project_id: number;
+  path: string;
+  title: string;
+  tags: string;
+}
+
+/** 多项目图谱边（resolved only） */
+export interface GraphEdgeRow {
+  project_id: number;
+  source: string;
+  target: string;
+  link_type: string;
+  anchor: string;
+}
+
+export interface OrphanRow {
+  project_id: number;
+  path: string;
+  title: string;
+}
+
+export interface BrokenLinkRow {
+  project_id: number;
+  from_path: string;
+  to_path: string;
+  display: string;
+  anchor: string;
+  updated_at: string;
+}
+
+/** 多项目统计：perProject 分项 + total 求和 */
+export interface MultiGraphStats {
+  total: GraphStats;
+  perProject: Array<{ project_id: number } & GraphStats>;
+}
+
+export interface PagedRows<T> {
+  rows: T[];
+  total: number;
+}
+
 export function upsertDocMeta(db: DatabaseCompat, projectId: number, meta: DocMetaRow): void {
   db.prepare(
     `INSERT OR REPLACE INTO doc_meta
@@ -150,7 +193,7 @@ export function queryBacklinks(
   toPath: string,
   opts: { limit?: number; offset?: number } = {},
 ): BacklinkRow[] {
-  const limit = Math.min(opts.limit ?? 50, 200);
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
   const offset = opts.offset ?? 0;
   return db
     .prepare(
@@ -173,6 +216,19 @@ export function queryOutlinks(db: DatabaseCompat, projectId: number, fromPath: s
     .all(projectId, fromPath) as unknown as LinkRow[];
 }
 
+/**
+ * 孤儿谓词（与 getGraphStats.orphans / queryOrphans 共享）：
+ * 无出链（任意 status）+ 无 resolved 入链。抽为常量保证计数与列表永远一致。
+ */
+const ORPHAN_PREDICATE_SQL = `
+  AND NOT EXISTS (SELECT 1 FROM doc_links l WHERE l.project_id = m.project_id AND l.from_path = m.file_path)
+  AND NOT EXISTS (SELECT 1 FROM doc_links l WHERE l.project_id = m.project_id AND l.to_path = m.file_path AND l.status = 'resolved')`;
+
+/** IN 占位符生成（空数组调用方应提前返回——SQLite IN () 为语法错误） */
+function inPlaceholders(n: number): string {
+  return Array.from({ length: n }, () => '?').join(',');
+}
+
 /** 图谱统计（nodes/edges/broken/orphans —— 孤立页 = 无出链无入链的节点） */
 export function getGraphStats(db: DatabaseCompat, projectId: number): GraphStats {
   const count = (sql: string): number => {
@@ -187,11 +243,160 @@ export function getGraphStats(db: DatabaseCompat, projectId: number): GraphStats
     broken: count(`SELECT COUNT(*) AS c FROM doc_links WHERE project_id = ? AND status = 'broken'`),
     orphans: count(
       `SELECT COUNT(*) AS c FROM doc_meta m
-       WHERE m.project_id = ?
-         AND NOT EXISTS (SELECT 1 FROM doc_links l WHERE l.project_id = m.project_id AND l.from_path = m.file_path)
-         AND NOT EXISTS (SELECT 1 FROM doc_links l WHERE l.project_id = m.project_id AND l.to_path = m.file_path AND l.status = 'resolved')`,
+       WHERE m.project_id = ?${ORPHAN_PREDICATE_SQL}`,
     ),
   };
+}
+
+/** 多项目节点（全量图谱数据；tags 为原始 JSON 字符串，路由层解析） */
+export function queryGraphNodes(
+  db: DatabaseCompat,
+  projectIds: number[],
+  opts?: { limit?: number },
+): GraphNodeRow[] {
+  if (projectIds.length === 0) return [];
+  const ph = inPlaceholders(projectIds.length);
+  const limitClause = opts?.limit ? ` LIMIT ${Math.max(1, opts.limit)}` : '';
+  return db
+    .prepare(
+      `SELECT m.project_id, m.file_path AS path, m.title, m.tags
+       FROM doc_meta m
+       WHERE m.project_id IN (${ph})
+       ORDER BY m.project_id, m.file_path${limitClause}`,
+    )
+    .all(...projectIds) as unknown as GraphNodeRow[];
+}
+
+/**
+ * 多项目 resolved 边（全量图谱数据）。
+ * 源文件必须存在于 doc_meta（与 /api/graph/:id 同语义）；
+ * 相关子查询命中 doc_meta 主键索引 (project_id, file_path)。
+ */
+export function queryGraphEdges(
+  db: DatabaseCompat,
+  projectIds: number[],
+  opts?: { limit?: number },
+): GraphEdgeRow[] {
+  if (projectIds.length === 0) return [];
+  const ph = inPlaceholders(projectIds.length);
+  const limitClause = opts?.limit ? ` LIMIT ${Math.max(1, opts.limit)}` : '';
+  return db
+    .prepare(
+      `SELECT l.project_id, l.from_path AS source, l.to_path AS target, l.link_type, l.anchor
+       FROM doc_links l
+       WHERE l.status = 'resolved'
+         AND l.project_id IN (${ph})
+         AND l.from_path IN (
+           SELECT m2.file_path FROM doc_meta m2
+           WHERE m2.project_id = l.project_id AND m2.project_id IN (${ph})
+         )
+       ORDER BY l.project_id, l.from_path${limitClause}`,
+    )
+    .all(...projectIds, ...projectIds) as unknown as GraphEdgeRow[];
+}
+
+/** 多项目统计：perProject 分项（零填充）+ total 求和，与 getGraphStats 同谓词 */
+export function getGraphStatsMulti(db: DatabaseCompat, projectIds: number[]): MultiGraphStats {
+  if (projectIds.length === 0) {
+    return { total: { nodes: 0, edges: 0, broken: 0, orphans: 0 }, perProject: [] };
+  }
+  const ph = inPlaceholders(projectIds.length);
+  const byProject = (sql: string): Array<{ project_id: number; c: number }> =>
+    db.prepare(sql).all(...projectIds) as unknown as Array<{ project_id: number; c: number }>;
+  const agg = (rows: Array<{ project_id: number; c: number }>): Map<number, number> =>
+    new Map(rows.map((r) => [r.project_id, r.c]));
+  const nodes = agg(
+    byProject(
+      `SELECT m.project_id, COUNT(*) AS c FROM doc_meta m WHERE m.project_id IN (${ph}) GROUP BY m.project_id`,
+    ),
+  );
+  const edges = agg(
+    byProject(
+      `SELECT l.project_id, COUNT(*) AS c FROM doc_links l WHERE l.project_id IN (${ph}) AND l.status = 'resolved' GROUP BY l.project_id`,
+    ),
+  );
+  const broken = agg(
+    byProject(
+      `SELECT l.project_id, COUNT(*) AS c FROM doc_links l WHERE l.project_id IN (${ph}) AND l.status = 'broken' GROUP BY l.project_id`,
+    ),
+  );
+  const orphans = agg(
+    byProject(
+      `SELECT m.project_id, COUNT(*) AS c FROM doc_meta m WHERE m.project_id IN (${ph})${ORPHAN_PREDICATE_SQL} GROUP BY m.project_id`,
+    ),
+  );
+  const perProject = projectIds.map((pid) => ({
+    project_id: pid,
+    nodes: nodes.get(pid) ?? 0,
+    edges: edges.get(pid) ?? 0,
+    broken: broken.get(pid) ?? 0,
+    orphans: orphans.get(pid) ?? 0,
+  }));
+  const sum = (key: 'nodes' | 'edges' | 'broken' | 'orphans'): number =>
+    perProject.reduce((acc, p) => acc + p[key], 0);
+  return {
+    total: {
+      nodes: sum('nodes'),
+      edges: sum('edges'),
+      broken: sum('broken'),
+      orphans: sum('orphans'),
+    },
+    perProject,
+  };
+}
+
+/** 孤立页列表（谓词与 stats.orphans 一致；limit 默认 200，clamp 10000） */
+export function queryOrphans(
+  db: DatabaseCompat,
+  projectIds: number[],
+  opts: { limit?: number; offset?: number } = {},
+): PagedRows<OrphanRow> {
+  if (projectIds.length === 0) return { rows: [], total: 0 };
+  const ph = inPlaceholders(projectIds.length);
+  const limit = Math.max(1, Math.min(opts.limit ?? 200, 10000));
+  const offset = opts.offset ?? 0;
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM doc_meta m WHERE m.project_id IN (${ph})${ORPHAN_PREDICATE_SQL}`,
+    )
+    .get(...projectIds) as { c: number } | undefined;
+  const rows = db
+    .prepare(
+      `SELECT m.project_id, m.file_path AS path, m.title
+       FROM doc_meta m
+       WHERE m.project_id IN (${ph})${ORPHAN_PREDICATE_SQL}
+       ORDER BY m.project_id, m.file_path
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...projectIds, limit, offset) as unknown as OrphanRow[];
+  return { rows, total: totalRow?.c ?? 0 };
+}
+
+/** 死链列表（status='broken' 的行；to_path 为规范化目标 key；limit 默认 100，clamp 500） */
+export function queryBrokenLinks(
+  db: DatabaseCompat,
+  projectIds: number[],
+  opts: { limit?: number; offset?: number } = {},
+): PagedRows<BrokenLinkRow> {
+  if (projectIds.length === 0) return { rows: [], total: 0 };
+  const ph = inPlaceholders(projectIds.length);
+  const limit = Math.max(1, Math.min(opts.limit ?? 100, 500));
+  const offset = opts.offset ?? 0;
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM doc_links WHERE project_id IN (${ph}) AND status = 'broken'`,
+    )
+    .get(...projectIds) as { c: number } | undefined;
+  const rows = db
+    .prepare(
+      `SELECT project_id, from_path, to_path, display, anchor, updated_at
+       FROM doc_links
+       WHERE project_id IN (${ph}) AND status = 'broken'
+       ORDER BY updated_at DESC, project_id, from_path
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...projectIds, limit, offset) as unknown as BrokenLinkRow[];
+  return { rows, total: totalRow?.c ?? 0 };
 }
 
 /** 便捷包装（默认连接） */

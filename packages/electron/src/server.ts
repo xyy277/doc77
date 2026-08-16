@@ -61,6 +61,7 @@ interface CoreModule {
   modulesDir: () => string;
   resolveModuleEntry: (pkgDir: string) => string | null;
   createAIChatHandler: (deps: Record<string, unknown>) => unknown;
+  createAgentLoopHandler: (deps: Record<string, unknown>) => unknown;
   createQueueApproveHandler: (executeApprovedTasks: unknown) => unknown;
   createEventsHandler: (eventBus: unknown) => unknown;
   setCapabilities: (caps: {
@@ -244,7 +245,9 @@ async function registerInstalledModules(core: CoreModule, app: ExpressLike): Pro
     try {
       const aiDeps: Record<string, unknown> = {
         AiProvider: ai.AiProvider,
-        DocAgent: ai.DocAgent,
+        OllamaProvider: ai.OllamaProvider,
+        AgentLoop: ai.AgentLoop,
+        createPersistenceAdapter: ai.createPersistenceAdapter,
         getReadTools: ai.getReadTools,
       };
       // When MCP is installed, let the AI propose writes through the approval
@@ -258,7 +261,9 @@ async function registerInstalledModules(core: CoreModule, app: ExpressLike): Pro
           batchOperations: mcp.batchOperations,
         };
       }
-      app.post('/api/ai/chat', core.createAIChatHandler(aiDeps));
+      // Phase 3 handler — writes sessions/messages to the SessionStore tree
+      // tables that /api/ai/sessions/* and the frontend read from.
+      app.post('/api/ai/chat', core.createAgentLoopHandler(aiDeps));
     } catch {
       /* keep booting without AI routes */
     }

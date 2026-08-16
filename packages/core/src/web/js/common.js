@@ -71,7 +71,7 @@ window.__doc77_i18n_ready = fetch('/api/i18n?' + (function () {
   var o = localStorage.getItem('doc77_lang');
   return o ? 'lang=' + encodeURIComponent(o)
            : 'hint=' + encodeURIComponent(navigator.language || '');
-})()).then(function (r) { return r.json(); }).then(function (d) {
+})(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
   window.__doc77_dict = d.dict;
   window.__doc77_lang = d.lang;
   window.__doc77_locales = d.available;

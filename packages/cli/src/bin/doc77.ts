@@ -310,14 +310,23 @@ async function main() {
 
       // Register AI-dependent routes (optional)
       try {
-        const { AiProvider, OllamaProvider, DocAgent, getReadTools, getWriteTools } =
-          await import('@doc77/ai');
-        const { createAIChatHandler } = await import('@doc77/core');
-        // T4: 注入 AiProvider + OllamaProvider，handler 根据 ai.provider 配置选择构造哪个
+        const {
+          AiProvider,
+          OllamaProvider,
+          AgentLoop,
+          createPersistenceAdapter,
+          getReadTools,
+          getWriteTools,
+        } = await import('@doc77/ai');
+        const { createAgentLoopHandler } = await import('@doc77/core');
+        // T4: 注入 AiProvider + OllamaProvider，handler 根据 ai.provider 配置选择构造哪个。
+        // 使用 Phase 3 的 createAgentLoopHandler（写 SessionStore 树表），前端
+        // 会话列表/消息树/中断/regenerate 均基于该存储协议。
         const aiDeps: Record<string, unknown> = {
           AiProvider,
           OllamaProvider,
-          DocAgent,
+          AgentLoop,
+          createPersistenceAdapter,
           getReadTools,
         };
         // When MCP is installed, let the AI propose writes through the approval
@@ -328,7 +337,7 @@ async function main() {
           aiDeps.getWriteTools = getWriteTools;
           aiDeps.writeFns = { createFolder, moveFile, deleteFile, batchOperations };
         }
-        app.post('/api/ai/chat', createAIChatHandler(aiDeps as any));
+        app.post('/api/ai/chat', createAgentLoopHandler(aiDeps as any));
       } catch {
         /* AI not installed */
       }

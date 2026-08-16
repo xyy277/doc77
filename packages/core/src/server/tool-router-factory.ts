@@ -167,7 +167,8 @@ export async function createToolRouterExecutor(
   return async (name: string, args: Record<string, unknown>): Promise<string> => {
     const pid = (args.project_id as number) || deps.project_id;
     console.error(`[ai-loop] executeTool: "${name}" pid=${pid}`, args);
-    if (!pid) return 'Error: project_id is required';
+    // list_projects 不需要项目上下文 —— 无 pid 时仍可用（列出项目引导用户选择）
+    if (!pid && name !== 'list_projects') return 'Error: project_id is required';
 
     const result = await (
       router as unknown as {
@@ -177,7 +178,7 @@ export async function createToolRouterExecutor(
           ctx: { projectId: number; sessionId: string },
         ) => Promise<{ output: string; success: boolean; denied: boolean; denialReason?: string }>;
       }
-    ).execute(name, args, { projectId: pid, sessionId: deps.toolSessionId });
+    ).execute(name, args, { projectId: pid ?? 0, sessionId: deps.toolSessionId });
 
     if (!result.success && result.denied) {
       console.error(`[ai-loop] tool "${name}" denied: ${result.denialReason}`);

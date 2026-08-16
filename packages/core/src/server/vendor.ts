@@ -93,7 +93,10 @@ export const VENDOR_ASSETS: VendorAsset[] = [
   },
   {
     name: 'marked.min.js',
-    url: 'https://cdn.jsdelivr.net/npm/marked@17.0.0/marked.min.js',
+    // marked@17 moved the UMD build out of the package root — the old
+    // /marked.min.js path 404s on jsdelivr, which made vendor-install skip
+    // it and left markdown rendering in plain-text fallback forever.
+    url: 'https://cdn.jsdelivr.net/npm/marked@17.0.0/lib/marked.umd.min.js',
     type: 'js',
     size: '~40KB',
   },
@@ -103,6 +106,32 @@ export const VENDOR_ASSETS: VendorAsset[] = [
     type: 'js',
     size: '~20KB',
   },
+  // d3-force 的 UMD 不打包依赖：浏览器分支从全局 d3 命名空间读取
+  // d3-dispatch/d3-quadtree/d3-timer，必须按序先加载（graph.js loadD3Force 同序）。
+  {
+    name: 'd3-dispatch.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-dispatch@3.0.1/dist/d3-dispatch.min.js',
+    type: 'js',
+    size: '~5KB',
+  },
+  {
+    name: 'd3-quadtree.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-quadtree@3.0.1/dist/d3-quadtree.min.js',
+    type: 'js',
+    size: '~10KB',
+  },
+  {
+    name: 'd3-timer.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-timer@3.0.1/dist/d3-timer.min.js',
+    type: 'js',
+    size: '~5KB',
+  },
+  {
+    name: 'd3-force.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-force@3.0.0/dist/d3-force.min.js',
+    type: 'js',
+    size: '~25KB',
+  },
 ];
 
 /**
@@ -111,9 +140,11 @@ export const VENDOR_ASSETS: VendorAsset[] = [
 export async function fetchVendorAssets(vendorDir: string, assets: VendorAsset[]): Promise<void> {
   fs.mkdirSync(vendorDir, { recursive: true });
 
+  let available = 0;
   for (const asset of assets) {
     const dest = path.join(vendorDir, asset.name);
     if (fs.existsSync(dest)) {
+      available++;
       console.log(t('cli.vendor.assetExists', { name: asset.name }));
       continue;
     }
@@ -126,6 +157,7 @@ export async function fetchVendorAssets(vendorDir: string, assets: VendorAsset[]
       }
       const buffer = Buffer.from(await resp.arrayBuffer());
       fs.writeFileSync(dest, buffer);
+      available++;
       console.log(`  ✓ ${asset.name} (${(buffer.length / 1024).toFixed(0)} KB)`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
@@ -133,8 +165,19 @@ export async function fetchVendorAssets(vendorDir: string, assets: VendorAsset[]
     }
   }
 
-  // Write a marker file to indicate vendor is ready
-  fs.writeFileSync(path.join(vendorDir, '.ready'), Date.now().toString());
+  // Write the ready marker ONLY when at least one asset is actually present.
+  // Previously the marker was written unconditionally, so a fully-failed
+  // download left an empty vendor dir "ready" — the frontend then probed
+  // /vendor/.ready, picked the local path and 404'd on every asset.
+  if (available > 0) {
+    fs.writeFileSync(path.join(vendorDir, '.ready'), Date.now().toString());
+  } else {
+    try {
+      fs.rmSync(path.join(vendorDir, '.ready'), { force: true });
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
 }
 
 /**

@@ -201,6 +201,15 @@ export function indexFileLinksSafe(projectId: number, projectRoot: string, relPa
 const dirtyTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const DIRTY_DEBOUNCE_MS = 5000;
 
+/** 取消挂起的脏标记重建（手动 POST index 立即执行后调用，防 5s 后二次全量） */
+export function cancelProjectGraphDirty(projectId: number): void {
+  const existing = dirtyTimers.get(projectId);
+  if (existing) {
+    clearTimeout(existing);
+    dirtyTimers.delete(projectId);
+  }
+}
+
 /** 标记项目图谱为脏（目录删除/批量变更），5s 去抖后后台全量重建 */
 export function markProjectGraphDirty(projectId: number): void {
   const existing = dirtyTimers.get(projectId);

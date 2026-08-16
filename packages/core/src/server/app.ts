@@ -260,6 +260,20 @@ export function createApp(
     res.status(404).type('html').send('<h1>Not Found</h1>');
   });
 
+  // === Knowledge graph workspace (phase 2: visualization + insights) ===
+  app.get('/graph', (_req: Request, res: Response) => {
+    if (!webDir) {
+      res.status(404).type('html').send('<h1>Not Found</h1>');
+      return;
+    }
+    const target = path.join(webDir, 'graph.html');
+    if (fs.existsSync(target)) {
+      res.sendFile(target, { dotfiles: 'allow' });
+      return;
+    }
+    res.status(404).type('html').send('<h1>Not Found</h1>');
+  });
+
   app.get('/preview.html', (_req: Request, res: Response) => {
     if (!webDir) {
       res.status(404).type('html').send('<h1>Not Found</h1>');
@@ -355,6 +369,25 @@ export function createApp(
     ? process.env.DOC77_VENDOR_DIR ||
       path.join((process as NodeJS.Process & { resourcesPath?: string }).resourcesPath!, 'vendor')
     : path.join(process.env.HOME || '/home', '.doc77', 'vendor');
+  // Readiness probe guard: report .ready as 404 when the vendor dir holds no
+  // real assets (a stale .ready from a failed vendor-install used to make the
+  // frontend pick the local path and 404 on every asset — blanking the AI
+  // chat and flashing the tab strip in a reload loop).
+  app.use('/vendor', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/.ready') {
+      try {
+        const hasAssets = fs.readdirSync(vendorDir).some((f) => f !== '.ready' && f !== '.');
+        if (!hasAssets) {
+          res.status(404).end();
+          return;
+        }
+      } catch {
+        res.status(404).end();
+        return;
+      }
+    }
+    next();
+  });
   app.use('/vendor', express.static(vendorDir, { fallthrough: true, dotfiles: 'allow' }));
 
   // CORS — allow all origins (localhost-only binding for security)
@@ -396,14 +429,42 @@ export function createApp(
   // the unauthenticated static /thumbnails path).
   const PUBLIC_API_PREFIXES = ['/api/share/', '/api/thumbnails/'];
 
-  function extractBearerToken(req: Request): string | null {
+  function extractBearerToken(req: Request, opts?: { allowQuery?: boolean }): string | null {
     const h = req.headers['authorization'];
     if (typeof h === 'string' && h.startsWith('Bearer ')) {
       return h.slice(7).trim() || null;
     }
     const x = req.headers['x-doc77-token'];
     if (typeof x === 'string') return x.trim() || null;
+    // EventSource 无法设置 Authorization header，SSE 端点（仅 /api/events）
+    // 允许经 ?token= 接收 session token。窄范围 opt-in：服务端无 URL 日志，
+    // 同源无 referrer 外泄；header 始终优先于 query。
+    if (opts?.allowQuery) {
+      const q = req.query.token;
+      if (typeof q === 'string' && q.trim()) return q.trim();
+    }
     return null;
+  }
+
+  /**
+   * 隧道信任边界（T3 安全修复）：XFF 客户端可伪造，仅当连接来源是本机
+   * （隧道代理如 cloudflared 在本地转发）时才信任 XFF，且取**末条**（代理
+   * 追加的真实客户端 IP）——首条/中间条目全为客户端可控。直连请求（socket
+   * 非本机）一律忽略 XFF，用连接来源 req.ip 判定。
+   */
+  function trustedClientIp(req: Request): string {
+    const socketIp = req.socket?.remoteAddress || '';
+    const socketIsLocal =
+      socketIp === '127.0.0.1' ||
+      socketIp === '::1' ||
+      socketIp === '::ffff:127.0.0.1' ||
+      socketIp === '';
+    const xff = (req.headers['x-forwarded-for'] as string) || '';
+    if (socketIsLocal && xff) {
+      const last = xff.split(',').pop()?.trim() || '';
+      if (last) return last;
+    }
+    return req.ip || '';
   }
 
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -412,12 +473,15 @@ export function createApp(
     if (PUBLIC_API_ROUTES.has(req.path)) return next();
     if (PUBLIC_API_PREFIXES.some((p) => req.path.startsWith(p))) return next();
 
+    // 仅 /api/events（SSE）允许 query token —— EventSource 无法带 header。
+    // 隧道与密码两分支都需传入（隧道 running + LAN 浏览时 SSE 走隧道分支）。
+    const allowQueryToken = req.path === '/api/events';
+
     // 隧道安全门控（T3）：隧道 running 且请求非 localhost 时，即使开放模式也强制认证。
-    // 通过 X-Forwarded-For 或 req.ip 判断来源 IP——隧道转发时 XFF 携带真实客户端 IP。
+    // 来源 IP 经 trustedClientIp 判定（XFF 信任边界见上）。
     const tunnelActive = getTunnelManager().getStatus().status === 'running';
     if (tunnelActive) {
-      const ip =
-        ((req.headers['x-forwarded-for'] as string) || '').split(',')[0]?.trim() || req.ip || '';
+      const ip = trustedClientIp(req);
       const isLocalhost =
         ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === '';
       if (!isLocalhost) {
@@ -433,7 +497,7 @@ export function createApp(
           return;
         }
         // 接受常规 session 或隧道 session（30min TTL）
-        const token = extractBearerToken(req);
+        const token = extractBearerToken(req, { allowQuery: allowQueryToken });
         if (token && (auth.validateSessionToken(token) || auth.validateTunnelSessionToken(token))) {
           return next();
         }
@@ -449,7 +513,7 @@ export function createApp(
     // Open mode: no password configured → no session required.
     if (!auth.isPasswordSet()) return next();
     // Password configured → require a valid, non-expired session token.
-    const token = extractBearerToken(req);
+    const token = extractBearerToken(req, { allowQuery: allowQueryToken });
     if (token && auth.validateSessionToken(token)) return next();
     res
       .status(401)
@@ -473,12 +537,17 @@ export function createApp(
   // --- API Routes ---
 
   // i18n dictionary delivery (with ETag caching)
+  // Note: no-store — the frontend fetch() cannot consume a 304 body (r.json()
+  // on an empty body rejects, leaving the client dict empty and every label
+  // rendering as its raw key). Browsers therefore must never cache this
+  // response; the ETag branch is kept for non-browser clients only.
   app.get('/api/i18n', (req: Request, res: Response) => {
     const r = buildI18nResponse({
       lang: String(req.query.lang || ''),
       hint: String(req.query.hint || ''),
       global: getConfig('locale.language') || '',
     });
+    res.set('Cache-Control', 'no-store');
     if (req.headers['if-none-match'] === r.etag) {
       res.status(304).end();
       return;
@@ -3365,7 +3434,8 @@ export function createApp(
 
   const loginRateLimiter = createRateLimiter();
   function clientIp(req: Request): string {
-    return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    // 与门控同一信任边界（trustedClientIp）：XFF 仅在本机代理转发时可信
+    return trustedClientIp(req) || 'unknown';
   }
 
   // Check auth status
@@ -4335,6 +4405,13 @@ export function createAIChatHandler(deps: {
  */
 export function createAgentLoopHandler(deps: {
   AiProvider: new (config: { apiKey: string; baseUrl: string; model: string }) => unknown;
+  /** T4: OllamaProvider — 仅当 ai.provider === 'ollama' 时使用。 */
+  OllamaProvider?: new (config: {
+    apiKey: string;
+    baseUrl?: string;
+    model?: string;
+    ollamaUrl?: string;
+  }) => unknown;
   AgentLoop: new (config: Record<string, unknown>) => {
     run(
       sessionId: string,
@@ -4368,7 +4445,15 @@ export function createAgentLoopHandler(deps: {
   const aiRateLimiter = createRateLimiter();
 
   return async (req: Request, res: Response) => {
-    const { message, project_id, session_id, context_file, regenerate_from, edit_from } = req.body;
+    const {
+      message,
+      project_id,
+      session_id,
+      context_file,
+      context_graph_neighbors,
+      regenerate_from,
+      edit_from,
+    } = req.body;
     console.error(
       `[ai-loop] chat request: session=${session_id || 'new'}, project=${project_id}, ` +
         `context_file=${context_file || 'none'}, msg="${(message || '').slice(0, 100)}"` +
@@ -4433,6 +4518,14 @@ export function createAgentLoopHandler(deps: {
     }
     const baseUrl = baseRow?.value || 'https://api.deepseek.com';
     const model = modelRow?.value || 'deepseek-v4-pro';
+    // T4: 读取 ai.provider，支持多 provider 切换（ollama / custom）
+    const providerRow = db.prepare("SELECT value FROM config WHERE key = 'ai.provider'").get() as
+      { value: string } | undefined;
+    const ollamaUrlRow = db
+      .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
+      .get() as { value: string } | undefined;
+    const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
+    const ollamaUrl = ollamaUrlRow?.value;
 
     // ── SSE setup ──
     res.writeHead(200, {
@@ -4471,6 +4564,23 @@ export function createAgentLoopHandler(deps: {
       }
       send('session', { session_id: sid });
 
+      // ── Per-session rate limit (message ceiling over a 5-minute window) ──
+      const rlLimit = (() => {
+        try {
+          const row = db
+            .prepare("SELECT value FROM config WHERE key = 'ai.read_limit_per_session'")
+            .get() as { value: string } | undefined;
+          return parseInt(row?.value || '200', 10) || 200;
+        } catch {
+          return 200;
+        }
+      })();
+      if (!aiRateLimiter.check(sid, rlLimit, 5 * 60 * 1000, Date.now()).allowed) {
+        send('error', { message: t('ai.context.rateLimited') });
+        res.end();
+        return;
+      }
+
       // ── Build the persistence adapter (bridges AgentLoop ↔ SessionStore) ──
       const persistence = createPersistenceAdapter({
         appendMessage: (sId: string, msg: Record<string, unknown>) =>
@@ -4497,10 +4607,11 @@ export function createAgentLoopHandler(deps: {
         logToolCall: (entry: Record<string, unknown>) => logToolCall(entry as never),
       });
 
-      // ── Build the provider ──
-      const provider = new AiProvider({ apiKey: token, baseUrl, model }) as InstanceType<
-        typeof AiProvider
-      >;
+      // ── Build the provider (T4: ollama / custom 按 ai.provider 选择) ──
+      const sessionProvider =
+        provider === 'ollama' && deps.OllamaProvider
+          ? new deps.OllamaProvider({ apiKey: 'ollama', model, ollamaUrl })
+          : new AiProvider({ apiKey: token, baseUrl, model });
 
       // ── Build the tool executor (same logic as createAIChatHandler) ──
       let toolSessionId = sid;
@@ -4550,6 +4661,14 @@ export function createAgentLoopHandler(deps: {
       const readTools = getReadTools();
       const writeTools = deps.writeFns ? deps.getWriteTools?.() || [] : [];
       const allTools = [...readTools, ...writeTools];
+      // 无项目上下文时：文件/写工具全部不可用（会因缺少 pid 失败），只保留
+      // list_projects 供 AI 列出项目、引导用户在界面中选择后再提问。
+      const activeTools = project_id
+        ? allTools
+        : allTools.filter(
+            (tool) =>
+              (tool as { function?: { name?: string } })?.function?.name === 'list_projects',
+          );
 
       // ── Context file fast-path (same as createAIChatHandler) ──
       let outgoing = message;
@@ -4558,6 +4677,16 @@ export function createAgentLoopHandler(deps: {
         const content = readProjectFileContent(project_id, context_file as string);
         if (!content.startsWith('Error:')) {
           outgoing = `${message}\n\n---\n${t('ai.context.fileDirective', { file: context_file as string })}\n\n${content}`;
+          // v1.2.0：图谱邻居注入（context_graph_neighbors !== false 时附加；
+          // N/K/T 预算内，复用 readProjectFileContent 的敏感拦截与截断语义）
+          if (context_graph_neighbors !== false) {
+            const neighbors = collectGraphNeighbors(
+              project_id,
+              context_file as string,
+              readProjectFileContent,
+            );
+            if (neighbors) outgoing += neighbors;
+          }
           noTools = true;
         }
       }
@@ -4621,6 +4750,10 @@ export function createAgentLoopHandler(deps: {
 
       // ── Inject project context for new sessions ──
       let systemPrompt = t('ai.systemPrompt');
+      if (!project_id) {
+        // 无项目上下文：引导 AI 不要调用文件工具，改为提示用户选择项目
+        systemPrompt += '\n\n' + t('ai.context.noProjectHint');
+      }
       if (project_id && !context_file) {
         try {
           const root = scanDirectory(project_id, '');
@@ -4645,9 +4778,9 @@ export function createAgentLoopHandler(deps: {
 
       // ── Create the AgentLoop ──
       const loop = new AgentLoop({
-        provider,
+        provider: sessionProvider,
         model,
-        tools: allTools as never[],
+        tools: activeTools as never[],
         executeTool,
         maxSteps: 10,
         systemPrompt,
@@ -4661,14 +4794,20 @@ export function createAgentLoopHandler(deps: {
         inject: (msg: string) => loop.interrupts.inject(msg),
       });
 
+      // ── Run the loop and forward events as SSE ──
+      // 累积 assistant 回复文本，结束后写日志便于排查（回复内容、状态、耗时）
+      let assistantText = '';
+      let replyFinish: string | null = null;
+      let replyError: string | null = null;
+      const replyStart = Date.now();
       try {
-        // ── Run the loop and forward events as SSE ──
         for await (const event of loop.run(sid, outgoing, { noTools, skipAppendUser })) {
           switch (event.type) {
             case 'session':
               // Already sent above; skip
               break;
             case 'token':
+              assistantText += event.content;
               send('token', { text: event.content });
               break;
             case 'tool_call_start':
@@ -4698,13 +4837,24 @@ export function createAgentLoopHandler(deps: {
               });
               break;
             case 'done':
+              replyFinish = event.finishReason || 'done';
               send('done', { finishReason: event.finishReason, usage: event.usage });
               break;
             case 'error':
+              replyError = event.message || null;
+              replyFinish = 'error';
               send('error', { message: event.message });
               break;
           }
         }
+        // 排查日志：记录本次 AI 回复的完整内容（截断）、状态与耗时
+        const elapsedMs = Date.now() - replyStart;
+        console.error(
+          `[ai-loop] reply done: session=${sid}, ${assistantText.length} chars, ` +
+            `finish=${replyFinish || 'interrupted'}, ${elapsedMs}ms` +
+            (replyError ? `, error=${replyError}` : '') +
+            `\n[ai-loop] reply text: ${assistantText.slice(0, 1000)}`,
+        );
       } finally {
         // ── Clean up: unregister the interrupt queue ──
         _activeInterruptQueues.delete(sid);
