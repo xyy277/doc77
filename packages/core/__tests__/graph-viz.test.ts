@@ -185,6 +185,16 @@ describe('hitTest', () => {
     ];
     expect(hitTest({ x: 0, y: 0, scale: 1 }, 100, 100, overlap)).toBe('top');
   });
+
+  it('命中容差随缩放换算：放大后边缘可点中，缩小时不产生幽灵命中区', () => {
+    const node = [{ id: 'n1', x: 100, y: 100, radius: 10 }];
+    // scale=2：节点屏幕位置 (200,200)，r=(10+4)*2=28 → 距中心 25px 命中
+    // （修复前世界单位半径 14，25px 处不命中）
+    expect(hitTest({ x: 0, y: 0, scale: 2 }, 200, 225, node)).toBe('n1');
+    // scale=0.1：节点屏幕位置 (10,10)，r=1.4 → 屏幕距中心 10px 不命中
+    // （修复前 14px 幽灵命中区）
+    expect(hitTest({ x: 0, y: 0, scale: 0.1 }, 20, 10, node)).toBeNull();
+  });
 });
 
 describe('view transforms', () => {
@@ -208,6 +218,24 @@ describe('view transforms', () => {
     expect(view.scale).toBe(8);
     zoomAt(view, 0, 0, 0.0001);
     expect(view.scale).toBe(0.05);
+  });
+
+  it('zoomAt：factor=0 / Infinity 不产生 NaN', () => {
+    const view = { x: 0, y: 0, scale: 1 };
+    zoomAt(view, 10, 10, 0);
+    expect(Number.isFinite(view.scale)).toBe(true);
+    expect(Number.isFinite(view.x)).toBe(true);
+    zoomAt(view, 10, 10, Infinity);
+    expect(Number.isFinite(view.scale)).toBe(true);
+    expect(Number.isFinite(view.x)).toBe(true);
+  });
+
+  it('clampView：w=0/h=0 不抛错且值有限', () => {
+    const view = { x: 50, y: -50, scale: 3 };
+    const out = clampView(view, 0, 0);
+    expect(Number.isFinite(out.x)).toBe(true);
+    expect(Number.isFinite(out.y)).toBe(true);
+    expect(out.scale).toBe(3);
   });
 
   it('clampView：平移与缩放边界', () => {

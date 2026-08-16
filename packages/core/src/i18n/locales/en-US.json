@@ -1117,5 +1117,7 @@
   "web.graph.empty": "No graph data — re-index to build",
   "web.graph.reindex": "Re-index",
   "web.graph.openSource": "Open source document",
+  "web.graph.sseLost": "Live updates lost — refresh the page to restore",
+  "web.graph.orphanLimit": "Showing first {n} only",
   "ai.context.noProjectHint": "Note: this conversation has no project attached (project_id is empty). Do NOT call file tools such as list_files, read_file, get_file_info, search_files — they require a project context and will fail. If the user asks about projects or files, use list_projects to list available projects and tell the user to select a project in the UI first, then ask again."
 }

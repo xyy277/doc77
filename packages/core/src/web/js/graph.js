@@ -147,7 +147,9 @@
       if (typeof n.x !== 'number' || typeof n.y !== 'number') continue;
       var sx = view.x + n.x * view.scale;
       var sy = view.y + n.y * view.scale;
-      var r = (n.radius || 5) + 4; // 命中容差
+      // 命中容差随缩放换算到屏幕单位（修复前世界单位半径在 scale=8 时
+      // 只能点中节点中心 ~16% 面积；scale=0.05 时产生 20px 幽灵命中区）
+      var r = ((n.radius || 5) + 4) * view.scale;
       var dx = x - sx;
       var dy = y - sy;
       if (dx * dx + dy * dy <= r * r) return n.id;
@@ -240,24 +242,28 @@
       cb(true);
       return;
     }
-    // d3-force UMD 从全局 d3 命名空间读取依赖：先按序加载 dispatch/quadtree/timer
-    var chain = D3_FORCE_DEPS.slice();
-    var next = function () {
-      if (!chain.length) {
-        loadScript(D3_FORCE_URL, function (ok) {
-          cb(ok && !!(window.d3 && window.d3.forceSimulation));
-        });
-        return;
-      }
-      loadScript(chain.shift(), function (ok) {
-        if (!ok) {
-          cb(false);
+    // 先探测 vendor 就绪：图谱页不加载 preview.js，__VENDOR_READY 从未被
+    // 设置 → vsrc 恒走 CDN（离线场景 d3 加载失败）。vendorReady 会设置该标志。
+    vendorReady(function () {
+      // d3-force UMD 从全局 d3 命名空间读取依赖：先按序加载 dispatch/quadtree/timer
+      var chain = D3_FORCE_DEPS.slice();
+      var next = function () {
+        if (!chain.length) {
+          loadScript(D3_FORCE_URL, function (ok) {
+            cb(ok && !!(window.d3 && window.d3.forceSimulation));
+          });
           return;
         }
-        next();
-      });
-    };
-    next();
+        loadScript(chain.shift(), function (ok) {
+          if (!ok) {
+            cb(false);
+            return;
+          }
+          next();
+        });
+      };
+      next();
+    });
   }
 
   // ── 页面状态 ──
@@ -278,6 +284,8 @@
     dragged: false,
     controller: null, // AbortController（取消过期请求）
     reloadTimer: null,
+    fingerprint: null, // 数据指纹（selection + 节点数 + 边数）：未变时跳过 sim 重启
+    simGen: 0, // 物理引擎代次：丢弃过期 loadD3Force 回调（双 sim 竞态守卫）
     insightsTab: 'orphans',
     insightPage: 1,
     insightRows: [], // 当前 tab 的全部行（客户端分页）
@@ -287,8 +295,8 @@
     return document.getElementById('graphCanvas');
   }
 
-  function fetchJ(url) {
-    return fetch(url).then(function (r) {
+  function fetchJ(url, opts) {
+    return fetch(url, opts || {}).then(function (r) {
       return r.json().then(function (d) {
         if (!r.ok) throw new Error(d.error || 'Request failed');
         return d;
@@ -411,7 +419,7 @@
     }
   }
 
-  // ── 数据加载（四请求并行，AbortController 取消过期请求）──
+  // ── 数据加载（四请求独立失败 + AbortController 网络级取消）──
   function loadData() {
     if (state.controller) state.controller.abort();
     var ctrl = (state.controller = new AbortController());
@@ -425,39 +433,57 @@
       return;
     }
     var q = 'projects=' + sel.join(',');
-    Promise.all([
-      fetchJ('/api/graph?' + q),
-      fetchJ('/api/graph/stats?' + q),
-      fetchJ('/api/graph/orphans?' + q + '&limit=10000'),
-      fetchJ('/api/graph/broken?' + q + '&limit=500'),
-    ])
-      .then(function (res) {
-        if (ctrl.signal.aborted) return;
-        var graph = res[0];
-        var orphans = res[2] || {};
-        var broken = res[3] || {};
-        state.data = {
-          graph: graph,
-          stats: res[1] || {},
-          orphans: orphans.orphans || [],
-          broken: broken.broken || [],
-          orphanTotal: orphans.total || 0,
-          brokenTotal: broken.total || 0,
-        };
-        state.model = buildGraphModel(graph.nodes || [], graph.edges || [], orphans.orphans || []);
-        state.view = { x: 0, y: 0, scale: 1 };
-        hideIndexing();
-        showTruncated(!!graph.truncated);
-        toggleEmptyState(!state.model.nodes.length);
-        renderInsights();
-        updateReindexBtn();
-        startSimulation();
-      })
-      .catch(function (err) {
-        if (!ctrl.signal.aborted) {
-          window.toast && window.toast(String((err && err.message) || err), 'error');
-        }
-      });
+    var opts = { signal: ctrl.signal };
+    // 修复前 Promise.all 原子失败：一个请求挂（如重索引期 SQLITE_BUSY）
+    // 整个模型被丢弃。现在 graph 独立失败才 toast，orphans/broken 失败
+    // 仅降级洞察面板（canvas 用 graph 数据即可渲染）。
+    var graphP = fetchJ('/api/graph?' + q, opts).catch(function (err) {
+      if (!ctrl.signal.aborted) {
+        window.toast && window.toast(String((err && err.message) || err), 'error');
+      }
+      return null;
+    });
+    var statsP = fetchJ('/api/graph/stats?' + q, opts).catch(function () {
+      return null;
+    });
+    var orphansP = fetchJ('/api/graph/orphans?' + q + '&limit=10000', opts).catch(function () {
+      return null;
+    });
+    var brokenP = fetchJ('/api/graph/broken?' + q + '&limit=500', opts).catch(function () {
+      return null;
+    });
+    Promise.all([graphP, statsP, orphansP, brokenP]).then(function (res) {
+      if (ctrl.signal.aborted) return;
+      var graph = res[0];
+      if (!graph) return; // graph 数据是渲染前提，失败已 toast
+      var orphans = res[2] || {};
+      var broken = res[3] || {};
+      var fingerprint =
+        sel.join(',') + ':' + (graph.nodes || []).length + ':' + (graph.edges || []).length;
+      var dataChanged = fingerprint !== state.fingerprint;
+      state.fingerprint = fingerprint;
+      state.data = {
+        graph: graph,
+        stats: res[1] || {},
+        orphans: orphans.orphans || [],
+        broken: broken.broken || [],
+        orphanTotal: orphans.total || 0,
+        brokenTotal: broken.total || 0,
+      };
+      hideIndexing();
+      showTruncated(!!graph.truncated);
+      renderInsights();
+      updateReindexBtn();
+      if (!dataChanged && state.model) {
+        return; // 数据未变（重索引进度刷新）：保留布局，不重启物理引擎
+      }
+      // 修复前每次 reload 重置 view（用户缩放/平移每秒丢失一次）
+      var firstLoad = !state.model;
+      state.model = buildGraphModel(graph.nodes || [], graph.edges || [], orphans.orphans || []);
+      if (firstLoad) state.view = { x: 0, y: 0, scale: 1 };
+      toggleEmptyState(!state.model.nodes.length);
+      startSimulation();
+    });
   }
 
   // ── 力导向模拟（d3-force，rAF 合并绘制）──
@@ -477,12 +503,15 @@
   }
 
   function startSimulation() {
-    if (state.sim) state.sim.stop();
-    state.sim = null;
+    // 修复前：'end' 后 state.sim=null → 拖拽只设 fx/fy 不重启物理 → 拖拽永久失效。
+    // 现在保留已收敛的 sim 引用（无 tick 无成本），拖拽时 lazy restart。
+    if (state.sim && state.sim._doc77Active) state.sim.stop();
     var model = state.model;
     if (!model || !model.nodes.length) return;
+    var gen = ++state.simGen;
     loadD3Force(function () {
-      if (!state.model) return;
+      if (gen !== state.simGen || !state.model) return; // 过期回调丢弃（双 sim 竞态）
+      if (state.sim && state.sim._doc77Active) state.sim.stop();
       if (!window.d3 || !window.d3.forceSimulation) {
         var fw = getCanvas().clientWidth || 800;
         var fh = getCanvas().clientHeight || 600;
@@ -519,9 +548,10 @@
         .alphaDecay(PHYSICS.alphaDecay)
         .velocityDecay(PHYSICS.velocityDecay)
         .on('tick', scheduleDraw);
+      sim._doc77Active = true;
       state.sim = sim;
       sim.on('end', function () {
-        if (state.sim === sim) state.sim = null; // 收敛后释放（alpha < ~0.0015 触发）
+        sim._doc77Active = false; // 收敛后停摆但保留引用：拖拽时 lazy restart
       });
     });
   }
@@ -553,25 +583,30 @@
     var edgeColor = state.dark ? 'rgba(148,163,184,0.35)' : 'rgba(100,116,139,0.35)';
     var labelColor = state.dark ? '#cbd5e1' : '#475569';
 
-    // 边（单 pass）
+    // 边（单 pass；降级模式（无 d3）source/target 是字符串 id，按 byId 解析——
+    // 修复前 moveTo(NaN) 导致降级时一条边都画不出来）
     ctx.strokeStyle = edgeColor;
     ctx.lineWidth = 1 / view.scale; // 屏幕恒定 1px
     ctx.beginPath();
     var edges = state.model.edges;
+    var byId = {};
+    var nodes = state.model.nodes;
+    for (var ni = 0; ni < nodes.length; ni++) byId[nodes[ni].id] = nodes[ni];
     for (var i = 0; i < edges.length; i++) {
       var e = edges[i];
-      var s = e.source;
-      var t = e.target;
+      var s = typeof e.source === 'string' ? byId[e.source] : e.source;
+      var t = typeof e.target === 'string' ? byId[e.target] : e.target;
+      if (!s || !t || typeof s.x !== 'number' || typeof t.x !== 'number') continue;
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(t.x, t.y);
     }
     ctx.stroke();
 
     // 节点（视口裁剪）
-    var nodes = state.model.nodes;
     var labelCount = 0;
     var showLabels = view.scale >= LABEL_MIN_SCALE;
-    ctx.font = '11px system-ui, -apple-system, sans-serif';
+    // 字体随缩放换算（修复前世界坐标空间下 scale=8 时 88px 大字重叠）
+    ctx.font = 11 / view.scale + 'px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     for (var j = 0; j < nodes.length; j++) {
       var n = nodes[j];
@@ -622,6 +657,7 @@
     });
 
     canvas.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return; // 仅左键（修复前右键点击节点误触发 openDoc）
       var c = canvasCoords(e);
       var id = hitTest(state.view, c.x, c.y, state.model ? state.model.nodes : []);
       state.dragged = false;
@@ -636,6 +672,8 @@
         state.dragNode = node;
         node.fx = node.x;
         node.fy = node.y;
+        // 修复前 sim 收敛（'end'）后 state.sim 被置 null → 拖拽永久失效；
+        // 现在 sim 保留引用，restart() 即可重新激活物理
         if (state.sim) state.sim.alphaTarget(0.3).restart();
       } else {
         state.panning = true;
@@ -663,18 +701,33 @@
         return;
       }
       var id = hitTest(state.view, c.x, c.y, state.model ? state.model.nodes : []);
+      var hoverChanged = id !== state.hover;
       state.hover = id;
       getCanvas().style.cursor = id ? 'pointer' : 'default';
       showTooltip(id, c.x, c.y);
-      scheduleDraw();
+      if (hoverChanged || state.highlightId) scheduleDraw(); // hover 未变跳过重绘
     });
 
     canvas.addEventListener('pointerup', function (e) {
+      if (e.button !== 0) return;
       if (state.dragNode) {
         state.dragNode.fx = null;
         state.dragNode.fy = null;
         if (state.sim) state.sim.alphaTarget(0);
         if (!state.dragged) openDoc(state.dragNode.pid, state.dragNode.path); // 点击（未拖动）
+        state.dragNode = null;
+      }
+      state.panning = false;
+      state.panStart = null;
+    });
+
+    // 修复前无 pointercancel：指针捕获丢失（窗口外释放/触摸取消）后
+    // dragNode/panning 永久卡住，后续每次 move 都拖拽节点
+    canvas.addEventListener('pointercancel', function () {
+      if (state.dragNode) {
+        state.dragNode.fx = null;
+        state.dragNode.fy = null;
+        if (state.sim) state.sim.alphaTarget(0);
         state.dragNode = null;
       }
       state.panning = false;
@@ -688,21 +741,22 @@
     });
   }
 
+  function findNodeById(id) {
+    if (!id || !state.model) return null;
+    for (var i = 0; i < state.model.nodes.length; i++) {
+      if (state.model.nodes[i].id === id) return state.model.nodes[i];
+    }
+    return null;
+  }
+
   function showTooltip(id, x, y) {
     var tip = document.getElementById('graphTooltip');
     if (!tip) return;
-    if (!id || !state.model) {
+    var node = findNodeById(id);
+    if (!node) {
       tip.classList.add('hidden');
       return;
     }
-    var node = null;
-    for (var i = 0; i < state.model.nodes.length; i++) {
-      if (state.model.nodes[i].id === id) {
-        node = state.model.nodes[i];
-        break;
-      }
-    }
-    if (!node) return;
     var tags = node.tags.length ? node.tags.join(', ') : '';
     tip.innerHTML =
       '<div class="font-medium">' +
@@ -753,9 +807,13 @@
     });
   }
 
+  var searchSeq = 0; // 搜索竞态守卫：仅最后一次请求的结果可渲染
+
   function runSearch(q) {
+    var seq = ++searchSeq;
     fetchJ('/api/fts?q=' + encodeURIComponent(q) + '&limit=10')
       .then(function (d) {
+        if (seq !== searchSeq) return; // 过期响应（快速输入时旧请求后到）丢弃
         var hits = [];
         var groups = (d && d.groups) || [];
         for (var g = 0; g < groups.length; g++) {
@@ -777,7 +835,7 @@
         renderSearchResults(hits.slice(0, 10));
       })
       .catch(function () {
-        hideSearchResults();
+        if (seq === searchSeq) hideSearchResults();
       });
   }
 
@@ -795,7 +853,7 @@
     for (var i = 0; i < hits.length; i++) {
       html +=
         '<button data-hit="' +
-        escAttr(hits[i].id) +
+        esc(hits[i].id) +
         '" class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 border-b border-slate-100 dark:border-slate-700 last:border-0">' +
         '<span class="text-slate-700 dark:text-slate-200">' +
         esc(hits[i].title) +
@@ -839,6 +897,9 @@
     state.view.scale = scale;
     state.view.x = w / 2 - node.x * scale;
     state.view.y = h / 2 - node.y * scale;
+    // 修复前 focusNode 不 clamp：聚焦远离原点的节点后滚轮一次就被
+    // clampView 拉回 ±2 视口边界，节点跳出视野
+    clampView(state.view, w, h);
     state.highlightId = id;
     clearTimeout(state.highlightTimer);
     state.highlightTimer = setTimeout(function () {
@@ -903,6 +964,14 @@
     for (var i = 0; i < slice.length; i++) {
       html += isOrphans ? orphanRow(slice[i]) : brokenRow(slice[i]);
     }
+    // 孤儿 >10000 时 API 截断（limit=10000）：显示提示防与 stats 计数
+    // 语义发散（修复前静默只显示前 10000，load-more 还消失）
+    if (total > rows.length) {
+      html +=
+        '<div class="text-xs text-amber-500 dark:text-amber-400 py-1.5">' +
+        esc(t('web.graph.orphanLimit', { n: String(rows.length) })) +
+        '</div>';
+    }
     var hasMore = rows.length > slice.length;
     html +=
       '<button id="insightLoadMore" class="' +
@@ -928,7 +997,7 @@
     var label = row.title || row.path;
     return (
       '<button data-open="' +
-      escAttr(row.project_id + ':' + row.path) +
+      esc(row.project_id + ':' + row.path) +
       '" class="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 border-b border-slate-100 dark:border-slate-700 last:border-0">' +
       '<span class="text-slate-700 dark:text-slate-200">' +
       esc(label) +
@@ -946,7 +1015,7 @@
     var target = row.display || row.to_path;
     return (
       '<button data-open="' +
-      escAttr(row.project_id + ':' + row.from_path) +
+      esc(row.project_id + ':' + row.from_path) +
       '" class="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 border-b border-slate-100 dark:border-slate-700 last:border-0">' +
       '<span class="text-slate-700 dark:text-slate-200">' +
       esc(row.from_path.split('/').pop() || row.from_path) +
@@ -1015,6 +1084,13 @@
         loadData();
       }, 1000);
     };
+    var inSelection = function (pid) {
+      return (
+        state.selection.length === 0 ||
+        state.selection.indexOf(pid) >= 0 ||
+        (state.data && (state.data.graph.projects || []).indexOf(pid) >= 0)
+      );
+    };
     es.addEventListener('graph:index-progress', function (ev) {
       var d = null;
       try {
@@ -1022,16 +1098,32 @@
       } catch (e) {
         return;
       }
-      if (d && d.projectId) {
-        var inSel =
-          state.selection.length === 0 ||
-          state.selection.indexOf(d.projectId) >= 0 ||
-          state.data &&
-            (state.data.graph.projects || []).indexOf(d.projectId) >= 0;
-        if (inSel) scheduleReload();
-      }
+      if (d && d.projectId && inSelection(d.projectId)) scheduleReload();
     });
-    es.addEventListener('file-tree:changed', scheduleReload);
+    es.addEventListener('file-tree:changed', function (ev) {
+      // 修复前无条件重载：其他项目（不在当前选择）的文件变更也触发
+      // reload，重索引期间每 ~1s 重启一次 5000 节点物理引擎
+      var d = null;
+      try {
+        d = JSON.parse(ev.data);
+      } catch (e) {
+        return;
+      }
+      if (d && d.projectId && inSelection(d.projectId)) scheduleReload();
+    });
+    // 修复前无 onerror：401（服务重启/token 过期）→ 每 ~3s 无限重连，
+    // 永不恢复。连续失败 3 次 → 关闭并一次性提示。
+    var sseFailures = 0;
+    es.onopen = function () {
+      sseFailures = 0;
+    };
+    es.onerror = function () {
+      sseFailures++;
+      if (sseFailures >= 3 && es.readyState === EventSource.CLOSED) {
+        es.close();
+        window.toast && window.toast(t('web.graph.sseLost'), 'error');
+      }
+    };
   }
 
   // ── 启动 ──
