@@ -4,6 +4,36 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-16] — `1.1.7`
+
+### 全包 (`1.1.7`)
+
+**Added — 知识图谱二阶段：可视化 + 洞察（core）**
+- **`/graph` 力导向图谱页**：Canvas + vendor 懒加载 d3-force（dispatch/quadtree/timer/force 4 模块按序），5000 节点 <60fps（DPR≤2、视口裁剪、标签上限、收敛即停）；节点大小 = 入链数、颜色 = 首标签、孤立页淡化开关；拖拽/缩放/点击打开文档、FTS 搜索定位（缩放居中 + 高亮）
+- **多项目聚合图谱**：`/api/graph?projects=` 家族（nodes/stats/orphans/broken，查询层 IN 合并零表结构改动）+ `mode=full` 全量模式（20k 节点/200k 边上限 + truncated 探测）；项目 tab 切换含"全部"
+- **洞察侧栏**：孤立页/死链列表（与 stats 同谓词共享，计数永远一致），断链行点击打开源文档编辑
+- 入口：dashboard 导航 + preview 工具栏；PWA shell 资产；i18n `web.graph.*` 双语
+
+**Added — AI 对话引擎（ai/cli/electron）**
+- AgentLoop 会话处理（SessionStore 持久化）+ Ollama provider 支持 + 会话消息树/中断/regenerate
+
+**Changed**
+- **SSE 认证**：`/api/events` 接受 `?token=` 查询参数（EventSource 无法携带 header；窄范围仅该端点，header 优先）——预览页与图谱页设密后事件推送恢复
+- **安全加固**（独立对抗性审查 38 项发现修复）：XFF 信任边界（修复伪造 `X-Forwarded-For: 127.0.0.1` 绕过隧道门控的 P1 漏洞，仅本机代理转发时信任且取末条真实 IP）；limit 参数下界 clamp（负值不再绕过上限，防 LAN 内存 DoS）；聚合路由 FULL caps；`JSON.parse(tags)` 防御；严格整数参数解析
+- **图谱页修复**（审查确认 21 项）：拖拽失效（sim 收敛后保留引用 lazy restart）、属性注入 XSS（escAttr → esc）、命中半径随缩放、reload 保留缩放视图、SSE 401 重连循环（3 次失败提示）、d3 vendor 探测缺失（离线即挂）、孤儿 >10000 上限提示
+
+**Fixed**
+- d3-force UMD 依赖加载（单文件加载抛 `r.timer is not a function`）
+- POST `/api/graph/:id/index` 双重建（5s 去抖计时器未取消 → 全量 ×2）
+- 子图边查询窗口截断（>8000 边项目锚点边静默缺失）
+
+**验证**
+- 测试 853 passed（+21 独立验证新增）；perf 回归：5000 节点全量图接口 ~49ms、20 万边表孤儿/断链 ~30ms、事件循环停顿 <50ms
+- Playwright 浏览器冒烟 13/13（`pnpm exec tsx scripts/graph-e2e-smoke.mts`）
+- 审查记录 `docs/planning/graph-viz-review.md`；手工冒烟清单 `docs/planning/graph-viz-smoke-checklist.md`
+
+---
+
 ## [2026-08-16] — `1.1.6`
 
 ### 全包 (`1.1.6`)
