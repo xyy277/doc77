@@ -103,6 +103,12 @@ export const VENDOR_ASSETS: VendorAsset[] = [
     type: 'js',
     size: '~20KB',
   },
+  {
+    name: 'd3-force.min.js',
+    url: 'https://cdn.jsdelivr.net/npm/d3-force@3.0.0/dist/d3-force.min.js',
+    type: 'js',
+    size: '~25KB',
+  },
 ];
 
 /**

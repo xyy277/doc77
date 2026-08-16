@@ -108,6 +108,14 @@ document.addEventListener('visibilitychange', function () {
 
 // Server-pushed write-task lifecycle events (executed/failed) via SSE.
 var taskEventSrc = null;
+function initGraphBtn() {
+  var btn = document.getElementById('graphBtn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    location.href = '/graph' + (pid ? '?projects=' + pid : '');
+  });
+}
+
 function initTaskEvents() {
   if (taskEventSrc || typeof EventSource === 'undefined') return;
   try {
@@ -239,6 +247,8 @@ function applyCapabilities() {
     // SSE 通道自 v1.1.2 起无条件注册（不再依赖 MCP），initTaskEvents 内部有 EventSource 可用性判断
     initTaskEvents();
   }).catch(function(){});
+  // 图谱页入口按钮（二阶段可视化）
+  initGraphBtn();
   // Preload editor module in background
   if (window.EditorCore) window.EditorCore.load();
   // Ensure i18n dictionary is loaded before any t() calls

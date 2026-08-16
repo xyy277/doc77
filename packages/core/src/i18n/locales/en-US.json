@@ -1099,5 +1099,22 @@
   "web.preview.graph.noBacklinks": "No backlinks yet — add [[wikilinks]] to connect documents",
   "web.preview.graph.related": "Related documents",
   "web.preview.graph.loadingRelated": "Loading…",
-  "web.preview.graph.noRelated": "No related documents"
+  "web.preview.graph.noRelated": "No related documents",
+  "web.graph.title": "Knowledge Graph",
+  "web.graph.allProjects": "All",
+  "web.graph.orphans": "Orphans",
+  "web.graph.brokenLinks": "Broken links",
+  "web.graph.insights": "Insights",
+  "web.graph.dimOrphans": "Dim orphans",
+  "web.graph.searchPlaceholder": "Find a document…",
+  "web.graph.noResults": "No matching documents",
+  "web.graph.loading": "Loading…",
+  "web.graph.indexing": "Indexing…",
+  "web.graph.noOrphans": "No orphans",
+  "web.graph.noBroken": "No broken links",
+  "web.graph.loadMore": "Load more",
+  "web.graph.truncated": "Graph too large — showing partial view",
+  "web.graph.empty": "No graph data — re-index to build",
+  "web.graph.reindex": "Re-index",
+  "web.graph.openSource": "Open source document"
 }

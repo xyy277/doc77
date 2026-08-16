@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full" data-i18n-page>
+<head>
+<script>document.documentElement.classList.add('i18n-loading');setTimeout(function(){document.documentElement.classList.remove('i18n-loading')},1500);</script>
+<style>.i18n-loading body{visibility:hidden}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="web.graph.title">Doc77 — Knowledge Graph</title>
+<!-- 尽早应用主题 + 静态 Tailwind CSS -->
+<script>(function(){try{var s=localStorage.getItem('doc77-theme');var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();</script>
+<style>
+html{background:#f8fafc}html.dark{background:#0f172a}
+</style>
+<link rel="stylesheet" href="css/tailwind.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1e293b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Doc77">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 overflow-hidden">
+
+<div class="flex flex-col h-screen w-full">
+  <!-- Header：标题 + 项目切换 + 控件 -->
+  <header class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0 z-20">
+    <a href="/" class="text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-500 dark:hover:text-blue-400 no-underline flex items-center gap-1.5">
+      <span>🕸️</span><span data-i18n="web.graph.title">Knowledge Graph</span>
+    </a>
+    <nav id="projectTabs" class="flex items-center gap-1.5 overflow-x-auto flex-1"></nav>
+    <div class="flex items-center gap-2 shrink-0">
+      <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 cursor-pointer select-none">
+        <input id="orphanDimToggle" type="checkbox" checked class="accent-blue-500">
+        <span data-i18n="web.graph.dimOrphans">Dim orphans</span>
+      </label>
+      <div class="relative">
+        <input id="nodeSearch" type="text" class="w-48 px-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500" data-i18n-placeholder="web.graph.searchPlaceholder" placeholder="Find a document…">
+        <div id="searchResults" class="hidden absolute right-0 top-full mt-1 w-80 max-h-80 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg z-30 text-sm"></div>
+      </div>
+      <button id="insightsBtn" class="px-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" data-i18n="web.graph.insights">Insights</button>
+      <button id="reindexBtn" class="hidden px-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" data-i18n="web.graph.reindex">Re-index</button>
+    </div>
+  </header>
+
+  <!-- 主区：Canvas + 悬浮层 -->
+  <div id="graphWrap" class="relative flex-1 overflow-hidden">
+    <canvas id="graphCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+    <div id="graphTooltip" class="hidden absolute pointer-events-none z-10 max-w-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white/95 dark:bg-slate-800/95 shadow-lg text-xs text-slate-700 dark:text-slate-200"></div>
+    <div id="indexingNotice" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 text-xs text-amber-700 dark:text-amber-300" data-i18n="web.graph.indexing">Indexing…</div>
+    <div id="truncatedNotice" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/40 border border-orange-200 dark:border-orange-700 text-xs text-orange-700 dark:text-orange-300" data-i18n="web.graph.truncated">Graph too large — showing partial view</div>
+    <div id="emptyState" class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
+      <div class="text-5xl">🕸️</div>
+      <div class="text-sm" data-i18n="web.graph.empty">No graph data — re-index to build</div>
+      <button id="emptyReindexBtn" class="px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" data-i18n="web.graph.reindex">Re-index</button>
+    </div>
+  </div>
+</div>
+
+<!-- 洞察侧栏：孤立页 / 死链 -->
+<aside id="insightsPanel" class="hidden fixed top-0 right-0 h-full w-96 max-w-[90vw] z-40 flex flex-col bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-xl">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 shrink-0">
+    <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200" data-i18n="web.graph.insights">Insights</h2>
+    <button id="insightsClose" class="w-7 h-7 inline-flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm">✕</button>
+  </div>
+  <div class="flex gap-1 px-4 pt-3 shrink-0">
+    <button id="tabOrphans" class="insight-tab px-3 py-1.5 text-sm rounded-md text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700" data-i18n="web.graph.orphans">Orphans</button>
+    <button id="tabBroken" class="insight-tab px-3 py-1.5 text-sm rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" data-i18n="web.graph.brokenLinks">Broken links</button>
+  </div>
+  <div id="insightBody" class="flex-1 overflow-y-auto px-4 py-3 text-sm"></div>
+</aside>
+
+<script defer src="js/common.js"></script>
+<script defer src="js/graph.js"></script>
+</body>
+</html>

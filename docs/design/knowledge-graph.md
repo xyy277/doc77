@@ -1,4 +1,4 @@
-# 知识图谱设计（v1.2.0，链接基础设施 MVP）
+# 知识图谱设计（v1.2.0 链接基础设施 + v1.2.1 可视化/洞察）
 
 > 语言规范：专业术语英文，其余中文（见根 CLAUDE.md）。
 
@@ -58,14 +58,22 @@
 ## 6. API
 
 ```
-GET  /api/graph/:id                     — 节点+边（?path= 子图，limit≤2000）
+# 聚合（多项目，二阶段；注册于 :id 之前，顺序敏感）
+GET  /api/graph?projects=1,2            — 多项目节点+边（聚合全量，project_id 进节点/边）
+GET  /api/graph/stats?projects=         — 多项目统计（total + perProject）
+GET  /api/graph/orphans?projects=&limit=&offset= — 孤立页列表（与 stats.orphans 同谓词，limit≤10000）
+GET  /api/graph/broken?projects=&limit=&offset= — 死链列表（status='broken' 行，limit≤500）
+# 单项目
+GET  /api/graph/:id                     — 节点+边（?path= 子图 limit≤2000；?mode=full 全量，上限 20k 节点/200k 边 + truncated 标志）
 GET  /api/graph/:id/backlinks?path=     — 入链（含 title，limit≤200）
 GET  /api/graph/:id/related?path=&limit=— 相关文档（co-citation + 一跳兜底，≤20）
 GET  /api/graph/:id/stats               — nodes/edges/broken/orphans
 POST /api/graph/:id/index               — 全量重建（立即返回 indexing）
 ```
 
-安全：path 走 `validatePath`（逃逸 403）；非法 :id/项目不存在 404；查询只 join 表不触磁盘。
+安全：path 走 `validatePath`（逃逸 403）；非法 :id/项目不存在 404；缺 `projects` 参数 400；查询只 join 表不触磁盘。
+
+**孤儿/断链一致性**：`getGraphStats`（计数）、`queryOrphans`（列表）共享同一 `ORPHAN_PREDICATE_SQL`（无出链任意 status + 无 resolved 入链）——计数与列表永远一致。
 
 **related 评分**：`score(B) = |out(A)∩out(B)| + |in(A)∩in(B)|`（共享引用数 ×1000 + 入链数 tie-break）；无共享引用的一跳直接邻居 score=1 兜底（被多人引用的中心节点，其相关文档就是直接引用者）。接口 `RelatedScorer` 可替换（三阶段 RAG 语义融合注入点）。
 
@@ -74,6 +82,17 @@ POST /api/graph/:id/index               — 全量重建（立即返回 indexing
 - `renderGraphPanel(path)`：文档卡片底部独立 DOM（**不拼进 d.content** —— tabDataCache 缓存 /api/content 响应）；异步 fetch backlinks + related
 - 刷新时机：保存回调（doSave）、SSE `graph:index-progress`、SSE `file-tree:changed`（仅当前激活文档受影响时）
 - i18n：`web.preview.graph.*`（en-US/zh-CN）
+
+**二阶段：`/graph` 页面**（graph.html + graph.js，入口：dashboard 导航 + preview toolbar 🕸️ 按钮）：
+
+- Canvas 渲染 + vendor 懒加载 d3-force（`d3-force.min.js`，VENDOR_MAP/vendor.ts 双注册）——无 DOM 节点，5000 节点 <60fps 交互
+- 节点大小 = 入链数（客户端由全量边精确计数），颜色 = 首标签（确定性 hash → 12 色调色板），孤立页淡化开关（与 orphans 列表同语义）
+- 交互：滚轮锚点缩放、拖拽平移、拖节点（fx/fy）、点击打开 preview（`/preview.html?id=&path=`）、FTS 搜索定位（缩放居中 + 2s 高亮）
+- 性能：DPR 上限 2、视口裁剪、标签仅 scale≥2 且 ≤400/帧、alpha 收敛后 sim.stop()；物理参数置顶常量
+- 洞察侧栏：孤立页/死链列表（客户端分页 + 加载更多），断链行点击打开**源文档**编辑
+- 多项目：`/graph?projects=1,2` 聚合视图，项目 tab 切换（含"全部"）；节点 id = `<project_id>:<path>` 防跨项目路径碰撞
+- 降级：d3 加载失败 → 网格静态布局；图谱缺失 → 空态 + 重建索引按钮；SSE 索引/变更 → 1s 去抖重载
+- i18n：`web.graph.*`（en-US/zh-CN）；测试：`__tests__/graph-viz.test.ts`（纯函数 vitest，无 jsdom）
 
 ## 8. AI 集成
 
@@ -87,14 +106,16 @@ POST /api/graph/:id/index               — 全量重建（立即返回 indexing
 | 场景 | 成本 |
 |---|---|
 | 单文件增量 | 1-3ms（读 1 文件 + 正则提取 + 少量 DB 写） |
-| 全量重建 10k 文件 | ~20-30s 后台（walkDir + 100 批/事务 + setTimeout(0) 让出，不冻结事件循环） |
+| 全量重建 10k 文件 | ~20-30s 后台（walkDir + 40 批/事务 + setTimeout(0) 让出，不冻结事件循环） |
 | backlinks 查询 | <5ms（idx_doc_links_to） |
 | related 聚合 | <50ms（内存 Set 交集） |
+| 全量图接口（5000 节点/10k 边） | 实测 ~50ms（perf 回归断言 <2s） |
+| orphans/broken 列表（20 万边表） | 实测 ~30ms 合计（断言 <200ms） |
 
 ## 10. 后续阶段
 
-- **二阶段**：力导向可视化（vendor 懒加载 d3-force 或手写 SVG/Canvas）、全局图谱页（多项目）、孤立页/断链洞察 UI（stats 已有数据）
-- **三阶段**：MCP 只读工具 graph_backlinks/graph_related、RAG 语义融合（RelatedScorer 注入点）、AI 建链（生成 wikilink 走既有保存挂点自动索引）、多项目聚合图谱
+- **二阶段（已落地，feature/graph-viz）**：力导向可视化（`/graph` 页，Canvas + vendor 懒加载 d3-force）、全局图谱页（多项目，查询层 `IN` 合并零表结构改动）、孤立页/断链洞察 UI（orphans/broken 列表端点，与 stats 同谓词）
+- **三阶段**：MCP 只读工具 graph_backlinks/graph_related、RAG 语义融合（RelatedScorer 注入点）、AI 建链（生成 wikilink 走既有保存挂点自动索引）、AI 对话展示图谱邻居建议链接（context 注入已有服务端基础，只缺前端展示）
 
 ## 11. 已知限制
 
