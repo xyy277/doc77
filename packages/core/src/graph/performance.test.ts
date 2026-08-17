@@ -271,4 +271,52 @@ describe('graph performance regression', () => {
     },
     SLOW_TIMEOUT,
   );
+  // ── v1.2.1 红队修复性能回归 ──
+
+  it(
+    '增量索引 1000 文件平均 <10ms/文件（文件列表缓存预热后）',
+    async () => {
+      const dir = synthProject(1000);
+      await fullGraphIndex(projectId, dir); // 预热：建 meta + 文件列表缓存
+      const t0 = Date.now();
+      // 修改 50 个文件后逐个增量索引（真实保存路径模拟）
+      for (let i = 0; i < 50; i++) {
+        fs.writeFileSync(path.join(dir, `doc${i}.md`), `# Doc ${i} 改\n\n参见 [[doc${i + 1}]]`);
+        indexFileLinks(projectId, dir, `doc${i}.md`, getConnection(), {
+          content: `# Doc ${i} 改\n\n参见 [[doc${i + 1}]]`,
+        });
+      }
+      const elapsed = Date.now() - t0;
+      // 修复前每次保存全项目重扫（10k 文件 +10-50ms/次）；缓存后 <10ms/文件
+      expect(elapsed / 50).toBeLessThan(10);
+      console.log(
+        `[graph-perf] incremental 50 files: ${elapsed}ms (${(elapsed / 50).toFixed(1)}ms/file)`,
+      );
+    },
+    SLOW_TIMEOUT,
+  );
+
+  it(
+    '100 链接 × 1 万文件项目 renderMarkdown < 2s（wikilink 索引化）',
+    async () => {
+      const dir = synthProject(10000);
+      // 预热文件列表缓存（全量索引本身会 walk，但渲染走 wikilink 缓存）
+      const { renderMarkdown } = await import('../renderers/markdown.js');
+      const { clearWikilinkCache } = await import('../renderers/wikilink.js');
+      await fullGraphIndex(projectId, dir);
+      clearWikilinkCache(projectId); // 模拟真实首开：缓存未预热
+      const doc = Array.from(
+        { length: 100 },
+        (_, i) => `见 [[doc${i * 97}]] 和 [[不存在${i}]]`,
+      ).join('\n');
+      const t0 = Date.now();
+      renderMarkdown(doc, { projectId, filePath: 'doc.md', obsidianMode: true });
+      const elapsed = Date.now() - t0;
+      // 修复前：100 链接 × 1 万文件线性扫描 + 每链接读盘 ≈ 数秒；
+      // 索引化后 O(链接)。2s 宽松断言（CI 抖动），10 倍余量抓数量级回归
+      expect(elapsed).toBeLessThan(2_000);
+      console.log(`[graph-perf] renderMarkdown 100 links x 10k files: ${elapsed}ms`);
+    },
+    SLOW_TIMEOUT,
+  );
 });

@@ -4,6 +4,33 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [Unreleased] — 红队性能专项（待发布版本）
+
+**Changed — 保存链（core）**
+- **原子写替换 shadow**：`PUT /api/content/:id` 改 tmp+rename（修复前每次保存整文件复制到 shadow 后立即删除，成功路径 100% 白做）；写失败时原文件从未被触碰
+- **content 透传**：保存点内容已在内存，FTS 与图谱索引直接复用（修复前同一文件被读 3 次 + sha256 3 次）
+- **增量图谱索引事务包裹**：50 链接文档从 ~52 次 autocommit fsync 降到 1 commit；watcher 兜底路径 mtime+size 前置短路（不再重读文件）
+- **保存路径零目录重扫**：createLinkResolver 复用共享文件列表缓存（10k 文件保存 +10-50ms → <1ms）
+
+**Changed — 文档渲染（core）**
+- **wikilink 解析索引化**：O(链接数×文件数) 线性扫描 → O(链接数) Map 查找（100 链接 × 1 万文件从数秒 → ~56ms）；`.doc77links` 别名表按 mtime 缓存；文件列表缓存原地增删（保存/重命名/删除挂点）
+- **`/api/content` markdown ETag/304**：重复打开文档免全量渲染（304 短路在渲染前）
+- 行为修复：node_modules 内 .md 不再作为 wikilink 目标（与图谱语义统一）
+
+**Changed — 服务端阻塞消除（core）**
+- **discover 异步化**：`/api/discover` 与 `/api/discover/git` 改 fs.promises + 每 64 目录让出 + deadline（git 分支修复前无 deadline，大 home 目录 5-30s 同步冻结）+ 并发限流 429
+- **find-folder 异步化**：execFileSync 同步外部 find（最坏 8-40s 冻结）→ execFile 异步 + 每 root 超时 + 并行 + 总 deadline；路由补 lanRestrict + 入参上限
+- **busy_timeout 5000ms**：WAL 多连接并发写（MCP 副本/sync/图谱重建）不再立即 SQLITE_BUSY
+
+**Changed — 前端（core）**
+- **SSE 熔断**：preview 页连续 3 次失败即关闭并提示（修复前服务重启后每 3s 无限重连，每次触发 watcher 全树枚举风暴）；graph.js 熔断死代码修正（readyState 条件在自动重连期恒 false）；新 i18n `web.preview.sseLost`
+
+**验证**
+- 测试 908 passed（+27：原子写、ETag、discover async 对等、find-folder 注入、wikilink 索引对等/缓存失效、保存链透传/短路/事务回滚、性能回归 2 项）
+- 性能实测：增量索引 0.2ms/文件（修复前 10-50ms+）；100 链接 × 1 万文件渲染 56ms（修复前数秒）
+
+---
+
 ## [2026-08-17] — `1.1.8`
 
 ### 全包 (`1.1.8`)
