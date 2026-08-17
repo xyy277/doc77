@@ -47,8 +47,18 @@
   var FORCE_AUTO_MAX_NODES = 2000;
 
   var PALETTE = [
-    '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#f59e0b',
-    '#84cc16', '#10b981', '#14b8a6', '#06b6d4', '#6366f1', '#a855f7',
+    '#3b82f6',
+    '#8b5cf6',
+    '#ec4899',
+    '#ef4444',
+    '#f97316',
+    '#f59e0b',
+    '#84cc16',
+    '#10b981',
+    '#14b8a6',
+    '#06b6d4',
+    '#6366f1',
+    '#a855f7',
   ];
   var NEUTRAL = '#94a3b8'; // 无标签节点颜色
 
@@ -491,7 +501,13 @@
       var p = state.projects[i];
       var active = state.selection.length === 1 && state.selection[0] === p.id;
       html +=
-        '<button data-pid="' + p.id + '" class="' + tabCls(active) + '">' + esc(p.name) + '</button>';
+        '<button data-pid="' +
+        p.id +
+        '" class="' +
+        tabCls(active) +
+        '">' +
+        esc(p.name) +
+        '</button>';
     }
     nav.innerHTML = html;
     nav.querySelectorAll('button[data-pid]').forEach(function (btn) {
@@ -522,9 +538,12 @@
           return parseInt(s, 10);
         })
         .filter(function (n) {
-          return !isNaN(n) && state.projects.some(function (p) {
-            return p.id === n;
-          });
+          return (
+            !isNaN(n) &&
+            state.projects.some(function (p) {
+              return p.id === n;
+            })
+          );
         });
       if (ids.length) state.selection = ids;
     }
@@ -537,9 +556,11 @@
   function loadData() {
     if (state.controller) state.controller.abort();
     var ctrl = (state.controller = new AbortController());
-    var sel = state.selection.length ? state.selection : state.projects.map(function (p) {
-      return p.id;
-    });
+    var sel = state.selection.length
+      ? state.selection
+      : state.projects.map(function (p) {
+          return p.id;
+        });
     if (!sel.length) {
       state.data = null;
       state.model = null;
@@ -626,9 +647,11 @@
     if (state.insightsController) state.insightsController.abort();
     var ctrl = (state.insightsController = new AbortController());
     var seq = ++state.insightsSeq;
-    var sel = state.selection.length ? state.selection : state.projects.map(function (p) {
-      return p.id;
-    });
+    var sel = state.selection.length
+      ? state.selection
+      : state.projects.map(function (p) {
+          return p.id;
+        });
     if (!sel.length) return;
     var q = 'projects=' + sel.join(',');
     var o = { signal: ctrl.signal };
@@ -715,20 +738,23 @@
         .forceSimulation(model.nodes)
         .force(
           'link',
-          window.d3.forceLink(model.edges).id(function (d) {
-            return d.id;
-          }).distance(phys.linkDistance),
+          window.d3
+            .forceLink(model.edges)
+            .id(function (d) {
+              return d.id;
+            })
+            .distance(phys.linkDistance),
         )
-        .force('charge', window.d3.forceManyBody().strength(phys.chargeStrength).distanceMax(phys.chargeDistanceMax))
+        .force(
+          'charge',
+          window.d3
+            .forceManyBody()
+            .strength(phys.chargeStrength)
+            .distanceMax(phys.chargeDistanceMax),
+        )
         .force('center', window.d3.forceCenter(w / 2, h / 2))
-        .force(
-          'x',
-          window.d3.forceX(w / 2).strength(phys.centerStrength),
-        )
-        .force(
-          'y',
-          window.d3.forceY(h / 2).strength(phys.centerStrength),
-        );
+        .force('x', window.d3.forceX(w / 2).strength(phys.centerStrength))
+        .force('y', window.d3.forceY(h / 2).strength(phys.centerStrength));
       if (phys.collide) {
         sim.force(
           'collide',
@@ -849,7 +875,11 @@
       if (showLabels && labelCount < LABEL_MAX_COUNT) {
         ctx.globalAlpha = Math.max(alpha, 0.85);
         ctx.fillStyle = labelColor;
-        ctx.fillText(n.title.length > 24 ? n.title.slice(0, 23) + '…' : n.title, n.x, n.y - n.radius - 3);
+        ctx.fillText(
+          n.title.length > 24 ? n.title.slice(0, 23) + '…' : n.title,
+          n.x,
+          n.y - n.radius - 3,
+        );
         labelCount++;
       }
     }
@@ -1055,7 +1085,12 @@
           var results = grp.results || [];
           for (var r = 0; r < results.length; r++) {
             var id = String(grp.project_id) + ':' + results[r].file_path;
-            if (state.model && state.model.nodes.some(function (n) { return n.id === id; })) {
+            if (
+              state.model &&
+              state.model.nodes.some(function (n) {
+                return n.id === id;
+              })
+            ) {
               hits.push({
                 id: id,
                 title: results[r].title || results[r].file_path,
@@ -1172,8 +1207,10 @@
     state.insightPage = 1;
     var orphansBtn = document.getElementById('tabOrphans');
     var brokenBtn = document.getElementById('tabBroken');
-    var active = 'insight-tab px-3 py-1.5 text-sm rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
-    var idle = 'insight-tab px-3 py-1.5 text-sm rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700';
+    var active =
+      'insight-tab px-3 py-1.5 text-sm rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+    var idle =
+      'insight-tab px-3 py-1.5 text-sm rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700';
     orphansBtn.className = tab === 'orphans' ? active : idle;
     brokenBtn.className = tab === 'broken' ? active : idle;
     renderInsights();
@@ -1280,12 +1317,16 @@
     });
     document.getElementById('reindexBtn').addEventListener('click', function () {
       if (state.selection.length !== 1) return;
-      fetch('/api/graph/' + state.selection[0] + '/index', { method: 'POST' }).catch(function () {});
+      fetch('/api/graph/' + state.selection[0] + '/index', { method: 'POST' }).catch(
+        function () {},
+      );
       window.toast && window.toast(t('web.graph.indexing'), 'info');
     });
     document.getElementById('emptyReindexBtn').addEventListener('click', function () {
       if (state.selection.length !== 1) return;
-      fetch('/api/graph/' + state.selection[0] + '/index', { method: 'POST' }).catch(function () {});
+      fetch('/api/graph/' + state.selection[0] + '/index', { method: 'POST' }).catch(
+        function () {},
+      );
       window.toast && window.toast(t('web.graph.indexing'), 'info');
     });
     var forceEnableBtn = document.getElementById('forceEnableBtn');
@@ -1300,7 +1341,9 @@
 
   function toggleEmptyState(empty) {
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
-    document.getElementById('emptyReindexBtn').classList.toggle('hidden', state.selection.length !== 1);
+    document
+      .getElementById('emptyReindexBtn')
+      .classList.toggle('hidden', state.selection.length !== 1);
   }
 
   function showTruncated(on) {
@@ -1316,14 +1359,24 @@
   }
 
   // ── SSE：索引进度 / 文件变更 → 1s 去抖重载 ──
+  // sse 提升到 factory 作用域：bfcache pageshow 恢复时需要重建连接
+  //（修复前 es 是函数局部变量，无法从外部关闭/重建）
+  var sse = null;
+  function closeSSE() {
+    if (sse) {
+      sse.close();
+      sse = null;
+    }
+  }
   function initSSE() {
-    if (!window.EventSource) return;
+    if (sse || !window.EventSource) return; // 防双开（boot 与 pageshow 都可能触发）
     // EventSource 无法设置 Authorization header；session token 经 ?token=
     // 传递（服务端仅对 /api/events 开放 query token；'1' 为无 token 哨兵）
     var tok = sessionStorage.getItem('doc77-auth');
     var es = new EventSource(
       '/api/events' + (tok && tok !== '1' ? '?token=' + encodeURIComponent(tok) : ''),
     );
+    sse = es;
     var scheduleReload = function () {
       clearTimeout(state.reloadTimer);
       state.reloadTimer = setTimeout(function () {
@@ -1369,7 +1422,7 @@
     es.onerror = function () {
       sseFailures++;
       if (sseFailures >= 3) {
-        es.close();
+        closeSSE(); // 置 null 使重建路径可用（preview.js 同款）
         window.toast && window.toast(t('web.graph.sseLost'), 'error');
       }
     };
@@ -1382,6 +1435,16 @@
     } else {
       boot();
     }
+    // ═══ bfcache 僵尸 EventSource 修复（v1.2.1）═══
+    // Chromium 冻结页面进 bfcache 时 EventSource 连接不关闭（Issue
+    // 358538891），占用每源 6 连接槽位 → 反复进出页面后卡死。
+    // pagehide（persisted）关闭连接释放槽位；pageshow（persisted）重建。
+    window.addEventListener('pagehide', function (ev) {
+      if (ev.persisted) closeSSE();
+    });
+    window.addEventListener('pageshow', function (ev) {
+      if (ev.persisted) initSSE(); // boot 不重跑，恢复时必须重建
+    });
   }
 
   // Public API（纯函数核心供 vitest 测试）
