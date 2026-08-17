@@ -209,6 +209,7 @@
   "api.electron.npmRequired": "Installing {pkg} requires Node.js/npm on this machine. Install Node.js (https://nodejs.org) and retry, or use the CLI: doc77 i translate",
   "api.lanRestricted": "This operation is restricted to local access. The server admin can disable this restriction in the Account settings.",
   "api.scan.dirNotAllowed": "This directory is not allowed to be scanned",
+  "api.scan.busy": "A scan is already in progress — try again shortly",
   "api.fs.mntNotAllowed": "Browsing /mnt (Windows drives) is not allowed in remote access mode",
   "api.fs.dirNotAllowed": "This directory is not allowed to be accessed",
   "api.file.truncatedWarning": "⚠️ File too large ({size} MB), only showing first 10,000 lines. Please open in a local editor.\n\n---\n\n",

@@ -131,6 +131,67 @@ export function discoverGitProjects(
   return results;
 }
 
+/** discoverGitProjects 的异步让出版（红队修复）：每 64 目录 setImmediate
+ * 让出 + deadline（修复前 git 分支无任何 deadline，大 home 目录遍历 5-30s
+ * 同步冻结）。同步版保留（CLI 用）。 */
+export async function discoverGitProjectsAsync(
+  rootDir: string,
+  depth: number = 3,
+  opts?: { deadlineMs?: number },
+): Promise<Array<{ path: string; name: string; tags: string[] }>> {
+  const deadlineMs = opts?.deadlineMs ?? 10_000;
+  const results: Array<{ path: string; name: string; tags: string[] }> = [];
+  const clampedDepth = Math.min(5, Math.max(2, depth || 3));
+
+  let expanded = rootDir.startsWith('~') ? os.homedir() + rootDir.slice(1) : rootDir;
+  expanded = path.resolve(expanded);
+
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(expanded);
+  } catch {
+    return [];
+  }
+  if (!stat.isDirectory()) return [];
+
+  const deadline = Date.now() + deadlineMs;
+  let visitedDirs = 0;
+
+  async function walk(dir: string, d: number): Promise<void> {
+    if (d > clampedDepth || Date.now() > deadline) return;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    visitedDirs++;
+
+    if (d > 0) {
+      const hasGit = entries.some((e) => e.name === '.git' && e.isDirectory());
+      if (hasGit) {
+        const fullPath = path.resolve(dir);
+        const tags = detectProjectTags(fullPath);
+        results.push({ path: fullPath, name: path.basename(dir), tags });
+        return;
+      }
+    }
+
+    for (const entry of entries) {
+      if (Date.now() > deadline) break;
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.')) continue;
+      if (SKIP_DIRS.has(entry.name)) continue;
+      await walk(path.join(dir, entry.name), d + 1);
+      if (visitedDirs % 64 === 0) await new Promise((r) => setImmediate(r));
+    }
+  }
+
+  await walk(expanded, 0);
+  return results;
+}
+
 /**
  * Parse a VS Code .code-workspace file and resolve folder paths.
  */
