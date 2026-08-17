@@ -128,6 +128,23 @@ describe('graph indexer + repository', () => {
     expect(after).toEqual(before);
   });
 
+  it('fullGraphIndex 内容级短路：touch 改 mtime 但内容不变 → 不重写', async () => {
+    await fullGraphIndex(projectId, projectDir);
+    // touch：utimes 改 mtime 不改内容——快速短路（mtime+size）被绕过，
+    // 内容级短路（hash 相同）兜底 → 不重写（indexed_at 不变）
+    const now = new Date();
+    fs.utimesSync(path.join(projectDir, 'a.md'), now, now);
+    await new Promise((r) => setTimeout(r, 1100));
+    const before = getConnection()
+      .prepare('SELECT indexed_at FROM doc_meta WHERE project_id = ? AND file_path = ?')
+      .get(projectId, 'a.md') as { indexed_at: string };
+    await fullGraphIndex(projectId, projectDir);
+    const after = getConnection()
+      .prepare('SELECT indexed_at FROM doc_meta WHERE project_id = ? AND file_path = ?')
+      .get(projectId, 'a.md') as { indexed_at: string };
+    expect(after.indexed_at).toBe(before.indexed_at);
+  });
+
   it('fullGraphIndex 短路后仅重建变更文件', async () => {
     await fullGraphIndex(projectId, projectDir);
     // 变更 b.md 内容（出链变化）；a/c 未变更

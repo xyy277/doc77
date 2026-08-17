@@ -20,6 +20,31 @@ export interface WatcherOptions {
   debounceMs?: number;
 }
 
+/** 图谱更新分派决策（纯函数可测）：'full' 全量 | {paths} 增量 | null 忽略 */
+export type GraphUpdateDecision =
+  { kind: 'full' } | { kind: 'incremental'; paths: string[] } | null;
+
+/**
+ * 图谱更新分派（修复前：非 md 修改也触发全量重建，Windows 编辑器
+ * autosave/同步工具的事件流导致每 5s 一次全项目核对 = 系统卡顿来源）。
+ * opType 取值：'create' / 'modify' / 'delete' / 'mixed'（见 EVENT_TO_OP）。
+ * - truncated（>50 路径）→ full
+ * - 无扩展名非 md 文件的 create/delete/mixed → full（可能引入新笔记）
+ * - md 变更 → incremental（仅 md 路径，非 md 不传入）
+ * - 其余（.png 等有扩展名非 md、无扩展名 modify）→ null（不影响链接结构）
+ */
+export function decideGraphUpdate(
+  entry: { paths: string[]; truncated: boolean },
+  opType: string,
+): GraphUpdateDecision {
+  const mdRe = /\.(md|mdx|markdown)$/i;
+  const mdPaths = entry.paths.filter((p) => mdRe.test(p));
+  const structural = entry.paths.some((p) => !mdRe.test(p) && !path.posix.extname(p));
+  if (entry.truncated || (structural && opType !== 'modify')) return { kind: 'full' };
+  if (mdPaths.length) return { kind: 'incremental', paths: mdPaths };
+  return null;
+}
+
 const DEFAULT_DEBOUNCE_MS = 500;
 const MAX_PATHS_PER_EVENT = 50;
 // 引用计数归零后延迟停止，防页面 reload 循环反复触发 chokidar 全树重扫；
@@ -96,16 +121,15 @@ function flush(projectId: number, relDir: string): void {
     /* best-effort */
   }
   // v1.2.0：图谱增量（外部变更/MCP 写路径的兜底入口；覆盖 REST 之外的
-  // 一切磁盘变化）。截断（>50 路径）或目录级事件 → 标记脏，后台全量重建。
+  // 一切磁盘变化）。分派规则见 decideGraphUpdate（纯函数，可单测）
+  const decision = decideGraphUpdate(entry, opType);
   try {
-    if (
-      entry.truncated ||
-      entry.paths.some((p) => !/\.(md|mdx|markdown)$/i.test(p) && !path.posix.extname(p))
-    ) {
+    if (!decision) return;
+    if (decision.kind === 'full') {
       markProjectGraphDirty(projectId);
     } else {
       const root = rootOf(projectId);
-      if (root) onWatcherFlush(projectId, root, opType, entry.paths);
+      if (root) onWatcherFlush(projectId, root, opType, decision.paths);
     }
   } catch {
     /* best-effort */

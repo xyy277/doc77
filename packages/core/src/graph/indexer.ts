@@ -120,16 +120,31 @@ export async function fullGraphIndex(
   const total = mdFiles.length;
   let processed = 0;
 
-  // hash 短路（对齐 indexFileLinks）：一次读全量 file_hash 建 Map，未变更
-  // 文件跳过重写。修复前每次启动/脏标记都无条件重读全部 md 并重写全部
-  // doc_meta/doc_links（10k 文件 20-30s 单核满负荷 = 常驻 CPU ~10% 来源）。
-  // 内容未变则链接未变，跳过安全；meta 缺失或 hash 为 NULL（旧数据）不短路。
-  const existingHashes = new Map<string, string>();
+  // 两级短路（对齐 indexFileLinks）：一次读全量 meta 建 Map。
+  // 1) 快速短路：mtime+size 未变 → 不读文件内容（stat 元数据廉价，
+  //    10k 文件核对从"读全部内容 + sha256"（10-30s IO 风暴）降到 <1s）
+  // 2) 内容级短路：mtime 变了但内容 hash 相同 → 不重写 DB（hash 兜底）
+  // 修复前每次启动/脏标记都无条件重读全部 md 并重写全部 doc_meta/doc_links
+  //（10k 文件 20-30s 单核满负荷 = 常驻 CPU ~10% + 全 API 拖慢的来源）。
+  const existingMeta = new Map<string, { hash: string; mtime: string; size: number }>();
   const metaRows = conn
-    .prepare('SELECT file_path, file_hash FROM doc_meta WHERE project_id = ?')
-    .all(projectId) as Array<{ file_path: string; file_hash: string | null }>;
+    .prepare(
+      'SELECT file_path, file_hash, file_mtime, file_size FROM doc_meta WHERE project_id = ?',
+    )
+    .all(projectId) as Array<{
+    file_path: string;
+    file_hash: string | null;
+    file_mtime: string | null;
+    file_size: number;
+  }>;
   for (const row of metaRows) {
-    if (row.file_hash) existingHashes.set(row.file_path, row.file_hash);
+    if (row.file_hash && row.file_mtime) {
+      existingMeta.set(row.file_path, {
+        hash: row.file_hash,
+        mtime: row.file_mtime,
+        size: row.file_size,
+      });
+    }
   }
 
   const resolver = createLinkResolver(
@@ -143,20 +158,33 @@ export async function fullGraphIndex(
     const tx = conn.transaction(() => {
       for (const rel of batch) {
         const abs = path.join(projectRoot, rel);
-        const content = readTextSafe(abs);
-        if (content === null) continue;
-        const hash = fileHash(content);
-        if (existingHashes.get(rel) === hash) {
-          processed++; // 已核对（未变更，跳过重写）；进度仍单调推进
-          continue;
-        }
-        const docMeta = extractDocMeta(content, rel);
         let stats: fs.Stats;
         try {
           stats = fs.statSync(abs);
         } catch {
           continue;
         }
+        const existing = existingMeta.get(rel);
+        // 快速短路：mtime+size 未变 → 内容未变（业界标准增量策略），
+        // 不读文件内容不算 hash。mtime 被恢复/伪造 + 内容同长同改才会
+        // 漏检，可接受（下次内容变更会正常触发）。
+        if (
+          existing &&
+          existing.mtime === stats.mtime.toISOString() &&
+          existing.size === stats.size
+        ) {
+          processed++; // 已核对；进度仍单调推进
+          continue;
+        }
+        const content = readTextSafe(abs);
+        if (content === null) continue;
+        const hash = fileHash(content);
+        // 内容级短路：mtime 变了但内容 hash 相同（touch/属性变更）→ 不重写
+        if (existing && existing.hash === hash) {
+          processed++;
+          continue;
+        }
+        const docMeta = extractDocMeta(content, rel);
         upsertDocMeta(conn, projectId, {
           project_id: projectId,
           file_path: rel,
