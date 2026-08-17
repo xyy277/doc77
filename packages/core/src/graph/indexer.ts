@@ -120,6 +120,18 @@ export async function fullGraphIndex(
   const total = mdFiles.length;
   let processed = 0;
 
+  // hash 短路（对齐 indexFileLinks）：一次读全量 file_hash 建 Map，未变更
+  // 文件跳过重写。修复前每次启动/脏标记都无条件重读全部 md 并重写全部
+  // doc_meta/doc_links（10k 文件 20-30s 单核满负荷 = 常驻 CPU ~10% 来源）。
+  // 内容未变则链接未变，跳过安全；meta 缺失或 hash 为 NULL（旧数据）不短路。
+  const existingHashes = new Map<string, string>();
+  const metaRows = conn
+    .prepare('SELECT file_path, file_hash FROM doc_meta WHERE project_id = ?')
+    .all(projectId) as Array<{ file_path: string; file_hash: string | null }>;
+  for (const row of metaRows) {
+    if (row.file_hash) existingHashes.set(row.file_path, row.file_hash);
+  }
+
   const resolver = createLinkResolver(
     projectRoot,
     relFiles.map((r) => path.join(projectRoot, r)),
@@ -134,6 +146,10 @@ export async function fullGraphIndex(
         const content = readTextSafe(abs);
         if (content === null) continue;
         const hash = fileHash(content);
+        if (existingHashes.get(rel) === hash) {
+          processed++; // 已核对（未变更，跳过重写）；进度仍单调推进
+          continue;
+        }
         const docMeta = extractDocMeta(content, rel);
         let stats: fs.Stats;
         try {
@@ -163,8 +179,9 @@ export async function fullGraphIndex(
   }
 
   // 清理残留 doc_meta：全量重插只覆盖当前文件集，磁盘上已删除的文件的
-  // meta 行不会出现在重插中，需显式清理（doc_links 无需清理——所有存在
-  // 文件都已重插出链，死链自愈为 broken，语义与磁盘一致）
+  // meta 行不会出现在重插中，需显式清理。同时把指向已删除文件的 resolved
+  // 边标记 broken —— 修复前靠"全部文件重写出链"隐式完成死链自愈；hash
+  // 短路后未变更文件的边不再重写，必须显式处理（语义与 deleteFileGraphFromIndex 一致）
   const files = new Set(mdFiles);
   const stale = conn
     .prepare('SELECT file_path FROM doc_meta WHERE project_id = ?')
@@ -173,6 +190,12 @@ export async function fullGraphIndex(
     if (!files.has(s.file_path)) {
       conn
         .prepare('DELETE FROM doc_meta WHERE project_id = ? AND file_path = ?')
+        .run(projectId, s.file_path);
+      conn
+        .prepare(
+          `UPDATE doc_links SET status = 'broken', updated_at = datetime('now')
+           WHERE project_id = ? AND to_path = ? AND status = 'resolved'`,
+        )
         .run(projectId, s.file_path);
     }
   }
@@ -236,14 +259,20 @@ export function markProjectGraphDirty(projectId: number): void {
  * 延迟 0 让出事件循环，不阻塞启动；图谱缺失可降级，失败静默。
  */
 export function bootstrapGraphIndexing(): void {
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
       const projects = getConnection().prepare('SELECT id, path FROM projects').all() as Array<{
         id: number;
         path: string;
       }>;
+      // 修复前 for 不 await → 多项目并发全量重建（启动 CPU 峰值叠加）。
+      // hash 短路后每项目主要成本是 walkDir 枚举，串行避免启动峰值。
       for (const p of projects) {
-        fullGraphIndex(p.id, p.path).catch(() => {});
+        try {
+          await fullGraphIndex(p.id, p.path);
+        } catch {
+          /* 单项目失败不阻断后续 */
+        }
       }
     } catch {
       /* best-effort */
