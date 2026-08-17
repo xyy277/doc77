@@ -133,3 +133,22 @@ pnpm store cache → .npmrc (hoisted) → pnpm install → sync-version → buil
 **防回归**：electron-builder.yml 中**不要配置 asarUnpack glob**（在 hoisted 布局下任何 asarUnpack 配置都会触发同样的越界校验错误）；原生模块依赖 electron-builder 的自动解包即可。
 
 **复现/验证方法**：`ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npx electron-builder --dir`（本地 GitHub 直连不稳定，用镜像）→ 检查 `release/linux-unpacked/resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node` 存在。
+
+---
+
+## 27 | CI test job 三平台 pnpm test 失败（2026-08-17，1.1.8 发布）
+
+**现象**：
+- 1.1.8 发布 commit（02ddd20）CI：ubuntu/macos/windows 三个 `Test (Node 22 on <os>)` job 的 `pnpm test` 全部失败（Lint/Build 通过）
+- 1.1.7 发布（6867359）与 PR#11 合并（baa8d2f）时：仅 windows `pnpm test` 失败，ubuntu/macos 通过
+- PR#12 合并（3281ab7，图谱性能修复）：仅 windows 失败
+
+**已知事实**：
+- 本地 Linux 全链全绿（873 passed / 10 skipped，`pnpm install && pnpm build && pnpm test`）
+- 02ddd20 与通过的 3281ab7 代码差异仅版本号（1.1.7→1.1.8）+ CHANGELOG，无测试相关改动 → 三平台同时失败更像 **flaky / 环境因素**，非确定性回归
+- 匿名 API 下载 logs 返回 403（需 admin 权限），根因未定位
+
+**待办**（有日志权限后执行）：
+1. 下载失败 run logs（`repos/xyy277/doc77/actions/runs/<id>/logs`），定位失败测试断言
+2. 若 flaky：对失败测试加超时/重试/网络 mock，或从 CI test job 排除网络依赖测试
+3. 更新本条目回填根因与修复
