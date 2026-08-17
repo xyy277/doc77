@@ -40,6 +40,11 @@
   var LABEL_MIN_SCALE = 2; // 仅缩放 ≥2 时画标签
   var LABEL_MAX_COUNT = 400; // 每帧标签上限（5000 个 fillText 会掉帧）
   var INSIGHT_PAGE_SIZE = 50;
+  // 大图降级阈值：≤2000 节点自动力导向（~0.4-0.6s 收敛不卡）；
+  // >2000 走网格快速布局（首帧 <100ms）→ 手动"启用力导向布局"按钮。
+  // 依据：2000 节点/4k 边每 tick 2-4ms，5000 节点 8-15ms/tick × 157 ticks
+  // = 1.2-2.2s 毛球动画（进入卡顿根因）。
+  var FORCE_AUTO_MAX_NODES = 2000;
 
   var PALETTE = [
     '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#f59e0b',
@@ -134,6 +139,100 @@
       if (out[r].isOrphan) orphanCount++;
     }
     return { nodes: out, edges: outEdges, maxInLinks: maxInLinks, orphanCount: orphanCount };
+  }
+
+  /**
+   * 大图是否自动启用力导向：nodeCount ≤ maxAutoNodes 才自动（大图降级决策）。
+   * nodeCount ≤ 0 返回 true：空模型误传时不该降级到 grid。
+   */
+  function shouldAutoForce(nodeCount, maxAutoNodes) {
+    var cap = maxAutoNodes == null ? FORCE_AUTO_MAX_NODES : maxAutoNodes;
+    if (nodeCount <= 0) return true;
+    return nodeCount <= cap;
+  }
+
+  /**
+   * 物理参数分段（大图自适应，降低布局阶段 CPU/收敛时间）：
+   * - n ≤ 1000：基线（collide 开、alphaDecay 0.045 ≈ 2.5s 收敛）
+   * - 1000 < n ≤ 2000：加速（去 collide —— 每 tick 最贵的第二遍四叉树、
+   *   收敛后仍抖动；decay 0.07 → tick 数减半）
+   * - n > 2000（手动启用时）：更强衰减 + 更弱电荷（charge -150 × 大节点数
+   *   陷入漫长互斥解缠），velocityDecay 提高防震荡
+   */
+  function physicsFor(nodeCount) {
+    if (nodeCount > 2000) {
+      return {
+        linkDistance: 60,
+        chargeStrength: -80,
+        chargeDistanceMax: 400,
+        centerStrength: 0.02,
+        alphaDecay: 0.08,
+        velocityDecay: 0.5,
+        collide: false,
+      };
+    }
+    if (nodeCount > 1000) {
+      return {
+        linkDistance: 60,
+        chargeStrength: -100,
+        chargeDistanceMax: 400,
+        centerStrength: 0.02,
+        alphaDecay: 0.07,
+        velocityDecay: 0.4,
+        collide: false,
+      };
+    }
+    return {
+      linkDistance: PHYSICS.linkDistance,
+      chargeStrength: PHYSICS.chargeStrength,
+      chargeDistanceMax: PHYSICS.chargeDistanceMax,
+      centerStrength: PHYSICS.centerStrength,
+      alphaDecay: PHYSICS.alphaDecay,
+      velocityDecay: PHYSICS.velocityDecay,
+      collide: true,
+    };
+  }
+
+  /**
+   * 就地应用孤儿集合（懒加载后补）：只改节点属性、不重建对象——
+   * 重建会丢失 x/y/fx/fy（sim 引用与拖拽位置绑定旧对象）。幂等。
+   * 返回新 orphanCount。
+   */
+  function applyOrphans(model, orphanRows) {
+    if (!model) return 0;
+    var orphanSet = new Set();
+    var rows = orphanRows || [];
+    for (var i = 0; i < rows.length; i++) {
+      orphanSet.add(String(rows[i].project_id) + ':' + rows[i].path);
+    }
+    var count = 0;
+    var nodes = model.nodes || [];
+    for (var j = 0; j < nodes.length; j++) {
+      nodes[j].isOrphan = orphanSet.has(nodes[j].id);
+      if (nodes[j].isOrphan) count++;
+    }
+    model.orphanCount = count;
+    return count;
+  }
+
+  /** 视口 → 世界矩形（margin 为世界单位；用于边裁剪/标签余量） */
+  function worldRectForView(view, w, h, margin) {
+    var m = margin || 0;
+    var scale = view.scale || 1;
+    return {
+      x0: (0 - view.x) / scale - m,
+      y0: (0 - view.y) / scale - m,
+      x1: (w - view.x) / scale + m,
+      y1: (h - view.y) / scale + m,
+    };
+  }
+
+  /** 边是否可能可见：e = {x1,y1,x2,y2} 世界坐标；两端都在矩形外 → false */
+  function edgePotentiallyVisible(e, rect) {
+    if (!e || !rect) return true;
+    var out1 = e.x1 < rect.x0 || e.x1 > rect.x1 || e.y1 < rect.y0 || e.y1 > rect.y1;
+    var out2 = e.x2 < rect.x0 || e.x2 > rect.x1 || e.y2 < rect.y0 || e.y2 > rect.y1;
+    return !(out1 && out2);
   }
 
   /**
@@ -270,9 +369,11 @@
   var state = {
     projects: [], // [{id, name}]
     selection: [], // number[]；[] = 全部
-    data: null, // {graph, stats, orphans[], broken[], orphanTotal, brokenTotal}
+    data: null, // {graph, stats}
+    insightsData: null, // {orphans[], broken[], orphanTotal, brokenTotal}（懒加载）
     model: null, // buildGraphModel 输出
     view: { x: 0, y: 0, scale: 1 },
+    layoutMode: null, // 'force' | 'grid'（大图降级决策结果）
     sim: null,
     raf: null,
     dimOrphans: true,
@@ -283,6 +384,8 @@
     panStart: null,
     dragged: false,
     controller: null, // AbortController（取消过期请求）
+    insightsController: null, // 洞察数据独立 AbortController
+    insightsSeq: 0, // 洞察加载竞态守卫（复用 searchSeq 模式）
     reloadTimer: null,
     fingerprint: null, // 数据指纹（selection + 节点数 + 边数）：未变时跳过 sim 重启
     simGen: 0, // 物理引擎代次：丢弃过期 loadD3Force 回调（双 sim 竞态守卫）
@@ -315,6 +418,14 @@
   // ── 启动 ──
   function boot() {
     if (!document.getElementById('graphCanvas')) return; // 非 /graph 页
+    // d3-force 预加载与数据请求并行（修复前数据到达后才开始串行加载 4 个
+    // UMD，进入路径多一串网络往返）。回调里补显降级横幅——数据先到而
+    // d3 后到时，grid 模式横幅此时才可显示（按钮依赖 d3 可用）
+    loadD3Force(function () {
+      if (state.layoutMode === 'grid' && state.model) {
+        showForceHint(state.model.nodes.length);
+      }
+    });
     var ready = window.__doc77_i18n_ready || Promise.resolve();
     ready.then(function () {
       window.applyI18n && window.applyI18n(document);
@@ -419,7 +530,10 @@
     }
   }
 
-  // ── 数据加载（四请求独立失败 + AbortController 网络级取消）──
+  // ── 数据加载（请求独立失败 + AbortController 网络级取消）──
+  // 修复前四请求每次都全量拉取：orphans(limit=10000, ~1MB) 仅洞察面板
+  // （默认隐藏）使用，重索引风暴期每秒重拉一次。现在仅当已加载过
+  // （SSE 刷新保持新鲜）才随主请求并行；首载走 loadInsightsData 空闲后台加载。
   function loadData() {
     if (state.controller) state.controller.abort();
     var ctrl = (state.controller = new AbortController());
@@ -446,30 +560,38 @@
     var statsP = fetchJ('/api/graph/stats?' + q, opts).catch(function () {
       return null;
     });
-    var orphansP = fetchJ('/api/graph/orphans?' + q + '&limit=10000', opts).catch(function () {
-      return null;
-    });
-    var brokenP = fetchJ('/api/graph/broken?' + q + '&limit=500', opts).catch(function () {
-      return null;
-    });
+    var haveInsights = !!state.insightsData;
+    var orphansP = haveInsights
+      ? fetchJ('/api/graph/orphans?' + q + '&limit=10000', opts).catch(function () {
+          return null;
+        })
+      : Promise.resolve(null);
+    var brokenP = haveInsights
+      ? fetchJ('/api/graph/broken?' + q + '&limit=500', opts).catch(function () {
+          return null;
+        })
+      : Promise.resolve(null);
     Promise.all([graphP, statsP, orphansP, brokenP]).then(function (res) {
       if (ctrl.signal.aborted) return;
       var graph = res[0];
       if (!graph) return; // graph 数据是渲染前提，失败已 toast
-      var orphans = res[2] || {};
-      var broken = res[3] || {};
+      if (haveInsights && res[2]) {
+        // SSE 刷新：洞察数据并回主请求保持新鲜
+        state.insightsData = {
+          orphans: res[2].orphans || [],
+          broken: (res[3] && res[3].broken) || [],
+          orphanTotal: res[2].total || 0,
+          brokenTotal: (res[3] && res[3].total) || 0,
+        };
+      }
+      var orphanRows = [];
+      if (haveInsights && res[2]) orphanRows = res[2].orphans || [];
+      else if (state.insightsData) orphanRows = state.insightsData.orphans;
       var fingerprint =
         sel.join(',') + ':' + (graph.nodes || []).length + ':' + (graph.edges || []).length;
       var dataChanged = fingerprint !== state.fingerprint;
       state.fingerprint = fingerprint;
-      state.data = {
-        graph: graph,
-        stats: res[1] || {},
-        orphans: orphans.orphans || [],
-        broken: broken.broken || [],
-        orphanTotal: orphans.total || 0,
-        brokenTotal: broken.total || 0,
-      };
+      state.data = { graph: graph, stats: res[1] || {} };
       hideIndexing();
       showTruncated(!!graph.truncated);
       renderInsights();
@@ -479,11 +601,76 @@
       }
       // 修复前每次 reload 重置 view（用户缩放/平移每秒丢失一次）
       var firstLoad = !state.model;
-      state.model = buildGraphModel(graph.nodes || [], graph.edges || [], orphans.orphans || []);
+      state.model = buildGraphModel(graph.nodes || [], graph.edges || [], orphanRows);
       if (firstLoad) state.view = { x: 0, y: 0, scale: 1 };
       toggleEmptyState(!state.model.nodes.length);
-      startSimulation();
+      // 布局降级决策：大图（>FORCE_AUTO_MAX_NODES）先网格快速布局立即可
+      // 交互（pan/zoom/hitTest 只依赖 x/y），力导向改为手动按钮按需启用
+      if (shouldAutoForce(state.model.nodes.length)) {
+        state.layoutMode = 'force';
+        startSimulation();
+      } else {
+        state.layoutMode = 'grid';
+        var w = getCanvas().clientWidth || 800;
+        var h = getCanvas().clientHeight || 600;
+        gridLayout(state.model, w, h);
+        draw();
+        showForceHint(state.model.nodes.length);
+      }
+      scheduleInsightsLoad();
     });
+  }
+
+  // ── 洞察数据懒加载（非关键路径：空闲时后台加载，首帧不等待）──
+  function loadInsightsData(opts) {
+    if (state.insightsController) state.insightsController.abort();
+    var ctrl = (state.insightsController = new AbortController());
+    var seq = ++state.insightsSeq;
+    var sel = state.selection.length ? state.selection : state.projects.map(function (p) {
+      return p.id;
+    });
+    if (!sel.length) return;
+    var q = 'projects=' + sel.join(',');
+    var o = { signal: ctrl.signal };
+    var orphansP = fetchJ('/api/graph/orphans?' + q + '&limit=10000', o).catch(function (err) {
+      // 用户主动打开面板失败才 toast；后台静默失败（防御式，降级仅影响淡化）
+      if (!ctrl.signal.aborted && opts && opts.userInitiated) {
+        window.toast && window.toast(String((err && err.message) || err), 'error');
+      }
+      return null;
+    });
+    var brokenP = fetchJ('/api/graph/broken?' + q + '&limit=500', o).catch(function () {
+      return null;
+    });
+    Promise.all([orphansP, brokenP]).then(function (res) {
+      if (ctrl.signal.aborted || seq !== state.insightsSeq) return; // 过期响应丢弃
+      var orphans = res[0] || {};
+      var broken = res[1] || {};
+      state.insightsData = {
+        orphans: orphans.orphans || [],
+        broken: broken.broken || [],
+        orphanTotal: orphans.total || 0,
+        brokenTotal: broken.total || 0,
+      };
+      if (state.model) {
+        applyOrphans(state.model, state.insightsData.orphans);
+        scheduleDraw(); // 淡化立即生效
+      }
+      renderInsights();
+    });
+  }
+
+  function scheduleInsightsLoad() {
+    if (state.insightsData) return;
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(function () {
+        loadInsightsData();
+      });
+    } else {
+      setTimeout(function () {
+        loadInsightsData();
+      }, 300);
+    }
   }
 
   // ── 力导向模拟（d3-force，rAF 合并绘制）──
@@ -516,44 +703,71 @@
         var fw = getCanvas().clientWidth || 800;
         var fh = getCanvas().clientHeight || 600;
         gridLayout(state.model, fw, fh);
+        state.layoutMode = 'grid';
         draw();
         return;
       }
       var w = getCanvas().clientWidth || 800;
       var h = getCanvas().clientHeight || 600;
+      // 大图物理自适应（physicsFor 分段）：加速收敛、大图去 collide/弱电荷
+      var phys = physicsFor(model.nodes.length);
       var sim = window.d3
         .forceSimulation(model.nodes)
         .force(
           'link',
           window.d3.forceLink(model.edges).id(function (d) {
             return d.id;
-          }).distance(PHYSICS.linkDistance),
+          }).distance(phys.linkDistance),
         )
-        .force('charge', window.d3.forceManyBody().strength(PHYSICS.chargeStrength).distanceMax(PHYSICS.chargeDistanceMax))
+        .force('charge', window.d3.forceManyBody().strength(phys.chargeStrength).distanceMax(phys.chargeDistanceMax))
         .force('center', window.d3.forceCenter(w / 2, h / 2))
         .force(
           'x',
-          window.d3.forceX(w / 2).strength(PHYSICS.centerStrength),
+          window.d3.forceX(w / 2).strength(phys.centerStrength),
         )
         .force(
           'y',
-          window.d3.forceY(h / 2).strength(PHYSICS.centerStrength),
-        )
-        .force(
+          window.d3.forceY(h / 2).strength(phys.centerStrength),
+        );
+      if (phys.collide) {
+        sim.force(
           'collide',
           window.d3.forceCollide().radius(function (d) {
             return d.radius + 1;
           }),
-        )
-        .alphaDecay(PHYSICS.alphaDecay)
-        .velocityDecay(PHYSICS.velocityDecay)
-        .on('tick', scheduleDraw);
+        );
+      }
+      sim.alphaDecay(phys.alphaDecay).velocityDecay(phys.velocityDecay).on('tick', scheduleDraw);
       sim._doc77Active = true;
       state.sim = sim;
+      state.layoutMode = 'force';
+      hideForceHint();
       sim.on('end', function () {
         sim._doc77Active = false; // 收敛后停摆但保留引用：拖拽时 lazy restart
       });
     });
+  }
+
+  /** 手动启用力导向（大图降级后按钮）：节点已有 grid x/y 作初始位置，平滑过渡 */
+  function enableForceLayout() {
+    hideForceHint();
+    state.layoutMode = 'force';
+    startSimulation();
+  }
+
+  /** 大图降级横幅（仅 d3 可用时显示——按钮点不动就没意义） */
+  function showForceHint(n) {
+    var hint = document.getElementById('forceHint');
+    if (!hint) return;
+    if (!window.d3 || !window.d3.forceSimulation) return;
+    var label = hint.querySelector('[data-i18n="web.graph.layoutHint"]');
+    if (label) label.textContent = t('web.graph.layoutHint', { n: String(n) });
+    hint.classList.remove('hidden');
+  }
+
+  function hideForceHint() {
+    var hint = document.getElementById('forceHint');
+    if (hint) hint.classList.add('hidden');
   }
 
   function scheduleDraw() {
@@ -592,11 +806,15 @@
     var byId = {};
     var nodes = state.model.nodes;
     for (var ni = 0; ni < nodes.length; ni++) byId[nodes[ni].id] = nodes[ni];
+    // 边视口裁剪（修复前每帧画全部边：200k 边时平移/缩放掉帧）。
+    // margin 用世界单位 64，覆盖半径上限 16 + 标签余量 + 线宽容差
+    var worldRect = worldRectForView(view, w, h, 64);
     for (var i = 0; i < edges.length; i++) {
       var e = edges[i];
       var s = typeof e.source === 'string' ? byId[e.source] : e.source;
       var t = typeof e.target === 'string' ? byId[e.target] : e.target;
       if (!s || !t || typeof s.x !== 'number' || typeof t.x !== 'number') continue;
+      if (!edgePotentiallyVisible({ x1: s.x, y1: s.y, x2: t.x, y2: t.y }, worldRect)) continue;
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(t.x, t.y);
     }
@@ -670,11 +888,14 @@
           }
         }
         state.dragNode = node;
-        node.fx = node.x;
-        node.fy = node.y;
         // 修复前 sim 收敛（'end'）后 state.sim 被置 null → 拖拽永久失效；
         // 现在 sim 保留引用，restart() 即可重新激活物理
-        if (state.sim) state.sim.alphaTarget(0.3).restart();
+        if (state.sim) {
+          node.fx = node.x;
+          node.fy = node.y;
+          state.sim.alphaTarget(0.3).restart();
+        }
+        // grid 模式（无 sim）：不设 fx/fy（无消费者），拖拽走 x/y 直写分支
       } else {
         state.panning = true;
         state.panStart = { x: e.clientX, y: e.clientY, vx: state.view.x, vy: state.view.y };
@@ -687,10 +908,17 @@
       if (state.dragNode) {
         var dx = (c.x - state.view.x) / state.view.scale;
         var dy = (c.y - state.view.y) / state.view.scale;
-        state.dragNode.fx = dx;
-        state.dragNode.fy = dy;
+        if (state.sim) {
+          state.dragNode.fx = dx;
+          state.dragNode.fy = dy;
+          state.sim.alphaTarget(0.3).restart();
+        } else {
+          // grid 模式：直写 x/y（修复前只设 fx/fy，无 sim 时节点拖不动）
+          state.dragNode.x = dx;
+          state.dragNode.y = dy;
+        }
         state.dragged = true;
-        if (state.sim) state.sim.alphaTarget(0.3).restart();
+        scheduleDraw();
         return;
       }
       if (state.panning && state.panStart) {
@@ -711,9 +939,12 @@
     canvas.addEventListener('pointerup', function (e) {
       if (e.button !== 0) return;
       if (state.dragNode) {
-        state.dragNode.fx = null;
-        state.dragNode.fy = null;
-        if (state.sim) state.sim.alphaTarget(0);
+        // grid 模式未设 fx/fy，无需清理（避免污染后续力导向会话）
+        if (state.sim) {
+          state.dragNode.fx = null;
+          state.dragNode.fy = null;
+          state.sim.alphaTarget(0);
+        }
         if (!state.dragged) openDoc(state.dragNode.pid, state.dragNode.path); // 点击（未拖动）
         state.dragNode = null;
       }
@@ -725,9 +956,11 @@
     // dragNode/panning 永久卡住，后续每次 move 都拖拽节点
     canvas.addEventListener('pointercancel', function () {
       if (state.dragNode) {
-        state.dragNode.fx = null;
-        state.dragNode.fy = null;
-        if (state.sim) state.sim.alphaTarget(0);
+        if (state.sim) {
+          state.dragNode.fx = null;
+          state.dragNode.fy = null;
+          state.sim.alphaTarget(0);
+        }
         state.dragNode = null;
       }
       state.panning = false;
@@ -913,6 +1146,8 @@
   function bindInsights() {
     document.getElementById('insightsBtn').addEventListener('click', function () {
       document.getElementById('insightsPanel').classList.remove('hidden');
+      // 洞察数据懒加载：用户主动打开面板时立即拉取（保证内容新鲜）
+      if (!state.insightsData) loadInsightsData({ userInitiated: true });
     });
     document.getElementById('insightsClose').addEventListener('click', function () {
       document.getElementById('insightsPanel').classList.add('hidden');
@@ -947,9 +1182,17 @@
   function renderInsights() {
     var body = document.getElementById('insightBody');
     if (!body || !state.data) return;
+    // 数据懒加载未完成：显示加载占位（后台空闲加载，面板打开前已就绪）
+    if (!state.insightsData) {
+      body.innerHTML =
+        '<div class="text-slate-400 dark:text-slate-500 py-8 text-center">' +
+        esc(t('web.graph.loading')) +
+        '</div>';
+      return;
+    }
     var isOrphans = state.insightsTab === 'orphans';
-    state.insightRows = isOrphans ? state.data.orphans : state.data.broken;
-    var total = isOrphans ? state.data.orphanTotal : state.data.brokenTotal;
+    state.insightRows = isOrphans ? state.insightsData.orphans : state.insightsData.broken;
+    var total = isOrphans ? state.insightsData.orphanTotal : state.insightsData.brokenTotal;
     if (!total) {
       body.innerHTML =
         '<div class="text-slate-400 dark:text-slate-500 py-8 text-center">' +
@@ -1045,6 +1288,10 @@
       fetch('/api/graph/' + state.selection[0] + '/index', { method: 'POST' }).catch(function () {});
       window.toast && window.toast(t('web.graph.indexing'), 'info');
     });
+    var forceEnableBtn = document.getElementById('forceEnableBtn');
+    if (forceEnableBtn) {
+      forceEnableBtn.addEventListener('click', enableForceLayout);
+    }
   }
 
   function updateReindexBtn() {
@@ -1144,6 +1391,13 @@
     applyViewToCtx: applyViewToCtx,
     clampView: clampView,
     zoomAt: zoomAt,
+    gridLayout: gridLayout,
+    shouldAutoForce: shouldAutoForce,
+    physicsFor: physicsFor,
+    applyOrphans: applyOrphans,
+    worldRectForView: worldRectForView,
+    edgePotentiallyVisible: edgePotentiallyVisible,
+    FORCE_AUTO_MAX_NODES: FORCE_AUTO_MAX_NODES,
     PALETTE: PALETTE,
     NEUTRAL: NEUTRAL,
   };
