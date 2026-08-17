@@ -4,7 +4,7 @@ import { deflateSync } from 'node:zlib';
 import { t } from '../i18n/index.js';
 import { getConnection } from '../db/connection.js';
 import { resolveProjectPath } from '../fs/index.js';
-import { resolveWikilink } from './wikilink.js';
+import { getProjectFiles, loadAliasMap, createWikilinkIndex } from './wikilink.js';
 
 /** Encode PlantUML source for kroki.io GET API (deflate + base64url). */
 function encodePlantUML(text: string): string {
@@ -407,11 +407,20 @@ function resolveWikilinks(html: string, projectId: number, filePath: string): st
   const projectRoot = getProjectRoot(projectId);
   if (!projectRoot) return html;
 
+  // v1.2.1 红队修复：每文档渲染一次构建索引（getProjectFiles/loadAliasMap
+  // 均带缓存），正则回调只做 O(1) Map 查找——修复前每链接一次全文件线性
+  // 扫描 + 每链接重读 .doc77links（100 链接 × 1 万文件 = 100 万次比较）。
+  const index = createWikilinkIndex(
+    getProjectFiles(projectId, projectRoot),
+    loadAliasMap(projectRoot),
+    projectRoot,
+  );
+
   return html.replace(
     /<a href="doc77-wikilink:([^"]+)"[^>]*>([^<]+)<\/a>/g,
     (_match: string, encoded: string, display: string) => {
       const title = decodeURIComponent(encoded);
-      const resolved = resolveWikilink(title, projectId, projectRoot);
+      const resolved = index.resolve(title);
       if (resolved) {
         // Convert resolved absolute path to doc77 API URL
         const rootPrefix = projectRoot.endsWith(path.sep) ? projectRoot : projectRoot + path.sep;

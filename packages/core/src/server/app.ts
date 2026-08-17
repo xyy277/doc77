@@ -47,6 +47,7 @@ import { getEventBus } from './event-bus.js';
 import { createEventsHandler } from './events.js';
 import { watchProject, stopWatching, acquireWatcherRef, releaseWatcherRef } from './watcher.js';
 import { onFileSaved, onFileRenamed, onFileDeleted } from '../graph/maintenance.js';
+import { updateFileListCache } from '../renderers/wikilink.js';
 import { markProjectGraphDirty } from '../graph/indexer.js';
 import { collectGraphNeighbors } from '../graph/context.js';
 import { registerGraphRoutes } from './routes/graph.js';
@@ -1587,6 +1588,8 @@ export function createApp(
       }
 
       fs.renameSync(absOld, absNew);
+      // v1.2.1 红队修复：文件列表缓存原地增删（不整清，保存频率高）
+      updateFileListCache(projectId, { removed: [absOld], added: [absNew] });
       const parentDir = path.dirname(oldPath);
       clearCache(projectId, parentDir === '.' ? '' : parentDir);
       // Also clear cache for the parent of the new path
@@ -1680,6 +1683,8 @@ export function createApp(
       }
 
       const parentDir = path.dirname(targetPath);
+      // v1.2.1 红队修复：文件列表缓存原地删除
+      if (!isDir) updateFileListCache(projectId, { removed: [absTarget] });
       clearCache(projectId, parentDir === '.' ? '' : parentDir);
       emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'delete', [targetPath]);
       // 图谱：删除文件后清理（v1.2.0；目录删除 → 标记脏，由全量重建自愈）
@@ -2653,6 +2658,8 @@ export function createApp(
         // 此前的 scanned_at 死写（无任何读取者）已删除——每次编辑触发
         // 一次 sql.js 整库序列化正是性能灾难放大器的一部分。
         const newStats = fs.statSync(absPath);
+        // v1.2.1 红队修复：新建文件加入文件列表缓存（避免 60s 内解析为死链）
+        if (!fileExists) updateFileListCache(projectId, { added: [absPath] });
 
         // 12. Incremental FTS index update
         try {
