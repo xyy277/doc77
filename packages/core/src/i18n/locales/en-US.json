@@ -1100,6 +1100,7 @@
   "web.preview.graph.related": "Related documents",
   "web.preview.graph.loadingRelated": "Loading…",
   "web.preview.graph.noRelated": "No related documents",
+  "web.preview.sseLost": "Live updates lost — refresh the page to restore",
   "web.graph.title": "Knowledge Graph",
   "web.graph.allProjects": "All",
   "web.graph.orphans": "Orphans",

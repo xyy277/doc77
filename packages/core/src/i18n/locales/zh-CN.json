@@ -1099,6 +1099,7 @@
   "web.preview.graph.related": "相关文档",
   "web.preview.graph.loadingRelated": "加载中…",
   "web.preview.graph.noRelated": "暂无相关文档",
+  "web.preview.sseLost": "实时推送连接失败，刷新页面后恢复",
   "web.graph.title": "知识图谱",
   "web.graph.allProjects": "全部",
   "web.graph.orphans": "孤立页",

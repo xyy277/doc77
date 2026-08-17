@@ -1360,13 +1360,15 @@
     });
     // 修复前无 onerror：401（服务重启/token 过期）→ 每 ~3s 无限重连，
     // 永不恢复。连续失败 3 次 → 关闭并一次性提示。
+    // 修复（红队）：readyState === CLOSED 条件在自动重连期恒为 CONNECTING，
+    // 熔断实为死代码（服务重启后永不提示）；与 preview.js 对齐去掉该条件。
     var sseFailures = 0;
     es.onopen = function () {
       sseFailures = 0;
     };
     es.onerror = function () {
       sseFailures++;
-      if (sseFailures >= 3 && es.readyState === EventSource.CLOSED) {
+      if (sseFailures >= 3) {
         es.close();
         window.toast && window.toast(t('web.graph.sseLost'), 'error');
       }

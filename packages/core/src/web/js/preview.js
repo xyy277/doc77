@@ -166,7 +166,22 @@ function initTaskEvents() {
       // v1.2.0：图谱全量重建进度 → 刷新当前面板
       refreshGraphPanel();
     });
-    taskEventSrc.onerror = function(){ /* EventSource auto-reconnects */ };
+    // 失败熔断（对齐 graph.js 3 次范式；不带 readyState 条件——自动重连期
+    // readyState 恒 CONNECTING，带条件会变成永不触发的死代码）：服务重启
+    // /断网后 EventSource 每 ~3s 无限重连，每次重连服务端重启 watcher 全树
+    // 枚举（大项目数十秒 CPU 风暴）。连续 3 次失败即关闭并提示手动刷新。
+    var taskSseFailures = 0;
+    taskEventSrc.onopen = function () {
+      taskSseFailures = 0;
+    };
+    taskEventSrc.onerror = function () {
+      taskSseFailures++;
+      if (taskSseFailures >= 3) {
+        taskEventSrc.close();
+        taskEventSrc = null; // 允许后续 initTaskEvents 重新初始化
+        toast(t('web.preview.sseLost'), 'error');
+      }
+    };
   } catch(_){}
 }
 //══════════ 外部修改横幅 ══════════
