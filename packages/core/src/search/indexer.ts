@@ -113,12 +113,16 @@ export interface IndexProgress {
 
 /**
  * Index a single file (incremental update).
+ * v1.2.1 红队修复：opts.content 透传（保存点已有内存内容，跳过整文件
+ * 重读）+ mtime/size 前置短路（无 content 时先 stat 对比，未变直接
+ * 跳过——消灭 watcher 兜底路径的第三次全文重读重哈希）。
  */
 export function indexFile(
   projectId: number,
   projectRoot: string,
   relativePath: string,
   db?: DatabaseCompat,
+  opts?: { content?: string },
 ): boolean {
   const conn = db ?? getConnection();
   const absPath = path.join(projectRoot, relativePath);
@@ -127,20 +131,25 @@ export function indexFile(
     const stat = fs.statSync(absPath);
     if (stat.size > MAX_FILE_SIZE) return false;
 
-    let content = fs.readFileSync(absPath, 'utf-8');
+    const mtime = stat.mtime.toISOString();
+    const meta = conn
+      .prepare(
+        'SELECT file_hash, file_mtime, file_size FROM search_index_meta WHERE project_id = ? AND file_path = ?',
+      )
+      .get(projectId, relativePath) as
+      { file_hash: string; file_mtime: string | null; file_size: number } | undefined;
+    // mtime+size 未变 → 内容未变，直接跳过（不读文件不算 hash）
+    if (meta && meta.file_mtime === mtime && meta.file_size === stat.size) return false;
+
+    let content = opts?.content ?? fs.readFileSync(absPath, 'utf-8');
     const ext = path.extname(relativePath).toLowerCase();
     if (ext === '.html' || ext === '.htm' || ext === '.xml' || ext === '.svg') {
       content = stripHtml(content);
     }
 
     const hash = fileHash(content);
-    const mtime = stat.mtime.toISOString();
 
-    // Check if already indexed with same hash
-    const meta = conn
-      .prepare('SELECT file_hash FROM search_index_meta WHERE project_id = ? AND file_path = ?')
-      .get(projectId, relativePath) as { file_hash: string } | undefined;
-
+    // Check if already indexed with same hash（touch/属性变更兜底）
     if (meta && meta.file_hash === hash) return false; // unchanged
 
     // Delete old entry

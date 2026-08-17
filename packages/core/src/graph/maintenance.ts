@@ -10,10 +10,15 @@ import { renameFileGraph } from './repository.js';
  * 图谱是最终一致：失败静默降级（图谱缺失可降级显示）。
  */
 
-/** 文件保存/新增/修改后增量索引 */
-export function onFileSaved(projectId: number, projectRoot: string, relPath: string): void {
+/** 文件保存/新增/修改后增量索引（v1.2.1：opts.content 透传，保存点免重读） */
+export function onFileSaved(
+  projectId: number,
+  projectRoot: string,
+  relPath: string,
+  opts?: { content?: string },
+): void {
   try {
-    indexFileLinks(projectId, projectRoot, relPath, getConnection());
+    indexFileLinks(projectId, projectRoot, relPath, getConnection(), opts);
   } catch {
     /* best-effort */
   }

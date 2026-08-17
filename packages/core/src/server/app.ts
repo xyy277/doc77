@@ -2662,15 +2662,17 @@ export function createApp(
         if (!fileExists) updateFileListCache(projectId, { added: [absPath] });
 
         // 12. Incremental FTS index update
+        // v1.2.1 红队修复：content 透传——保存点内容已在内存，避免整文件
+        // 重读 + 重哈希（修复前同一文件在保存链里被读 3 次、sha256 3 次）
         try {
-          indexFile(projectId, project.path, filePath);
+          indexFile(projectId, project.path, filePath, undefined, { content });
         } catch {
           /* non-critical */
         }
 
         // 12b. 图谱增量索引（v1.2.0：链接基础设施）
         try {
-          onFileSaved(projectId, project.path, filePath);
+          onFileSaved(projectId, project.path, filePath, { content });
         } catch {
           /* non-critical */
         }

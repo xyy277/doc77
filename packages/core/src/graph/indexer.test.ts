@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -6,8 +6,14 @@ import { initDatabase, closeConnection, getConnection } from '../db/connection.j
 import { runMigrations } from '../db/migrations.js';
 import { registerProject } from '../db/projects.js';
 import { indexFileLinks, fullGraphIndex } from './indexer.js';
-import { queryBacklinks, queryOutlinks, getGraphStats } from './repository.js';
+import { queryBacklinks, queryOutlinks, getGraphStats, replaceFileLinks } from './repository.js';
 import { relatedDocs } from './related.js';
+
+// 事务测试需注入 replaceFileLinks 失败（ESM 静态 import 绑定下 spyOn 不生效）
+vi.mock('./repository.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./repository.js')>();
+  return { ...actual, replaceFileLinks: vi.fn(actual.replaceFileLinks) };
+});
 
 describe('graph indexer + repository', () => {
   let testDir: string;
@@ -35,6 +41,10 @@ describe('graph indexer + repository', () => {
     } catch {
       /* ignore */
     }
+    // 每个测试重建 DB 后 projectId 复用（都是 1），必须清文件列表缓存
+    // 防跨测试串扰（真实世界 projectId 唯一无此问题）
+    const { clearWikilinkCache } = await import('../renderers/wikilink.js');
+    clearWikilinkCache(projectId);
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -177,5 +187,58 @@ describe('graph indexer + repository', () => {
     expect(
       queryBacklinks(getConnection(), projectId, 'a.md').map((b) => b.from_path),
     ).not.toContain('notes.ts');
+  });
+
+  it('content 透传：索引的是传入内容而非磁盘（保存点免重读）', () => {
+    // 磁盘内容与传入 content 不同——断言索引结果来自传入值
+    fs.writeFileSync(path.join(projectDir, 'a.md'), '# 磁盘旧内容\n\n[[b]]');
+    const changed = indexFileLinks(projectId, projectDir, 'a.md', getConnection(), {
+      content: '# 传入新内容\n\n[[c]] 和 [b](b.md)',
+    });
+    expect(changed).toBe(true);
+    const out = queryOutlinks(getConnection(), projectId, 'a.md');
+    expect(out.map((l) => l.to_path).sort()).toEqual(['b.md', 'c.md']);
+    // meta 的 title 来自传入内容
+    const meta = getConnection()
+      .prepare('SELECT title FROM doc_meta WHERE project_id = ? AND file_path = ?')
+      .get(projectId, 'a.md') as { title: string };
+    expect(meta.title).toBe('传入新内容');
+  });
+
+  it('mtime+size 前置短路：索引后无 content 再次调用不读文件不重写', async () => {
+    await fullGraphIndex(projectId, projectDir);
+    await new Promise((r) => setTimeout(r, 1100));
+    const before = getConnection()
+      .prepare('SELECT indexed_at FROM doc_meta WHERE project_id = ? AND file_path = ?')
+      .get(projectId, 'a.md') as { indexed_at: string };
+    // 无 content（watcher 兜底路径）→ mtime+size 相同 → 直接短路
+    const changed = indexFileLinks(projectId, projectDir, 'a.md', getConnection());
+    expect(changed).toBe(false);
+    const after = getConnection()
+      .prepare('SELECT indexed_at FROM doc_meta WHERE project_id = ? AND file_path = ?')
+      .get(projectId, 'a.md') as { indexed_at: string };
+    expect(after.indexed_at).toBe(before.indexed_at);
+  });
+
+  it('事务包裹：replaceFileLinks 失败时 doc_meta 一并回滚', async () => {
+    // 基线：先成功索引一次（a.md 的 meta title = A）
+    indexFileLinks(projectId, projectDir, 'a.md', getConnection(), {
+      content: '# A\n\n参见 [[b]]',
+    });
+    // 注入失败：验证 upsertDocMeta + replaceFileLinks 在同一事务内——
+    // 失败后 doc_meta 保持旧值（不残留部分写入）
+    vi.mocked(replaceFileLinks).mockImplementationOnce(() => {
+      throw new Error('injected failure');
+    });
+    expect(() =>
+      indexFileLinks(projectId, projectDir, 'a.md', getConnection(), {
+        content: '# 新标题\n\n[[b]]',
+      }),
+    ).toThrow('injected failure');
+    const meta = getConnection()
+      .prepare('SELECT title FROM doc_meta WHERE project_id = ? AND file_path = ?')
+      .get(projectId, 'a.md') as { title: string };
+    expect(meta.title).toBe('A'); // 回滚：保持旧值
+    vi.mocked(replaceFileLinks).mockClear();
   });
 });

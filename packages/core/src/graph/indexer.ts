@@ -7,6 +7,7 @@ import { walkDir, isTextFile } from '../search/indexer.js';
 import { extractLinksFromContent, createLinkResolver } from './link-extractor.js';
 import { extractDocMeta } from './frontmatter.js';
 import { upsertDocMeta, replaceFileLinks, withConn } from './repository.js';
+import { getProjectFiles } from '../renderers/wikilink.js';
 
 /**
  * 知识图谱批量索引（v1.2.0）。
@@ -41,14 +42,23 @@ export interface GraphIndexProgress {
 }
 
 /**
- * 增量索引单个文件（hash 短路）。返回是否实际重建了该文件的图谱。
+ * 增量索引单个文件（两级短路 + 事务）。返回是否实际重建了该文件的图谱。
  * 由保存挂点 / watcher 调用，文件已写入磁盘。
+ *
+ * v1.2.1 红队修复：
+ * - opts.content 透传：保存点已有内存内容，跳过整文件重读（原来同文件
+ *   在保存链里被读 3 次 + sha256 3 次）
+ * - mtime+size 前置短路：无 content 时先 stat 对比（meta 有 mtime/size），
+ *   未变直接返回——watcher 兜底路径不再重读文件
+ * - 变更/删除分支包事务：原来 50 链接文档 ≈ 52 次 autocommit（每次 fsync）
+ * - createLinkResolver 传共享文件列表缓存，消除每次保存的全项目目录重扫
  */
 export function indexFileLinks(
   projectId: number,
   projectRoot: string,
   relPath: string,
   db?: DatabaseCompat,
+  opts?: { content?: string },
 ): boolean {
   const conn = db ?? getConnection();
   const absPath = path.join(projectRoot, relPath);
@@ -56,33 +66,56 @@ export function indexFileLinks(
   if (!/\.(md|mdx|markdown)$/i.test(relPath)) return false;
   if (!fs.existsSync(absPath) || !isTextFile(absPath)) {
     // 文件不存在/非文本：清掉它的图谱（删除路径触发）
-    deleteFileGraphFromIndex(conn, projectId, relPath);
+    conn.transaction(() => {
+      deleteFileGraphFromIndex(conn, projectId, relPath);
+    })();
     return false;
   }
-  const content = readTextSafe(absPath);
+
+  const meta = conn
+    .prepare(
+      'SELECT file_hash, file_mtime, file_size FROM doc_meta WHERE project_id = ? AND file_path = ?',
+    )
+    .get(projectId, relPath) as
+    { file_hash: string; file_mtime: string | null; file_size: number } | undefined;
+  const stats = fs.statSync(absPath);
+  // 快速短路：mtime+size 未变 → 内容未变，不读文件（watcher 兜底路径
+  // 500ms 后重触发时命中——REST 保存刚 upsert 的 mtime 与磁盘一致）。
+  // 有 content 透传时跳过（保存点内容已在内存，直接走 hash 级短路）。
+  if (
+    !opts?.content &&
+    meta &&
+    meta.file_mtime === stats.mtime.toISOString() &&
+    meta.file_size === stats.size
+  ) {
+    return false;
+  }
+
+  const content = opts?.content ?? readTextSafe(absPath);
   if (content === null) return false;
 
   const hash = fileHash(content);
-  const meta = conn
-    .prepare('SELECT file_hash FROM doc_meta WHERE project_id = ? AND file_path = ?')
-    .get(projectId, relPath) as { file_hash: string } | undefined;
-  if (meta && meta.file_hash === hash) return false; // 未变更，短路
+  if (meta && meta.file_hash === hash) return false; // 内容级短路（touch 兜底）
 
   const docMeta = extractDocMeta(content, relPath);
-  const stats = fs.statSync(absPath);
-  upsertDocMeta(conn, projectId, {
-    project_id: projectId,
-    file_path: relPath,
-    title: docMeta.title,
-    aliases: docMeta.aliases,
-    tags: docMeta.tags,
-    file_hash: hash,
-    file_mtime: stats.mtime.toISOString(),
-    file_size: stats.size,
-  });
-
-  const links = extractLinksFromContent(content, relPath, createLinkResolver(projectRoot));
-  replaceFileLinks(conn, projectId, relPath, links);
+  const links = extractLinksFromContent(
+    content,
+    relPath,
+    createLinkResolver(projectRoot, getProjectFiles(projectId, projectRoot)),
+  );
+  conn.transaction(() => {
+    upsertDocMeta(conn, projectId, {
+      project_id: projectId,
+      file_path: relPath,
+      title: docMeta.title,
+      aliases: docMeta.aliases,
+      tags: docMeta.tags,
+      file_hash: hash,
+      file_mtime: stats.mtime.toISOString(),
+      file_size: stats.size,
+    });
+    replaceFileLinks(conn, projectId, relPath, links);
+  })();
   return true;
 }
 
