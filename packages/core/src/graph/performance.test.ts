@@ -164,15 +164,18 @@ describe('graph performance regression', () => {
         }
       });
       tx();
+      // 预热：20 万行事务提交后 SQLite 触发 WAL checkpoint（合并到主库，
+      // 慢 IO 环境可达数百 ms）。修复前计时含 checkpoint 成本，CI 实测
+      // 231→570ms 抖动（本地 NVMe 仅数十 ms 不暴露）。预热查询让一次性
+      // 成本移出计时，测的是真实查询延迟。
+      getGraphStats(conn, projectId);
 
       const t0 = Date.now();
       queryBacklinks(conn, projectId, 'doc1.md');
       relatedDocs(projectId, 'doc1.md', 5);
       getGraphStats(conn, projectId);
       const elapsed = Date.now() - t0;
-      // 目标：单查询 < 50ms；断言宽松（CI 抖动）。2026-08-17 CI 三平台实测
-      // 231ms（20 万行事务插入后立即计时的首查 + 共享 runner 负载），
-      // 原 200ms 阈值把抖动误判为回归；500ms 仍能抓住数量级退化
+      // 目标：单查询 < 50ms；断言宽松（CI 抖动），500ms 抓数量级退化
       expect(elapsed).toBeLessThan(500);
       console.log(`[graph-perf] 200k edges, 3 queries: ${elapsed}ms`);
     },
@@ -237,11 +240,13 @@ describe('graph performance regression', () => {
         }
       });
       tx();
+      // 预热：同上方测试——20 万行事务的 WAL checkpoint 成本移出计时
+      queryOrphans(conn, [projectId], { limit: 10 });
       const t0 = Date.now();
       queryOrphans(conn, [projectId], { limit: 10000 });
       queryBrokenLinks(conn, [projectId], { limit: 500 });
       const elapsed = Date.now() - t0;
-      // 与上方同型断言（20 万行插入后立即计时）：同为 500ms 防 CI 抖动
+      // 与上方同型断言：500ms 防 CI 抖动，抓数量级退化
       expect(elapsed).toBeLessThan(500);
       console.log(`[graph-perf] 200k edges, orphans/broken list queries: ${elapsed}ms`);
     },

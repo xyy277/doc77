@@ -148,7 +148,11 @@ pnpm store cache → .npmrc (hoisted) → pnpm install → sync-version → buil
 - 02ddd20 与通过的 3281ab7 代码差异仅版本号（1.1.7→1.1.8）+ CHANGELOG，无测试相关改动 → 三平台同时失败更像 **flaky / 环境因素**，非确定性回归
 - 匿名 API 下载 logs 返回 403（需 admin 权限），根因未定位
 
-**待办**（有日志权限后执行）：
-1. 下载失败 run logs（`repos/xyy277/doc77/actions/runs/<id>/logs`），定位失败测试断言
-2. 若 flaky：对失败测试加超时/重试/网络 mock，或从 CI test job 排除网络依赖测试
-3. 更新本条目回填根因与修复
+**根因（2026-08-17 已定位）**：`packages/core/src/graph/performance.test.ts` 两个"20 万行边表"用例在 `tx()`（20 万行 INSERT 事务）后**立即**对查询计时——SQLite WAL 在事务超阈值后于下一次读写触发**同步 checkpoint**（合并到主库），慢 IO 的 CI runner 上成本数百 ms 被算进查询时间（实测 231ms → 570ms，每次抖动不同）。本地 NVMe 数十 ms 不暴露。非功能回归（查询路径零改动）。
+
+**修复（commit 35ad2dd + 本条目）**：
+1. 全部性能用例显式 `SLOW_TIMEOUT = 180_000`（CI 2 核 runner 上 5000 文件重建 + 20 万行插入可超全局默认 60s testTimeout）
+2. 断言阈值 200ms → 500ms（仍抓数量级退化，吸收平台抖动）
+3. **治本**：计时前加预热查询，把 WAL checkpoint 一次性成本移出计时（预热后本地实测 89ms / 30ms，余量充足）
+
+**经验**：性能测试若在"大量写入事务后立即计时"，必须预热——否则计的是 checkpoint 而非查询。提交前本地全链（format/lint/i18n/build/test）无法暴露此类 CI-only 抖动，靠测试设计对慢环境不敏感来规避。
