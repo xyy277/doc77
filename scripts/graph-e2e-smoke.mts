@@ -15,7 +15,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { chromium } from '@playwright/test';
 
-import { initDatabase, closeConnection } from '../packages/core/src/db/connection.js';
+import { initDatabase, closeConnection, getConnection } from '../packages/core/src/db/connection.js';
 import { runMigrations } from '../packages/core/src/db/migrations.js';
 import { createApp } from '../packages/core/src/server/app.js';
 import { registerProject } from '../packages/core/src/db/projects.js';
@@ -182,6 +182,55 @@ async function main(): Promise<void> {
     await page.click(`#projectTabs button[data-pid="${pid}"]`);
     const reindexVisible = await page.locator('#reindexBtn').isVisible();
     assert(reindexVisible, '单项目 tab → 重建索引按钮可见');
+
+    await waitForNoError();
+
+    // ── 8. 返回 Dashboard 入口（显式按钮）──
+    await page.goto(`${baseUrl}/graph`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#backDashboard');
+    const backHref = await page.getAttribute('#backDashboard', 'href');
+    assert(backHref === '/', `返回按钮 href="/"（${backHref}）`);
+    await page.click('#backDashboard');
+    await page.waitForURL(`${baseUrl}/`, { timeout: 10000 });
+    assert(true, '点击返回按钮 → 回到 dashboard');
+
+    // ── 9. 大图降级：网格快速布局 + 手动启用力导向 ──
+    const bigDir = path.join(testDir, 'big');
+    fs.mkdirSync(bigDir, { recursive: true });
+    fs.writeFileSync(path.join(bigDir, 'doc0.md'), '# Doc 0\n');
+    const bigPid = registerProject('E2E Big', bigDir).id;
+    // 2500 节点 raw SQL 直插（免 fullGraphIndex，对齐 graph-truncation.test.ts seedNodes）
+    {
+      const conn = getConnection();
+      const tx = conn.transaction(() => {
+        const ins = conn.prepare(
+          'INSERT INTO doc_meta (project_id, file_path, title, tags) VALUES (?, ?, ?, ?)',
+        );
+        for (let i = 0; i < 2500; i++) ins.run(bigPid, `doc${i}.md`, `Doc ${i}`, '["tag-a"]');
+      });
+      tx();
+    }
+    await page.goto(`${baseUrl}/graph?projects=${bigPid}`, { waitUntil: 'domcontentloaded' });
+    const hintVisible = await page
+      .waitForSelector('#forceHint:not(.hidden)', { timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    assert(hintVisible, '大图（2500 节点）→ 快速布局横幅可见');
+    const bigPixels = await waitCanvasPixels(page, 1000, 20000);
+    assert(bigPixels > 0, `大图网格布局已渲染（${bigPixels} alpha 像素）`);
+    await page.click('#forceEnableBtn');
+    await page.waitForSelector('#forceHint.hidden', { timeout: 20000 });
+    assert(true, '启用力导向布局 → 横幅隐藏');
+    const forcePixels = await waitCanvasPixels(page, 1000, 20000);
+    assert(forcePixels > 0, `力导向布局后仍渲染（${forcePixels} alpha 像素）`);
+
+    // ── 10. 小图回归守卫：forceHint 不显示（防误降级）──
+    // 单项目视图（5 节点，避免"全部项目"含大项目 2500 节点触发降级）
+    await page.goto(`${baseUrl}/graph?projects=${pid}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#graphCanvas');
+    await page.waitForTimeout(1500); // 等 loadData + 布局决策完成
+    const hintShown = await page.locator('#forceHint:not(.hidden)').count();
+    assert(hintShown === 0, '小图（5 节点）→ 快速布局横幅不显示');
 
     await waitForNoError();
   } finally {
