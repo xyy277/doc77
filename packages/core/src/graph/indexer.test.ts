@@ -109,6 +109,48 @@ describe('graph indexer + repository', () => {
     expect(queryBacklinks(getConnection(), projectId, 'c.md')).toHaveLength(0);
   });
 
+  it('fullGraphIndex hash 短路：未变更文件不重写（indexed_at 不变）', async () => {
+    await fullGraphIndex(projectId, projectDir);
+    // datetime('now') 秒级精度：等 1.1s 保证未短路时 indexed_at 必变化
+    await new Promise((r) => setTimeout(r, 1100));
+    const before = getConnection()
+      .prepare(
+        'SELECT file_path, title, tags, file_hash, indexed_at FROM doc_meta ORDER BY file_path',
+      )
+      .all() as Array<{ file_path: string }>;
+    await fullGraphIndex(projectId, projectDir);
+    const after = getConnection()
+      .prepare(
+        'SELECT file_path, title, tags, file_hash, indexed_at FROM doc_meta ORDER BY file_path',
+      )
+      .all();
+    // 短路跳过 → 行内容逐字段完全一致（修复前每次重建都会重写 indexed_at）
+    expect(after).toEqual(before);
+  });
+
+  it('fullGraphIndex 短路后仅重建变更文件', async () => {
+    await fullGraphIndex(projectId, projectDir);
+    // 变更 b.md 内容（出链变化）；a/c 未变更
+    fs.writeFileSync(path.join(projectDir, 'b.md'), '# B 改\n\n引用 [[a]] 和 [[c.md]]');
+    await new Promise((r) => setTimeout(r, 1100));
+    const before = getConnection()
+      .prepare(
+        'SELECT file_path, indexed_at FROM doc_meta WHERE project_id = ? AND file_path IN (?, ?) ORDER BY file_path',
+      )
+      .all(projectId, 'a.md', 'c.md') as Array<{ file_path: string; indexed_at: string }>;
+    await fullGraphIndex(projectId, projectDir);
+    // b.md 变更 → 出链重建
+    const bOut = queryOutlinks(getConnection(), projectId, 'b.md');
+    expect(bOut.map((l) => l.to_path).sort()).toEqual(['a.md', 'c.md']);
+    // 未变更文件 → 短路跳过（indexed_at 不变，未被重写）
+    const untouched = getConnection()
+      .prepare(
+        'SELECT file_path, indexed_at FROM doc_meta WHERE project_id = ? AND file_path IN (?, ?) ORDER BY file_path',
+      )
+      .all(projectId, 'a.md', 'c.md') as Array<{ file_path: string; indexed_at: string }>;
+    expect(untouched).toEqual(before);
+  });
+
   it('非 markdown 文件不产生图谱节点（代码文件过滤）', async () => {
     fs.writeFileSync(path.join(projectDir, 'notes.ts'), '// 代码文件\n[[a]] 与 [b](b.md)');
     fs.writeFileSync(path.join(projectDir, 'README.md'), '# 说明\n见 [[a]]');

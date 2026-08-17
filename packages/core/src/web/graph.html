@@ -27,6 +27,8 @@ html{background:#f8fafc}html.dark{background:#0f172a}
 <div class="flex flex-col h-screen w-full">
   <!-- Header：标题 + 项目切换 + 控件 -->
   <header class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0 z-20">
+    <!-- 显式返回入口（修复前仅 logo 可点击返回，外观是标题用户未察觉） -->
+    <a id="backDashboard" href="/" class="shrink-0 px-2.5 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors no-underline" data-i18n="web.graph.backToDashboard">← Back to Dashboard</a>
     <a href="/" class="text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-500 dark:hover:text-blue-400 no-underline flex items-center gap-1.5">
       <span>🕸️</span><span data-i18n="web.graph.title">Knowledge Graph</span>
     </a>
@@ -50,6 +52,11 @@ html{background:#f8fafc}html.dark{background:#0f172a}
     <canvas id="graphCanvas" class="absolute inset-0 w-full h-full block"></canvas>
     <div id="graphTooltip" class="hidden absolute pointer-events-none z-10 max-w-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white/95 dark:bg-slate-800/95 shadow-lg text-xs text-slate-700 dark:text-slate-200"></div>
     <div id="indexingNotice" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 text-xs text-amber-700 dark:text-amber-300" data-i18n="web.graph.indexing">Indexing…</div>
+    <!-- 大图降级横幅（top 右侧，与居中通知错开）：容器不带 data-i18n（内部有按钮子元素，check-i18n 规则 3） -->
+    <div id="forceHint" class="hidden absolute top-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-700 text-xs text-blue-700 dark:text-blue-300">
+      <span data-i18n="web.graph.layoutHint">Large graph — fast layout enabled</span>
+      <button id="forceEnableBtn" class="px-2 py-0.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors whitespace-nowrap" data-i18n="web.graph.enableForce">Enable force layout</button>
+    </div>
     <div id="truncatedNotice" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/40 border border-orange-200 dark:border-orange-700 text-xs text-orange-700 dark:text-orange-300" data-i18n="web.graph.truncated">Graph too large — showing partial view</div>
     <div id="emptyState" class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
       <div class="text-5xl">🕸️</div>
