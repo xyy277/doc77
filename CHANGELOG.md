@@ -4,6 +4,32 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-17] — `1.1.8`
+
+### 全包 (`1.1.8`)
+
+**Added — 图谱页导航与布局降级（core）**
+- **显式返回 Dashboard 按钮**：图谱页 header 左侧新增"← 返回首页"（修复前仅 logo 可点击返回，外观是页面标题用户未察觉）；i18n `web.graph.backToDashboard` 双语
+- **大图快速布局横幅**：>2000 节点自动网格布局时顶部横幅提示 + 一键"启用力导向布局"按钮（`web.graph.layoutHint` / `web.graph.enableForce` 双语）
+
+**Changed — 图谱进入性能（core/electron）**
+- **大图布局降级**：>2000 节点默认网格快速布局（首帧 <100ms 立即可交互，修复前 d3-force 全量模拟数千节点卡死数秒）；物理参数按节点数分段自适应（1000+/2000+ 去 collide、提高 alphaDecay、弱电荷）
+- **洞察数据懒加载**：orphans/broken 移出进入关键路径（修复前每次进入/SSE 刷新都拉 1MB 全量），空闲后台加载 + 打开面板即时拉取
+- **draw() 边视口裁剪**：大图每帧从 O(E) 降到 O(可见边)；boot 时 d3-force 预加载与数据请求并行（原先串行 4 个 UMD）
+- **Electron 常驻 CPU 修复**：`fullGraphIndex` 加 `file_hash` 短路（修复前每次启动对全部项目全量重建图谱，10k 文件 20-30s 单核满负荷 = 常驻 CPU ~10%）；bootstrap 串行化避免多项目并发峰值
+- **移除强制 GPU 开关**：`enable-gpu-rasterization`/`enable-zero-copy` 在无 GPU 环境（WSL2/虚拟机）强制 SwiftShader 反向加码，删除后恢复 Chromium 自动策略
+
+**Fixed**
+- grid 布局模式节点拖拽失效（无 sim 时只设 fx/fy 无消费者，改直写 x/y）
+- hash 短路回归：删除文件后指向它的 resolved 边不再自动标 broken（stale 清理补显式自愈）
+
+**验证**
+- 测试 873 passed（+20：shouldAutoForce/physicsFor/gridLayout/applyOrphans/边裁剪 18 项 + indexer 短路 2 项）
+- Playwright 浏览器冒烟 22/22（新增返回按钮、2500 节点大图降级、小图回归守卫三节）
+- 性能：启动图谱重建 10k 文件 20-30s → 秒级（未变更文件全部跳过）
+
+---
+
 ## [2026-08-16] — `1.1.7`
 
 ### 全包 (`1.1.7`)
