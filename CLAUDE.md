@@ -209,6 +209,16 @@ git gc --prune=now --aggressive
 - **提交前 CI 预检** — 每次提交前运行 `pnpm format:check && pnpm lint && pnpm check:i18n && pnpm build && pnpm test`，确保 CI 全绿
 - **GitHub Actions 权限** — Release 上传需要 `permissions: contents: write`
 
+### 性能/时序测试规范（防 CI 抖动，2026-08-17 三连败教训）
+
+性能/时序断言必须对慢环境不敏感——CI 共享 runner（2 核 + 慢 IO）比本地慢 5-10 倍，本地全绿 ≠ CI 全绿：
+
+1. **写后计时必预热** — 大量写入事务（如 20 万行插入）提交后立即计时的查询包含同步 WAL checkpoint 等一次性成本，计时前先跑一次同型查询预热，把一次性成本移出计时
+2. **阈值留数量级余量** — 断言抓 10 倍级回归，不追精确毫秒；CI 实测超阈值时先检查计时位置 / 阈值 / 超时配置，再怀疑功能回归
+3. **重 IO 用例显式长超时** — vitest 全局默认 60s testTimeout 不够 CI 慢机（5000 文件重建 + 20 万行插入可超时），重用例显式传 timeout（如 180s）
+
+排查顺序：CI-only 失败 → 先按上述三条检查测试设计（预热 / 阈值 / 超时），确认测试对慢环境不敏感后再怀疑代码回归。教训档案：`docs/planning/ci-electron-lessons.md` #27。
+
 ## 项目概述
 
 Doc77 是一个"默认安全、对话驱动"的智能本地文档管理 Agent。
