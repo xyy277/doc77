@@ -29,9 +29,9 @@ const dynamicImport = new Function('specifier', 'return import(specifier)') as (
   specifier: string,
 ) => Promise<any>;
 
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-
+// 修复前强制 enable-gpu-rasterization / enable-zero-copy：无 GPU 环境
+// （WSL2 / 虚拟机）强制退回 SwiftShader 软件渲染，反而增加 CPU 与内存。
+// 删除后恢复 Chromium 自动策略（有 GPU 自动启用，无 GPU 自动降级）。
 let mainWindow: BrowserWindow | null = null;
 let server: ServerProcess | null = null;
 // tray reference is kept to prevent garbage collection of the system tray.
