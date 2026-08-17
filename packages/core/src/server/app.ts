@@ -2,14 +2,14 @@ import express, { type Request, type Response, type NextFunction, type Applicati
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { exec, execFileSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
-import { discoverProjects } from '../scanner/discover.js';
+import { discoverProjectsAsync } from '../scanner/discover.js';
 import {
   detectProjectTags,
-  discoverGitProjects,
+  discoverGitProjectsAsync,
   parseCodeWorkspace,
 } from '../scanner/project-detector.js';
 import {
@@ -45,6 +45,7 @@ import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.j
 import { createToolRouterExecutor } from './tool-router-factory.js';
 import { getEventBus } from './event-bus.js';
 import { createEventsHandler } from './events.js';
+import { findFoldersByFingerprint, resolveSearchRoots } from './find-folder.js';
 import { watchProject, stopWatching, acquireWatcherRef, releaseWatcherRef } from './watcher.js';
 import { onFileSaved, onFileRenamed, onFileDeleted } from '../graph/maintenance.js';
 import { updateFileListCache } from '../renderers/wikilink.js';
@@ -830,9 +831,17 @@ export function createApp(
   });
 
   // Project auto-discovery
-  app.get('/api/discover', lanRestrict, (req: Request, res: Response) => {
+  // v1.2.1 红队修复：async 让出版（每 64 目录让出事件循环 + deadline）+
+  // 并发限流 429（修复前同步递归遍历可冻结主进程 2-10s，且可被重复触发）
+  let discoverBusy = false;
+  app.get('/api/discover', lanRestrict, async (req: Request, res: Response) => {
+    if (discoverBusy) {
+      res.status(429).json({ error: t('api.scan.busy'), code: 'SCAN_BUSY' });
+      return;
+    }
     const dirPath = (req.query.path as string) || '~';
-    const depth = parseInt(req.query.depth as string, 10) || 2;
+    const depthRaw = parseInt(req.query.depth as string, 10);
+    const depth = Number.isNaN(depthRaw) ? 2 : Math.min(5, Math.max(1, depthRaw));
 
     // Security: reject blocked roots
     const blocked = [
@@ -866,8 +875,13 @@ export function createApp(
       const registered = db.prepare('SELECT path FROM projects').all() as { path: string }[];
       const existingPaths = new Set(registered.map((r) => path.resolve(r.path)));
 
-      const results = discoverProjects(dirPath, Math.min(depth, 5), existingPaths);
-      res.json(results);
+      discoverBusy = true;
+      try {
+        const results = await discoverProjectsAsync(dirPath, depth, existingPaths);
+        res.json(results);
+      } finally {
+        discoverBusy = false;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
@@ -875,17 +889,25 @@ export function createApp(
   });
 
   // Git project discovery
-  app.get('/api/discover/git', lanRestrict, (req: Request, res: Response) => {
+  app.get('/api/discover/git', lanRestrict, async (req: Request, res: Response) => {
+    if (discoverBusy) {
+      res.status(429).json({ error: t('api.scan.busy'), code: 'SCAN_BUSY' });
+      return;
+    }
     const dirPath = (req.query.path as string) || os.homedir();
     const depth = Math.min(5, Math.max(2, parseInt(req.query.depth as string, 10) || 3));
 
     try {
-      const repos = discoverGitProjects(dirPath, depth);
-      // Filter out already-registered paths
-      const existingPaths = new Set(listProjects().map((p) => path.resolve(p.path)));
-      const filtered = repos.filter((r) => !existingPaths.has(r.path));
-
-      res.json({ root: dirPath, repositories: filtered, count: filtered.length });
+      discoverBusy = true;
+      try {
+        const repos = await discoverGitProjectsAsync(dirPath, depth);
+        // Filter out already-registered paths
+        const existingPaths = new Set(listProjects().map((p) => path.resolve(p.path)));
+        const filtered = repos.filter((r) => !existingPaths.has(r.path));
+        res.json({ root: dirPath, repositories: filtered, count: filtered.length });
+      } finally {
+        discoverBusy = false;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(400).json({ error: message });
@@ -1080,111 +1102,27 @@ export function createApp(
 
   // Fingerprint-based folder finder — matches a directory picked by the browser
   // against the server's local filesystem
-  app.post('/api/find-folder', async (req: Request, res: Response) => {
+  // v1.2.1 红队修复：execFileSync 同步跑外部 find（多 root 串行最坏 8-40s
+  // 全进程冻结 + 网页可滥用）→ 异步并行 + 超时 + lanRestrict + 入参上限
+  app.post('/api/find-folder', lanRestrict, async (req: Request, res: Response) => {
     const { folderName, fingerprint } = req.body as {
       folderName?: string;
       fingerprint?: Array<{ name: string; size: number; type: string }>;
     };
-    if (!folderName || !fingerprint || fingerprint.length === 0) {
+    if (
+      !folderName ||
+      typeof folderName !== 'string' ||
+      folderName.length > 128 ||
+      !Array.isArray(fingerprint) ||
+      fingerprint.length === 0
+    ) {
       res.status(400).json({ error: 'folderName and fingerprint are required' });
       return;
     }
+    const limitedFp = fingerprint.slice(0, 50);
 
-    // Determine search roots — Linux home first (fast), then Windows mounts
-    const searchRoots: string[] = [];
-    const home = process.env.HOME || '/home';
-    searchRoots.push(home);
-    let isWsl = false;
-    try {
-      isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
-    } catch {}
-    if (isWsl) {
-      for (const drive of ['d', 'c', 'e']) {
-        try {
-          if (fs.existsSync('/mnt/' + drive)) searchRoots.push('/mnt/' + drive);
-        } catch {}
-      }
-      try {
-        const usersDir = '/mnt/c/Users';
-        for (const e of fs.readdirSync(usersDir, { withFileTypes: true })) {
-          if (
-            e.isDirectory() &&
-            !e.isSymbolicLink() &&
-            !['Public', 'Default', 'Default User', 'All Users', 'WsiAccount'].includes(e.name) &&
-            !e.name.startsWith('.')
-          ) {
-            searchRoots.push(usersDir + '/' + e.name);
-          }
-        }
-      } catch {}
-    }
-
-    const matches: Array<{ path: string; score: number }> = [];
-    const deadline = Date.now() + 5000;
-
-    for (const root of searchRoots) {
-      if (Date.now() > deadline) break;
-      try {
-        const raw = (() => {
-          try {
-            // Security: use execFileSync (no shell) and pass folderName as a
-            // single argv element to prevent command injection. The previous
-            // template-string form allowed RCE via a crafted folderName.
-            return execFileSync(
-              'find',
-              [root, '-maxdepth', '4', '-type', 'd', '-name', folderName],
-              {
-                timeout: 4000,
-                encoding: 'utf-8',
-                maxBuffer: 1024 * 1024,
-                stdio: ['ignore', 'pipe', 'ignore'],
-              },
-            ).trim();
-          } catch (e: unknown) {
-            // execFileSync throws on non-zero exit, but stdout may still have results
-            const err = e as { stdout?: string; stderr?: string };
-            return (err.stdout || '').trim();
-          }
-        })();
-        const candidates = raw.split('\n').filter(Boolean);
-        for (const candidate of candidates) {
-          if (Date.now() > deadline) break;
-          try {
-            // Match all fingerprint entries (files + directories)
-            let matched = 0,
-              checked = 0;
-            for (const fp of fingerprint) {
-              checked++;
-              try {
-                const fpPath = candidate + '/' + fp.name;
-                const st = fs.statSync(fpPath);
-                if (fp.type === 'directory' && st.isDirectory()) {
-                  matched++;
-                } else if (fp.type === 'file' && st.isFile()) {
-                  if (fp.size === 0 || st.size === fp.size || Math.abs(st.size - fp.size) < 10)
-                    matched++;
-                }
-              } catch {}
-            }
-            const score = checked > 0 ? matched / checked : 0;
-            if (score > 0) {
-              matches.push({ path: candidate, score });
-            }
-          } catch {}
-        }
-      } catch {}
-    }
-
-    // Sort by score descending, deduplicate
-    matches.sort((a, b) => b.score - a.score);
-    const seen = new Set<string>();
-    const unique = matches.filter((m) => {
-      if (seen.has(m.path)) return false;
-      seen.add(m.path);
-      return true;
-    });
-
-    res.json({ matches: unique.slice(0, 5) });
+    const matches = await findFoldersByFingerprint(resolveSearchRoots(), folderName, limitedFp);
+    res.json({ matches: matches.slice(0, 5) });
   });
 
   // Server-side file browser — for remote access or when native dialog unavailable
@@ -1964,6 +1902,16 @@ export function createApp(
       // --- Normal render ---
       switch (rendererType) {
         case 'markdown': {
+          // v1.2.1 红队修复：ETag/304——渲染对同一 content 确定性，保存后
+          // mtime 变化 → etag 自然失效；304 短路在渲染前，重复打开文档
+          // （tab 切换/刷新/多窗口）免全量渲染（大 vault 渲染 1-3s）
+          const etag = `"${stats.size}-${Math.round(stats.mtimeMs)}"`;
+          res.setHeader('ETag', etag);
+          res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
+          if (req.headers['if-none-match'] === etag) {
+            res.status(304).end();
+            return;
+          }
           const raw = await fs.promises.readFile(absPath, 'utf-8');
           res.json({
             path: filePath,
