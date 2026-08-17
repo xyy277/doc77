@@ -2628,33 +2628,18 @@ export function createApp(
         }
       }
 
-      // 7. Shadow backup
-      const shadowDir = path.join(
-        process.env.HOME || process.env.USERPROFILE || '/tmp',
-        '.doc77',
-        'shadow',
-        `edit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      );
-      let shadowCreated = false;
+      // 7. 原子写（修复前：整文件 shadow 复制 → 写 → 删除，成功路径 100%
+      // 白做——每次保存额外整文件 IO。tmp+rename 天然防写坏：任何失败时
+      // 原文件从未被触碰，回滚分支仅清理残留 tmp；Windows renameSync 覆盖
+      // 已有文件走 MoveFileEx REPLACE_EXISTING）
+      const dir = path.dirname(absPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const tmpPath = `${absPath}.tmp-${process.pid}-${Date.now()}`;
       try {
-        if (fileExists) {
-          fs.mkdirSync(shadowDir, { recursive: true });
-          fs.copyFileSync(absPath, path.join(shadowDir, path.basename(filePath)));
-          shadowCreated = true;
-        }
+        fs.writeFileSync(tmpPath, content, 'utf-8');
+        fs.renameSync(tmpPath, absPath);
 
-        // 8. Write
-        const dir = path.dirname(absPath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(absPath, content, 'utf-8');
-
-        // 9. Clear shadow
-        if (shadowCreated) {
-          shadowCreated = false;
-          fs.rmSync(shadowDir, { recursive: true, force: true });
-        }
-
-        // 10. Audit log
+        // 8. Audit log
         await auditLog({
           project_id: projectId,
           operation_type: 'edit_file',
@@ -2685,15 +2670,12 @@ export function createApp(
 
         res.json({ ok: true, size: newStats.size, modified: newStats.mtime.toISOString() });
       } catch (writeErr: unknown) {
-        // Rollback
+        // 回滚：原文件从未被触碰，仅清理残留 tmp（rename 失败时 tmp 可能
+        // 仍在磁盘上；writeFileSync 失败时 tmp 可能不完整）
         const message = writeErr instanceof Error ? writeErr.message : 'Unknown error';
-        if (shadowCreated) {
-          try {
-            const sf = path.join(shadowDir, path.basename(filePath));
-            if (fs.existsSync(sf)) fs.copyFileSync(sf, absPath);
-            fs.rmSync(shadowDir, { recursive: true, force: true });
-          } catch {}
-        }
+        try {
+          fs.rmSync(tmpPath, { force: true });
+        } catch {}
         await auditLog({
           project_id: projectId,
           operation_type: 'edit_file',
