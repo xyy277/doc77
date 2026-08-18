@@ -156,3 +156,17 @@ pnpm store cache → .npmrc (hoisted) → pnpm install → sync-version → buil
 3. **治本**：计时前加预热查询，把 WAL checkpoint 一次性成本移出计时（预热后本地实测 89ms / 30ms，余量充足）
 
 **经验**：性能测试若在"大量写入事务后立即计时"，必须预热——否则计的是 checkpoint 而非查询。提交前本地全链（format/lint/i18n/build/test）无法暴露此类 CI-only 抖动，靠测试设计对慢环境不敏感来规避。
+
+## 28 | Windows CI test 失败（2026-08-18，v1.1.9 发布后）
+
+**症状**：main 上 `Test (Node 22 on windows-latest)` 的 `Run pnpm test` 4 个失败（Linux/macOS 全绿）：
+- `config-crypto.test.ts > config.key 权限 0600`：expected 438 to be 384 —— 438=0o666（Windows stat mode），384=0o600
+- `markdown.test.ts > obsidian 子目录链接解析`：期望 `sub%2FDeep.md`（正斜杠编码），实际 `sub%5CDeep.md`（反斜杠）
+- `find-folder.test.ts` ×2（命中排序去重 / allSettled 隔离）：results 为空
+
+**根因**：
+1. **Windows chmod 语义**：`fs.chmodSync(0600)` 在 Windows 是 no-op，`statSync().mode` 恒 0666 —— 权限断言须平台分支（本次引入，测试问题）
+2. **markdown.ts wikilink URL 反斜杠**（预存，红队 b855fc8 引入）：`resolved` 为 Windows 反斜杠路径，`path.posix.normalize` 不转换分隔符 → `encodeURIComponent` 产出 `%5C` 而非 `%2F`。**修复**：slice 后先 `replaceAll('\\','/')` 再 posix.normalize（Linux 零影响）
+3. **find-folder.test.ts mock 硬编码正斜杠**（预存，红队 82b3e2e 引入）：实现 `path.join(candidate, name)` 在 Windows 产出反斜杠，mock 的 `p.includes('/home/user/myproj/')` 匹配不上 → 全部 ENOENT。**修复**：mock 判断改平台无关正则 `/[\\/]myproj[\\/]/`
+
+**经验**：8/17 红队 commit 直接 push main（bypass PR 保护）后从未跑 CI —— 12:21 之后的 Windows 失败积累到 v1.1.9 发布才暴露。**main 直推的 commit 必须补跑 CI 验证**；mock 里硬编码路径分隔符的测试天然 Windows 不友好（`path.sep` 或正则分隔）。

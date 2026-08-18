@@ -121,8 +121,14 @@ describe('Config sensitive value encryption', () => {
     expect(keyPath).toBe(path.join(testDir, 'config.key'));
     getOrCreateConfigKey();
     expect(fs.existsSync(keyPath)).toBe(true);
-    const mode = fs.statSync(keyPath).mode & 0o777;
-    expect(mode).toBe(0o600);
+    // POSIX 权限位在 Windows 上无意义（chmod 为 no-op，mode 恒 0666），
+    // 仅 POSIX 平台断言 0600；Windows 只验证存在性与 owner 可写
+    if (process.platform !== 'win32') {
+      const mode = fs.statSync(keyPath).mode & 0o777;
+      expect(mode).toBe(0o600);
+    } else {
+      expect(fs.statSync(keyPath).mode & 0o200).not.toBe(0);
+    }
     // 密钥长度 32 字节（AES-256）
     expect(fs.readFileSync(keyPath).length).toBe(32);
     // 重复获取返回同一把钥匙（不重建）

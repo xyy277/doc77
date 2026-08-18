@@ -19,8 +19,10 @@ function makeDeps(overrides?: Partial<FindFolderDeps>): FindFolderDeps {
     },
     stat: async (p) => {
       // 仅"真实"项目目录（myproj）下存在 fingerprint 条目；other 是子目录
-      const isReal = p.includes('/home/user/myproj/');
-      const base = p.split('/').pop() || '';
+      // Windows CI 回归（v1.1.9）：实现用 path.join 拼接 → Windows 反斜杠
+      // 路径匹配不上硬编码正斜杠 → 全部 ENOENT。用平台无关分隔符正则
+      const isReal = /[\\/]myproj[\\/]/.test(p);
+      const base = p.split(/[\\/]/).pop() || '';
       if (isReal && base === 'README.md') {
         return { isFile: () => true, isDirectory: () => false, size: 100 } as ReturnType<
           FindFolderDeps['stat']

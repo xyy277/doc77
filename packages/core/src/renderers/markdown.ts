@@ -423,10 +423,16 @@ function resolveWikilinks(html: string, projectId: number, filePath: string): st
       const resolved = index.resolve(title);
       if (resolved) {
         // Convert resolved absolute path to doc77 API URL
+        // Windows CI 回归（v1.1.9 发布后）：resolved 为平台路径（Windows 用
+        // 反斜杠），posix.normalize 不转换分隔符 → URL 编码出 %5C 而非 %2F。
+        // 先统一为 posix 分隔符再 normalize（Linux/macOS 下 replace 无操作）
         const rootPrefix = projectRoot.endsWith(path.sep) ? projectRoot : projectRoot + path.sep;
-        const relative = resolved.startsWith(rootPrefix)
-          ? path.posix.normalize(resolved.slice(rootPrefix.length))
-          : path.posix.normalize(resolved);
+        const relative = path.posix.normalize(
+          (resolved.startsWith(rootPrefix)
+            ? resolved.slice(rootPrefix.length)
+            : resolved
+          ).replaceAll('\\', '/'),
+        );
         const apiUrl = `/api/content/${projectId}?path=${encodeURIComponent(relative)}`;
         return `<a href="${apiUrl}" class="wikilink">${display}</a>`;
       }
