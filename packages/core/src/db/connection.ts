@@ -113,12 +113,21 @@ export async function initDatabase(filePath: string): Promise<DatabaseCompat> {
     rawDb = new Database(filePath);
     rawDb.pragma('journal_mode = WAL');
     rawDb.pragma('foreign_keys = ON');
+    // 修复前未设 busy_timeout（SQLite 默认 0ms）：同进程多连接并发写
+    //（MCP 副本、sync 定时器、图谱重建与保存链同时写 data.db）会立即
+    // 抛 SQLITE_BUSY。5s 等待窗口让写冲突排队而非失败。
+    rawDb.pragma('busy_timeout = 5000');
     dbPath = filePath;
     wrappedDb = new DatabaseCompat(rawDb);
     return wrappedDb;
   })();
 
   return initPromise;
+}
+
+/** DB 文件绝对路径（initDatabase 后可用；config.key 等附属文件与它同目录）。 */
+export function getDbPath(): string | null {
+  return dbPath;
 }
 
 /** Get current connection (must call initDatabase first). */

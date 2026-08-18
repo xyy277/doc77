@@ -23,6 +23,8 @@ var CACHE_THUMBS = CACHE_VERSION + '-thumbs';
 // v1.1.4 (F4)：API 内容缓存（Cache API + IndexedDB 各一份）上限与过期裁剪，
 // 防止长期使用后渲染进程存储无限膨胀（拖慢 Electron 启动）
 var MAX_API_ENTRIES = 200;
+// v1.2.1：导航缓存（含 query 变体 URL）从不修剪会无限膨胀 → 50 条 LRU
+var MAX_SHELL_ENTRIES = 50;
 var API_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天
 
 // App Shell 资源列表
@@ -394,11 +396,18 @@ function cacheFirstLRU(request, cacheName, maxEntries) {
 function navigationHandler(request) {
   return fetch(request)
     .then(function (response) {
-      // 在线时缓存 HTML 页面
+      // 在线时缓存 HTML 页面（v1.2.1：LRU 修剪，防含 query 的导航条目无限膨胀）
       if (response.ok) {
         var clone = response.clone();
         caches.open(CACHE_SHELL).then(function (cache) {
           cache.put(request, clone);
+          cache.keys().then(function (keys) {
+            if (keys.length > MAX_SHELL_ENTRIES) {
+              keys.slice(0, keys.length - MAX_SHELL_ENTRIES).forEach(function (key) {
+                cache.delete(key);
+              });
+            }
+          });
         });
       }
       return response;

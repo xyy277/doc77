@@ -77,6 +77,7 @@ export {
 } from './db/connection.js';
 export { runMigrations } from './db/migrations.js';
 export { getConfig, setConfig, listConfig, loadDefaults } from './db/config.js';
+export { migrateSensitiveConfigs } from './db/config-crypto.js';
 export { registerProject, listProjects, removeProject, updateProject } from './db/projects.js';
 export type { Project, ProjectUpdate } from './db/projects.js';
 

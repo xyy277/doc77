@@ -107,3 +107,33 @@ describe('discoverProjects', () => {
     expect(Array.isArray(results)).toBe(true);
   });
 });
+
+describe('discoverProjectsAsync（红队异步让出版）', () => {
+  it('与同步版结果对等', async () => {
+    const { discoverProjectsAsync } = await import('../src/scanner/discover.js');
+    const sync = discoverProjects(TEST_ROOT, 1, new Set());
+    const async = await discoverProjectsAsync(TEST_ROOT, 1, new Set());
+    expect(async).toEqual(sync);
+  });
+
+  it('deadline 极短时立即返回（不冻结事件循环）', async () => {
+    const { discoverProjectsAsync } = await import('../src/scanner/discover.js');
+    const start = Date.now();
+    const results = await discoverProjectsAsync(TEST_ROOT, 3, new Set(), { deadlineMs: 1 });
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeLessThan(2000);
+    expect(Array.isArray(results)).toBe(true);
+  });
+});
+
+describe('discoverGitProjectsAsync（红队异步让出版）', () => {
+  it('与同步版结果对等 + deadline 提前返回', async () => {
+    const { discoverGitProjects } = await import('../src/scanner/project-detector.js');
+    const { discoverGitProjectsAsync } = await import('../src/scanner/project-detector.js');
+    const sync = discoverGitProjects(TEST_ROOT, 2);
+    const async = await discoverGitProjectsAsync(TEST_ROOT, 2);
+    expect(async).toEqual(sync);
+    const fast = await discoverGitProjectsAsync(TEST_ROOT, 2, { deadlineMs: 1 });
+    expect(Array.isArray(fast)).toBe(true);
+  });
+});

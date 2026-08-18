@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { watch, type FSWatcher } from 'chokidar';
 import { listProjects } from '../db/projects.js';
 import { clearCache } from '../scanner/index.js';
@@ -193,6 +194,12 @@ export function startFileWatcher(opts?: WatcherOptions): void {
   const w = watch([], {
     ignoreInitial: true,
     persistent: true,
+    // v1.1.9 OOM 修复：chokidar 默认 followSymlinks:true 会跟随项目内 symlink
+    // 展开（pnpm 布局 node_modules → .pnpm 虚拟 store 的交叉引用图），枚举
+    // 永不结束 —— ready 永不触发、事件为 0，仅以 ~20MB/s 分配 fs watcher
+    // 对象直至 V8 堆满 OOM（服务器 ~4 分钟崩溃，exit 134）。symlink 按普通
+    // 文件处理即可（node_modules 等目标本就在 IGNORED 中，跟随无意义）
+    followSymlinks: false,
     // v1.1.4 移除 awaitWriteFinish：它对每个被写文件 50ms stat 轮询，
     // 是 CPU 持续占用与事件放大的来源之一；事件提前由 500ms 去抖合并
     ignored: IGNORED,
@@ -274,7 +281,14 @@ export function watchProject(projectId: number): void {
     return;
   }
   if (!root) return;
-  const absRoot = path.resolve(root);
+  // v1.1.9：followSymlinks:false 后 symlink 项目根本身不会被递归监听，
+  // 先 realpath 归一化（失败回退原路径），保证 symlink 项目根仍可工作
+  let absRoot = path.resolve(root);
+  try {
+    absRoot = fs.realpathSync(absRoot);
+  } catch {
+    /* 路径不可解析时维持原值 */
+  }
   if (_rootToProject.has(absRoot)) return;
   _rootToProject.set(absRoot, projectId);
   _watcher.add(absRoot);

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { resolveWikilinkIn, loadAliasMap } from '../renderers/wikilink.js';
+import { createWikilinkIndex, loadAliasMap } from '../renderers/wikilink.js';
 import { walkDir } from '../search/indexer.js';
 
 /**
@@ -62,18 +62,22 @@ function collectProjectFiles(projectRoot: string): string[] {
 export function createLinkResolver(projectRoot: string, fileList?: string[]): LinkResolver {
   const allFiles = fileList ?? collectProjectFiles(projectRoot);
   const aliasMap = loadAliasMap(projectRoot);
+  // v1.2.1 红队修复：构造期建一次索引（basename Map + 全文件 Set）——
+  // 修复前每链接线性扫描 allFiles（O(链接×文件)）且 fileExists 用
+  // includes（O(n)）。现在 resolve O(1)、fileExists O(1)。
+  const index = createWikilinkIndex(allFiles, aliasMap, projectRoot);
 
   const toRel = (absPath: string): string =>
     path.relative(projectRoot, absPath).split(path.sep).join('/');
 
   return {
     resolveWikilink(title: string): string | null {
-      const abs = resolveWikilinkIn(allFiles, aliasMap, projectRoot, title);
+      const abs = index.resolve(title);
       return abs ? toRel(abs) : null;
     },
     fileExists(relPath: string): boolean {
       const abs = path.resolve(projectRoot, relPath);
-      return allFiles.includes(abs) || fs.existsSync(abs);
+      return index.has(abs) || fs.existsSync(abs);
     },
   };
 }

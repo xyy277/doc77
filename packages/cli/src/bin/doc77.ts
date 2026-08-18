@@ -18,6 +18,7 @@ import {
   resolveProjectPath,
   loadDefaults,
   listProjects,
+  migrateSensitiveConfigs,
   removeProject,
   updateProject,
   discoverProjects,
@@ -75,6 +76,12 @@ async function init() {
   await initDatabase(DB_PATH);
   runMigrations();
   loadDefaults();
+  // v1.1.9：历史明文敏感 config（ai.token 等）迁移为机器密钥加密（幂等）
+  try {
+    migrateSensitiveConfigs();
+  } catch {
+    /* best-effort — 读端兼容明文，迁移失败不阻断启动 */
+  }
   // Phase 2 i18n init: use DB-persisted locale config
   initI18n(getConfig('locale.language') || '');
 }

@@ -2,14 +2,14 @@ import express, { type Request, type Response, type NextFunction, type Applicati
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { exec, execFileSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { openDirectoryDialog } from './dialog.js';
 import { fileURLToPath } from 'node:url';
 import { getConnection } from '../db/connection.js';
-import { discoverProjects } from '../scanner/discover.js';
+import { discoverProjectsAsync } from '../scanner/discover.js';
 import {
   detectProjectTags,
-  discoverGitProjects,
+  discoverGitProjectsAsync,
   parseCodeWorkspace,
 } from '../scanner/project-detector.js';
 import {
@@ -45,8 +45,10 @@ import { executeAiWriteTool, isAiWriteTool, type AiWriteFns } from './ai-tools.j
 import { createToolRouterExecutor } from './tool-router-factory.js';
 import { getEventBus } from './event-bus.js';
 import { createEventsHandler } from './events.js';
+import { findFoldersByFingerprint, resolveSearchRoots } from './find-folder.js';
 import { watchProject, stopWatching, acquireWatcherRef, releaseWatcherRef } from './watcher.js';
 import { onFileSaved, onFileRenamed, onFileDeleted } from '../graph/maintenance.js';
+import { updateFileListCache } from '../renderers/wikilink.js';
 import { markProjectGraphDirty } from '../graph/indexer.js';
 import { collectGraphNeighbors } from '../graph/context.js';
 import { registerGraphRoutes } from './routes/graph.js';
@@ -73,7 +75,7 @@ import { getTunnelManager } from '../tunnel/manager.js';
 import { getPluginLoader } from '../plugin/loader.js';
 
 import { VERSION } from '../version.gen.js';
-import { getConfig, setConfig } from '../db/config.js';
+import { getConfig, setConfig, listConfig } from '../db/config.js';
 import { initI18n, t } from '../i18n/index.js';
 import { buildI18nResponse } from './i18n-route.js';
 import { registerAiSessionRoutes } from './routes/ai-sessions.js';
@@ -829,9 +831,17 @@ export function createApp(
   });
 
   // Project auto-discovery
-  app.get('/api/discover', lanRestrict, (req: Request, res: Response) => {
+  // v1.2.1 红队修复：async 让出版（每 64 目录让出事件循环 + deadline）+
+  // 并发限流 429（修复前同步递归遍历可冻结主进程 2-10s，且可被重复触发）
+  let discoverBusy = false;
+  app.get('/api/discover', lanRestrict, async (req: Request, res: Response) => {
+    if (discoverBusy) {
+      res.status(429).json({ error: t('api.scan.busy'), code: 'SCAN_BUSY' });
+      return;
+    }
     const dirPath = (req.query.path as string) || '~';
-    const depth = parseInt(req.query.depth as string, 10) || 2;
+    const depthRaw = parseInt(req.query.depth as string, 10);
+    const depth = Number.isNaN(depthRaw) ? 2 : Math.min(5, Math.max(1, depthRaw));
 
     // Security: reject blocked roots
     const blocked = [
@@ -865,8 +875,13 @@ export function createApp(
       const registered = db.prepare('SELECT path FROM projects').all() as { path: string }[];
       const existingPaths = new Set(registered.map((r) => path.resolve(r.path)));
 
-      const results = discoverProjects(dirPath, Math.min(depth, 5), existingPaths);
-      res.json(results);
+      discoverBusy = true;
+      try {
+        const results = await discoverProjectsAsync(dirPath, depth, existingPaths);
+        res.json(results);
+      } finally {
+        discoverBusy = false;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(500).json({ error: message });
@@ -874,17 +889,25 @@ export function createApp(
   });
 
   // Git project discovery
-  app.get('/api/discover/git', lanRestrict, (req: Request, res: Response) => {
+  app.get('/api/discover/git', lanRestrict, async (req: Request, res: Response) => {
+    if (discoverBusy) {
+      res.status(429).json({ error: t('api.scan.busy'), code: 'SCAN_BUSY' });
+      return;
+    }
     const dirPath = (req.query.path as string) || os.homedir();
     const depth = Math.min(5, Math.max(2, parseInt(req.query.depth as string, 10) || 3));
 
     try {
-      const repos = discoverGitProjects(dirPath, depth);
-      // Filter out already-registered paths
-      const existingPaths = new Set(listProjects().map((p) => path.resolve(p.path)));
-      const filtered = repos.filter((r) => !existingPaths.has(r.path));
-
-      res.json({ root: dirPath, repositories: filtered, count: filtered.length });
+      discoverBusy = true;
+      try {
+        const repos = await discoverGitProjectsAsync(dirPath, depth);
+        // Filter out already-registered paths
+        const existingPaths = new Set(listProjects().map((p) => path.resolve(p.path)));
+        const filtered = repos.filter((r) => !existingPaths.has(r.path));
+        res.json({ root: dirPath, repositories: filtered, count: filtered.length });
+      } finally {
+        discoverBusy = false;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       res.status(400).json({ error: message });
@@ -1079,111 +1102,27 @@ export function createApp(
 
   // Fingerprint-based folder finder — matches a directory picked by the browser
   // against the server's local filesystem
-  app.post('/api/find-folder', async (req: Request, res: Response) => {
+  // v1.2.1 红队修复：execFileSync 同步跑外部 find（多 root 串行最坏 8-40s
+  // 全进程冻结 + 网页可滥用）→ 异步并行 + 超时 + lanRestrict + 入参上限
+  app.post('/api/find-folder', lanRestrict, async (req: Request, res: Response) => {
     const { folderName, fingerprint } = req.body as {
       folderName?: string;
       fingerprint?: Array<{ name: string; size: number; type: string }>;
     };
-    if (!folderName || !fingerprint || fingerprint.length === 0) {
+    if (
+      !folderName ||
+      typeof folderName !== 'string' ||
+      folderName.length > 128 ||
+      !Array.isArray(fingerprint) ||
+      fingerprint.length === 0
+    ) {
       res.status(400).json({ error: 'folderName and fingerprint are required' });
       return;
     }
+    const limitedFp = fingerprint.slice(0, 50);
 
-    // Determine search roots — Linux home first (fast), then Windows mounts
-    const searchRoots: string[] = [];
-    const home = process.env.HOME || '/home';
-    searchRoots.push(home);
-    let isWsl = false;
-    try {
-      isWsl = /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf-8'));
-    } catch {}
-    if (isWsl) {
-      for (const drive of ['d', 'c', 'e']) {
-        try {
-          if (fs.existsSync('/mnt/' + drive)) searchRoots.push('/mnt/' + drive);
-        } catch {}
-      }
-      try {
-        const usersDir = '/mnt/c/Users';
-        for (const e of fs.readdirSync(usersDir, { withFileTypes: true })) {
-          if (
-            e.isDirectory() &&
-            !e.isSymbolicLink() &&
-            !['Public', 'Default', 'Default User', 'All Users', 'WsiAccount'].includes(e.name) &&
-            !e.name.startsWith('.')
-          ) {
-            searchRoots.push(usersDir + '/' + e.name);
-          }
-        }
-      } catch {}
-    }
-
-    const matches: Array<{ path: string; score: number }> = [];
-    const deadline = Date.now() + 5000;
-
-    for (const root of searchRoots) {
-      if (Date.now() > deadline) break;
-      try {
-        const raw = (() => {
-          try {
-            // Security: use execFileSync (no shell) and pass folderName as a
-            // single argv element to prevent command injection. The previous
-            // template-string form allowed RCE via a crafted folderName.
-            return execFileSync(
-              'find',
-              [root, '-maxdepth', '4', '-type', 'd', '-name', folderName],
-              {
-                timeout: 4000,
-                encoding: 'utf-8',
-                maxBuffer: 1024 * 1024,
-                stdio: ['ignore', 'pipe', 'ignore'],
-              },
-            ).trim();
-          } catch (e: unknown) {
-            // execFileSync throws on non-zero exit, but stdout may still have results
-            const err = e as { stdout?: string; stderr?: string };
-            return (err.stdout || '').trim();
-          }
-        })();
-        const candidates = raw.split('\n').filter(Boolean);
-        for (const candidate of candidates) {
-          if (Date.now() > deadline) break;
-          try {
-            // Match all fingerprint entries (files + directories)
-            let matched = 0,
-              checked = 0;
-            for (const fp of fingerprint) {
-              checked++;
-              try {
-                const fpPath = candidate + '/' + fp.name;
-                const st = fs.statSync(fpPath);
-                if (fp.type === 'directory' && st.isDirectory()) {
-                  matched++;
-                } else if (fp.type === 'file' && st.isFile()) {
-                  if (fp.size === 0 || st.size === fp.size || Math.abs(st.size - fp.size) < 10)
-                    matched++;
-                }
-              } catch {}
-            }
-            const score = checked > 0 ? matched / checked : 0;
-            if (score > 0) {
-              matches.push({ path: candidate, score });
-            }
-          } catch {}
-        }
-      } catch {}
-    }
-
-    // Sort by score descending, deduplicate
-    matches.sort((a, b) => b.score - a.score);
-    const seen = new Set<string>();
-    const unique = matches.filter((m) => {
-      if (seen.has(m.path)) return false;
-      seen.add(m.path);
-      return true;
-    });
-
-    res.json({ matches: unique.slice(0, 5) });
+    const matches = await findFoldersByFingerprint(resolveSearchRoots(), folderName, limitedFp);
+    res.json({ matches: matches.slice(0, 5) });
   });
 
   // Server-side file browser — for remote access or when native dialog unavailable
@@ -1587,6 +1526,8 @@ export function createApp(
       }
 
       fs.renameSync(absOld, absNew);
+      // v1.2.1 红队修复：文件列表缓存原地增删（不整清，保存频率高）
+      updateFileListCache(projectId, { removed: [absOld], added: [absNew] });
       const parentDir = path.dirname(oldPath);
       clearCache(projectId, parentDir === '.' ? '' : parentDir);
       // Also clear cache for the parent of the new path
@@ -1680,6 +1621,8 @@ export function createApp(
       }
 
       const parentDir = path.dirname(targetPath);
+      // v1.2.1 红队修复：文件列表缓存原地删除
+      if (!isDir) updateFileListCache(projectId, { removed: [absTarget] });
       clearCache(projectId, parentDir === '.' ? '' : parentDir);
       emitTreeChanged(projectId, parentDir === '.' ? '' : parentDir, 'delete', [targetPath]);
       // 图谱：删除文件后清理（v1.2.0；目录删除 → 标记脏，由全量重建自愈）
@@ -1959,6 +1902,16 @@ export function createApp(
       // --- Normal render ---
       switch (rendererType) {
         case 'markdown': {
+          // v1.2.1 红队修复：ETag/304——渲染对同一 content 确定性，保存后
+          // mtime 变化 → etag 自然失效；304 短路在渲染前，重复打开文档
+          // （tab 切换/刷新/多窗口）免全量渲染（大 vault 渲染 1-3s）
+          const etag = `"${stats.size}-${Math.round(stats.mtimeMs)}"`;
+          res.setHeader('ETag', etag);
+          res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
+          if (req.headers['if-none-match'] === etag) {
+            res.status(304).end();
+            return;
+          }
           const raw = await fs.promises.readFile(absPath, 'utf-8');
           res.json({
             path: filePath,
@@ -2628,33 +2581,18 @@ export function createApp(
         }
       }
 
-      // 7. Shadow backup
-      const shadowDir = path.join(
-        process.env.HOME || process.env.USERPROFILE || '/tmp',
-        '.doc77',
-        'shadow',
-        `edit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      );
-      let shadowCreated = false;
+      // 7. 原子写（修复前：整文件 shadow 复制 → 写 → 删除，成功路径 100%
+      // 白做——每次保存额外整文件 IO。tmp+rename 天然防写坏：任何失败时
+      // 原文件从未被触碰，回滚分支仅清理残留 tmp；Windows renameSync 覆盖
+      // 已有文件走 MoveFileEx REPLACE_EXISTING）
+      const dir = path.dirname(absPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const tmpPath = `${absPath}.tmp-${process.pid}-${Date.now()}`;
       try {
-        if (fileExists) {
-          fs.mkdirSync(shadowDir, { recursive: true });
-          fs.copyFileSync(absPath, path.join(shadowDir, path.basename(filePath)));
-          shadowCreated = true;
-        }
+        fs.writeFileSync(tmpPath, content, 'utf-8');
+        fs.renameSync(tmpPath, absPath);
 
-        // 8. Write
-        const dir = path.dirname(absPath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(absPath, content, 'utf-8');
-
-        // 9. Clear shadow
-        if (shadowCreated) {
-          shadowCreated = false;
-          fs.rmSync(shadowDir, { recursive: true, force: true });
-        }
-
-        // 10. Audit log
+        // 8. Audit log
         await auditLog({
           project_id: projectId,
           operation_type: 'edit_file',
@@ -2668,32 +2606,33 @@ export function createApp(
         // 此前的 scanned_at 死写（无任何读取者）已删除——每次编辑触发
         // 一次 sql.js 整库序列化正是性能灾难放大器的一部分。
         const newStats = fs.statSync(absPath);
+        // v1.2.1 红队修复：新建文件加入文件列表缓存（避免 60s 内解析为死链）
+        if (!fileExists) updateFileListCache(projectId, { added: [absPath] });
 
         // 12. Incremental FTS index update
+        // v1.2.1 红队修复：content 透传——保存点内容已在内存，避免整文件
+        // 重读 + 重哈希（修复前同一文件在保存链里被读 3 次、sha256 3 次）
         try {
-          indexFile(projectId, project.path, filePath);
+          indexFile(projectId, project.path, filePath, undefined, { content });
         } catch {
           /* non-critical */
         }
 
         // 12b. 图谱增量索引（v1.2.0：链接基础设施）
         try {
-          onFileSaved(projectId, project.path, filePath);
+          onFileSaved(projectId, project.path, filePath, { content });
         } catch {
           /* non-critical */
         }
 
         res.json({ ok: true, size: newStats.size, modified: newStats.mtime.toISOString() });
       } catch (writeErr: unknown) {
-        // Rollback
+        // 回滚：原文件从未被触碰，仅清理残留 tmp（rename 失败时 tmp 可能
+        // 仍在磁盘上；writeFileSync 失败时 tmp 可能不完整）
         const message = writeErr instanceof Error ? writeErr.message : 'Unknown error';
-        if (shadowCreated) {
-          try {
-            const sf = path.join(shadowDir, path.basename(filePath));
-            if (fs.existsSync(sf)) fs.copyFileSync(sf, absPath);
-            fs.rmSync(shadowDir, { recursive: true, force: true });
-          } catch {}
-        }
+        try {
+          fs.rmSync(tmpPath, { force: true });
+        } catch {}
         await auditLog({
           project_id: projectId,
           operation_type: 'edit_file',
@@ -2922,41 +2861,15 @@ export function createApp(
 
   // === AI Test Connection ===
 
-  // (helper for reading & decrypting AI config)
+  // (helper for reading & decrypting AI config — v1.1.9: 统一走 getConfig
+  // 解密，删除了复制粘贴的 pbkdf2 分支，见 config-crypto.ts)
   const { getDecryptedAiConfig } = (() => {
     const fn = (): { token: string; baseUrl: string; model: string } | null => {
-      const db = getConnection();
-      const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
-        { value: string } | undefined;
-      const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
-        { value: string } | undefined;
-      const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
-        { value: string } | undefined;
+      const token = getConfig('ai.token');
+      if (!token) return null;
 
-      if (!tokenRow?.value) return null;
-
-      const baseUrl = baseRow?.value || 'https://api.deepseek.com';
-      const model = modelRow?.value || 'deepseek-v4-pro';
-
-      let token = tokenRow.value;
-      if (token.startsWith('{')) {
-        try {
-          const encData = JSON.parse(token);
-          if (encData.iv && encData.tag && encData.ciphertext) {
-            const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-              { pbkdf2_salt: string } | undefined;
-            if (authRow?.pbkdf2_salt) {
-              const encKey = crypto.deriveKey(
-                'doc77-config-key',
-                Buffer.from(authRow.pbkdf2_salt, 'hex'),
-              );
-              token = crypto.decrypt(encData, encKey);
-            }
-          }
-        } catch {
-          /* not encrypted */
-        }
-      }
+      const baseUrl = getConfig('ai.base_url') || 'https://api.deepseek.com';
+      const model = getConfig('ai.model') || 'deepseek-v4-pro';
 
       return { token, baseUrl, model };
     };
@@ -3680,16 +3593,8 @@ export function createApp(
 
   app.get('/api/config', (_req: Request, res: Response) => {
     try {
-      const db = getConnection();
-      const rows = db.prepare('SELECT key, value FROM config ORDER BY key').all() as {
-        key: string;
-        value: string;
-      }[];
-      const result: Record<string, string> = {};
-      for (const r of rows) {
-        result[r.key] = crypto.isSensitiveKey(r.key) ? crypto.maskSensitive(r.value) : r.value;
-      }
-      res.json(result);
+      const rows = listConfig();
+      res.json(rows);
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }
@@ -3702,8 +3607,6 @@ export function createApp(
       return;
     }
     try {
-      const db = getConnection();
-
       // Guard: reject masked sensitive values (e.g. "sk-1••••cdef") to
       // prevent corruption from the load→save round-trip on the client side.
       if (typeof value === 'string' && value.includes('•') && crypto.isSensitiveKey(key)) {
@@ -3717,25 +3620,10 @@ export function createApp(
         return;
       }
 
-      let storeValue = value;
-      // Encrypt sensitive fields
-      if (crypto.isSensitiveKey(key)) {
-        const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-          { pbkdf2_salt: string } | undefined;
-        if (authRow?.pbkdf2_salt) {
-          // Use a fixed passphrase for config encryption (derived from user password if available)
-          // For now, store encrypted with a local key
-          const encKey = crypto.deriveKey(
-            'doc77-config-key',
-            Buffer.from(authRow.pbkdf2_salt, 'hex'),
-          );
-          const enc = crypto.encrypt(value, encKey);
-          storeValue = JSON.stringify(enc);
-        }
-      }
-      db.prepare(
-        'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-      ).run(key, storeValue);
+      // v1.1.9：敏感 key 由 setConfig 统一加密落库（机器密钥 config.key）。
+      // 修复前：加密分支依赖 user_auth.pbkdf2_salt，DEK 迁移后该字段被清空
+      // → 敏感值明文落库；CLI `doc77 config set` 则从未加密（config-crypto.ts）
+      setConfig(key, typeof value === 'string' ? value : JSON.stringify(value));
       // Language change takes effect immediately for backend t() (API errors,
       // AI runtime). MCP tool descriptions are registered at startup and still
       // need a restart — the settings panel toast already says so.
@@ -4036,44 +3924,20 @@ export function createAIChatHandler(deps: {
         ollamaUrl?: string;
       } | null;
       const fn = (): AiConfig => {
-        const db = getConnection();
-        const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
-          { value: string } | undefined;
-        const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
-          { value: string } | undefined;
-        const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
-          { value: string } | undefined;
+        // v1.1.9: token 统一走 getConfig 解密（config-crypto.ts）
+        const token = getConfig('ai.token');
         // T4: 读取 ai.provider，支持多 provider 切换
-        const providerRow = db
-          .prepare("SELECT value FROM config WHERE key = 'ai.provider'")
-          .get() as { value: string } | undefined;
-        const ollamaUrlRow = db
-          .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
-          .get() as { value: string } | undefined;
-        if (!tokenRow?.value) return null;
-        const baseUrl = baseRow?.value || 'https://api.deepseek.com';
-        const model = modelRow?.value || 'deepseek-v4-pro';
-        const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
-        let token = tokenRow.value;
-        if (token.startsWith('{')) {
-          try {
-            const encData = JSON.parse(token);
-            if (encData.iv && encData.tag && encData.ciphertext) {
-              const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-                { pbkdf2_salt: string } | undefined;
-              if (authRow?.pbkdf2_salt) {
-                const encKey = crypto.deriveKey(
-                  'doc77-config-key',
-                  Buffer.from(authRow.pbkdf2_salt, 'hex'),
-                );
-                token = crypto.decrypt(encData, encKey);
-              }
-            }
-          } catch {
-            /* not encrypted */
-          }
-        }
-        return { token, baseUrl, model, provider, ollamaUrl: ollamaUrlRow?.value };
+        const provider = getConfig('ai.provider') as 'custom' | 'ollama' | undefined;
+        if (!token) return null;
+        const baseUrl = getConfig('ai.base_url') || 'https://api.deepseek.com';
+        const model = getConfig('ai.model') || 'deepseek-v4-pro';
+        return {
+          token,
+          baseUrl,
+          model,
+          provider: provider || 'custom',
+          ollamaUrl: getConfig('ai.ollama_url'),
+        };
       };
       return { getDecryptedAiConfig: fn };
     })();
@@ -4485,47 +4349,18 @@ export function createAgentLoopHandler(deps: {
       return;
     }
 
-    // ── Decrypt AI config ──
+    // ── Decrypt AI config（v1.1.9: 统一走 getConfig，见 config-crypto.ts）──
     const db = getConnection();
-    const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
-      { value: string } | undefined;
-    const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
-      { value: string } | undefined;
-    const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
-      { value: string } | undefined;
-    if (!tokenRow?.value) {
+    const token = getConfig('ai.token');
+    if (!token) {
       res.status(400).json({ error: t('api.ai.notConfiguredMessage'), code: 'AI_NOT_CONFIGURED' });
       return;
     }
-    let token = tokenRow.value;
-    if (token.startsWith('{')) {
-      try {
-        const encData = JSON.parse(token);
-        if (encData.iv && encData.tag && encData.ciphertext) {
-          const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-            { pbkdf2_salt: string } | undefined;
-          if (authRow?.pbkdf2_salt) {
-            const encKey = crypto.deriveKey(
-              'doc77-config-key',
-              Buffer.from(authRow.pbkdf2_salt, 'hex'),
-            );
-            token = crypto.decrypt(encData, encKey);
-          }
-        }
-      } catch {
-        /* not encrypted */
-      }
-    }
-    const baseUrl = baseRow?.value || 'https://api.deepseek.com';
-    const model = modelRow?.value || 'deepseek-v4-pro';
+    const baseUrl = getConfig('ai.base_url') || 'https://api.deepseek.com';
+    const model = getConfig('ai.model') || 'deepseek-v4-pro';
     // T4: 读取 ai.provider，支持多 provider 切换（ollama / custom）
-    const providerRow = db.prepare("SELECT value FROM config WHERE key = 'ai.provider'").get() as
-      { value: string } | undefined;
-    const ollamaUrlRow = db
-      .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
-      .get() as { value: string } | undefined;
-    const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
-    const ollamaUrl = ollamaUrlRow?.value;
+    const provider = (getConfig('ai.provider') as 'custom' | 'ollama') || 'custom';
+    const ollamaUrl = getConfig('ai.ollama_url');
 
     // ── SSE setup ──
     res.writeHead(200, {
