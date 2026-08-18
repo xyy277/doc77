@@ -307,6 +307,54 @@ describe('file watcher', { retry: 2 }, () => {
     expect(payload.paths).toEqual([]);
   });
 
+  // v1.1.9 OOM 回归：chokidar 默认 followSymlinks:true 跟随项目内 symlink
+  //（pnpm 布局 node_modules → .pnpm 虚拟 store 的交叉引用图）后枚举永不
+  // 结束 —— ready 永不触发、事件为 0，仅以 ~20MB/s 分配 fs watcher 对象
+  // 直至 V8 堆满 OOM（服务器 4 分钟崩溃）。followSymlinks:false 后 symlink
+  // 按普通文件处理，枚举即时完成（实测 41ms vs >30s）。Windows 跳过：
+  // symlink 创建需管理员/开发模式权限（本缺陷亦为 Linux chokidar 后端特有）。
+  it.skipIf(process.platform === 'win32')(
+    'symlink web fixture 不卡死枚举（followSymlinks 回归）',
+    async () => {
+      registerProject('WatcherSymlinkWeb', projectDir);
+      // 模拟 pnpm 布局：外部 store 120 个包、包间经各自 node_modules 交叉
+      // symlink（3 出边），项目内 60 条 symlink 指向 store —— 旧代码跟随
+      // symlink 展开成指数级遍历，readdir/stat 风暴永不 ready（实测 >30s
+      // 且事件循环被阻塞）；新代码 symlink 按普通文件处理，毫秒级 ready
+      const store = path.join(testDir, 'store');
+      fs.mkdirSync(store, { recursive: true });
+      for (let i = 0; i < 120; i++) {
+        const pkg = path.join(store, `pkg${i}`);
+        fs.mkdirSync(path.join(pkg, 'node_modules'), { recursive: true });
+        fs.writeFileSync(path.join(pkg, 'index.js'), 'x');
+        for (let j = 0; j < 3; j++) {
+          const dep = (i * 7 + j * 13) % 120;
+          if (dep !== i) {
+            fs.symlinkSync(
+              path.join(store, `pkg${dep}`),
+              path.join(pkg, 'node_modules', `dep${dep}`),
+              'dir',
+            );
+          }
+        }
+      }
+      for (let i = 0; i < 60; i++) {
+        fs.symlinkSync(
+          path.join(store, `pkg${(i * 2) % 120}`),
+          path.join(projectDir, `nm${i}`),
+          'dir',
+        );
+      }
+
+      startFileWatcher({ debounceMs: 50 });
+      // 修复前：枚举在 symlink 图上永不结束，ready 永不触发 → 此处超时失败；
+      // 修复后：立即 resolve
+      await watcherReady();
+      expect(isWatcherRunning()).toBe(true);
+    },
+    10000,
+  );
+
   it('引用翻覆防抖：停止窗口内重新 acquire 不重启 watcher', async () => {
     registerProject('WatcherFlap', projectDir);
     acquireWatcherRef();

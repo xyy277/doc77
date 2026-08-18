@@ -2,7 +2,7 @@
 
 > 本文档是性能问题的**事实档案与后续工作交接**：根因证据链、已实施的修复（1.1.4）、以及待执行的架构专项路线图。后续任何涉及性能、DB 层、搜索、启动链路的改动，**先读本文档**，避免重复调查或误将临时方案当作永久方案。
 >
-> 状态：1.1.4 热修复（Part 1 A-D）与高性价比架构项（Part 2 F1-F4）已发布；P-A（better-sqlite3 迁移）已随 1.1.5 完成并发布（2026-08-15，分支 feature/better-sqlite3-migration）。
+> 状态：1.1.4 热修复（Part 1 A-D）与高性价比架构项（Part 2 F1-F4）已发布；P-A（better-sqlite3 迁移）已随 1.1.5 完成并发布（2026-08-15，分支 feature/better-sqlite3-migration）；v1.1.9 watcher followSymlinks OOM 修复（Part 3 W1-W3）2026-08-18 完成（§2.5 记录证据链）。
 >
 > 语言规范：专业术语英文，其余中文（见根 CLAUDE.md）。
 
@@ -47,6 +47,17 @@
 
 Electron 主进程无 setInterval；preload 无轮询；无 dev-server 混入打包（electron-builder.yml 确认）；自动更新非轮询（updater.ts:59-61 一次性）；无高频日志；项目根 <1 万文件（watcher watch 图非内存主因）；SSE 连接监听器随 req close 正确清理（events.ts）。
 
+### 2.5 引爆器（2）：1.1.8 watcher followSymlinks → pnpm .pnpm symlink 图枚举死循环（1.1.9 OOM，2026-08-18）
+
+- **事故**：dev server 启动后浏览器打开 Dashboard → 项目 → preview 页，约 230 秒后 "Ineffective mark-compacts near heap limit - JavaScript heap out of memory"（V8 默认 4GB 堆上限）exit 134，每次必现。与同日 15:00 的 bfcache/SSE 修复（心跳、pagehide 关闭连接）无关 —— 含全部修复的当前分支仍崩溃。
+- **根因**：`packages/core/src/server/watcher.ts` `startFileWatcher` 以 **chokidar v4 默认 `followSymlinks:true`** 监听全部项目根。注册项目 "Doc77" = `/home/zhouj/code/doc77`（pnpm monorepo）：`packages/*/node_modules` 全是指向 `node_modules/.pnpm` 虚拟 store 的 symlink，store 内 750+ 包经各自 node_modules 交叉引用。chokidar 枚举跟随 symlink 展开成指数级遍历：**`ready` 永不触发、事件为 0**，仅以 ~17-25MB/s 分配 FSEventWrap / fs.Stats / 路径对象直至堆满。
+- **触发链**：浏览器开 Dashboard → `/api/events` SSE → `acquireWatcherRef()` → 启动 watcher → 泄漏开始。vault 大小无关（本机两项目合计 ~1300 文件 / 254 篇 md，全部候选排除后锁定 watcher）。
+- **证据链（沙箱完整复现 + 修复验证）**：
+  - 独立 chokidar 复现：watch `packages/core/node_modules` 单目录 27s 堆 → 1GB、无 ready；加 `followSymlinks:false` → 10ms ready、堆稳定 5MB。`/mnt/d`（drvfs）项目单独 watch 健康（1.4s ready、堆平），排除文件系统因素
+  - 全服务复现（临时 HOME + DB 副本 + preview 页模拟客户端）：默认构建 80s 内 RSS 1.25GB→7.2GB→OOM（GC 签名与用户崩溃一致，mu≈0.37）；堆快照 28M 个对象，名字集中在 FSEventWrap / FSWatcher / Stats / FSEvent / FSReqPromise
+  - 打补丁副本（`followSymlinks:false`）3 分钟全量 preview 流量 RSS 稳定 ~326MB；源码构建修复后同样稳定
+- **修复**（v1.1.9）：`watcher.ts` `watch()` 加 `followSymlinks:false`（symlink 按普通文件处理；node_modules 等目标本就在 IGNORED 中，跟随无意义）；`watchProject` 项目根改 `fs.realpathSync`（try/catch 回退），保证 symlink 项目根仍被递归监听。回归测试：symlink web fixture（store 120 包 + 3 出边交叉引用 + 项目 60 条 symlink）—— 旧代码 `watcherReady()` 10s 超时（事件循环被阻塞 >30s），新代码 41ms resolve。
+
 ## 3. 1.1.4 修复记录
 
 > 状态标记：⬜ 未开始 / ✅ 已完成 / 🚧 进行中。实施完成后回填。
@@ -69,6 +80,14 @@ Electron 主进程无 setInterval；preload 无轮询；无 dev-server 混入打
 | F2 | `sync/src/adapters/s3.ts:5` AWS SDK 移方法内 lazy import（webdav/simple-git 同查）；`sync/src/index.ts` 不再静态 re-export 重型适配器；gallery sharp 方法内 lazy | ✅ |
 | F3 | `electron/src/server.ts` 启动时（initDatabase 后）：`pruneAiSessions(24)`；`audit_log`/`sync_log` 90 天保留窗。`.doc77-trash` shadow 孤儿清理发现已由 createApp 的 cleanupTrash（app.ts:1707-1743，30 天保留）覆盖，无需新增 | ✅ |
 | F4 | `sw.js`：CACHE_VERSION → `doc77-v3`；Cache API + IndexedDB 各加 200 条上限 + 30 天过期裁剪；`index.html` 移除远程 phosphor 脚本（3 处图标改文字字形）、脚本 defer；`preview.html` 移除渲染阻塞的 highlight 远程 CSS（改 preview.js 懒加载 ensureHighlightCss，vendor 可本地化）；i18n 1.5s 兜底核实：本地 fetch 秒回，保留 | ✅ |
+
+### Part 3 — v1.1.9 修复记录（watcher followSymlinks OOM，2026-08-18）
+
+| 项 | 内容 | 状态 |
+|---|---|---|
+| W1 | `watcher.ts` `startFileWatcher`：chokidar `watch()` 加 `followSymlinks:false`（根因见 §2.5） | ✅ |
+| W2 | `watcher.ts` `watchProject`：项目根 `fs.realpathSync` 归一化（try/catch 回退），symlink 项目根仍可递归监听 | ✅ |
+| W3 | 回归测试 `watcher.test.ts`：symlink web fixture（120 包 store + 交叉引用 + 60 symlink），旧代码 `watcherReady()` 超时/事件循环阻塞，新代码毫秒级 resolve；Windows skipIf（symlink 权限） | ✅ |
 
 ## 4. 专项路线图（后续 AGENT 直接接着干）
 
