@@ -55,6 +55,7 @@ interface CoreModule {
   ) => http.RequestListener;
   initDatabase: (filePath: string) => Promise<unknown>;
   loadDefaults: () => void;
+  migrateSensitiveConfigs: () => number;
   runMigrations: () => void;
   t: TFn;
   // Optional-module wiring (one-click installs from the settings page)
@@ -368,13 +369,27 @@ export async function startServer(port: number, uiLocale?: string): Promise<Serv
   }
 
   const core = await loadCore();
-  const { closeConnection, createApp, getConfig, initDatabase, loadDefaults, runMigrations } = core;
+  const {
+    closeConnection,
+    createApp,
+    getConfig,
+    initDatabase,
+    loadDefaults,
+    migrateSensitiveConfigs,
+    runMigrations,
+  } = core;
   // Make core's t() available to tray/dialog (see ./i18n shim).
   bindCoreT(core.t);
 
   await initDatabase(DB_PATH);
   runMigrations();
   loadDefaults();
+  // v1.1.9：历史明文敏感 config 迁移为机器密钥加密（幂等，失败不阻断启动）
+  try {
+    migrateSensitiveConfigs();
+  } catch {
+    /* best-effort */
+  }
 
   // v1.1.4 (F3)：启动 GC —— 遏制"用久了越来越卡"（表无限累积 → sql.js
   // 全库序列化越来越贵）。与 CLI 的 pruneAiSessions(24) 对齐；日志保留 90 天。

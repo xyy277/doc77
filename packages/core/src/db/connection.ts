@@ -125,6 +125,11 @@ export async function initDatabase(filePath: string): Promise<DatabaseCompat> {
   return initPromise;
 }
 
+/** DB 文件绝对路径（initDatabase 后可用；config.key 等附属文件与它同目录）。 */
+export function getDbPath(): string | null {
+  return dbPath;
+}
+
 /** Get current connection (must call initDatabase first). */
 export function getConnection(): DatabaseCompat {
   if (!rawDb || !wrappedDb) {

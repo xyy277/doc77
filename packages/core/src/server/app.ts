@@ -75,7 +75,7 @@ import { getTunnelManager } from '../tunnel/manager.js';
 import { getPluginLoader } from '../plugin/loader.js';
 
 import { VERSION } from '../version.gen.js';
-import { getConfig, setConfig } from '../db/config.js';
+import { getConfig, setConfig, listConfig } from '../db/config.js';
 import { initI18n, t } from '../i18n/index.js';
 import { buildI18nResponse } from './i18n-route.js';
 import { registerAiSessionRoutes } from './routes/ai-sessions.js';
@@ -2861,41 +2861,15 @@ export function createApp(
 
   // === AI Test Connection ===
 
-  // (helper for reading & decrypting AI config)
+  // (helper for reading & decrypting AI config — v1.1.9: 统一走 getConfig
+  // 解密，删除了复制粘贴的 pbkdf2 分支，见 config-crypto.ts)
   const { getDecryptedAiConfig } = (() => {
     const fn = (): { token: string; baseUrl: string; model: string } | null => {
-      const db = getConnection();
-      const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
-        { value: string } | undefined;
-      const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
-        { value: string } | undefined;
-      const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
-        { value: string } | undefined;
+      const token = getConfig('ai.token');
+      if (!token) return null;
 
-      if (!tokenRow?.value) return null;
-
-      const baseUrl = baseRow?.value || 'https://api.deepseek.com';
-      const model = modelRow?.value || 'deepseek-v4-pro';
-
-      let token = tokenRow.value;
-      if (token.startsWith('{')) {
-        try {
-          const encData = JSON.parse(token);
-          if (encData.iv && encData.tag && encData.ciphertext) {
-            const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-              { pbkdf2_salt: string } | undefined;
-            if (authRow?.pbkdf2_salt) {
-              const encKey = crypto.deriveKey(
-                'doc77-config-key',
-                Buffer.from(authRow.pbkdf2_salt, 'hex'),
-              );
-              token = crypto.decrypt(encData, encKey);
-            }
-          }
-        } catch {
-          /* not encrypted */
-        }
-      }
+      const baseUrl = getConfig('ai.base_url') || 'https://api.deepseek.com';
+      const model = getConfig('ai.model') || 'deepseek-v4-pro';
 
       return { token, baseUrl, model };
     };
@@ -3619,16 +3593,8 @@ export function createApp(
 
   app.get('/api/config', (_req: Request, res: Response) => {
     try {
-      const db = getConnection();
-      const rows = db.prepare('SELECT key, value FROM config ORDER BY key').all() as {
-        key: string;
-        value: string;
-      }[];
-      const result: Record<string, string> = {};
-      for (const r of rows) {
-        result[r.key] = crypto.isSensitiveKey(r.key) ? crypto.maskSensitive(r.value) : r.value;
-      }
-      res.json(result);
+      const rows = listConfig();
+      res.json(rows);
     } catch (e: unknown) {
       res.status(500).json({ error: (e as Error).message });
     }
@@ -3641,8 +3607,6 @@ export function createApp(
       return;
     }
     try {
-      const db = getConnection();
-
       // Guard: reject masked sensitive values (e.g. "sk-1••••cdef") to
       // prevent corruption from the load→save round-trip on the client side.
       if (typeof value === 'string' && value.includes('•') && crypto.isSensitiveKey(key)) {
@@ -3656,25 +3620,10 @@ export function createApp(
         return;
       }
 
-      let storeValue = value;
-      // Encrypt sensitive fields
-      if (crypto.isSensitiveKey(key)) {
-        const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-          { pbkdf2_salt: string } | undefined;
-        if (authRow?.pbkdf2_salt) {
-          // Use a fixed passphrase for config encryption (derived from user password if available)
-          // For now, store encrypted with a local key
-          const encKey = crypto.deriveKey(
-            'doc77-config-key',
-            Buffer.from(authRow.pbkdf2_salt, 'hex'),
-          );
-          const enc = crypto.encrypt(value, encKey);
-          storeValue = JSON.stringify(enc);
-        }
-      }
-      db.prepare(
-        'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-      ).run(key, storeValue);
+      // v1.1.9：敏感 key 由 setConfig 统一加密落库（机器密钥 config.key）。
+      // 修复前：加密分支依赖 user_auth.pbkdf2_salt，DEK 迁移后该字段被清空
+      // → 敏感值明文落库；CLI `doc77 config set` 则从未加密（config-crypto.ts）
+      setConfig(key, typeof value === 'string' ? value : JSON.stringify(value));
       // Language change takes effect immediately for backend t() (API errors,
       // AI runtime). MCP tool descriptions are registered at startup and still
       // need a restart — the settings panel toast already says so.
@@ -3975,44 +3924,20 @@ export function createAIChatHandler(deps: {
         ollamaUrl?: string;
       } | null;
       const fn = (): AiConfig => {
-        const db = getConnection();
-        const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
-          { value: string } | undefined;
-        const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
-          { value: string } | undefined;
-        const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
-          { value: string } | undefined;
+        // v1.1.9: token 统一走 getConfig 解密（config-crypto.ts）
+        const token = getConfig('ai.token');
         // T4: 读取 ai.provider，支持多 provider 切换
-        const providerRow = db
-          .prepare("SELECT value FROM config WHERE key = 'ai.provider'")
-          .get() as { value: string } | undefined;
-        const ollamaUrlRow = db
-          .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
-          .get() as { value: string } | undefined;
-        if (!tokenRow?.value) return null;
-        const baseUrl = baseRow?.value || 'https://api.deepseek.com';
-        const model = modelRow?.value || 'deepseek-v4-pro';
-        const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
-        let token = tokenRow.value;
-        if (token.startsWith('{')) {
-          try {
-            const encData = JSON.parse(token);
-            if (encData.iv && encData.tag && encData.ciphertext) {
-              const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-                { pbkdf2_salt: string } | undefined;
-              if (authRow?.pbkdf2_salt) {
-                const encKey = crypto.deriveKey(
-                  'doc77-config-key',
-                  Buffer.from(authRow.pbkdf2_salt, 'hex'),
-                );
-                token = crypto.decrypt(encData, encKey);
-              }
-            }
-          } catch {
-            /* not encrypted */
-          }
-        }
-        return { token, baseUrl, model, provider, ollamaUrl: ollamaUrlRow?.value };
+        const provider = getConfig('ai.provider') as 'custom' | 'ollama' | undefined;
+        if (!token) return null;
+        const baseUrl = getConfig('ai.base_url') || 'https://api.deepseek.com';
+        const model = getConfig('ai.model') || 'deepseek-v4-pro';
+        return {
+          token,
+          baseUrl,
+          model,
+          provider: provider || 'custom',
+          ollamaUrl: getConfig('ai.ollama_url'),
+        };
       };
       return { getDecryptedAiConfig: fn };
     })();
@@ -4424,47 +4349,18 @@ export function createAgentLoopHandler(deps: {
       return;
     }
 
-    // ── Decrypt AI config ──
+    // ── Decrypt AI config（v1.1.9: 统一走 getConfig，见 config-crypto.ts）──
     const db = getConnection();
-    const tokenRow = db.prepare("SELECT value FROM config WHERE key = 'ai.token'").get() as
-      { value: string } | undefined;
-    const baseRow = db.prepare("SELECT value FROM config WHERE key = 'ai.base_url'").get() as
-      { value: string } | undefined;
-    const modelRow = db.prepare("SELECT value FROM config WHERE key = 'ai.model'").get() as
-      { value: string } | undefined;
-    if (!tokenRow?.value) {
+    const token = getConfig('ai.token');
+    if (!token) {
       res.status(400).json({ error: t('api.ai.notConfiguredMessage'), code: 'AI_NOT_CONFIGURED' });
       return;
     }
-    let token = tokenRow.value;
-    if (token.startsWith('{')) {
-      try {
-        const encData = JSON.parse(token);
-        if (encData.iv && encData.tag && encData.ciphertext) {
-          const authRow = db.prepare('SELECT pbkdf2_salt FROM user_auth WHERE id = 1').get() as
-            { pbkdf2_salt: string } | undefined;
-          if (authRow?.pbkdf2_salt) {
-            const encKey = crypto.deriveKey(
-              'doc77-config-key',
-              Buffer.from(authRow.pbkdf2_salt, 'hex'),
-            );
-            token = crypto.decrypt(encData, encKey);
-          }
-        }
-      } catch {
-        /* not encrypted */
-      }
-    }
-    const baseUrl = baseRow?.value || 'https://api.deepseek.com';
-    const model = modelRow?.value || 'deepseek-v4-pro';
+    const baseUrl = getConfig('ai.base_url') || 'https://api.deepseek.com';
+    const model = getConfig('ai.model') || 'deepseek-v4-pro';
     // T4: 读取 ai.provider，支持多 provider 切换（ollama / custom）
-    const providerRow = db.prepare("SELECT value FROM config WHERE key = 'ai.provider'").get() as
-      { value: string } | undefined;
-    const ollamaUrlRow = db
-      .prepare("SELECT value FROM config WHERE key = 'ai.ollama_url'")
-      .get() as { value: string } | undefined;
-    const provider = (providerRow?.value as 'custom' | 'ollama') || 'custom';
-    const ollamaUrl = ollamaUrlRow?.value;
+    const provider = (getConfig('ai.provider') as 'custom' | 'ollama') || 'custom';
+    const ollamaUrl = getConfig('ai.ollama_url');
 
     // ── SSE setup ──
     res.writeHead(200, {

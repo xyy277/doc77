@@ -1,4 +1,6 @@
 import { getConnection } from './connection.js';
+import { readConfigValue, writeConfigValue } from './config-crypto.js';
+import { isSensitiveKey, maskSensitive } from '../crypto.js';
 
 /**
  * Default configuration values defined in architecture doc §7.3.
@@ -51,29 +53,26 @@ const DEFAULTS: Record<string, string> = {
 };
 
 /**
- * Get a config value by key.
+ * Get a config value by key (sensitive keys are decrypted transparently).
  * Returns the raw string value, or undefined if not set.
  */
 export function getConfig(key: string): string | undefined {
-  const db = getConnection();
-  const row = db.prepare('SELECT value FROM config WHERE key = ?').get(key) as
-    { value: string } | undefined;
-  return row?.value;
+  return readConfigValue(key);
 }
 
 /**
  * Set a config value. Inserts or updates as needed.
+ * Sensitive keys (token/secret/password/...) are encrypted at rest via
+ * the machine key file (config.key) — see config-crypto.ts.
  */
 export function setConfig(key: string, value: string): void {
-  const db = getConnection();
-  db.prepare(
-    `INSERT INTO config (key, value) VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-  ).run(key, value);
+  writeConfigValue(key, value);
 }
 
 /**
- * List all config entries as a plain key-value object.
+ * List all config entries as a key-value object.
+ * Sensitive keys are decrypted then masked (••••) — never expose plaintext
+ * secrets through bulk listing (CLI `config list` / settings panel).
  */
 export function listConfig(): Record<string, string> {
   const db = getConnection();
@@ -83,7 +82,9 @@ export function listConfig(): Record<string, string> {
   }[];
   const result: Record<string, string> = {};
   for (const row of rows) {
-    result[row.key] = row.value;
+    result[row.key] = isSensitiveKey(row.key)
+      ? maskSensitive(readConfigValue(row.key) ?? '')
+      : row.value;
   }
   return result;
 }
