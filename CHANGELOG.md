@@ -4,6 +4,28 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-18] — `1.1.9`
+
+**Fixed — watcher OOM（core）**
+- **chokidar `followSymlinks: false`**：注册项目为 pnpm monorepo 时（`packages/*/node_modules` → `.pnpm` 虚拟 store 交叉 symlink 图），chokidar 默认跟随 symlink 展开成指数级枚举——`ready` 永不触发、零事件、以 ~17-25MB/s 分配 fs 对象直至 V8 4GB 堆满 OOM（打开 Dashboard 后 ~4 分钟崩溃，exit 134）。symlink 按普通文件处理（node_modules 本就在忽略列表）；项目根 `fs.realpathSync` 归一化保证 symlink 项目根仍可监听。回归测试：symlink web fixture（120 包 + 60 symlink）旧代码 `watcherReady()` 超时、新代码毫秒级
+- 沙箱实测：全量 preview 流量 3 分钟 RSS 恒定 ~323MB（修复前 80s OOM）
+
+**Fixed — config 敏感值加密（core/cli/electron）**
+- **机器密钥文件 `config.key`**（与 `data.db` 同目录、权限 0600、AES-256-GCM）：`ai.token` 等敏感 config 值统一加密落库。修复前 CLI `doc77 config set` 从未加密；设置页加密分支依赖 `user_auth.pbkdf2_salt`，DEK 迁移后该字段被清空导致加密失效 → 明文落库
+- `setConfig`/`getConfig` 统一加解密（读取三级回退：机器密钥 → 旧 pbkdf2 派生 key → 明文兼容）；`listConfig`/`GET /api/config` 敏感值解密后打码
+- 启动幂等迁移 `migrateSensitiveConfigs()`（CLI + Electron）：历史明文/旧密文 → 机器密钥加密
+- 删除 app.ts 三处复制粘贴的手工 pbkdf2 解密分支
+
+**Fixed — bfcache 僵尸 SSE 连接（core/web）**
+- preview/graph 页 `pagehide`（persisted）主动关闭 EventSource、`pageshow` 重建（Chromium bfcache 冻结页面连接不关闭，占用每源 6 连接槽位 → 反复进出页面后同源请求永久排队）
+- SSE 心跳 30s（NAT/代理空闲超时）+ write 失败即收割（`res.destroy()` 保证 watcher 引用释放）
+- graph 页 SSE 作用域提升至 factory 级（pageshow 可重建）；SW `CACHE_SHELL` LRU 上限 50
+
+**验证**
+- 测试 921 passed（+13：watcher followSymlinks 回归、config 加密 roundtrip/兼容/迁移幂等/权限）
+
+---
+
 ## [Unreleased] — 红队性能专项（待发布版本）
 
 **Changed — 保存链（core）**
