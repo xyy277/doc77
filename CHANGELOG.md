@@ -4,6 +4,22 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-08-19] — `1.1.10`
+
+**Fixed — preview 多 tab 内容缓存失效链（core/web）**
+- **外部修改自动刷新**：SSE `file-tree:changed` modify/mixed 事件命中打开中的 tab 时，活动 tab 1s 节流自动重载新内容（编辑中/页面隐藏不打断，横幅保留）；后台 tab 切回激活时强制 fresh 重拉。修复前三层前端缓存（`tabDataCache`/`paneCache`/SW SWR）命中即走、从不校验新鲜度——外部更新后已打开 tab 与"刷新目录树后重开"均显示历史内容
+- **SW 缓存绕过**：内容请求引入 `x-doc77-fresh` 网络优先语义（横幅手动重载、后台 tab 激活、启动校验共用），修复"清内存缓存后首次仍被 SW SWR 喂旧数据"；fresh 响应照常写回缓存，离线能力不变
+- **启动新鲜度校验**：boot 恢复的 tab 后台校验（带 If-None-Match，未变走 ETag 304 零渲染），覆盖"应用关闭期间文档被外部修改、重启后显示旧内容"
+- **目录树刷新兜底**：刷新后对比 open tab 的服务端 mtime（SSE 断线/漏事件/单事件 paths>50 truncated 时生效），走与 SSE 同款自动刷新链路
+- **ETag 精度**：markdown ETag 去 `Math.round` 保留 `mtimeMs` 小数，粗粒度文件系统同秒内修改不再 304 复用旧体
+- 新增 `doc-freshness.js` 纯函数模块（`isNewer`/`autoReloadDecision`）；SW `CACHE_VERSION` v4→v5 清除修复前残留的过期 SWR 条目
+
+**验证**
+- 测试 929 passed（+8：doc-freshness 决策矩阵、ETag 小数精度）
+- 实测：ETag 小数精度、If-None-Match 304、外部修改 etag 失效、SSE modify 事件携带路径
+
+---
+
 ## [2026-08-18] — `1.1.9`
 
 **Fixed — watcher OOM（core）**
