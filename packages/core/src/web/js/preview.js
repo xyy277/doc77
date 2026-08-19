@@ -120,7 +120,11 @@ function flushAllTreeRefreshes() {
 }
 
 document.addEventListener('visibilitychange', function () {
-  if (!document.hidden) flushAllTreeRefreshes();
+  if (!document.hidden) {
+    flushAllTreeRefreshes();
+    // v1.2.x：恢复可见时补发活动 tab 待处理的外部自动刷新（与树刷新对称）
+    flushPendingExternalReloads();
+  }
 });
 
 // ═══ bfcache 僵尸 EventSource 修复（v1.2.1）═══
@@ -213,6 +217,8 @@ function initTaskEvents() {
       } else if (opType === 'modify' || opType === 'mixed') {
         affected.forEach(function (tabPath) {
           markExternalModified(tabPath);
+          // v1.2.x：活动 tab 走 1s 节流自动刷新；后台 tab 内部跳过（切回激活时消费）
+          maybeAutoReloadExternal(tabPath);
         });
       }
       // v1.1.4：目录树刷新合并节流 —— 同一目录 1s 内只刷一次；
@@ -281,21 +287,88 @@ function updateExternalModifiedBanner() {
   b.classList.toggle('hidden', !show);
 }
 
-// 重新加载：丢弃未保存编辑（走既有 dirty 确认）→ 清缓存 → 重新拉取
+// 重新加载：丢弃未保存编辑（走既有 dirty 确认）→ fresh 网络优先重拉。
+// v1.2.x：原 delete 缓存 + activateTab 的普通 GET 会被 SW SWR 喂旧数据（首次仍返回缓存旧副本），
+// 改走 refetchDocFresh（带 x-doc77-fresh 头，SW 网络优先并写回缓存）
 function reloadDocAfterExternalChange() {
   if (!activeTabPath) return;
   var path = activeTabPath;
   if (editMode) doExitEdit(true);
-  delete paneCache[path];
-  delete tabDataCache[path];
-  delete externallyModified[path];
-  activateTab(path, { silent: true });
+  refetchDocFresh(path);
 }
 
 // 忽略外部修改（仅清除标记，不重载）
 function dismissExternalModified() {
   if (activeTabPath) delete externallyModified[activeTabPath];
   updateExternalModifiedBanner();
+}
+
+//══════════ 外部修改自动刷新（v1.2.x）══════════
+// 活动 tab：1s 节流后 fresh 网络优先重拉；编辑中/页面隐藏/已切走 → 跳过，
+// 标记保留，由横幅按钮 / 切回激活 / visibilitychange 补发兜底消费。
+// 所有消费点（SSE 自动刷新、横幅重载、后台 tab 激活、启动校验、树刷新兜底）
+// 汇入 refetchDocFresh / validateDocFresh 两条共享执行链。
+var externalReloadTimers = {}; // path -> timer（活动 tab 自动重载节流，复用 REFRESH_THROTTLE_MS）
+
+function maybeAutoReloadExternal(path) {
+  var d = Doc77Fresh.autoReloadDecision({
+    isActiveTab: path === activeTabPath,
+    editMode: editMode,
+    editDirty: editDirty,
+    pageHidden: document.hidden,
+  });
+  if (d.decision !== 'schedule') return;
+  if (externalReloadTimers[path]) clearTimeout(externalReloadTimers[path]);
+  externalReloadTimers[path] = setTimeout(function () {
+    delete externalReloadTimers[path];
+    if (document.hidden) return; // 依旧不可见：标记保留，visibilitychange 兜底
+    if (editMode || editDirty) return; // 进入编辑：标记保留（横幅按钮可手动重载）
+    if (activeTabPath !== path) return; // 已切走：标记保留，切回时激活链路消费
+    refetchDocFresh(path);
+  }, REFRESH_THROTTLE_MS);
+}
+
+// 页面恢复可见：补发活动 tab 待处理的外部刷新（与 flushAllTreeRefreshes 对称）
+function flushPendingExternalReloads() {
+  if (!activeTabPath) return;
+  if (externalReloadTimers[activeTabPath]) {
+    clearTimeout(externalReloadTimers[activeTabPath]);
+    delete externalReloadTimers[activeTabPath];
+  }
+  if (externallyModified[activeTabPath] && !editMode && !editDirty) {
+    refetchDocFresh(activeTabPath);
+  }
+}
+
+// 渲染统一入口：SSE 自动刷新 / 横幅重载 / 启动校验共用（镜像 activateTab 渲染段）
+function renderDocInto(path, d) {
+  if (translateActive) exitTranslateMode(); // 对齐 openTab 先例
+  if (tabDataCache[path] !== d) return; // 并发保护：已被更新的数据取代
+  var pane = renderDocNode(path, d);
+  if (!isHeavyDoc(path, d)) {
+    paneCache[path] = pane;
+    var evicted = tabStore.noteRendered(path);
+    if (evicted && evicted !== path) delete paneCache[evicted];
+  }
+  mountPane(pane, path);
+  afterActivate(path, d);
+  updateExternalModifiedBanner();
+}
+
+// 无条件 fresh 重拉并渲染；失败保留旧 DOM + 恢复标志与横幅（可手动重试）。
+// 不删 tabDataCache：成功会被覆盖，失败旧数据仍在、旧 DOM 未动——失败时显示旧内容而非报错页
+function refetchDocFresh(path) {
+  delete paneCache[path];
+  delete externallyModified[path];
+  fetchDoc(path, { fresh: true })
+    .then(function (d) {
+      if (activeTabPath !== path) return; // 已切走：数据已更新进 tabDataCache，下次激活自然渲染新内容
+      renderDocInto(path, d);
+    })
+    .catch(function () {
+      externallyModified[path] = true; // 失败（离线等）：旧内容仍显示，标志恢复
+      updateExternalModifiedBanner();
+    });
 }
 
 // 在聊天区追加一条居中的任务回执（若聊天区存在）
@@ -733,6 +806,7 @@ function refreshTree() {
     })
     .then(function (d) {
       applyDiff(tree, entriesFromDom(tree), d.entries || [], '');
+      checkTreeVsTabs('', d.entries || []); // v1.2.x：树刷新兜底（SSE 断线/漏事件）
     })
     .catch(function () {
       toast(t('web.preview.loadFailed'), 'error');
@@ -781,8 +855,27 @@ function refreshSubtree(dirPath) {
     })
     .then(function (d) {
       applyDiff(container, entriesFromDom(container), d.entries || [], dirPath);
+      checkTreeVsTabs(dirPath, d.entries || []); // v1.2.x：树刷新兜底（SSE 断线/漏事件）
     })
     .catch(function () {});
+}
+
+/** 树刷新兜底（SSE 断线/漏事件/truncated paths>50 时生效）：被刷新目录内 open tab 的
+ *  服务端 mtime 比 tabDataCache 新 → 走 SSE 同款自动刷新链路。
+ *  必须以本次拉取的 d.entries 为准——applyDiff 对同 size 编辑不替换行 DOM，
+ *  行上的 data-modified 属性是旧值，DOM 对比会漏掉主要场景。 */
+function checkTreeVsTabs(dirPath, entries) {
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (e.type === 'directory') continue;
+    var fullPath = dirPath ? dirPath + '/' + e.name : e.name;
+    var cached = tabDataCache[fullPath];
+    if (!cached || !cached.modified || !tabStore.has(fullPath)) continue;
+    if (Doc77Fresh.isNewer(e.modified, cached.modified)) {
+      markExternalModified(fullPath);
+      maybeAutoReloadExternal(fullPath);
+    }
+  }
 }
 function applyFilter() {
   var q = document.getElementById('fileFilter').value.toLowerCase();
@@ -1054,17 +1147,29 @@ async function navigateToFile(filePath, lineNumber) {
 
 //══════════ Content（多 tab + LRU 渲染）══════════
 
-/** 取文档数据：命中缓存直接返回，否则请求 /api/content 并缓存。 */
-function fetchDoc(path) {
-  if (tabDataCache[path]) return Promise.resolve(tabDataCache[path]);
-  return fetch('/api/content/' + pid + '?path=' + encodeURIComponent(path))
+/** 取文档数据：命中缓存直接返回（默认路径零新请求）；opts.fresh 强制网络优先
+ *  （x-doc77-fresh 头，SW 见该标记直接网络优先并写回缓存，sw.js）；
+ *  opts.conditional 时带 If-None-Match（服务端 304 → 复用缓存对象同一引用，免全量渲染）。 */
+function fetchDoc(path, opts) {
+  opts = opts || {};
+  var cached = tabDataCache[path];
+  if (cached && !opts.fresh) return Promise.resolve(cached);
+  var headers = new Headers();
+  if (opts.fresh) headers.set('x-doc77-fresh', '1');
+  if (opts.fresh && opts.conditional && cached && cached.etag) {
+    headers.set('if-none-match', cached.etag);
+  }
+  return fetch('/api/content/' + pid + '?path=' + encodeURIComponent(path), { headers: headers })
     .then(function (r) {
+      if (r.status === 304 && cached) return cached; // 未变：返回旧对象（同一引用）
       if (!r.ok) throw new Error('Not found');
-      return r.json();
-    })
-    .then(function (d) {
-      tabDataCache[path] = d;
-      return d;
+      return r.json().then(function (d) {
+        var etag = r.headers.get('etag');
+        if (etag) d.etag = etag;
+        else if (cached && cached.etag) d.etag = cached.etag;
+        tabDataCache[path] = d;
+        return d;
+      });
     });
 }
 
@@ -1565,6 +1670,14 @@ function activateTab(path, opts) {
   saveTabsState();
   if (!opts.silent && !TempPreview.isTempPath(path)) addRecentFile(path);
 
+  // v1.2.x：外部修改标记消费 —— 被标记的 tab 重新激活时强制 fresh 网络优先重拉
+  // （后台 tab 被外部修改后切回，走这里拿到新内容而非三层缓存旧数据）
+  var wasMarked = !!externallyModified[path];
+  if (wasMarked) {
+    delete paneCache[path];
+    delete tabDataCache[path];
+    delete externallyModified[path];
+  }
   var cached = paneCache[path];
   if (cached) {
     tabStore.noteRendered(path); // touch LRU
@@ -1579,9 +1692,10 @@ function activateTab(path, opts) {
   if (empty) empty.classList.add('hidden');
   host.innerHTML =
     '<div class="p-4 sm:p-10"><div class="h-full flex items-center justify-center"><div class="skeleton h-4 w-48"></div></div></div>';
-  fetchDoc(path)
+  fetchDoc(path, wasMarked ? { fresh: true } : undefined)
     .then(function (d) {
       if (activeTabPath !== path) return; // user switched away
+      if (tabDataCache[path] !== d) return; // 并发保护：已有更新的数据在途/落地（如启动校验），由新数据渲染
       if (translateActive) {
         exitTranslateMode();
         return;
@@ -1648,6 +1762,12 @@ function releaseTab(path) {
   delete tabDataCache[path];
   delete paneCache[path];
   delete tabScroll[path];
+  // v1.2.x：容量淘汰路径也清理外部修改状态与节流 timer，防泄漏
+  delete externallyModified[path];
+  if (externalReloadTimers[path]) {
+    clearTimeout(externalReloadTimers[path]);
+    delete externalReloadTimers[path];
+  }
   tabStore.dropRendered(path);
 }
 
@@ -1843,6 +1963,41 @@ function restoreTabs(preferActivePath) {
   });
   renderTabBar();
   if (active) activateTab(active);
+  // v1.2.x：启动后台新鲜度校验（应用关闭期间被外部修改的文档，重启后自动纠正；
+  // markdown 走 ETag 304 未变免渲染；fire-and-forget 不阻塞首屏）
+  validateRestoredTabs();
+}
+
+//══════════ 启动后台新鲜度校验（v1.2.x）══════════
+// boot 恢复的 tab 逐个后台校验。恢复的 tab 只对活动 tab 立即加载，其余惰性
+// （无 tabDataCache 条目）——这类 tab 由本次 fetch 预热缓存，激活时自然渲染新内容
+function validateRestoredTabs() {
+  tabStore.list().forEach(function (tab) {
+    if (TempPreview.isTempPath(tab.path)) return;
+    validateDocFresh(tab.path);
+  });
+}
+
+/** 条件 fresh 校验：带 If-None-Match 走服务端 ETag，未变返回 304（同一引用，零渲染）；
+ *  变了 → 失效 DOM 缓存，活动 tab 直接重渲染，其余留待激活/横幅/visibility 兜底消费。 */
+function validateDocFresh(path) {
+  var prev = tabDataCache[path]; // 必须在 fetch 前捕获旧引用（fetchDoc 会原地覆盖）
+  fetchDoc(path, { fresh: true, conditional: true })
+    .then(function (d) {
+      if (prev && prev.modified && d.modified === prev.modified) return; // 未变（含 304 同一引用）
+      if (!prev) return; // 惰性恢复 tab 无旧数据：fresh 已入 tabDataCache，激活时自然渲染
+      delete paneCache[path];
+      if (document.hidden || editMode || editDirty) {
+        externallyModified[path] = true; // 标记 → 恢复可见时 flush / 激活时消费
+        updateExternalModifiedBanner();
+        return;
+      }
+      if (activeTabPath === path) renderDocInto(path, d);
+      // 非活动 tab：数据已新 + paneCache 已删，激活时自然渲染新内容
+    })
+    .catch(function () {
+      /* 离线等：保持现状，SSE/横幅链路兜底 */
+    });
 }
 
 //══════════ 面包屑（可点击跳转到上一级目录）══════════

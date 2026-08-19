@@ -14,7 +14,9 @@ importScripts('/js/sw-policy.js');
 
 // v1.1.5：bump 到 v4 —— 旧版本缓存的 /api/tree 条目（SWR 命中即返回旧数据，
 // 且旧 SW 的 fresh 请求不写回缓存）会让升级用户看到过期目录树，必须整体清除
-var CACHE_VERSION = 'doc77-v4';
+// v1.2.x：bump 到 v5 —— 新增 doc-freshness.js shell 资产；清除修复前残留的
+// 过期 /api/content、/api/tree SWR 条目（外部修改后 tab 显示历史内容的旧数据来源）
+var CACHE_VERSION = 'doc77-v5';
 var CACHE_SHELL = CACHE_VERSION + '-shell';
 var CACHE_VENDOR = CACHE_VERSION + '-vendor';
 var CACHE_API = CACHE_VERSION + '-api';
@@ -36,6 +38,7 @@ var SHELL_ASSETS = [
   '/js/dashboard.js',
   '/js/preview.js',
   '/js/graph.js',
+  '/js/doc-freshness.js',
   '/js/sw-policy.js',
   '/graph.html',
   '/assets/favicon.svg',
