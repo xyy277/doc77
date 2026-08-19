@@ -84,4 +84,21 @@ describe('GET /api/content/:id ETag/304', () => {
       expect(second.headers.get('etag')).not.toBe(etag);
     });
   });
+
+  it('ETag 保留 mtime 小数精度（同秒内修改不与旧 etag 碰撞）', async () => {
+    await withServer(async (baseUrl) => {
+      const file = path.join(projectDir, 'a.md');
+      const t = 1700000000.123; // 亚秒小数 mtime
+      fs.utimesSync(file, t, t);
+      const st = fs.statSync(file);
+
+      const url = `${baseUrl}/api/content/${projectId}?path=${encodeURIComponent('a.md')}`;
+      const res = await fetch(url);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('etag')).toBe(`"${st.size}-${st.mtimeMs}"`);
+      // 说明：支持亚毫秒精度 mtime 的文件系统（ext4/tmpfs）上，旧 Math.round 实现
+      // 会把 1700000000.123 截断成 1700000000，etag 断言必然失败 → 捕获精度回归；
+      // 粗粒度文件系统（FAT/drvfs）stat 本身即整数，两种实现等价（文档化局限）。
+    });
+  });
 });

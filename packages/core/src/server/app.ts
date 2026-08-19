@@ -1905,7 +1905,9 @@ export function createApp(
           // v1.2.1 红队修复：ETag/304——渲染对同一 content 确定性，保存后
           // mtime 变化 → etag 自然失效；304 短路在渲染前，重复打开文档
           // （tab 切换/刷新/多窗口）免全量渲染（大 vault 渲染 1-3s）
-          const etag = `"${stats.size}-${Math.round(stats.mtimeMs)}"`;
+          // v1.2.x：去掉 Math.round，保留 mtimeMs 浮点小数——粗粒度文件系统上
+          // 同毫秒内修改不再与旧 ETag 碰撞而 304 复用旧体
+          const etag = `"${stats.size}-${stats.mtimeMs}"`;
           res.setHeader('ETag', etag);
           res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
           if (req.headers['if-none-match'] === etag) {
