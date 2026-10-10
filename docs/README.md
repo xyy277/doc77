@@ -30,6 +30,8 @@ docs/
 | 文件 | 说明 | 状态 |
 |---|---|---|
 | `system-architecture-analysis.md` | 对 architecture v2.4 的全面评审：Technology Stack 验证、Architecture 缺口分析、Security 评估、依赖版本修正建议 | ✅ 已完成（v2.5 已采纳） |
+| `graph-performance-report-2026-10-10.md` | **图谱性能实测诊断**：各规模基线（500~10000 节点）、首屏阻塞外链根因、绘制成本分解微基准、卡顿根因排序与优化建议、复现命令与测量局限 | ✅ 已完成（1.2.0 据此优化） |
+| `spec-status-2026-08-14.md` | 11 份 spec 的实现状态核对与已知差距清单 | 🔄 2026-10-10 复核更新 |
 
 ### planning/ — 规划与跟踪
 
@@ -52,3 +54,5 @@ docs/
 - 想知道怎么开发？→ `planning/implementation-plan.md`
 - 想了解当前进度？→ `planning/implementation-status.md`
 - 想了解性能问题与架构专项？→ `planning/performance-architecture-review.md`
+- 想知道图谱为什么卡/怎么优化？→ `analysis/graph-performance-report-2026-10-10.md`
+- 想知道哪些 spec 还没做？→ `analysis/spec-status-2026-08-14.md`

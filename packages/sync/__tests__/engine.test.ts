@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { SyncEngine } from '../src/engine.js';
 import { scanLocal, compareRemote, shouldIgnore } from '../src/state.js';
 import type { SyncConfig } from '../src/types.js';
@@ -219,21 +219,23 @@ describe('SyncEngine — git 适配器回归', () => {
    * 2. git.status() 自发现变更路径未被破坏
    */
   it('git push 提交并推送到本地 bare 仓库', async () => {
+    // 用 execFileSync 而非 execSync：后者经 shell（Windows 上 spawn cmd.exe
+    // 在受限环境会 EBUSY），且避免为含空格路径手工加引号。
     // 初始化 bare 远程仓库
-    execSync('git init --bare', { cwd: bareRemote });
+    execFileSync('git', ['init', '--bare'], { cwd: bareRemote });
 
     // 初始化源仓库
-    execSync('git init', { cwd: gitSrc });
-    execSync('git config user.email test@doc77.local', { cwd: gitSrc });
-    execSync('git config user.name Doc77Test', { cwd: gitSrc });
-    execSync('git checkout -b main', { cwd: gitSrc });
-    execSync(`git remote add origin "${bareRemote}"`, { cwd: gitSrc });
+    execFileSync('git', ['init'], { cwd: gitSrc });
+    execFileSync('git', ['config', 'user.email', 'test@doc77.local'], { cwd: gitSrc });
+    execFileSync('git', ['config', 'user.name', 'Doc77Test'], { cwd: gitSrc });
+    execFileSync('git', ['checkout', '-b', 'main'], { cwd: gitSrc });
+    execFileSync('git', ['remote', 'add', 'origin', bareRemote], { cwd: gitSrc });
 
     // 初始提交
     fs.writeFileSync(path.join(gitSrc, 'README.md'), '# Test Repo');
-    execSync('git add .', { cwd: gitSrc });
-    execSync('git commit -m "init"', { cwd: gitSrc });
-    execSync('git push -u origin main', { cwd: gitSrc });
+    execFileSync('git', ['add', '.'], { cwd: gitSrc });
+    execFileSync('git', ['commit', '-m', 'init'], { cwd: gitSrc });
+    execFileSync('git', ['push', '-u', 'origin', 'main'], { cwd: gitSrc });
 
     // 新增一个文件（git.status 应发现）
     fs.writeFileSync(path.join(gitSrc, 'new-file.md'), '# New File');

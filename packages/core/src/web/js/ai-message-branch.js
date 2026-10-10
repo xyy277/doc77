@@ -105,8 +105,8 @@
       }
     }
     // 诊断：标记库未就绪的原因（排查用）
-    console.warn(
-      '[md] marked/DOMPurify 未就绪: marked=' + (window.marked ? 'ok' : 'missing') +
+    console.warn('[md] marked/DOMPurify 未就绪: marked=' +
+      (window.marked ? 'ok' : 'missing') +
       ', DOMPurify=' + (window.DOMPurify ? typeof window.DOMPurify : 'missing') +
       ', sanitize=' + (window.DOMPurify && typeof window.DOMPurify.sanitize)
     );

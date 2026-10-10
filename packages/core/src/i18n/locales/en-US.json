@@ -576,6 +576,8 @@
   "mcp.tool.listFiles.desc": "List files and folders in the specified path, including name/type/size/modified. Sensitive files are filtered by default.",
   "mcp.tool.readFile.desc": "Read file content (only within registered projects; sensitive files are automatically rejected).",
   "mcp.tool.getFileInfo.desc": "Get file metadata (size, modification time, type).",
+  "mcp.tool.graphBacklinks.desc": "Query backlinks of a document (which documents link to it), sorted by most recent update (knowledge graph, read-only).",
+  "mcp.tool.graphRelated.desc": "Recommend documents related to a given document (co-citation scoring, knowledge graph, read-only).",
   "mcp.tool.writeFile.desc": "Create or overwrite file content (requires approval).",
   "mcp.tool.createFolder.desc": "Create a new folder (requires approval).",
   "mcp.tool.moveFile.desc": "Move or rename a file (requires approval).",

@@ -575,6 +575,8 @@
   "mcp.tool.listFiles.desc": "列出项目指定路径下的文件和文件夹，包含 name/type/size/modified。默认过滤敏感文件。",
   "mcp.tool.readFile.desc": "读取指定文件内容（仅限已注册项目内，敏感文件自动拒绝）",
   "mcp.tool.getFileInfo.desc": "获取文件元数据（大小、修改时间、类型）",
+  "mcp.tool.graphBacklinks.desc": "查询某文档的反向链接（哪些文档链接到它），按最近更新排序（知识图谱，只读）",
+  "mcp.tool.graphRelated.desc": "推荐与某文档相关的其他文档（co-citation 评分，知识图谱，只读）",
   "mcp.tool.writeFile.desc": "创建或覆盖文件内容（需审批）",
   "mcp.tool.createFolder.desc": "创建新文件夹（需审批）",
   "mcp.tool.moveFile.desc": "移动或重命名文件（需审批）",

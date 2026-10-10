@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import type { DatabaseCompat } from '../db/connection.js';
 import { getConnection } from '../db/connection.js';
-import { walkDir, isTextFile } from '../search/indexer.js';
+import { walkDir, walkDirAsync, isTextFile } from '../search/indexer.js';
 import { extractLinksFromContent, createLinkResolver } from './link-extractor.js';
 import { extractDocMeta } from './frontmatter.js';
 import { upsertDocMeta, replaceFileLinks, withConn } from './repository.js';
@@ -18,10 +18,12 @@ import { getProjectFiles } from '../renderers/wikilink.js';
  * 末尾清理不存在文件（死链自愈）。
  */
 
-// 批大小影响事件循环停顿：100 文件/批在真实项目可达 ~100ms 阻塞
-// （性能测试实测 95ms）—— 40/批把单次停顿压到 ~40ms（1.1.3 事件循环
-// 冻结教训的量化约束：全量重建期间 UI/API 不应可感知卡顿）
-const BATCH_SIZE = 40;
+// 批大小影响事件循环停顿：批内处理是同步的（better-sqlite3 事务必须同步
+// 完成，无法在中间让出），批越大单次停顿越长。实测 10k 文件全量重建
+// 40/批 ≈ 188ms/批停顿、16/批 ≈ 75ms/批；hash 短路路径批内几乎无 DB 写，
+// 停顿 <20ms。全量重建是后台罕见操作，代价（事务数 ×2.5）远小于
+// UI 可感知卡顿的代价（1.1.3 事件循环冻结教训的量化约束）。
+const BATCH_SIZE = 16;
 
 function fileHash(content: string): string {
   return createHash('sha256').update(content).digest('hex').slice(0, 16);
@@ -147,7 +149,9 @@ export async function fullGraphIndex(
   db?: DatabaseCompat,
 ): Promise<GraphIndexProgress> {
   const conn = db ?? getConnection();
-  const relFiles = walkDir(projectRoot, projectRoot);
+  // 异步遍历：10k 文件同步 walkDir ≈ 400ms 单次事件循环停顿（实测），
+  // walkDirAsync 每 64 条目让出，把该停顿压到毫秒级。
+  const relFiles = await walkDirAsync(projectRoot, projectRoot);
   // 仅索引 markdown 家族（walkDir 返回全部文件，代码文件不产生图谱节点）
   const mdFiles = relFiles.filter((rel) => /\.(md|mdx|markdown)$/i.test(rel));
   const total = mdFiles.length;

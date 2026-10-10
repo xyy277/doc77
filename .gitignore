@@ -59,3 +59,6 @@ dist.locked*/
 # 本机调试/验证 scratch 文件（仓库根）
 /tmp-*
 
+
+# tsup 临时配置产物
+tsup.config.bundled_*.mjs

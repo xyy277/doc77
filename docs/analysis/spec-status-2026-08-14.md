@@ -29,14 +29,16 @@
 
 ## 已知差距（相对 spec，非阻断）
 
-| 差距 | 说明 |
-|---|---|
-| Git 适配器无 E2EE | spec 09 的加密钩子已接入 webdav/s3/local，`adapters/git.ts` 未接入（git 仓库本身加密语义复杂，团队已知取舍） |
-| 代码文件语法高亮未接线 | `loadHighlightJS` 存在但高亮未挂到编辑器/预览渲染（`editor-core.js:155-182` 的 `effects: []` 为空操作） |
-| 无 `/api/offline/manifest` | spec 01 Phase 2 的离线清单页未实现；当前离线靠 SW 缓存 + 离线横幅 |
-| tunnel 会话 TTL 非 spec 值 | spec 06 要求隧道场景 30min TTL，当前仍用全局 6h `SESSION_TTL_MS`（`core/src/server/sessions.ts:12`） |
-| 配置键名不符 | 代码用 `editor.maxFileSizeMB`，spec 写 `editor.maxFileSize` |
-| Web Push 未实现 | spec 01 Phase 2 项，未排期 |
+> 2026-10-10 复核（v1.2.0）：代码高亮接线、`/api/offline/manifest` 两项已补齐。
+
+| 差距 | 说明 | 状态 |
+|---|---|---|
+| Git 适配器无 E2EE | spec 09 的加密钩子已接入 webdav/s3/local，`adapters/git.ts` 未接入（git 仓库本身加密语义复杂，团队已知取舍） | 遗留 |
+| ~~代码文件语法高亮未接线~~ | v1.2.0 已修复：`editor-core.js` 原为 `effects: []` 空操作，现改用本地打包 bundle（CodeMirror 6 + 17 语言 + oneDark，`web/assets/editor-bundle.js`），`preview.js` 预加载语言包后同步注入 | ✅ 已实现 |
+| ~~无 `/api/offline/manifest`~~ | v1.2.0 已实现：`GET /api/offline/manifest?projectId=&limit=` 返回可缓存文档清单（异步遍历 + 上限保护 + truncated） | ✅ 已实现 |
+| tunnel 会话 TTL 非 spec 值 | spec 06 要求隧道场景 30min TTL，当前仍用全局 6h `SESSION_TTL_MS`（`core/src/server/sessions.ts:12`） | 遗留 |
+| 配置键名不符 | 代码用 `editor.maxFileSizeMB`，spec 写 `editor.maxFileSize` | 遗留 |
+| Web Push 未实现 | spec 01 Phase 2 项，未排期 | 遗留 |
 
 ## 测试指南
 

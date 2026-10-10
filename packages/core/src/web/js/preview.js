@@ -3476,8 +3476,19 @@ async function initEditorInstance(initialText) {
 
   // Wait for CodeMirror to load (may be in-flight from preload or freshly started)
   var cmLoaded = false;
+  var editLang = getEditLanguage(currentFile);
   if (window.EditorCore && window.EditorCore.load) {
     cmLoaded = await window.EditorCore.load();
+    // 预加载语言包：CodeMirror 创建后无法可靠地动态追加语言扩展（跨模块实例的
+    // Compartment 会被判为 Unrecognized extension value），必须在 createEditor
+    // 之前完成加载，否则首次打开该语言的文件没有语法高亮。
+    if (cmLoaded && window.EditorCore.loadLanguage) {
+      try {
+        await window.EditorCore.loadLanguage(editLang);
+      } catch (e) {
+        /* 语言包加载失败 → 纯文本编辑（不影响编辑/保存） */
+      }
+    }
   }
 
   // Clear loading indicator
@@ -3492,7 +3503,7 @@ async function initEditorInstance(initialText) {
 
   window._editEditor = window.EditorCore.createEditor(pane, {
     initialValue: initialText,
-    language: getEditLanguage(currentFile),
+    language: editLang,
     onSave: function () {
       doSave();
     },

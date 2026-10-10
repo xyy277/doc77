@@ -2,7 +2,7 @@
 
 > 本文档是性能问题的**事实档案与后续工作交接**：根因证据链、已实施的修复（1.1.4）、以及待执行的架构专项路线图。后续任何涉及性能、DB 层、搜索、启动链路的改动，**先读本文档**，避免重复调查或误将临时方案当作永久方案。
 >
-> 状态：1.1.4 热修复（Part 1 A-D）与高性价比架构项（Part 2 F1-F4）已发布；P-A（better-sqlite3 迁移）已随 1.1.5 完成并发布（2026-08-15，分支 feature/better-sqlite3-migration）；v1.1.9 watcher followSymlinks OOM 修复（Part 3 W1-W3）2026-08-18 完成（§2.5 记录证据链）。
+> 状态：1.1.4 热修复（Part 1 A-D）与高性价比架构项（Part 2 F1-F4）已发布；P-A（better-sqlite3 迁移）已随 1.1.5 完成并发布（2026-08-15，分支 feature/better-sqlite3-migration）；v1.1.9 watcher followSymlinks OOM 修复（Part 3 W1-W3）2026-08-18 完成（§2.5 记录证据链）；**v1.2.0 图谱/首屏性能专项（Part 4）2026-10-10 完成**（详见 `docs/analysis/graph-performance-report-2026-10-10.md`）。
 >
 > 语言规范：专业术语英文，其余中文（见根 CLAUDE.md）。
 

@@ -1,14 +1,17 @@
 /* ═════════ Doc77 Design Tokens ═════════ */
 /* Shared between desktop and mobile — keep in sync with mobile/index.html */
 
-/* Font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Font：系统字体栈，零外链零阻塞（原 Google Fonts @import 为渲染阻塞外链，
+   国内网络/离线环境下可拖慢首屏数秒，与"本地优先、离线可用"定位冲突） */
 body {
   font-family:
-    'Inter',
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    system-ui,
     Roboto,
     sans-serif;
 }
@@ -1921,10 +1924,13 @@ body {
     transform 0.18s ease;
   line-height: 1.5;
   font-family:
-    'Inter',
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    system-ui,
     Roboto,
     sans-serif;
 }

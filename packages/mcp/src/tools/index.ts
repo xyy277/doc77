@@ -5,6 +5,7 @@ import { registerDiscoveryTools } from './discovery.js';
 import { registerSearchTools } from './search.js';
 import { registerDiffTools } from './diff.js';
 import { registerSessionTools } from './session.js';
+import { registerGraphTools } from './graph.js';
 
 /**
  * Register all tools (discovery, read-only + write) on the given MCP server.
@@ -17,4 +18,5 @@ export function registerAllTools(server: McpServer): void {
   registerWriteTools(server);
   registerDiffTools(server);
   registerSessionTools(server);
+  registerGraphTools(server);
 }

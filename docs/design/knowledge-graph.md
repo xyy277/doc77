@@ -1,5 +1,7 @@
-# 知识图谱设计（v1.2.0 链接基础设施 + v1.2.1 可视化/洞察）
+# 知识图谱设计（链接基础设施 + 可视化/洞察）
 
+> 阶段命名说明：本文档历史标题曾用 "v1.2.0 链接基础设施 + v1.2.1 可视化/洞察" 指代两个阶段，
+> 实际均随 `1.1.7` 发布；当前发布版本为 `1.2.0`（图谱性能专项 + 三阶段第 1 项）。
 > 语言规范：专业术语英文，其余中文（见根 CLAUDE.md）。
 
 ## 1. 背景与目标
@@ -115,7 +117,24 @@ POST /api/graph/:id/index               — 全量重建（立即返回 indexing
 ## 10. 后续阶段
 
 - **二阶段（已落地，feature/graph-viz）**：力导向可视化（`/graph` 页，Canvas + vendor 懒加载 d3-force）、全局图谱页（多项目，查询层 `IN` 合并零表结构改动）、孤立页/断链洞察 UI（orphans/broken 列表端点，与 stats 同谓词）
-- **三阶段**：MCP 只读工具 graph_backlinks/graph_related、RAG 语义融合（RelatedScorer 注入点）、AI 建链（生成 wikilink 走既有保存挂点自动索引）、AI 对话展示图谱邻居建议链接（context 注入已有服务端基础，只缺前端展示）
+- **三阶段**：
+  - ✅ **MCP 只读工具**（v1.2.0）：`graph_backlinks` / `graph_related`（`packages/mcp/src/tools/graph.ts`），查询仅走图谱索引不触磁盘
+  - ⬜ RAG 语义融合（`RelatedScorer` 注入点已预留）
+  - ⬜ AI 建链（生成 wikilink 走既有保存挂点自动索引）
+  - ⬜ AI 对话展示图谱邻居建议链接（服务端 `collectGraphNeighbors` 已有，只缺前端展示）
+
+## 10.1 性能实测基线（2026-10-10，v1.2.0）
+
+| 规模 | 全量索引 | 事件循环停顿 | `/api/graph` | payload | gzip 后 |
+|---|---|---|---|---|---|
+| 500 | 0.64s | 82ms | 13ms | 128KB | — |
+| 2000 | 2.88s | 92ms | 36ms | 512KB | — |
+| 5000 | 6.70s | 158ms | 70ms | 1.25MB | 66KB |
+| 10000 | 12.09s | 122ms（优化前 211ms） | 214ms | 2.51MB | ≈300KB |
+
+前端交互（主线程占用率，10000 节点）：拖拽平移 22.4%、缩放 22.1%、拖拽节点 23.8%（批量绘制 + byId 消除后）。
+≤500 节点所有操作 ≤8% 占用、60fps 零掉帧。完整数据与复现方式见
+`docs/analysis/graph-performance-report-2026-10-10.md`。
 
 ## 11. 已知限制
 

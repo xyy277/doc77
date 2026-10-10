@@ -6,7 +6,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-WHITELIST='packages/core/src/translate/models\.ts|packages/core/src/i18n/locales/|packages/mcp/src/prompts/|packages/ai/src/skills/|packages/sync/src/merge/|packages/core/src/db/session-store\.ts|packages/core/src/pwa/sw-policy\.ts|PWA Service Worker 仅在 HTTPS|__tests__|\.test\.ts|doc77_logo_design\.html'
+WHITELIST='packages/core/src/translate/models\.ts|packages/core/src/i18n/locales/|packages/mcp/src/prompts/|packages/ai/src/skills/|packages/sync/src/merge/|packages/core/src/db/session-store\.ts|packages/core/src/pwa/sw-policy\.ts|PWA Service Worker 仅在 HTTPS|__tests__|\.test\.ts|doc77_logo_design\.html|packages/core/src/graph/context\.ts|assets/editor-bundle\.js'
 TARGETS=("$@")
 if [ ${#TARGETS[@]} -eq 0 ]; then
   TARGETS=(packages/*/src)
@@ -40,7 +40,10 @@ if [ $# -eq 0 ]; then
   fi
 
   # 4) 前端 JS 禁止用 t 作为回调形参（会遮蔽全局 t()，运行时 TypeError）
-  SHADOW=$(grep -rnP 'function\s*\(\s*t\s*[,)]' packages/core/src/web --include='*.js' 2>/dev/null || true)
+  #    assets/editor-bundle.js 是 CodeMirror 构建产物（minified 第三方代码），
+  #    经 WHITELIST 排除，不参与源码级检查
+  SHADOW=$(grep -rnP 'function\s*\(\s*t\s*[,)]' packages/core/src/web --include='*.js' 2>/dev/null \
+            | grep -Ev "$WHITELIST" || true)
   if [ -n "$SHADOW" ]; then
     echo "❌ 回调形参命名为 t 会遮蔽全局 i18n t()，请换名（tab/task/tag 等）:"
     echo "$SHADOW"

@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type NextFunction, type Application } from 'express';
+import compression from 'compression';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -52,6 +53,7 @@ import { updateFileListCache } from '../renderers/wikilink.js';
 import { markProjectGraphDirty } from '../graph/indexer.js';
 import { collectGraphNeighbors } from '../graph/context.js';
 import { registerGraphRoutes } from './routes/graph.js';
+import { registerOfflineRoutes } from './routes/offline.js';
 import { createRateLimiter } from './rate-limit.js';
 import { saveAiSession, loadAiSession } from '../db/ai-sessions.js';
 import {
@@ -161,6 +163,20 @@ export function createApp(
 
   // Parse JSON bodies
   app.use(express.json({ limit: '5mb' }));
+
+  // gzip/deflate 响应压缩：大图谱 JSON（5000 节点 ≈1.25MB、10000 节点 ≈2.51MB
+  // 实测）与渲染产物体积大，LAN/移动端/隧道场景收益明显（JSON 通常压至 10-15%）。
+  // SSE（/api/events）必须排除：compression 会缓冲输出并破坏流式语义。
+  // threshold 1KB：小响应压缩反而增大体积且浪费 CPU。
+  app.use(
+    compression({
+      threshold: 1024,
+      filter: (req: Request, res: Response) => {
+        if (req.path === '/api/events') return false;
+        return compression.filter(req, res);
+      },
+    }),
+  );
 
   // LAN access control — collect local IPs at startup
   const _localIPs: Set<string> = getLocalIPs();
@@ -3714,6 +3730,13 @@ export function createApp(
     registerGraphRoutes(app);
   } catch {
     /* best-effort — 图谱缺失可降级 */
+  }
+
+  // 离线缓存清单 API（spec 01 Phase 2：/api/offline/manifest）
+  try {
+    registerOfflineRoutes(app);
+  } catch {
+    /* best-effort — 离线清单缺失不影响在线功能 */
   }
 
   return app;

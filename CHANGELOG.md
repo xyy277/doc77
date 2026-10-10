@@ -4,6 +4,79 @@ This document records all notable changes to Doc77 packages. Follows [Keep a Cha
 
 ---
 
+## [2026-10-10] — `1.2.0`
+
+**Fixed — 首屏渲染阻塞外链（core / gallery）**
+- 移除 `packages/core/src/web/css/app.css` 的 Google Fonts `@import` —— 该外链是
+  **渲染阻塞**资源：实测（`fonts.googleapis.com` 注入 5s 延迟后失败）
+  DCL 254ms → **5136ms**、FCP 1084ms → 5348ms、canvas 首帧 1.34s → **5.48s**。
+  改用系统字体栈（含 PingFang SC / Microsoft YaHei 中文回退），不受网络影响，
+  与"本地优先、离线可用"定位一致
+- `packages/gallery/src/web/gallery.html` 同款外链一并移除（该页实际从未使用 Inter，
+  纯浪费一次跨网请求）
+
+**Added — 服务端响应压缩（core）**
+- 引入 `compression` 中间件（`threshold: 1KB`，显式排除 SSE `/api/events` —— 
+  压缩会缓冲输出、破坏流式语义）
+- 实测收益：`/api/graph` 5000 节点 **1.25MB → 66KB（94.8% 削减）**；
+  10000 节点 2.51MB → ≈300KB。LAN / 移动端伴侣 / 隧道场景收益最明显
+
+**Changed — 图谱渲染性能（core/web js）**
+- `draw()` 节点绘制改**按 (颜色, alpha) 分组批量填充**（原为每节点独立
+  `beginPath + arc + fill`，5000 次光栅化/帧）：实测 5000 节点节点绘制
+  **8.87ms → 4.08ms/帧（2.2x）**，整帧 11.05ms → 6.25ms（1.8x）
+- 消除 `draw()` 内**每帧重建的 `byId` 映射**：正常 d3 模式下 `forceLink` 已把
+  `source/target` 替换为节点对象引用，该 5000 键对象纯属浪费（仅 d3 降级模式需要，
+  改为按需惰性构建并缓存）。实测 10000 节点 JS 堆 **50.6MB → 22.5MB**
+- 拖拽节点 `pointerup` / `pointercancel` 主动将 alpha 压到 0.05：
+  收敛期从 ~1.3s 缩短到 ~0.3s，消除"松开鼠标后页面还在卡"
+  （2000 节点收敛期主线程占用 33.3% → ~8%）
+- 实测交互改善（10000 节点）：拖拽平移主线程占用 **41.6% → 22.4%**、
+  缩放 45.7% → 22.1%、拖拽节点 45.2% → 23.8%
+
+**Changed — 图谱索引与目录遍历（core）**
+- 新增 `walkDirAsync`（逐目录 readdir + 每 64 条目让出事件循环），
+  `fullGraphIndex` 改用它：10k 文件同步 `walkDir` ≈ 400ms 单次事件循环阻塞
+  已消除（实测该路径停顿 467ms → 79ms）
+- 索引批大小 40 → 16（批内处理是同步的，better-sqlite3 事务无法中途让出）：
+  10k 文件全量重建单次事件循环停顿 **1088ms → 122ms**
+
+**Added — 编辑器语法高亮接线（core）**
+- `editor-core.js` 的语言包注入此前是一串 `effects: []` 空 dispatch（从未生效）——
+  非 markdown 文件在编辑器里**从来没有语法高亮**。改为**本地打包 bundle**
+  （`scripts/build-editor-bundle.mjs` → `web/assets/editor-bundle.js`）：
+  CodeMirror 6 + 17 种语言 + oneDark，离线可用、无 esm.sh 外链依赖；
+  `preview.js` 进入编辑模式前预加载语言包，语言扩展同步注入
+- 根因链（均已实测定位）：① `codemirror@6.0.1` 元包实际只导出
+  `{EditorView, basicSetup, minimalSetup}`，原代码引用的 `cm.EditorState` 恒为 undefined；
+  ② 逐包从 CDN import 导致 `@codemirror/state` 出现多实例 → 
+  `Unrecognized extension value in extension set`；③ `searchKeymap` 是 `KeyBinding[]`
+  而非 extension，直接入 extensions 数组会抛同样错误，必须 `keymap.of()` 包装
+- 构建脚本内置**重复包守卫**：bundle 内同包多版本时直接构建失败并给出修复指引；
+  `pnpm.overrides` 锁定 `@codemirror/{state,view,language}` 版本防漂移
+
+**Added — 图谱 MCP 只读工具（mcp）**
+- `graph_backlinks`（文档反向链接，按最近更新排序）、`graph_related`
+  （co-citation 相关文档推荐），补齐 `docs/design/knowledge-graph.md` 三阶段第 1 项；
+  查询仅走图谱索引不触磁盘，limit 双向 clamp
+
+**Added — 离线缓存清单 API（core）**
+- `GET /api/offline/manifest?projectId=&limit=`（spec 01 Phase 2）：
+  返回项目内**可离线缓存文档清单**（路径 / 标题 / 大小 / 修改时间 + 分项目汇总），
+  供前端 SW 与设置页比对本地缓存状态、按需预缓存
+- 实现要点：`walkDirAsync` 异步遍历（不阻塞事件循环）、只列渲染器支持的格式、
+  limit 严格解析 + clamp（默认 2000 / 最大 10000）+ `truncated` 标志；
+  项目不存在 404、非法 id 400
+
+**验证**
+- 测试 964 passed（+35：MCP 图谱工具 6、离线清单 5、编辑器/索引相关回归）
+- 性能实测（本机，Windows + system Chrome）：服务端 5000 节点 `/api/graph`
+  70ms；10000 节点索引 12.09s、事件循环停顿 211ms → 122ms
+- 详见 `docs/analysis/graph-performance-report-2026-10-10.md`（含完整基线、
+  复现命令与测量局限说明）
+
+---
+
 ## [2026-08-19] — `1.1.10`
 
 **Fixed — preview 多 tab 内容缓存失效链（core/web）**

@@ -357,3 +357,38 @@ export function walkDir(root: string, dir: string): string[] {
   }
   return results;
 }
+
+/**
+ * walkDir 的异步版：逐目录 readdir + 每 64 条目让出事件循环。
+ * 大目录（10k 文件 ≈ 400ms）是 fullGraphIndex 实测的最大单次事件循环
+ * 停顿来源（同步 walkDir 全程阻塞）。仅在已经是 async 的调用方使用；
+ * 同步调用方（wikilink / link-extractor 的增量路径）保持同步 walkDir。
+ */
+export async function walkDirAsync(root: string, dir: string): Promise<string[]> {
+  const results: string[] = [];
+  let opsSinceYield = 0;
+  async function visit(current: string): Promise<void> {
+    let entries: fs.Dirent[];
+    try {
+      entries = await fs.promises.readdir(current, { withFileTypes: true });
+    } catch {
+      return; /* permission denied etc. */
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') && entry.name !== '.env.example') continue;
+      if (IGNORE_DIRS.has(entry.name)) continue;
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        await visit(fullPath);
+      } else if (entry.isFile()) {
+        results.push(path.relative(root, fullPath).replace(/\\/g, '/'));
+      }
+      if (++opsSinceYield >= 64) {
+        opsSinceYield = 0;
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    }
+  }
+  await visit(dir);
+  return results;
+}
