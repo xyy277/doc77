@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import type { DatabaseCompat } from '../db/connection.js';
 import { getConnection } from '../db/connection.js';
-import { walkDir, walkDirAsync, isTextFile } from '../search/indexer.js';
+import { walkDirAsync, isTextFile } from '../search/indexer.js';
 import { extractLinksFromContent, createLinkResolver } from './link-extractor.js';
 import { extractDocMeta } from './frontmatter.js';
 import { upsertDocMeta, replaceFileLinks, withConn } from './repository.js';
@@ -14,7 +14,7 @@ import { getProjectFiles } from '../renderers/wikilink.js';
  *
  * 增量模式完全复刻 FTS indexer（search/indexer.ts）：
  * file_hash（sha256 前 16 位）短路跳过未变更文件；
- * 全量重建 = walkDir 一次遍历 + 100 条/事务 + setTimeout(0) 让出，
+ * 全量重建 = walkDirAsync 一次遍历 + 16 条/事务 + setTimeout(0) 让出，
  * 末尾清理不存在文件（死链自愈）。
  */
 
