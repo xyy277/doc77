@@ -86,14 +86,27 @@ jobs:
         working-directory: packages/electron
         shell: bash
         run: |
-          npx electron-builder --publish never || {
-            echo "first attempt failed — force-detaching stale volumes and retrying"
-            hdiutil info | grep '/Volumes/' | awk '{print $NF}' | xargs -I{} hdiutil detach -force "{}" 2>/dev/null || true
-            sleep 10
-            npx electron-builder --publish never
+          set -o pipefail
+          npx electron-builder --publish never 2>&1 | tee electron-build.log || {
+            if [ "${{ matrix.target }}" = "mac" ]; then
+              echo "first attempt failed — force-detaching stale volumes and retrying"
+              hdiutil info | grep '/Volumes/' | awk '{print $NF}' | xargs -I{} hdiutil detach -force "{}" 2>/dev/null || true
+              sleep 10
+            fi
+            npx electron-builder --publish never 2>&1 | tee -a electron-build.log
           }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # electron-builder 失败时无法通过 API 拉日志（需 admin token），
+      # 打包输出转为 artifact，供匿名下载排障
+      - name: Upload electron-builder log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-build-log-${{ matrix.target }}
+          path: packages/electron/electron-build.log
+          if-no-files-found: ignore
 
       - name: Generate update metadata (latest.yml)
         working-directory: packages/electron
