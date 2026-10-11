@@ -104,11 +104,9 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          if [ -f packages/electron/electron-build.log ]; then
-            tail -c 900 packages/electron/electron-build.log | tr '\n' '|' | head -c 950 | xargs -I{} echo "::error::EBLOG {}"
-          else
-            echo "::error::EBLOG: no log file written"
-          fi
+          # 不能用 xargs -I{}：日志含引号时 xargs 报 unmatched quote 而自身失败
+          LOG=$(tail -c 900 packages/electron/electron-build.log 2>/dev/null | tr '\n' '|' | head -c 950)
+          echo "::error::EBLOG $LOG"
 
       - name: Upload electron-builder log
         if: failure()
