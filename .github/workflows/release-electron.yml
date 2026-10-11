@@ -100,6 +100,16 @@ jobs:
 
       # electron-builder 失败时无法通过 API 拉日志（需 admin token / 认证），
       # 把日志尾部写入 step summary（run 页面匿名可见）+ artifact
+      - name: Report electron-builder log via annotations
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f packages/electron/electron-build.log ]; then
+            tail -c 900 packages/electron/electron-build.log | tr '\n' '|' | head -c 950 | xargs -I{} echo "::error::EBLOG {}"
+          else
+            echo "::error::EBLOG: no log file written"
+          fi
+
       - name: Upload electron-builder log
         if: failure()
         uses: actions/upload-artifact@v4
