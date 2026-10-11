@@ -98,8 +98,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # electron-builder 失败时无法通过 API 拉日志（需 admin token），
-      # 打包输出转为 artifact，供匿名下载排障
+      # electron-builder 失败时无法通过 API 拉日志（需 admin token / 认证），
+      # 把日志尾部写入 step summary（run 页面匿名可见）+ artifact
       - name: Upload electron-builder log
         if: failure()
         uses: actions/upload-artifact@v4
@@ -107,6 +107,18 @@ jobs:
           name: electron-build-log-${{ matrix.target }}
           path: packages/electron/electron-build.log
           if-no-files-found: ignore
+
+      - name: Dump electron-builder log tail to summary
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo "### electron-builder log tail (${{ matrix.target }})"
+            echo ''
+            echo '```'
+            tail -c 6000 packages/electron/electron-build.log 2>/dev/null || echo '(no log file)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate update metadata (latest.yml)
         working-directory: packages/electron
