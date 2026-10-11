@@ -75,9 +75,23 @@ jobs:
         working-directory: packages/electron
         run: npm run build
 
+      - name: Disable Spotlight indexing (macOS arm64 runners)
+        if: matrix.target == 'mac'
+        run: sudo mdutil -a -i off || true
+
+      # macOS arm64 runner 上 hdiutil 对 DMG 挂载卷的处理偶发失败
+      #（Spotlight 索引 / 卷占用，重试 5 次仍失败 → job 终止，见
+      # ci-electron-lessons 后续补充）。失败后强制卸载残留卷并重试一次。
       - name: Package Electron
         working-directory: packages/electron
-        run: npx electron-builder --publish never
+        shell: bash
+        run: |
+          npx electron-builder --publish never || {
+            echo "first attempt failed — force-detaching stale volumes and retrying"
+            hdiutil info | grep '/Volumes/' | awk '{print $NF}' | xargs -I{} hdiutil detach -force "{}" 2>/dev/null || true
+            sleep 10
+            npx electron-builder --publish never
+          }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
