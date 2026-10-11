@@ -8,6 +8,15 @@ packages:
   - "packages/mcp"
   - "packages/sync"
 linkWorkspacePackages: true
+# 注意：必须放在 pnpm-workspace.yaml —— pnpm 11 起不再读取 package.json 的
+# `pnpm` 字段（会打印 "The pnpm field in package.json is no longer read"），
+# 放在那里会导致 CI（pnpm latest）忽略 overrides，与 lockfile 解析结果不一致。
+# 锁定 CodeMirror 核心包版本：多版本会使 bundle 内出现多份 @codemirror/state，
+# 破坏 instanceof 检查（语言扩展报 "Unrecognized extension value"）。
+overrides:
+  '@codemirror/state': 6.7.6
+  '@codemirror/view': 6.43.14
+  '@codemirror/language': 6.13.1
 allowBuilds:
   '@parcel/watcher': true
   better-sqlite3: true
