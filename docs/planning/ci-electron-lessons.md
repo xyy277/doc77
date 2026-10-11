@@ -170,3 +170,41 @@ pnpm store cache → .npmrc (hoisted) → pnpm install → sync-version → buil
 3. **find-folder.test.ts mock 硬编码正斜杠**（预存，红队 82b3e2e 引入）：实现 `path.join(candidate, name)` 在 Windows 产出反斜杠，mock 的 `p.includes('/home/user/myproj/')` 匹配不上 → 全部 ENOENT。**修复**：mock 判断改平台无关正则 `/[\\/]myproj[\\/]/`
 
 **经验**：8/17 红队 commit 直接 push main（bypass PR 保护）后从未跑 CI —— 12:21 之后的 Windows 失败积累到 v1.1.9 发布才暴露。**main 直推的 commit 必须补跑 CI 验证**；mock 里硬编码路径分隔符的测试天然 Windows 不友好（`path.sep` 或正则分隔）。
+
+## v1.2.0 发布踩坑（2026-10-11，Release #58~#66 共 9 次迭代）
+
+> 背景：v1.1.10（2026-08-19）成功发布后，GitHub runner 镜像与 pnpm 大版本演进，
+> 同一 workflow 静默失效。本次 5 个新坑全部为**环境漂移**类，逐个实测定位。
+
+| # | 问题 | 错误信息 | 根因 | 修复 |
+|---|---|---|---|---|
+| 27 | pnpm 11 忽略 package.json 的 pnpm 字段 | `The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides"` | overrides 写在 package.json 的 pnpm 字段，CI 的 pnpm 11（version:latest）不再读取 → CodeMirror 版本锁定失效 | overrides 移至 `pnpm-workspace.yaml`（pnpm 10/11 均读取，已双向验证） |
+| 28 | pnpm 11 静默升级导致 install 全挂 | `pnpm install --frozen-lockfile` exit 1（5 个 job 全部） | `version: latest` 在 pnpm 11 发布后解析到 11.28.5，其 lockfile 解析语义与 pnpm 10 写的 pnpm-lock.yaml 不一致 | **3 个 workflow 固定 `version: 10`**（与本地及历史成功配置一致） |
+| 29 | lockfile tarball 指向区域镜像，海外 runner 偶发失败 | ubuntu test job 的 install 27s 即 exit 1（同 run 的 lint job 同命令成功 = 偶发） | 本机 registry 为淘宝镜像，lockfile 记录 266 个 `tarball: registry.npmmirror.com/...`；`--lockfile-only --registry=npmjs` 不重写已有解析 | 各 workflow install 前 `sed` 重写 tarball host 为 npmjs（integrity 保证内容一致，零版本漂移） |
+| 30 | electron-builder 26 拒绝 range 版本 | `⨯ Electron version ^33.0.0 is a range, not a fixed version... Cannot compute electron version from installed node_modules` | hoisted 模式下 electron 提升到根 node_modules，builder 回退读 package.json 的 `^33.0.0` → 拒绝。25.x 检测宽松而侥幸通过，26.x 严格化 | pin `electron: 33.4.11`（与 lockfile 解析一致，零漂移） |
+| 31 | electron-builder 26 推断出非法 executableName | `⨯ failed to build AppImage error=executableName contains characters that cannot be safely used in file paths: @doc77electron` | 26.x 从 package.json `name`（@doc77/electron）推断可执行文件名并严格校验，`@` 被拒 | electron-builder.yml 显式 `executableName: doc77` |
+
+### 日志获取手段（排障关键，本次新增）
+
+API 的 job logs / artifact 下载均需 **admin token**（本地无登录态时全部 401/403），
+网页日志为动态加载无法抓取。可行的三条通道：
+
+1. **`::error::` annotations** —— `tail 日志 | tr '\n' '|' | echo "::error::EBLOG $LOG"`
+   写入失败 annotation，匿名 `GET /check-runs/{id}/annotations` 可读。
+   **勿用 `xargs -I{}`**（日志含引号时 xargs 自身报 unmatched quote 失败）。
+2. **step summary**（`$GITHUB_STEP_SUMMARY`）—— run 页面可见，但 check-run API 的
+   `output.summary` 不含它，且网页为 JS 渲染，机器读取不稳定。
+3. **artifact**（tee 落盘 + upload-artifact）—— 下载需认证，仅作为人工兜底。
+
+另：macos arm64 runner 打 dmg 偶发失败（Spotlight 干扰 hdiutil 挂载卷），
+Package Electron 已加「关 Spotlight + 失败 force-detach 重试一次」缓解。
+
+### 预检清单新增项（叠加在上方 10 项之后）
+
+| # | 检查项 | 命令/方法 |
+|---|---|---|
+| 11 | workflow 的 pnpm 版本已固定（勿用 latest） | `grep "version:" .github/workflows/*.yml` |
+| 12 | overrides 在 pnpm-workspace.yaml（非 package.json） | `grep -A4 overrides pnpm-workspace.yaml` |
+| 13 | electron devDep 为精确版本（非 ^range） | `grep '"electron"' packages/electron/package.json` |
+| 14 | electron-builder.yml 已显式 executableName | `grep executableName packages/electron/electron-builder.yml` |
+| 15 | lockfile 无区域镜像 tarball（或 workflow 已有 sed 重写） | `grep -c npmmirror pnpm-lock.yaml` |
