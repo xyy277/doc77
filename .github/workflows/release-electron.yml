@@ -51,6 +51,10 @@ jobs:
       - name: Configure pnpm for electron-builder
         run: node -e "const fs=require('fs');fs.writeFileSync('.npmrc','node-linker=hoisted\nshamefully-hoist=true\n')"
 
+      - name: Point lockfile tarballs to npmjs
+        shell: bash
+        run: sed -i.bak 's|registry\.npmmirror\.com|registry.npmjs.org|g' pnpm-lock.yaml && rm -f pnpm-lock.yaml.bak
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 

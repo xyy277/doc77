@@ -22,6 +22,12 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
+      # lockfile 在本地生成（registry 为区域镜像），tarball URL 指向
+      # registry.npmmirror.com —— 海外 runner 下载不稳定（偶发 27s 快速失败）。
+      # 就地重写 host；integrity 校验保证包内容一致，无版本漂移。
+      - name: Point lockfile tarballs to npmjs
+        shell: bash
+        run: sed -i.bak 's|registry\.npmmirror\.com|registry.npmjs.org|g' pnpm-lock.yaml && rm -f pnpm-lock.yaml.bak
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm format:check
@@ -42,6 +48,12 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
+      # lockfile 在本地生成（registry 为区域镜像），tarball URL 指向
+      # registry.npmmirror.com —— 海外 runner 下载不稳定（偶发 27s 快速失败）。
+      # 就地重写 host；integrity 校验保证包内容一致，无版本漂移。
+      - name: Point lockfile tarballs to npmjs
+        shell: bash
+        run: sed -i.bak 's|registry\.npmmirror\.com|registry.npmjs.org|g' pnpm-lock.yaml && rm -f pnpm-lock.yaml.bak
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
@@ -65,6 +77,12 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
+      # lockfile 在本地生成（registry 为区域镜像），tarball URL 指向
+      # registry.npmmirror.com —— 海外 runner 下载不稳定（偶发 27s 快速失败）。
+      # 就地重写 host；integrity 校验保证包内容一致，无版本漂移。
+      - name: Point lockfile tarballs to npmjs
+        shell: bash
+        run: sed -i.bak 's|registry\.npmmirror\.com|registry.npmjs.org|g' pnpm-lock.yaml && rm -f pnpm-lock.yaml.bak
       - run: pnpm install --frozen-lockfile
       # 跨包测试（如 packages/mcp）import 了已构建的 @doc77/core，需先 build 生成 dist
       - run: pnpm build

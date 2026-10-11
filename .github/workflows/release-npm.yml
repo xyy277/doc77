@@ -46,6 +46,10 @@ jobs:
           fi
           echo "Version verified: $ROOT_VERSION"
 
+      - name: Point lockfile tarballs to npmjs
+        shell: bash
+        run: sed -i.bak 's|registry\.npmmirror\.com|registry.npmjs.org|g' pnpm-lock.yaml && rm -f pnpm-lock.yaml.bak
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
