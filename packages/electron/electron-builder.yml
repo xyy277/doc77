@@ -1,5 +1,10 @@
 appId: com.doc77.desktop
 productName: Doc77
+# 显式声明：26.x 会从 package.json name（@doc77/electron）推断 executableName，
+# 得到含 @ 的 "@doc77electron" → AppImage 构建
+# "executableName contains characters that cannot be safely used in file paths"
+executableName: doc77
+
 directories:
   output: release
 
